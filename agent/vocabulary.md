@@ -42,8 +42,8 @@ the entry links to it.
   milliseconds, 50 a second, and each one puts the frame that is due at that moment on the
   LEDs. The board refreshes more slowly when the pictures are costly to work out;
   [working-rules.md](working-rules.md#the-frame-rate) says which rates are acceptable.
-- **source**: The file in which an animation is kept and changed. It is tracked by git
-  like program code.
+- **source**: The file in which an animation is kept and changed. For an animation of the
+  bench build or of a test it is tracked by git like program code.
 - **JSON frames**: The format of a source: a JSON file that lists every frame with its
   time and the colour of every place on the canvas. It loses nothing and can be read by
   eye. It is never played. See [format.md](../docs/format.md).
@@ -76,8 +76,8 @@ the entry links to it.
   `play <id>`, `play all`, `on`, `off`, `brightness <n>`, `status`, `fault`, `space`, `list`,
   `read <id> <offset>`, which reads a file back, `catalog` for the catalogs of storage,
   `remove <id>`, `ignore` for playlist inclusion, `order` for the saved order of the
-  playlist, `mapping` for assignments and the diagonal check, and `upload`, which
-  sends a file as several lines. Each is answered by one
+  playlist, `mapping` for assignments and the diagonal check, `repeat` for the loops of
+  the turn in progress, and `upload`, which sends a file as several lines. Each is answered by one
   line of JSON. See
   [commands.md](../docs/commands.md).
 
@@ -119,6 +119,11 @@ the entry links to it.
   known are kept in `thumbnails/`, the default preview catalog; a phone keeps those of what
   it uploaded. Not the moving picture of the form of a text or a clock, which the app draws
   itself, and not `python -m preview`, which plays one animation in the emulator.
+- **collection**: Every animation file the installation has been given, kept as the file
+  that is played, with its preview and a readme of where it came from beside it, in
+  `collection/`. Git tracks the small ones; the heavy ones, the groups of a long video and
+  the files over 50 MB, are kept on the share, and only their previews and readmes are
+  tracked. Nothing of the installation reads it.
 
 ## How the work is organised
 

@@ -1,0 +1,10 @@
+{
+  "number": 50,
+  "slug": "50-p2-more-than-256-files-on-a-drive",
+  "state": "remaining",
+  "title": "More than 256 files on a drive",
+  "priority": "P2",
+  "addedAt": "2026-10-27T23:23:58+02:00",
+  "addedCommit": "pending-local",
+  "summary": "The entries the core keeps for every file of a drive move to the card as an index beside the catalog: one fixed-width file of rows per folder in the playlist's order, a table of the folders and a map of the ids, written and committed with the catalog; the core keeps a cursor and reads a row when it needs it, so the number of files and folders is bounded by the card alone."
+}

@@ -145,8 +145,11 @@ export function draw(state) {
   const canSelect = animations.some(selectable);
   byId("selection-bar").hidden = !selecting;
   byId("animations-list").classList.toggle("selecting", selecting);
-  byId("select-mode").hidden = selecting;
-  byId("select-mode").disabled = locked() || !canSelect;
+  const mode = byId("select-mode");
+  if (mode !== null) {
+    mode.hidden = selecting;
+    mode.disabled = locked() || !canSelect;
+  }
   byId("select-all").disabled = locked() || !canSelect;
   byId("clear-selection").disabled = locked() || selected.size === 0;
   byId("delete-selected").disabled = locked() || selected.size === 0;
@@ -157,7 +160,7 @@ export function start(options) {
   message = options.message;
   redraw = options.redraw;
   if (options.visible) visible = options.visible;
-  byId("select-mode").addEventListener("click", () => enter());
+  byId("select-mode")?.addEventListener("click", () => enter());
   byId("selection-done").addEventListener("click", leave);
   byId("select-all").addEventListener("click", () => {
     for (const item of client.state.animations || []) if (selectable(item)) selected.add(item.id);

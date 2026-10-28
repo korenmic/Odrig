@@ -1,7 +1,7 @@
 // The operator ignores and restores an animation from its row's menu, and selects
 // animations of the list for deletion.
 
-import {choose, menuOf, rowOf, shown, spaceKnown} from "../reading.js";
+import {choose, menuOf, rowOf, shown, spaceKnown, startSelection} from "../reading.js";
 
 export default async function(app) {
   await shown(app, app.settings.rows);
@@ -42,7 +42,7 @@ export default async function(app) {
   const checks = () => [...app.doc.querySelectorAll('#animations-list .row .pick input[type="checkbox"]')];
   const shownChecks = () => checks().filter((input) => input.getClientRects().length > 0);
   seen.hiddenBefore = shownChecks().length;
-  app.press("Select");
+  startSelection(app);
   await app.until(() => shownChecks().length === app.settings.selectable, "selection checkboxes");
   seen.checkboxes = shownChecks().length;
   seen.external = app.text("show-external-space");

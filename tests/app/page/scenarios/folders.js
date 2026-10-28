@@ -2,7 +2,7 @@
 // folder, goes back, chooses a playlist by the level's button or plays a row, moves and
 // selects within the level, and the card goes out and comes back.
 
-import {choose, menuOf, playRow, rowOf, rows, shown, state} from "../reading.js";
+import {choose, menuOf, playing, playRow, rowOf, rows, shown, startSelection, state} from "../reading.js";
 
 function pointer(app, type, target, x, y) {
   const view = app.frame.contentWindow;
@@ -86,8 +86,9 @@ function enter(app, path) {
   found.click();
 }
 
-// Waits for the level a step names, and for its rows when the step counts them: up to
-// the list's refresh after a card went out or came in.
+// Waits for the level a step names, for its rows when the step counts them, and for what
+// the screen and the line of what plays say when it names them: up to the list's refresh
+// after a card went out or came in.
 async function settled(app, step) {
   if (step.level !== undefined) {
     await app.until(() => app.text("level-title") === step.level, `the level ${step.level}`, 25000);
@@ -97,6 +98,9 @@ async function settled(app, step) {
   }
   if (step.until !== undefined) {
     await app.until(() => app.says(step.until), `on the screen: ${step.until}`, 25000);
+  }
+  if (step.line !== undefined) {
+    await app.until(() => new RegExp(step.line).test(playing(app)), `the line of what plays: ${step.line}`, 25000);
   }
   await app.sleep(step.wait === undefined ? 200 : step.wait);
 }
@@ -109,6 +113,9 @@ export default async function (app) {
   }
   if (settings.until !== undefined) {
     await app.until(() => app.says(settings.until), `on the screen: ${settings.until}`, 8000);
+  }
+  if (settings.line !== undefined) {
+    await app.until(() => new RegExp(settings.line).test(playing(app)), `the line of what plays: ${settings.line}`, 8000);
   }
   if (settings.tests) {
     app.press("Settings");
@@ -170,12 +177,11 @@ export default async function (app) {
       // Select all at this level: the rows checked on the screen, and which of these ids
       // the selection holds, shown or not.
       const selection = await app.frame.contentWindow.eval('import("/screens/selection.js")');
-      if (app.byId("select-mode").disabled) {
-        // Nothing of this level can be selected: Select is off.
+      if (startSelection(app) === null) {
+        // Nothing of this level can be selected: no row's menu offers Select.
         found.steps.push({selected: [], held: step.select.filter((id) => selection.has(id)), offered: false, ...seen(app)});
         continue;
       }
-      app.press("Select");
       const selectAll = app.byId("select-all");
       if (!selectAll.disabled) app.press("Select all");
       const selected = [...app.doc.querySelectorAll("#animations-list .pick input")].filter((input) => input.checked).map((input) => Number(input.closest(".row").dataset.id));

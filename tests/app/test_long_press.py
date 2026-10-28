@@ -7,8 +7,9 @@ from .test_storage import SPACE
 # The kinds of `input` that take typing. Such an input is a field unless it is read only
 # or switched off, and so is a text area.
 TYPED = {"text", "number", "search", "url", "email", "tel", "password", "date", "time", "datetime-local", "month", "week"}
-# The fields of the page: the address, and the start and the length of a part of a video.
-FIELDS = ["#start", "#length", "#text-words", "#text-speed", "#text-pause", "#clock-seconds", "#clock-speed-min", "#clock-speed-max", "#address"]
+# The fields of the page: the brightness, the start and the length of a part of a video,
+# the forms of a text and of a clock, and the address.
+FIELDS = ["#level-number", "#start", "#length", "#text-words", "#text-speed", "#text-pause", "#clock-seconds", "#clock-speed-min", "#clock-speed-max", "#address"]
 LOOKS = ("animations", "upload", "question", "target", "message")
 
 

@@ -11,7 +11,7 @@ GROUPS = ("The installation", "What is played", "The programs", "How the work is
 WORDS = (
     "board", "pin", "canvas", "strip", "leg", "snake", "mapping", "bench build", "target",
     "animation", "frame", "refresh", "source", "JSON frames", "ODRG", "generator", "show", "item", "cycle", "playlist", "turn", "installed file set", "command",
-    "converter", "Python library", "core", "host", "emulator", "firmware", "command tool", "operators' app", "preview",
+    "converter", "Python library", "core", "host", "emulator", "firmware", "command tool", "operators' app", "preview", "collection",
     "owner", "seed", "spec", "task", "drift",
 )
 
@@ -60,7 +60,7 @@ class Vocabulary(unittest.TestCase):
     def test_the_entry_for_command_names_every_command_of_the_command_list(self):
         table = support.read("docs/commands.md").split("\n## Commands\n")[1].split("\n## ")[0]
         listed = sorted({row.split("`")[1].split(" ")[0] for row in table.splitlines() if row.startswith("| `")})
-        self.assertEqual(listed, ["brightness", "catalog", "fault", "ignore", "list", "mapping", "off", "on", "order", "play", "read", "remove", "space", "status", "upload"])
+        self.assertEqual(listed, ["brightness", "catalog", "fault", "ignore", "list", "mapping", "off", "on", "order", "play", "read", "remove", "repeat", "space", "status", "upload"])
         named = sorted({span.split(" ")[0] for span in re.findall(r"`([^`]+)`", dict(self.entries)["command"])})
         self.assertEqual(named, listed)
 

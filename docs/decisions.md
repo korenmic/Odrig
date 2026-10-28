@@ -35,7 +35,7 @@ it stands now.
   needs no board passing. [drifts.md](drifts.md) and the change log of this file are only
   ever added to at the end, so that two contributors' additions can both be kept. Every
   significant advance is committed. The remote is `https://github.com/korenmic/Odrig`, a
-  private repository, and history that has been pushed to it is never rewritten. See
+  public repository, and history that has been pushed to it is never rewritten. See
   [working-rules.md](../agent/working-rules.md), "Several contributors at once".
 - The pages for newcomers are a workstream of their own and are in the folder `agent/`,
   with `AGENTS.md` and `CLAUDE.md` at the top of the repository. Among them are a
@@ -136,29 +136,35 @@ it stands now.
 
 | Format | Role |
 |---|---|
-| JSON frames | The tracked, lossless source of each animation (source code, not runtime). A list of frames; each frame is a duration in milliseconds plus one value per LED, with only the fields that are consumed. |
+| JSON frames | The tracked, lossless source of each animation of the bench or of a test (source code, not runtime). A list of frames; each frame is a duration in milliseconds plus one value per LED, with only the fields that are consumed. |
 | Custom binary, compressed | The runtime format the board plays. First choice. |
 | Custom binary, uncompressed | Fallback if decompression proves too slow on the board. The player may support both. |
-| GIF | Fallback of last resort: the working proof of concept on stock WLED. And, never played, the preview of each animation that the operators' app shows, kept in `thumbnails/` and made by the converter. |
+| GIF | Fallback of last resort: the working proof of concept on stock WLED. And, never played, the preview of each animation that the operators' app shows, kept in `thumbnails/` and made by the converter; a copy of each preview lies beside its animation file in `collection/`. |
 
 Animated PNG, FSEQ and live streaming from a computer were considered and dropped.
 
-The JSON source is committed for every animation, including those imported from video, and
-nothing else is committed in its place. A dense 60 x 60 clip is 16 MB of JSON per 10 seconds,
-and a hosting service refuses a single file above 100 MB, so a long piece is cut into several
+The JSON source is committed for every animation of the bench or of a test, including
+those imported from video, and nothing else is committed in its place. An animation the
+installation is given is tracked as its ODRG or ODRGX file in `collection/`, with its
+preview and a readme of its source beside it, but a heavy one, a group of a long video or
+a file over 50,000,000 bytes, which the share keeps, with only its preview and its readme
+tracked; its JSON is not committed. The repository is public, so the tracked collection is
+published with it. A dense 60 x 60 clip is 16 MB of JSON per 10 seconds, and a hosting
+service refuses a single file above 100 MB, so a long piece is cut into several
 animations.
 
 Both formats are specified in [format.md](format.md). The custom binary format is called ODRG.
 
 The runtime format was extended on purpose with seed 37: ODRGX, a container of 20 bytes
-that names what its payload is, holds frames as an ODRG file, a text, or a widget, a clock.
-The tracked source of a text or a clock is typed JSON, not JSON frames: the settings of
-the text with its words, or of the clock. The player draws them at every refresh from
-those settings, with fonts and clocks that are built into the core and the converter
-alike, generated from one source; a file names a font or a clock and brings no glyph, no
-code and no network to the player. The converter makes a text's layout and stores it,
-and the core checks its bounds and draws it. A clock's randomness comes from the timing
-of the refreshes, mixed with the turn. See [format.md](format.md), "ODRGX".
+that names what its payload is, holds frames as an ODRG file, a text, or a widget, a
+clock. The tracked source of a text or a clock of the bench or of a test is typed JSON,
+not JSON frames: the settings of the text with its words, or of the clock. The player
+draws them at every refresh from those settings, with fonts and clocks that are built into
+the core and the converter alike, generated from one source; a file names a font or a
+clock and brings no glyph, no code and no network to the player. The converter makes a
+text's layout and stores it, and the core checks its bounds and draws it. A clock's
+randomness comes from the timing of the refreshes, mixed with the turn. See
+[format.md](format.md), "ODRGX".
 
 ### Measurements behind the choice
 
@@ -214,7 +220,12 @@ are in [format.md](format.md), "Measured sizes".
   once, the playlist chosen by `play` is current for 24 hours of the board's running time
   and then the next in the tree's order is, calendar time never considered, the choice is
   kept across a restart, and the saved order names a card file by its path from `odrig`
-  (the owner, 2026-10-26, seed 41).
+  (the owner, 2026-10-26, seed 41). An operator gives the turn in progress another count
+  of loops with `repeat <id> <n>`, for that turn alone, keeps a count for every later turn
+  of an animation in the board's `repeats.txt` by its file name with `repeat <id> <n>
+  save`, and brings its own count back with `repeat <id> default`; `status` reports the
+  turn's `repeat`, `loop` and `saved`, and `show.json` is never changed for a repeat (the
+  owner, 2026-10-27, seed 48).
 - Commands are plain text lines and every reply is one JSON line. A line has up to 2,048
   characters and a reply up to 1,024 bytes. See [commands.md](commands.md).
 - An animation is uploaded as an ODRG file in pieces of up to 1,500 bytes, written in
@@ -770,3 +781,28 @@ are in [format.md](format.md), "Measured sizes".
   previews of what a phone uploads in that phone's IndexedDB. A GIF gains its second role
   in the table of formats; the board's memory, the catalogs' format and every other reply
   are unchanged. The board session and the owner's check on a phone are open.
+- 2026-10-28: Seed 48, the owner's request of 2026-10-27 for a bar of the animation playing
+  now: the command `repeat` in three forms, `repeat <id> <n>`, which the owner approved on
+  2026-10-27, `repeat <id> <n> save` and `repeat <id> default`, the `status` members
+  `repeat`, `loop` and `saved`, and the board's file `repeats.txt`, which the owner approved
+  through the seed by ordering it built as written. A turn plays the count `repeat` gave it,
+  else the saved repeat, else the show's own count; neither of the first two is cut by
+  `max_seconds`. The firmware tool keeps the board's `repeats.txt` as it keeps `order.txt`.
+- 2026-10-28: The owner's ruling: GIFs may be tracked beside a seed, in its folder, as its
+  references, besides the previews of `thumbnails/`; MP4 and MOV files are tracked nowhere.
+  Seed 52's two text files of references end their lines with a line feed alone.
+- 2026-10-28: The owner's orders for the operators' app, made directly on `master` by the
+  owner's exception to the rule of one's own branch: the list's own `Select` and `Add
+  animation` go, so a selection starts from a row's menu or the bar and Upload is reached
+  by its tab; the line of what plays and the words `On` and `Off` are hidden, and the power
+  icon alone switches the LEDs, `off` while they are on and `on` otherwise, lit while the
+  status says they are on; a chevron at the right of the panel's top row, with the power
+  icon at its left, both 48 pixels round, collapses the panel to that row and expands it,
+  and each phone keeps the choice. No command and no reply changed.
+- 2026-10-28: Seed 46, by the owner's answers of 2026-10-27 and 2026-10-28: the animations
+  the installation is given are tracked in `collection/`, each as its ODRG file with its
+  preview and a readme of its source beside it, but the heavy ones, the groups of the long
+  videos and the files over 50,000,000 bytes, which the share keeps, with only their
+  previews and readmes tracked; no JSON of them is committed. `env.template`, tracked, and
+  `env`, ignored, name the share's collection. The remote is public, and the tracked
+  collection is published with it. The sources of the earlier set are unknown for now.

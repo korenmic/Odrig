@@ -144,7 +144,7 @@ Builds the folder of files that is installed for a show.
     flags: {"--uncompressed": "uncompressed"},
   },
   thumbnail: {
-    usage: `usage: ${TOOL} thumbnail FILE... (--catalog DIR [--card ODRIG] | --out OUT.gif)
+    usage: `usage: ${TOOL} thumbnail FILE... (--catalog DIR [--card ODRIG] [--beside] | --out OUT.gif)
 
 Makes the preview of an animation, a GIF of its pictures over its first loop: with
 --catalog the preview of each file is added to the preview catalog of a folder, with
@@ -154,6 +154,7 @@ Makes the preview of an animation, a GIF of its pictures over its first loop: wi
   --catalog DIR  the folder of the preview catalog, made when it is missing
   --card ODRIG   the folder odrig of a card: a file inside it is named in the
                  catalog by its path from that folder
+  --beside       writes each file's preview beside it too, as X.gif for X.odrg
   --out OUT.gif  the GIF file to write, for one file
   --help         shows this text
 `,
@@ -164,7 +165,7 @@ Makes the preview of an animation, a GIF of its pictures over its first loop: wi
       "--card": {name: "card", initial: null},
       "--out": {name: "out", initial: null},
     },
-    flags: {},
+    flags: {"--beside": "beside"},
     check(values, refuse) {
       if ((values.catalog === null) === (values.out === null)) {
         throw refuse("give one of --catalog and --out");
@@ -174,6 +175,9 @@ Makes the preview of an animation, a GIF of its pictures over its first loop: wi
       }
       if (values.out !== null && values.card !== null) {
         throw refuse("--card goes with --catalog");
+      }
+      if (values.out !== null && values.beside) {
+        throw refuse("--beside goes with --catalog");
       }
     },
   },

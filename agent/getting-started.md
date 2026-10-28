@@ -51,7 +51,7 @@ npm test --prefix converter
 
 ## Set up
 
-Clone the repository, which is private, with
+Clone the repository, which is public, with
 `git clone https://github.com/korenmic/Odrig.git`, and go into its folder, `Odrig`. Every
 command of this repository is run from that folder, the repository root.
 
@@ -61,13 +61,13 @@ npm ci --prefix converter
 make -C core shared
 ```
 
-The first command makes a Python environment in the folder `.venv`; nothing is installed
-into it, since every Python program of the repository needs only Python's own library. The
-second puts the converter's two packages into `converter/node_modules/`; one of them
-fetches a decoder program, an ffmpeg built for your computer, with which the converter
-reads videos. The third builds the core as the library the emulator loads,
-`core/build/libodrig_core.dylib`. Git ignores these three folders. `.venv/bin/python` is
-the Python for every command of this repository. The other documents write it as `python`.
+The first command makes a Python environment in `.venv`; nothing is installed into it, as
+every Python program here needs only Python's own library. The second puts the converter's
+two packages into `converter/node_modules/`; one fetches a decoder program, ffmpeg. The
+third builds the core as the library the emulator loads, `core/build/libodrig_core.dylib`.
+Git ignores these three folders. `.venv/bin/python` is the Python for every command here;
+the others write it as `python`. With the collection of animations at hand, copy
+`env.template` to `env`, git ignores it, and set the collection's full path in it.
 
 ## Run the tests
 
@@ -90,7 +90,7 @@ the network.
 | `tests/converter` | The Python library and the generators, and every tracked document against the tools. | 20 seconds |
 | `tests/core` | The core. `make -C core test` builds it first, with the compiler's checks for memory faults switched on, and uses `python3`. | 40 seconds |
 | `tests/emulator` | The emulator and the command tool. | 2 minutes |
-| `tests/onboarding` | This page and the other pages for newcomers: that every path, link and command in them is real. | 2 seconds |
+| `tests/onboarding` | This page and the other pages for newcomers: that every path, link and command in them is real; and the collection in git. | 3 seconds |
 
 ## Suites that need more
 
@@ -181,7 +181,7 @@ printf '1000 status\n' > build/demo-20/ask.txt
 ```
 
 ```text
-reply 1000 {"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null,"width":60,"height":60,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":"odrig emulator on Darwin arm64","seed":null,"left":86399}
+reply 1000 {"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null,"width":60,"height":60,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":"odrig emulator on Darwin arm64","seed":null,"repeat":6,"loop":1,"saved":null,"left":86399}
 ```
 
 `"error":null` says the show is valid, `"playing":"all"` that the playlist is playing,

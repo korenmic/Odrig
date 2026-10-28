@@ -51,6 +51,24 @@ export function menuOf(app, id) {
   return [...menu.children].map((item) => (item.localName === "button" ? `${item.textContent}${item.disabled ? " (disabled)" : ""}` : item.textContent));
 }
 
+// Starts the selection mode as a row's menu does: from the first row of the list on the
+// screen whose menu offers Select, with that row ticked. Gives the row's id, or null when
+// no row offers it.
+export function startSelection(app) {
+  for (const row of app.doc.querySelectorAll("#animations-list > .row")) {
+    if (row.getClientRects().length === 0 || row.querySelector(".more").disabled) {
+      continue;
+    }
+    const id = Number(row.dataset.id);
+    if (menuOf(app, id).includes("Select")) {
+      choose(app, "Select");
+      return id;
+    }
+    app.doc.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true}));
+  }
+  return null;
+}
+
 // Presses an action of the menu that is open.
 export function choose(app, words) {
   const found = [...app.byId("row-menu").querySelectorAll("button")].filter((button) => button.textContent === words);
@@ -60,12 +78,19 @@ export function choose(app, words) {
   found[0].click();
 }
 
-// The state as the screen says it, each line or null when it is not shown.
+// The words of the line that says what plays. The screen does not show the line; the app
+// keeps its words up to date.
+export function playing(app) {
+  return app.raw("playing");
+}
+
+// The state as the screen says it, each line or null when it is not shown, and the words
+// of the line of what plays.
 export function state(app) {
   return {
     power: app.text("power"),
     brightness: app.text("brightness"),
-    playing: app.text("playing"),
+    playing: playing(app),
     now: app.text("now"),
     fps: app.text("fps"),
     none: app.text("none"),
@@ -77,14 +102,15 @@ export function state(app) {
   };
 }
 
-// The controls as the screen shows them: which of `On` and `Off` is marked, and where
-// the slider stands.
+// The controls as the screen shows them: whether the power icon is pressed, which says
+// that the LEDs are on, where the slider stands, and the text of the brightness field, or
+// null while it is not shown.
 export function controls(app) {
+  const field = app.byId("level-number");
   return {
-    on: app.byId("on").getAttribute("aria-pressed") === "true",
-    off: app.byId("off").getAttribute("aria-pressed") === "true",
+    lit: app.byId("power-toggle").getAttribute("aria-pressed") === "true",
     slider: Number(app.byId("level").value),
-    number: app.text("level-number"),
+    number: field.getClientRects().length > 0 ? field.value : null,
   };
 }
 

@@ -16,6 +16,8 @@ export default async function (app) {
     }
     if (step.row !== undefined) {
       playRow(app, step.row);
+    } else if (step.tap !== undefined) {
+      app.tap(step.tap);
     } else if (step.pressIn !== undefined) {
       app.pressIn(step.pressIn, step.press);
     } else {

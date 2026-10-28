@@ -13,6 +13,10 @@ MAPPING = core_support.mapping_texts()["legs-2"]
 HINT = "Hold a row to move it, or use Move up and Move down in its menu."
 
 
+# A phone tall enough that the four rows of a drag stand under the panel that stays at the
+# top, where a finger reaches each of them.
+TALL = (360, 1200)
+
 class TheSavedOrder(unittest.TestCase):
     def folder(self, count=4, order=None, drive=None):
         work = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
@@ -45,7 +49,7 @@ class TheSavedOrder(unittest.TestCase):
     def test_a_row_dragged_by_a_finger_is_saved_where_it_was_let_go(self):
         emulator, folder = self.emulator()
         settings = {"rows": 4, "drag": {"id": 4, "before": 2, "kind": "touch", "expected": [1, 4, 2, 3]}}
-        found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings=settings).seen
+        found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings=settings, size=TALL).seen
         self.assertTrue(found["lifted"])
         self.assertTrue(found["placeholder"])
         self.assertEqual(found["saving"], "Saving…")
@@ -58,7 +62,7 @@ class TheSavedOrder(unittest.TestCase):
     def test_a_mouse_drags_as_a_finger_does(self):
         emulator, _ = self.emulator()
         settings = {"rows": 4, "drag": {"id": 1, "before": 4, "kind": "mouse", "expected": [2, 3, 1, 4]}}
-        found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings=settings).seen
+        found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings=settings, size=TALL).seen
         self.assertEqual(found["after"], [2, 3, 1, 4])
         self.assertEqual(self.order_of(emulator), [2, 3, 1, 4])
 
@@ -72,7 +76,7 @@ class TheSavedOrder(unittest.TestCase):
     def test_a_drag_let_go_where_it_began_or_cancelled_moves_nothing(self):
         emulator, folder = self.emulator()
         with emulator_support.EventStream(emulator.port) as stream:
-            found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 4, "back": True, "cancel": True}).seen
+            found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 4, "back": True, "cancel": True}, size=TALL).seen
             events = stream.read_for(1)
         self.assertTrue(found["unmoved"])
         self.assertTrue(found["cancelled"])

@@ -1,0 +1,10 @@
+{
+  "number": 53,
+  "slug": "53-p1-fast-and-parallel-tests-and-builds",
+  "state": "remaining",
+  "title": "Fast and parallel tests and builds",
+  "priority": "P1",
+  "addedAt": "2026-10-28T04:40:00+02:00",
+  "addedCommit": "pending-local",
+  "summary": "One runner, tests/run.py, runs every suite at the same time, splits the heavy suites across worker processes by discovery, builds the APK and the firmware alongside with toolchains shared across checkouts through ODRIG_TOOLS, reports the slowest tests, sweeps stray processes, and narrows the walkthrough; the full pass drops from about 45 to 12 minutes or less."
+}

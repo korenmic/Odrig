@@ -13,7 +13,7 @@ export default async function (app) {
     }
     if (line !== null && line.startsWith("Reading")) {
       const plays = [...app.doc.querySelectorAll("#animations-list > .row:not(.unavailable) .play")];
-      pressable = pressable && ["on", "off", "play-all", "level"].every((id) => !app.byId(id).disabled) && plays.every((button) => !button.disabled);
+      pressable = pressable && ["power-toggle", "play-all", "level"].every((id) => !app.byId(id).disabled) && plays.every((button) => !button.disabled);
     }
     return line === app.settings.last;
   }, `the line ${JSON.stringify(app.settings.last)}`, 20000);

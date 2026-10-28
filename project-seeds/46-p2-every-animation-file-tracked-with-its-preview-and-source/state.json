@@ -1,0 +1,11 @@
+{
+  "number": 46,
+  "slug": "46-p2-every-animation-file-tracked-with-its-preview-and-source",
+  "state": "completed",
+  "completedAt": "2026-10-28T15:08:55+02:00",
+  "title": "Every animation tracked with its preview and its source, the heavy ones on the share",
+  "priority": "P2",
+  "addedAt": "2026-10-27T18:00:00+02:00",
+  "addedCommit": "pending-local",
+  "summary": "Every animation file the installation has been given is tracked in collection/ with its preview GIF and its readme beside it, except the heavy ones, the groups of the 8 long videos and every other file over 50,000,000 bytes, which move to collection/long/ and stay on the share, whose collection holds every file, ignored through .gitignore, with only their GIFs and readmes tracked; the seed also makes collection/README.md a tracked file, adds --beside to the converter's thumbnail subcommand, documents env and env.template, which name the share's collection for agents and the emulator's one-line commands, and corrects the pages and the decision, the repository being public."
+}

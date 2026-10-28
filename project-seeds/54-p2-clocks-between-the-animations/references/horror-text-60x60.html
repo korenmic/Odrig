@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>זה לא הזמן — 60×60</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;min-height:100vh;background:#080809;color:#c2bcbc;display:grid;place-content:center;text-align:center;font:14px Arial,sans-serif}canvas{width:min(80vw,480px);height:auto;image-rendering:pixelated;background:#000;box-shadow:0 0 60px #27070833;border:1px solid #241416}p{margin:18px 0 12px;color:#958888}button{background:#191315;border:1px solid #493235;color:#e0cdcd;border-radius:5px;padding:9px 18px;cursor:pointer}button:hover{background:#29191d}
+</style>
+<main>
+  <canvas id="screen" width="60" height="60" aria-label="זה לא הזמן — הנפשת אימה קצרה עם הבהובים עדינים"></canvas>
+  <p>זה לא הזמן · 60×60 פיקסלים · 6 שניות</p>
+  <button id="replay">ניגון חוזר</button>
+</main>
+<script>
+(() => {
+  'use strict';
+  const canvas=document.getElementById('screen'), ctx=canvas.getContext('2d');
+  const mask=document.createElement('canvas');mask.width=mask.height=60;
+  const ink=mask.getContext('2d',{willReadFrequently:true});
+  ink.direction='rtl';ink.textAlign='center';ink.textBaseline='middle';
+  ink.fillStyle='#fff';ink.font='bold 15px Arial, sans-serif';
+  ink.fillText('זה לא',30,23);ink.fillText('הזמן',30,40);
+  const pixels=ink.getImageData(0,0,60,60).data;
+  const duration=6000;
+  let start=0, frame=0, last=-1;
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const clamp=x=>Math.max(0,Math.min(1,x));
+  const smooth=x=>{x=clamp(x);return x*x*(3-2*x)};
+  function noise(x,y,t){let v=Math.sin(x*127.1+y*311.7+t*19.19)*43758.5453;return v-Math.floor(v)}
+  function paint(ms){
+    const t=Math.min(ms,duration)/1000;
+    ctx.fillStyle='#030203';ctx.fillRect(0,0,60,60);
+    const reveal=reduced?1:smooth((t-.35)/1.1);
+    const fade=reduced?1:1-.83*smooth((t-4.8)/1.2);
+    // Two small, soft brightness dips rather than full-screen flashes.
+    const dip=reduced?0:.19*Math.exp(-Math.pow((t-2.15)/.09,2))+.14*Math.exp(-Math.pow((t-3.72)/.12,2));
+    const level=reveal*fade*(1-dip);
+    for(let y=0;y<60;y++)for(let x=0;x<60;x++){
+      const n=noise(x,y,Math.floor(t*12));
+      if(n>.86){const g=3+Math.floor(n*4);ctx.fillStyle=`rgb(${g+2},${g},${g})`;ctx.fillRect(x,y,1,1)}
+      const a=pixels[(y*60+x)*4+3]/255;
+      if(a<.25)continue;
+      const material=.84+.16*noise(x,y,0);
+      const scan=reduced?1:1-.075*Math.exp(-Math.pow((y-((t*13)%78-9))/1.6,2));
+      const b=level*material*scan*a;
+      // A restrained dark-red edge sits one real pixel behind the lettering.
+      ctx.fillStyle=`rgba(107,17,26,${b*.38})`;ctx.fillRect(x+1,y,1,1);
+      ctx.fillStyle=`rgb(${Math.round(224*b)},${Math.round(213*b)},${Math.round(204*b)})`;ctx.fillRect(x,y,1,1);
+    }
+    // Sparse dim scanlines and a closed black border keep the 60×60 frame legible.
+    ctx.fillStyle='rgba(0,0,0,.09)';for(let y=0;y<60;y+=3)ctx.fillRect(0,y,60,1);
+    ctx.strokeStyle='#080405';ctx.strokeRect(.5,.5,59,59);
+  }
+  function tick(now){const elapsed=now-start;const sample=Math.floor(elapsed/50);if(sample!==last){paint(elapsed);last=sample}if(elapsed<duration)frame=requestAnimationFrame(tick)}
+  function play(){cancelAnimationFrame(frame);last=-1;start=performance.now();paint(0);frame=requestAnimationFrame(tick)}
+  document.getElementById('replay').addEventListener('click',play);
+  document.fonts.ready.then(play);
+})();
+</script>
+</html>
