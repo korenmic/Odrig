@@ -3,7 +3,7 @@
 Requirements: [requirements.md](requirements.md). Design: [design.md](design.md).
 Each task is seed 53's task of the same subject, moved here unchanged.
 
-- [ ] 1. The walkthrough (seed 53's task 5). It runs only by `--walkthrough` or its own
+- [x] 1. The walkthrough (seed 53's task 5). It runs only by `--walkthrough` or its own
       command; its five suites in the copy through the copy's runner; `npm ci` from the
       computer's cache; its emulators given `--parent` and ended; port 8600 checked before
       the page's emulator. Suites: runner, onboarding, then `tests/run.py --walkthrough`.
