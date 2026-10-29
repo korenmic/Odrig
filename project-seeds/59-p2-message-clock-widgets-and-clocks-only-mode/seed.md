@@ -111,9 +111,9 @@ existing `its-not-the-time.odrg` and its preview/readme.
    refused and timed-out changes honestly, and refreshes after reconnect or a
    change by another client. Browser Controller and APK share the same UI/code.
 10. `Off` and `Between animations` preserve their existing scheduling meanings.
-    Proposed additional command is `clocks only`; `clocks off` and `clocks on`
-    select Off and Between respectively. This new command requires the owner's
-    explicit approval below; do not treat a proposed form as approved code.
+    The owner approved the additional command `clocks only` on 2026-10-29;
+    `clocks off` and `clocks on` select Off and Between respectively. The new form
+    is shared by every command transport, with restrictions enforced in firmware.
 11. Persist the three-state mode atomically in the board's internal clock settings,
     retaining the independent message setting. Migrate valid old `clocks.txt`:
     old off becomes Off, old on becomes Between, message retains its value.
@@ -180,15 +180,17 @@ existing `its-not-the-time.odrg` and its preview/readme.
 
 ## Open Questions Requiring The Owner
 
-One approval remains: allow the proposed shared command `clocks only`? This was
-presented with the recommended approval. Until answered, the seed is not ready
-for specification with zero open questions. The product choices above otherwise
-resolve the seven-file mapping, source defaults, existing `message` path, message
-rotation, missing-card behavior and the firmware-enforced subtree boundary.
+None. On 2026-10-29 the owner explicitly approved `clocks only`, with existing
+`clocks off/on` meanings preserved and clocks-only restrictions enforced by
+firmware, not just the app. The product choices above also resolve the seven-file
+mapping, source defaults, existing `message` path, message rotation, missing-card
+behavior and firmware-enforced subtree boundary. The seed is ready for
+specification with zero open product questions; later implementation acceptance
+checks remain as listed below.
 
 ## Definition Of Done
 
-1. The owner-only command approval is recorded before claiming zero open questions.
+1. Preserve the owner-only command approval recorded above.
    Creation stops at this seed/reference; no implementation or board writes occur.
 2. Seven real widget files and their sources/previews/readmes are tracked at the
    stated message paths; the old message remains. Converter/Python/core round trips

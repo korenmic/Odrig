@@ -6,5 +6,5 @@
   "priority": "P2",
   "addedAt": "2026-10-29",
   "addedCommit": "pending-local",
-  "summary": "Seven tracked runtime widgets from the supplied Hebrew LED simulator go into clocks/message; the clock checkbox becomes Off/Between/Clocks-only, with unrestricted browsing but shared-runtime enforcement against playback outside clocks. Approval of the new clocks-only command remains open."
+  "summary": "Seven tracked runtime widgets from the supplied Hebrew LED simulator go into clocks/message; the clock checkbox becomes Off/Between/Clocks-only, with unrestricted browsing but shared-runtime enforcement against playback outside clocks. The owner approved clocks only; no product questions remain before specification."
 }
