@@ -1,0 +1,10 @@
+{
+  "number": 57,
+  "slug": "57-p2-miniature-matrix-debug-mode",
+  "state": "remaining",
+  "title": "Miniature matrix debug mode",
+  "priority": "P2",
+  "addedAt": "2026-10-29",
+  "addedCommit": "pending-local",
+  "summary": "A shared app checkbox controls a temporary firmware projection of original 60x60 animations onto the purchased 10x6 WS2812 matrix, with exact approved pin-to-pin wiring in the root README; command and hardware approvals remain open."
+}
