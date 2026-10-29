@@ -8,6 +8,8 @@ provenance and managed catalog support. Replace Settings' clock-enable checkbox
 with a dropdown: `Off`, `Between animations`, `Clocks only`. The last mode plays
 only the external `clocks` subtree, while the app may browse the entire playlist
 tree. The shared runtime, not just the app, rejects playback outside that subtree.
+Both clock modes respect persistent ignored files and folders, including messages
+and inherited exclusions from ancestor folders.
 Include converter/library/core, firmware integration, emulator, app/APK, commands,
 content, tests and documentation. Seed creation implements or installs none of it.
 
@@ -20,6 +22,8 @@ content, tests and documentation. Seed creation implements or installs none of i
 - Seeds 37 and 52: ODRGX widgets, seeded clocks and shared pixel rendering.
 - Seeds 46 and 44/49: tracked collection, provenance, previews and their catalog.
 - Seed 54: the clock-break scheduler, messages, settings, commands and migration.
+- Seed 29: persistent playlist inclusion; extend it to external clock/message files
+  and folders without introducing a second inclusion setting.
 - Seeds 35, 38, 41 and 50: managed external catalogs, microSD and folder playlists.
 - Coordinate with seeds 57/58 if merged: miniature projection and saved brightness
   consume the same widget pictures and animation identity; do not duplicate them.
@@ -152,7 +156,7 @@ existing `its-not-the-time.odrg` and its preview/readme.
     diagnostics must not escape the subtree; a display-taking diagnostic requires
     exiting exclusive mode first. Reuse existing refusal categories where possible.
 17. With no card, missing Clocks, no playable clock faces or all relevant entries
-    quarantined, retain Clocks only and report why it cannot play. Do not fall back
+    ignored or quarantined, retain Clocks only and report why it cannot play. Do not fall back
     to internal/non-clock animations. Remount or catalog refresh re-resolves ids
     and resumes eligible clocks. Status, catalogs, browsing, uploads, off/on and
     other non-playback controls remain responsive. No body rescan is added.
@@ -161,6 +165,47 @@ existing `its-not-the-time.odrg` and its preview/readme.
     an invalid saved id or an old paused break. The message checkbox retains its
     value through mode changes. State/timing and the playback restriction are
     identical over Wi-Fi, both serial routes, `odrigctl` and the emulator.
+
+### Playlist Inclusion In Both Clock Modes
+
+19. Apply the existing Ignore/include feature to clock and message animation rows
+    and folder rows, including `clocks`, `clocks/message` and their subfolders.
+    The owner's hardening request approves extending the existing
+    `ignore <id> <0|1>` form to these external files and folders; no additional
+    command spelling or independent clock-specific exclusion is introduced.
+    Report their saved `ignored` state through the shared list/UI model. A folder's
+    exclusion applies to all descendants for automatic selection; retain each
+    descendant's own setting, so including the parent again does not include a
+    child that was separately ignored. Show inherited exclusion distinctly from
+    the child's own setting, without hiding the browsable items.
+20. Use one eligibility rule in Between animations and Clocks only: a candidate
+    must be available, not quarantined, not itself ignored and have no ignored
+    ancestor. Apply it to clock-face bags, message bags, ordinary folder traversal,
+    automatic advances, boot/resume and already prepared candidates. Ignored files
+    cannot leak into a break or exclusive-mode turn via a stale shuffled bag.
+    This is inclusion filtering, not a change to which folders count as clock faces
+    or automatic messages: preserve the direct-child roles defined above.
+21. An acknowledged Ignore change removes affected candidates from future automatic
+    playback at once. If the automatic clock/message turn in progress becomes
+    excluded, finish no further loop: transition promptly at the next safe playback
+    boundary, without waiting for its full turn or rereading animation bodies.
+    In Between mode, no eligible clocks means skip the break and continue ordinary
+    playback; no eligible messages means omit the message, not the clock. In Only
+    mode, no eligible clocks means remain in that mode, dark and responsive with
+    an explanatory state; never fall back outside Clocks or spin over excluded
+    entries. Ignoring the message folder suppresses messages only; ignoring Clocks
+    excludes its whole subtree. Re-including an item restores normal eligibility
+    at the next applicable selection, without a reboot or catalog body scan.
+22. Preserve the existing meaning of Ignore as automatic-playlist exclusion, not
+    deletion, quarantine or a manual-play ban. Explicit play remains possible for
+    an ignored item where existing rules allow it, but Only mode still rejects
+    every outside-subtree play. Preserve saved exclusions across reboot, mode
+    switches and remount; bind external selections to stable storage/path identity,
+    not transient numeric ids, so a catalog refresh cannot exclude another file.
+    Store operator preferences using existing atomic internal settings mechanisms,
+    without requiring a writable SD card or rewriting its animation files/catalog.
+    A failed save must not be reported as success. Non-ignored items retain their
+    existing playback behavior, subject only to the modes specified in this seed.
 
 ## Constraints And Documentation
 
@@ -171,7 +216,8 @@ existing `its-not-the-time.odrg` and its preview/readme.
   flash tooling. Runtime widgets and new collection files must work with both
   installed and external format readers even though their intended home is external.
 - Update `docs/format.md`, command/show/app/core references, firmware-additions and
-  collection provenance, including the migration and first-message-rule change.
+  collection provenance, including the migration, first-message-rule change and
+  external file/folder inclusion semantics.
   Record the new mode's deliberate restriction and owner-approved command without
   silently rewriting append-only historical decisions.
 - Source sliders, browser tabs, layout alternatives and HTML editing are not new
@@ -186,7 +232,9 @@ firmware, not just the app. The product choices above also resolve the seven-fil
 mapping, source defaults, existing `message` path, message rotation, missing-card
 behavior and firmware-enforced subtree boundary. The seed is ready for
 specification with zero open product questions; later implementation acceptance
-checks remain as listed below.
+checks remain as listed below. The owner also requested that the existing Ignore
+feature cover clock/message files and folder items in both modes; the semantics
+and unchanged command form are recorded above.
 
 ## Definition Of Done
 
@@ -203,6 +251,12 @@ checks remain as listed below.
    unrestricted browsing, random exhaustion, messages on/off, settings migration,
    resets, card changes, missing/quarantined files and no outside fallback. App
    tests prove all dropdown states, old-firmware behavior and disabled Play controls.
+   Inclusion tests cover one ignored clock, one ignored message, ignored nested
+   folders and inherited exclusions, the Clocks/message roots, all ignored,
+   exclusion during playback and from a prepared bag, re-inclusion, both modes,
+   persistent reboot/remount with changed ids, read-only SD, save failures, manual
+   play semantics and unchanged behavior for included items. The shared app exposes
+   these toggles and inherited state for external files and folders.
 5. Relevant discovered suites pass and firmware/APK build through repository tools.
    Later approved board/phone acceptance verifies actual pixels, complete sequences,
    rates, transitions and outside-play refusal, separately from automated evidence.
