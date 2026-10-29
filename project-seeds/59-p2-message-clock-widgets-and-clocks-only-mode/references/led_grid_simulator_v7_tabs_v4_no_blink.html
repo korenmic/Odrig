@@ -1,0 +1,115 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>LED Matrix Simulator V7 — Tabs Edition</title><style>
+:root{color-scheme:dark;font-family:system-ui,Arial,sans-serif}*{box-sizing:border-box}body{margin:0;background:#111319;color:#f1f3fa}main{max-width:1190px;margin:auto;padding:14px}h1{font-size:19px;margin:3px 0 14px}.layout{display:grid;grid-template-columns:minmax(0,1fr) 295px;gap:19px;align-items:start}.tabs{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 13px}.tabs button{margin:0;padding:8px 10px;font-size:12px}.tabs button.active{background:#b9dbff;color:#101722;font-weight:700}.tabs button:focus-visible{outline:2px solid white}canvas{display:block;width:100%;aspect-ratio:1;height:auto;background:#050508;border:1px solid #313540;border-radius:7px}aside{padding:16px;border-radius:10px;background:#1d222d;border:1px solid #38404d;max-height:92vh;overflow:auto}h2{font-size:15px;margin:8px 0 12px}.control{margin:13px 0}.control label{display:flex;align-items:center;justify-content:space-between;font-size:12px;gap:6px}.control output{color:#b4d9ff;font-variant-numeric:tabular-nums;white-space:nowrap}input[type=range]{width:100%;accent-color:#c5dfff;margin:7px 0 0}select{background:#30394b;border:1px solid #62708b;border-radius:5px;color:white;padding:7px;width:100%;margin-top:5px}.check{font-size:13px;display:flex;align-items:center;gap:8px;margin:12px 0}.check input{accent-color:#d7eaff}button{background:#3a475c;border:1px solid #697992;color:white;border-radius:5px;padding:9px 15px;cursor:pointer;margin:6px 6px 0 0}.note{font-size:12px;color:#a7afc2;line-height:1.5}.status{color:#bdd7f2;font-size:12px;margin-top:12px;min-height:30px}hr{border:0;border-top:1px solid #3a4150;margin:16px 0}@media(max-width:850px){.layout{grid-template-columns:1fr}aside{max-height:none}}
+</style></head><body><main><h1>60 × 60 LED Simulator — V7 Tabs</h1><div class="tabs" id="tabs" aria-label="Text sequences"></div><div class="layout"><canvas id="display" width="900" height="900" aria-label="LED grid"></canvas><aside><h2>Display</h2><div class="control"><label for="mode">Display layout</label><select id="mode"><option value="alternate">Alternate text / clock</option><option value="split" selected>Text above clock</option><option value="text">Text only</option><option value="clock">Clock only</option></select></div>
+<div class="control"><label for="hold">Text on screen <output id="holdV"></output></label><input id="hold" type="range" min="0.3" max="9" step="0.1" value="5"></div>
+<div class="control"><label for="clockHold">Clock on screen (alternating) <output id="clockHoldV"></output></label><input id="clockHold" type="range" min="0.5" max="12" step="0.5" value="8"></div>
+<div class="control"><label for="fadeIn">Text fade in <output id="fadeInV"></output></label><input id="fadeIn" type="range" min="0" max="3" step="0.1" value="0.6"></div>
+<div class="control"><label for="fadeOut">Text fade out <output id="fadeOutV"></output></label><input id="fadeOut" type="range" min="0" max="3" step="0.1" value="0.5"></div>
+<hr><h2>Clock</h2><div class="control"><label for="clockSpeed">Clock speed <output id="clockSpeedV"></output></label><input id="clockSpeed" type="range" min="0.25" max="5" step="0.25" value="0.5"></div>
+<div class="control"><label for="roll">Wheel roll duration <output id="rollV"></output></label><input id="roll" type="range" min="0.1" max="1.2" step="0.05" value="0.5"></div>
+<p class="note">Minute and hour digits can roll randomly at the same time as seconds. Every wheel uses the same scroll animation.</p>
+<hr><h2>Pendulum</h2><div class="control"><label for="swing">Full oscillation <output id="swingV"></output></label><input id="swing" type="range" min="0.6" max="6" step="0.1" value="4"></div>
+<div class="control"><label for="curve">Motion curve <output id="curveV"></output></label><input id="curve" type="range" min="1" max="3" step="0.05" value="1"></div><p class="note">1.0 = physical harmonic motion, smooth reversal at edges. Higher = sharper center crossing, still no dwell/stop.</p>
+<hr><h2>Color wave</h2><div class="control"><label for="wave">Wave every <output id="waveV"></output></label><input id="wave" type="range" min="3" max="30" step="1" value="9"></div><div class="control"><label for="waveLength">Wave duration <output id="waveLengthV"></output></label><input id="waveLength" type="range" min="0.5" max="4" step="0.1" value="1.5"></div>
+<button id="pause">Pause</button><button id="restart">Restart</button><button id="defaults">Back to defaults</button><button id="textLoop">Back to text loop</button><div class="status" id="status"></div><p class="note">LED diameter 0.3 cm · pitch 1.6 cm. The last three rows contain the white moving square. Text remains small and bright white at one fixed size. Countdown zero stays visible during three follow-up sentences. The seconds roll normally; minute/hour wheels may roll independently. Text tabs restart the selected sequence. The motion scene slows the clock and pendulum together; once stopped, digits remain frozen and the clock and pendulum stay steadily lit.</p></aside></div></main><script>
+const N=60,ROWS=57,RATIO=.3/1.6;
+const canvas=document.querySelector('#display'),ctx=canvas.getContext('2d');
+const ids=['hold','clockHold','fadeIn','fadeOut','clockSpeed','roll','swing','curve','wave','waveLength'];
+const C=Object.fromEntries(ids.map(id=>[id,document.getElementById(id)]));
+const sequences=[
+ {name:'1 · התודעה',lines:['זה לא הזמן','זה המרחב','זו התודעה','תרגישו את זה זז','מרגישים?','זז לכם?']},
+ {name:'2 · סימטריה',lines:['זה לא הזמן','זו הסימטריה','זו הגאומטריה','זה המרחק']},
+ {name:'3 · טמפרטורה',lines:['זה לא הזמן','זו הטמפרטורה.','הזמן חם','מתחמם','רותח','הזמן נשרף']},
+ {name:'4 · השעה',lines:['מה אתם מחפשים?','את השעה?','היא הייתה פה קודם','פספסתם','נסו שוב','לאט יותר']},
+ {name:'5 · ספירה לאחור',lines:['עשר','תשע','שמונה','שבע','שש','חמש','ארבע','שלוש','שתיים','אחת','אפס',{text:'קטע',zero:true},{text:'לא קרה כלום',zero:true},{text:'יודעים למה?',zero:true},'כי זה לא הזמן','זה המקום','המקום עליו אתם עומדים','מה איתו','סתם מקום','אבל בטוח שהוא לא זמן']},
+ {name:'6 · השעון',lines:['הזמן עצר','אל תסתכלו עכשיו','הכול בשליטה','שום דבר לא זז']},
+ {name:'7 · הטעויות',lines:['זה לא הזמן','או שזה הזמן למות','או שזה הזמן רק לשלם את המחיר','על כל טעות ועוד טעות','ועוד טעות','כמה טעויות סעמק','מתי כבר נפסיק לטעות','אף פעם','כי זה אף פעם לא הזמן.']},
+];
+const messageText=m=>typeof m==='string'?m:m.text;
+const zeroSubtitle=m=>typeof m==='object'&&m.zero;
+const layer=document.createElement('canvas');layer.width=N;layer.height=ROWS;
+const lc=layer.getContext('2d',{willReadFrequently:true});
+function drawWrapped(text,cy,maxRows){const words=text.split(/\s+/),lines=[];let line='';
+ for(const word of words){const candidate=line?line+' '+word:word;
+ if(line&&lc.measureText(candidate).width>58){lines.push(line);line=word}else line=candidate;}
+ if(line)lines.push(line);const visible=lines.slice(0,maxRows);
+ visible.forEach((l,i)=>lc.fillText(l,30,cy+(i-(visible.length-1)/2)*9));}
+function textMask(msg,split){lc.clearRect(0,0,N,ROWS);lc.direction='rtl';lc.textAlign='center';lc.textBaseline='middle';lc.fillStyle='#fff';lc.font='900 8px Arial, sans-serif';
+ if(zeroSubtitle(msg)){lc.fillText('אפס',30,split?6:18);drawWrapped(messageText(msg),split?19:35,2)}
+ else drawWrapped(messageText(msg),split?15:28,split?2:3);
+ const d=lc.getImageData(0,0,N,ROWS).data;return Float32Array.from({length:N*ROWS},(_,i)=>d[i*4+3]/255);}
+const masks=sequences.map(seq=>({full:seq.lines.map(m=>textMask(m,false)),small:seq.lines.map(m=>textMask(m,true))}));
+let section=0,index=0,phaseTime=0,elapsed=0,previous=null,paused=false,lastMessageKey='',stopAt=-1,stopped=false;
+let motionTime=0,clockAccum=0,pendulumFrozenX=null,clockDigits=[0,0,0,0,0,0],rolls=Array(6).fill(null);
+const tabs=document.getElementById('tabs');
+sequences.forEach((seq,i)=>{const b=document.createElement('button');b.textContent=seq.name;b.onclick=()=>chooseSection(i);b.id='tab'+i;tabs.append(b);});
+function syncTabs(){[...tabs.children].forEach((b,i)=>{b.classList.toggle('active',i===section);b.setAttribute('aria-pressed',String(i===section));});}
+function chooseSection(i){section=i;index=0;phaseTime=0;lastMessageKey='';stopAt=-1;stopped=false;pendulumFrozenX=null;syncTabs();}
+syncTabs();
+const smooth=p=>{p=Math.max(0,Math.min(1,p));return p*p*(3-2*p)};
+function motionFactor(){if(stopAt<0)return 1;return 1-smooth((elapsed-stopAt)/3.5);}
+function reset(){elapsed=0;phaseTime=0;motionTime=0;clockAccum=0;previous=null;rolls=Array(6).fill(null);const d=new Date();clockDigits=[d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,'0')).join('').split('').map(Number);chooseSection(0);}
+reset();
+for(const [id,el] of Object.entries(C)){const out=document.getElementById(id+'V');const update=()=>out.textContent=id==='curve'||id==='clockSpeed'?Number(el.value).toFixed(2)+'×':id==='wave'?el.value+' s':Number(el.value).toFixed(2).replace(/0$/,'')+' s';el.addEventListener('input',update);update();}
+const defaults={mode:'split',hold:'5',clockHold:'8',fadeIn:'0.6',fadeOut:'0.5',clockSpeed:'0.5',roll:'0.5',swing:'4',curve:'1',wave:'9',waveLength:'1.5'};
+document.getElementById('defaults').onclick=()=>{for(const [id,value] of Object.entries(defaults)){const el=document.getElementById(id);el.value=value;el.dispatchEvent(new Event('input'));}reset();};
+document.getElementById('textLoop').onclick=()=>{document.getElementById('mode').value='text';chooseSection(0);};
+document.getElementById('pause').onclick=()=>{paused=!paused;document.getElementById('pause').textContent=paused?'Resume':'Pause'};
+document.getElementById('restart').onclick=reset;
+function rollDigit(i,dir=1){const from=clockDigits[i],to=(from+dir+10)%10;rolls[i]={from,to,start:motionTime,duration:+C.roll.value};clockDigits[i]=to;}
+function updateClock(dt){clockAccum+=dt*+C.clockSpeed.value;let cnt=0;
+ while(clockAccum>=1&&cnt++<10){clockAccum-=1;
+ // Independent conditions: seconds always roll, minutes/hours sometimes roll too.
+ rollDigit(5);if(clockDigits[5]===0)rollDigit(4);
+ const minuteRandom=Math.random() < (sequences[section].lines[index]==='הכול בשליטה'?.48:.14);
+ const hourRandom=Math.random() < (sequences[section].lines[index]==='הכול בשליטה'?.25:.045);
+ if(minuteRandom){const dir=Math.random()<.5?-1:1;rollDigit(3,dir);if((dir===1&&clockDigits[3]===0)||(dir===-1&&clockDigits[3]===9))rollDigit(2,dir);}
+ if(hourRandom){const dir=Math.random()<.5?-1:1;rollDigit(1,dir);if((dir===1&&clockDigits[1]===0)||(dir===-1&&clockDigits[1]===9))rollDigit(0,dir);}
+ }
+}
+function clockPixels(mode){lc.clearRect(0,0,N,ROWS);lc.textBaseline='middle';lc.textAlign='center';lc.font='bold 12px monospace';
+ const slot=6.9,left=(N-slot*8)/2,top=mode==='split'?34:22,center=top+8;
+ for(let i=0;i<8;i++){const x=left+(i+.5)*slot,di=i<2?i:i<5?i-1:i-2;
+ lc.save();lc.beginPath();lc.rect(left+i*slot,top,slot,16);lc.clip();lc.fillStyle='#fff';
+ if(i===2||i===5)lc.fillText(':',x,center);
+ else {const r=rolls[di];const age=r?motionTime-r.start:1e9;
+ if(r&&age<r.duration){const p=smooth(age/r.duration);lc.fillText(String(r.from),x,center-16*p);lc.fillText(String(r.to),x,center+16*(1-p));}
+ else lc.fillText(String(clockDigits[di]),x,center);}
+ lc.restore();}
+ return lc.getImageData(0,0,N,ROWS).data;}
+function currentMessage(){return sequences[section].lines[index];}
+function activateMessage(){const key=section+':'+index;if(key===lastMessageKey)return;lastMessageKey=key;
+ const text=messageText(currentMessage());if(text==='תרגישו את זה זז')stopAt=elapsed;
+ if(text==='שום דבר לא זז')pendulumFrozenX=lastPendulumX;
+ else pendulumFrozenX=null;}
+let lastPendulumX=29.5;
+function advance(dt){const fi=+C.fadeIn.value,fo=+C.fadeOut.value,hold=+C.hold.value,clockHold=+C.clockHold.value,mode=document.getElementById('mode').value;
+ const textDuration=fi+hold+fo,isCountdown=sequences[section].name.includes('ספירה')&&index<=10,cycle=isCountdown?2:textDuration+(mode==='alternate'?clockHold:0);
+ phaseTime+=dt;while(phaseTime>=cycle){phaseTime-=cycle;index++;if(index>=sequences[section].lines.length){section=(section+1)%sequences.length;index=0;stopAt=-1;stopped=false;pendulumFrozenX=null;syncTabs();}lastMessageKey='';}
+ activateMessage();const showText=mode==='text'||mode==='split'||(mode==='alternate'&&phaseTime<textDuration);
+ const showClock=mode==='clock'||mode==='split'||(mode==='alternate'&&phaseTime>=textDuration);
+ const p=phaseTime,brightness=isCountdown?1:p<fi?(fi?p/fi:1):p<fi+hold?1:fo?Math.max(0,1-(p-fi-hold)/fo):0;
+ return {showText,showClock,brightness,mode};}
+function draw(t){const dt=previous===null?0:paused?0:Math.min(.08,(t-previous)/1000);previous=t;elapsed+=dt;
+ const state=advance(dt);const factor=motionFactor(),motionDt=dt*factor;motionTime+=motionDt;updateClock(motionDt);if(factor<.001){for(let i=0;i<rolls.length;i++)rolls[i]=null;}
+ const mask=(state.mode==='split'?masks[section].small:masks[section].full)[index];const cd=clockPixels(state.mode);
+ // During a time stop the clock stays frozen and continuously lit.
+ const stopClockFade=1;
+ const period=+C.swing.value,angle=2*Math.PI*motionTime/period,curve=+C.curve.value,harmonic=Math.cos(angle),k=(curve-1)*1.7;
+ const position=k<.0001?harmonic:Math.tanh(k*harmonic)/Math.tanh(k);let xc=29.5+26.5*position;
+ if(pendulumFrozenX!==null)xc=pendulumFrozenX;lastPendulumX=xc;
+ const blink=true;
+ const waveTime=elapsed%(+C.wave.value),waveOn=waveTime<+C.waveLength.value,waveP=waveTime/(+C.waveLength.value);
+ const step=canvas.width/N,radius=step*RATIO/2;
+ ctx.fillStyle='#06070a';ctx.fillRect(0,0,canvas.width,canvas.height);
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+ let strength=0;
+ if(y>=ROWS){strength=Math.abs(x-Math.round(xc))<=1&&blink?1:0;}
+ else {if(state.showText)strength=mask[y*N+x]*state.brightness;
+ if(state.showClock){const p=(y*N+x)*4;strength=Math.max(strength,cd[p+3]/255*stopClockFade);}}
+ if(strength>.015){if(state.showText&&y<ROWS&&waveOn&&mask[y*N+x]*state.brightness>.03){const center=waveP*1.35-.15;ctx.fillStyle=Math.abs(x/N-center)<.07?`rgba(90,205,255,${strength})`:`rgba(255,255,255,${strength})`;}else ctx.fillStyle=`rgba(255,255,255,${strength})`;}else ctx.fillStyle='#252b34';
+ ctx.beginPath();ctx.arc((x+.5)*step,(y+.5)*step,radius,0,2*Math.PI);ctx.fill();}
+ document.getElementById('status').textContent=`${sequences[section].name} · ${messageText(currentMessage())} · ${factor<.01?'Motion stopped':factor<1?'Slowing down':'Moving'}`;
+ requestAnimationFrame(draw);}
+requestAnimationFrame(draw);
+</script></body></html>
