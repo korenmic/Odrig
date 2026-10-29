@@ -8,6 +8,7 @@
 #include <SD.h>
 #include <SPI.h>
 #include "odrig_sd_config.h"
+#include "odrig_sd_capacity.h"
 #else
 #include "soc/usb_serial_jtag_struct.h"
 #include "usb/msc_host.h"
@@ -133,13 +134,26 @@ char filesWritten[FILES_NAME_ROOM] = "";
 
 #ifdef ODRIG_DRIVE_SD_SPI
 SPIClass cardBus(FSPI);
+void say(const char *format, ...);
 bool cardMounted = false;
 // Set only with the guard held. The worker closes the files before it unmounts the card.
 bool cardFailed = false;
 // Whether the card has its folder odrig, which the board never makes.
 bool cardFolder = false;
 const uint32_t CARD_POLL_MS = 1000;
+const uint32_t CAPACITY_SLICE_MS = 5;
 alignas(4) uint8_t cardProbe[512];
+OdrigSdCapacity cardCapacity;
+bool capacityUnsafe = false;
+
+// Called with the guard held before any operation that might change allocation.
+void invalidateCapacity() { cardCapacity.reset(cardMounted && !capacityUnsafe ? SD.numSectors() : 0); }
+
+void capacityWriteFailed() {
+  capacityUnsafe = true;
+  cardCapacity.fail();
+  say("capacity unavailable after failed storage mutation; waiting for remount");
+}
 
 // The file of the card being written, its path, and the bytes given to it so far.
 FILE *written = nullptr;
@@ -285,19 +299,20 @@ uint32_t driveNumber(void *) {
   return number;
 }
 
-// The drive's free and total bytes, read from its file system without a write: the
-// card's from the SD library, the stick's from the USB driver's volume.
+// Capacity queries never wait for the card worker or perform card IO.
 int driveSpace(void *, uint32_t drive, uint64_t *freeBytes, uint64_t *totalBytes) {
-  Guarded held;
 #ifdef ODRIG_DRIVE_SD_SPI
-  if (drive == 0 || drive != number || !cardMounted) return -1;
-  const uint64_t total = SD.totalBytes();
-  const uint64_t used = SD.usedBytes();
-  if (total == 0 || used > total) return -1;
-  *totalBytes = total;
-  *freeBytes = total - used;
-  return 1;
+  if (xSemaphoreTake(guard, 0) != pdTRUE) return -1;
+  const bool known = drive != 0 && drive == number && cardMounted && !cardFailed &&
+                     written == nullptr && cardCapacity.known();
+  if (known) {
+    *totalBytes = cardCapacity.total();
+    *freeBytes = cardCapacity.free();
+  }
+  xSemaphoreGive(guard);
+  return known ? 1 : -1;
 #else
+  Guarded held;
   if (drive == 0 || drive != number || mounted == nullptr) return -1;
   return msc_host_vfs_space(mounted, freeBytes, totalBytes) == ESP_OK ? 1 : -1;
 #endif
@@ -613,9 +628,11 @@ void changing(const char *path) {
 // With the guard held.
 void giveUpWritten(bool removing) {
   if (written == nullptr) return;
-  fclose(written);
+  invalidateCapacity();
+  const bool closed = fclose(written) == 0;
   written = nullptr;
-  if (removing) unlink(writtenPath);
+  const bool removed = !removing || unlink(writtenPath) == 0 || errno == ENOENT;
+  if (!closed || !removed) capacityWriteFailed();
   writtenPath[0] = 0;
 }
 
@@ -632,9 +649,10 @@ int beginDriveFile(const char *name) {
   giveUpWritten(true);
   char path[PATH_ROOM];
   if (!changedPath(name, path)) return -1;
+  invalidateCapacity();
   changing(path);
   written = fopen(path, "wb");
-  if (written == nullptr) return -1;
+  if (written == nullptr) { capacityWriteFailed(); return -1; }
   strcpy(writtenPath, path);
   writtenBytes = 0;
   return 1;
@@ -644,8 +662,11 @@ int addDriveBytes(const uint8_t *bytes, size_t length) {
   OdrigFiles::StorageCall call;
   Guarded held;
   if (written == nullptr) return -1;
+  invalidateCapacity();
   writtenBytes += length;
-  return fwrite(bytes, 1, length, written) == length ? 1 : -1;
+  if (fwrite(bytes, 1, length, written) == length) return 1;
+  capacityWriteFailed();
+  return -1;
 }
 
 // The file is whole when its data and its directory entry are on the card and it holds as
@@ -654,11 +675,13 @@ int endDriveFile() {
   OdrigFiles::StorageCall call;
   Guarded held;
   if (written == nullptr) return -1;
+  invalidateCapacity();
   struct stat found;
   bool whole = fflush(written) == 0 && fsync(fileno(written)) == 0 && fstat(fileno(written), &found) == 0 && (size_t)found.st_size == writtenBytes;
   whole = fclose(written) == 0 && whole;
   written = nullptr;
   writtenPath[0] = 0;
+  if (!whole) capacityWriteFailed();
   return whole ? 1 : -1;
 }
 
@@ -670,13 +693,18 @@ int renameDriveFile(const char *from, const char *to) {
   Guarded held;
   char pathFrom[PATH_ROOM], pathTo[PATH_ROOM];
   if (!changedPath(from, pathFrom) || !changedPath(to, pathTo)) return -1;
+  invalidateCapacity();
   if (written != nullptr && (strcasecmp(writtenPath, pathFrom) == 0 || strcasecmp(writtenPath, pathTo) == 0)) giveUpWritten(false);
   changing(pathFrom);
   changing(pathTo);
   struct stat found;
   if (stat(pathFrom, &found) != 0 || !S_ISREG(found.st_mode)) return -1;
-  if (strcasecmp(pathFrom, pathTo) != 0 && unlink(pathTo) != 0 && errno != ENOENT) return -1;
-  return rename(pathFrom, pathTo) == 0 ? 1 : -1;
+  if (strcasecmp(pathFrom, pathTo) != 0 && unlink(pathTo) != 0 && errno != ENOENT) {
+    capacityWriteFailed(); return -1;
+  }
+  if (rename(pathFrom, pathTo) == 0) return 1;
+  capacityWriteFailed();
+  return -1;
 }
 
 int removeDriveFile(const char *name) {
@@ -684,10 +712,13 @@ int removeDriveFile(const char *name) {
   Guarded held;
   char path[PATH_ROOM];
   if (!changedPath(name, path)) return -1;
+  invalidateCapacity();
   if (written != nullptr && strcasecmp(writtenPath, path) == 0) giveUpWritten(false);
   changing(path);
   if (unlink(path) == 0) return 1;
-  return errno == ENOENT ? 0 : -1;
+  if (errno == ENOENT) return 0;
+  capacityWriteFailed();
+  return -1;
 }
 #else
 // A stick is never written.
@@ -962,6 +993,8 @@ void mountCard() {
   // Zero always means absent, also when the generation counter wraps.
   if (++plugged == 0) ++plugged;
   number = plugged;
+  capacityUnsafe = false;
+  invalidateCapacity();
   cardFailed = false;
   cardFolder = folder;
   state = MOUNTED;
@@ -986,6 +1019,7 @@ void sdStep() {
       giveUpWritten(false);
       SD.end();
       cardMounted = false;
+      cardCapacity.fail();
       cardFailed = false;
       cardFolder = false;
       state = NO_DRIVE;
@@ -994,6 +1028,18 @@ void sdStep() {
     }
   }
   if (removed) say("card unavailable; files closed, waiting for a card");
+}
+
+void capacityStep() {
+  Guarded held;
+  if (!cardMounted || cardFailed || written != nullptr || !cardCapacity.pending()) return;
+  if (SD.sectorSize() != 512 || !SD.readRAW(cardProbe, cardCapacity.sector())) {
+    cardCapacity.fail();
+    say("capacity unavailable: sector read failed");
+    return;
+  }
+  cardCapacity.consume(cardProbe);
+  if (!cardCapacity.pending() && !cardCapacity.known()) say("capacity unavailable: unsupported volume geometry");
 }
 
 void driveEvents(void *) {
@@ -1006,9 +1052,23 @@ void driveEvents(void *) {
     vTaskDelete(nullptr);
     return;
   }
+  uint32_t untilPoll = 0;
   for (;;) {
-    sdStep();
-    vTaskDelay(pdMS_TO_TICKS(CARD_POLL_MS));
+    if (untilPoll == 0) {
+      sdStep();
+      untilPoll = CARD_POLL_MS;
+    } else {
+      capacityStep();
+    }
+    bool scanning;
+    {
+      Guarded held;
+      scanning = cardCapacity.pending() && written == nullptr;
+    }
+    const uint32_t pause = scanning ? CAPACITY_SLICE_MS : CARD_POLL_MS;
+    untilPoll = pause >= untilPoll ? 0 : untilPoll - pause;
+    const TickType_t ticks = pdMS_TO_TICKS(pause);
+    vTaskDelay(ticks != 0 ? ticks : 1);
   }
 }
 

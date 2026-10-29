@@ -5,7 +5,7 @@ implementation task sets the seed to `in_progress`. Preserve the owner's final
 APK build ordering; firmware compilation is deferred to future seed 60. Task 4
 requires a later approved physical session and is not software-complete by proxy.
 
-- [ ] 1. Replace synchronous SD capacity scans with generation-safe bounded discovery.
+- [x] 1. Replace synchronous SD capacity scans with generation-safe bounded discovery.
   - Observe a compiled real-backend cold-query regression fail first and record
     the observed failure in the commit. Keep mounted presence independent.
   - Implement the fixed-memory FAT16/FAT32 sector state machine, checked geometry,
