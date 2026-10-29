@@ -142,6 +142,7 @@ function failed(error) {
   }
   state.link = "no-answer";
   state.failure = error;
+  state.space = null;
 }
 
 async function askStatus() {

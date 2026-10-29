@@ -17,7 +17,7 @@ requires a later approved physical session and is not software-complete by proxy
     core/emulator capacity and upload rollback tests by discovery. Report unrelated
     host limitations without claiming a firmware build.
 
-- [ ] 2. Discard stale storage reports and distinguish unknown capacity in the shared app.
+- [x] 2. Discard stale storage reports and distinguish unknown capacity in the shared app.
   - Observe regressions for stale absence and mounted reports fail before the fix.
   - Invalidate old `space` state on connection loss; render a current unknown
     report, a present/unknown card and a confirmed absence distinctly. Preserve
