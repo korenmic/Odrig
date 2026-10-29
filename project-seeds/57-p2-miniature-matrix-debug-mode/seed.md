@@ -39,6 +39,13 @@ makes it work, and exact ESP32-S3/matrix pin instructions in the README. Creatin
 this seed is the only work authorised now: do not generate its spec, implement,
 build, flash, change a board or instruct the owner to wire an unapproved circuit.
 
+The owner subsequently selected the ESP board's **5 V pin**, not 3V3, for miniature
+matrix power. Normal snake 1 uses GPIO1 for data and a separate external supply
+reported at about 4.3 V. Those are separate functions: GPIO1 is not a power pin,
+and successful operation of the snake does not establish the miniature matrix's
+power budget. For miniature testing the normal wall is disconnected; do not join
+its external positive supply to the ESP's USB-derived 5 V rail.
+
 ## Sources And Current Boundaries
 
 - Manufacturer: https://wiki.seeedstudio.com/rgb_matrix_for_xiao/ . The product
@@ -46,6 +53,23 @@ build, flash, change a board or instruct the owner to wire an unapproved circuit
   The XIAO header layout is not the ESP32-S3-N16R8 development board's header.
 - Purchase: https://www.4project.co.il/product/6x10-rgb-ws2812-matrix-for-seeed-studio-xiao .
   SKU 4P-7304 / SE-104030107; the retailer specifies 5 V operation.
+- Owner's rear-board photograph: `references/1000317545.jpg`, supplied on
+  2026-10-29. It visibly identifies `seeed studio 6x10 RGB MATRIX for XIAO`.
+  In that photograph the right-side three pads read `5V`, `GND`, `IN`; the
+  left-side group reads `5V`, `GND`, `OUT`. The XIAO header has D0-D10, 3V3,
+  GND and 5V labels. Use the labelled **IN** pad for incoming ESP data, never OUT.
+  Do not treat matrix D1 as the target merely because the ESP output is GPIO1:
+  the manufacturer's XIAO data connection is D0. Prefer the dedicated IN/5V/GND
+  group in the README to avoid confusing the two boards' header numbering.
+  The photograph establishes visible labels, not a silicon revision, current
+  rating, electrical continuity, solder quality or a powered functional test.
+- Manufacturer-linked LED datasheet:
+  https://files.seeedstudio.com/wiki/xiao-rgb-matrix/WS2812B-1010-DATASHEET.pdf .
+  Its parameter table specifies a 2.8 V minimum high-input threshold at VDD=5 V,
+  supporting direct 3.3 V data for that documented part. Do not carry forward the
+  unsupported assumption that a 3.3-to-5 V buffer is mandatory for this matrix.
+  Confirm the supplied board corresponds to that documentation and that the
+  signal at DIN meets the requirement under the intended short-wire connection.
 - The board's normal data pins are GPIO1-18, GPIO21 and GPIO47. GPIO39-42 are the
   microSD SPI pins; GPIO19/20 are native USB and GPIO43/44 are UART. Do not borrow
   these storage/USB/UART pins for the matrix.
@@ -54,7 +78,8 @@ build, flash, change a board or instruct the owner to wire an unapproved circuit
   `app/www/`, served by the emulator and packaged into the APK unchanged. Commands
   are shared across HTTP and serial, never an APK-only firmware endpoint.
 - Hardware/power and additions to the command list require the owner's explicit
-  approval under AGENTS.md. The proposals below are not approved instructions.
+  approval under AGENTS.md. Approved choices and remaining electrical verification
+  are distinguished below; the photograph alone is not a safe-power certification.
 
 ## Required Behavior
 
@@ -130,11 +155,19 @@ build, flash, change a board or instruct the owner to wire an unapproved circuit
     for chaining and stays unused here; it is not connected to an ESP input. Do
     not present a XIAO header pin number as an ESP32-S3 header pin number.
 14. Approved data output is GPIO1, temporarily replacing snake 1, with the full-size
-    wall disconnected for this mode. Proposed power/signal arrangement is an
-    owner-approved regulated 5 V source and an appropriate 3.3-to-5 V data buffer.
-    The command and GPIO1 arrangement are approved; power/signal conditioning
-    still needs verification and the owner's informed approval below. Determine the actual component
-    and its pin numbers from primary documentation before publishing the table.
+    wall disconnected for this mode. The owner selected ESP **5V -> matrix 5V**,
+    **ESP GND -> matrix GND**, and **GPIO1 -> matrix IN** as the intended arrangement.
+    Do not connect matrix 3V3, OUT or its unused XIAO header signals for this setup.
+    Before publishing this as validated wiring, establish this exact ESP board's
+    5 V rail/USB protection/current capability and remaining budget after the ESP
+    and microSD load, against the matrix demand at the enforced debug cap. Check
+    startup and failure states as well as typical animation demand; pin availability
+    is not proof of current capacity. Verify simultaneous USB power paths if both
+    board sockets remain attached. Direct data is supported by the linked part's
+    threshold, subject to the correspondence/signal checks above, not by snake
+    stability at 4.3 V. If extra supply or signal components prove necessary,
+    identify the concrete part/circuit and obtain owner approval before substituting
+    it; do not silently require a buffer or connect positive supply rails together.
     Never assume an ESP GPIO supplies matrix power or that 5 V is safe on a GPIO.
 15. Instructions explicitly cover power-off rewiring, required assembly, verified
     supply/data compatibility, which normal display connections must be removed,
@@ -170,23 +203,20 @@ the full installation. Seed 56 remains separate.
 
 ## Open Questions Requiring The Owner
 
-On 2026-10-29 the owner explicitly approved the shared command `debug mini on|off`
-and GPIO1 with the full wall disconnected. These are settled.
+On 2026-10-29 the owner explicitly approved the shared command `debug mini on|off`,
+GPIO1 with the wall disconnected, and choosing the ESP's 5 V pin rather than 3V3
+for matrix power. The photograph resolves which labelled matrix pads are intended.
+These choices are settled; do not repeatedly ask the owner to choose the voltage.
 
-The earlier third question was unclear: the owner asked whether to use the ESP's
-5 V pin or its 3V3 pin and said either is acceptable. The matrix's specified power
-is **5 V at VCC**, not the ESP's 3V3 output. GPIO1 is the separate data signal.
-The owner's statement does not prove available supply current, safe simultaneous
-USB power paths or the matrix's input-high threshold, and is not approval to buy
-or require an unidentified signal-level converter.
-
-One hardware item remains before zero-question S2S: establish the exact matrix
-revision's data-level requirements and this board's safe 5 V source, then obtain
-approval of the concrete circuit based on the parts the owner actually has. Prefer
-the existing hardware when supported by primary specifications; do not require a
-level shifter by assumption. If an additional component is necessary, identify it
-and ask the owner plainly before fixing it into the wiring plan. Never suggest
-putting 5 V onto an ESP GPIO. Assembly remains a separate owner check.
+One electrical verification remains before claiming zero-open-question readiness
+for the complete hardware plan: confirm this exact ESP board's safe available 5 V
+current/power path for the matrix, with the intended peripherals and USB connections.
+This is a factual check, not another voltage preference. The photo of the matrix
+cannot settle it. The documented LED threshold supports direct GPIO data for that
+part; verify the correspondence rather than assuming a mandatory level converter.
+If verification requires changing the selected power arrangement or adding a part,
+present that concrete change to the owner and wait for approval. Assembly and the
+later powered acceptance test remain separate owner checks.
 
 ## Definition Of Done
 

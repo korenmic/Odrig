@@ -6,5 +6,5 @@
   "priority": "P2",
   "addedAt": "2026-10-29",
   "addedCommit": "pending-local",
-  "summary": "A shared app checkbox controls a temporary firmware projection of original 60x60 animations onto the purchased 10x6 WS2812 matrix. The command and GPIO1 mini-only output are approved; exact safe 5 V power and data-level conditioning remain to be verified and approved before publishing the README wiring."
+  "summary": "A shared app checkbox controls temporary firmware projection of original 60x60 animations onto the purchased 10x6 matrix. Command, GPIO1 mini-only output and ESP 5V power choice are approved; the owner's photo identifies the IN/5V/GND pads and the linked LED specification supports 3.3V data for that part. Exact ESP-board 5V current and USB power-path capacity still require verification before claiming a fully validated wiring plan."
 }
