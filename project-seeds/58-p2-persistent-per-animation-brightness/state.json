@@ -1,0 +1,10 @@
+{
+  "number": 58,
+  "slug": "58-p2-persistent-per-animation-brightness",
+  "state": "remaining",
+  "title": "Persistent per-animation brightness",
+  "priority": "P2",
+  "addedAt": "2026-10-29",
+  "addedCommit": "pending-local",
+  "summary": "A checkbox beside the brightness slider saves a durable per-animation override on the installation; checked controls edit that override, unchecked controls edit the default, and later default changes or restarts never replace saved overrides. Command forms are owner-approved and no product questions remain."
+}
