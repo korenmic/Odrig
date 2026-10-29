@@ -133,6 +133,10 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Previews at once, each as soon as it is known**, seed 49: by name and size from the default catalog, and keys kept on the phone.
 - **A brightness field beside the slider, and a bar for the animation playing now**, seed 47 and seed 48: built; the phone checks are open, and seed 48's `repeat` needs its firmware on the board.
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
+- **Nonblocking SD capacity reporting**, seed 56: planned; avoid a cold free-space query freezing playback and command replies.
+- **Miniature matrix debug mode**, seed 57: planned; app and firmware project the full canvas onto the purchased 10x6 display, with exact approved wiring documented and hardware acceptance checks retained.
+- **Persistent animation brightness overrides**, seed 58: planned; a checkbox saves an animation's brightness independently of the global default.
+- **Message clock widgets and clocks-only mode**, seed 59: planned; seven Hebrew message widgets, exclusive clock playback and ignored file/folder support in both clock modes.
 
 The state of every seed is in the `state.json` of its folder.
 
