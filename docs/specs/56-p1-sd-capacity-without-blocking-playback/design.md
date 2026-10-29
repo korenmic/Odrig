@@ -55,8 +55,11 @@ under the guard before touching the file. While `written` exists do not scan. Cl
 and synchronize the writable handle through the existing close path before
 restarting. Rename/remove attempts and abandoned/failed writes also invalidate;
 conservative rescan is safer than inaccurate byte-delta estimates (clusters,
-directory growth and replacement semantics differ). Remount resets all scan state;
-unmount publishes absence and drops capacity before another card can be published.
+directory growth and replacement semantics differ). A failed mutation instead
+keeps discovery unavailable until remount: a failed FatFs synchronization may
+leave allocation state in RAM newer than the raw on-media table. Remount clears
+that unsafe state and resets discovery. This does not revoke mounted write capability.
+Unmount publishes absence and drops capacity before another card can be published.
 
 The existing upload transaction remains responsible for out-of-space failures and
 catalog/animation publication. Unknown preflight capacity is not a promise that a

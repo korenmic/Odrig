@@ -48,7 +48,13 @@ a top bar with the app's name and whether the installation answers.
   number; a card whose catalog is not `ok` has no count, and its line says only what is
   free, as `External storage: free 3.1 GB of 31.9 GB`. While the
   card's catalog is still read, the external number is `animations not known yet`, and
-  while the show is invalid the internal one is `animations not known`. Below them, when
+  while the show is invalid the internal one is `animations not known`.
+  A mounted card with unknown byte counts keeps its catalog count and says
+  `capacity unavailable`; its write capability remains independent of capacity.
+  After a connection failure, refused space query or target change, the old storage
+  report is no longer current: the external line says `External storage: information
+  unavailable.` until a fresh reply arrives. A fresh absent reply alone says `absent`.
+  Below them, when
   Settings says so, stands the pinned Tests group; then two filters and the one list of
   animations, one level of the card's folders at a time, as a file explorer shows them.
   Above the list stands the level's heading, `Root` or the folder's whole path, as

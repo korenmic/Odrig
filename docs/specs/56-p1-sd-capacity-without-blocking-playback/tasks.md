@@ -25,7 +25,7 @@ requires a later approved physical session and is not software-complete by proxy
   - Run discovered app tests against the emulator/stand-in targets, including
     disconnect/reconnect and target changes, without rebuilding the APK yet.
 
-- [ ] 3. Document capacity freshness and record software verification.
+- [x] 3. Document capacity freshness and record software verification.
   - Update core/firmware/microSD/app contracts and append design resolutions to
     `docs/drifts.md`; keep command/schema compatibility and safe unknown uploads.
   - Record failing-before evidence, passing discovered suites, emulator smoke and

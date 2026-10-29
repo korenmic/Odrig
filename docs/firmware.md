@@ -2291,4 +2291,15 @@ cannot split a frame between two assignments. The standalone output adapter foll
 the same pin lookup contract. Its current main program remains a seed-12 trial,
 not a complete standalone player or evidence that app control works on that trial.
 
-The shared core handles `ignore ID 0|1` and atomic `remove many IDS` over serial and HTTP. The WLED drive adapter supplies optional external free/total bytes from FAT free clusters under its mutex. It never formats removable media, never writes a USB stick, and changes only files of a card's folder `odrig`, as the core asks ([microsd.md](microsd.md#plugging-in-and-pulling-out)). Unsupported hosts report unavailable capacity; the standalone image remains its existing trial, not a complete player.
+The shared core handles `ignore ID 0|1` and atomic `remove many IDS` over serial and HTTP.
+The microSD adapter supplies external free/total bytes from a generation-safe cache.
+Its query never waits for a FAT scan: a worker counts one raw FAT sector per slice,
+releasing the storage guard between slices. Mounted presence does not wait for
+capacity. Mutations invalidate it, and failed writes keep it unavailable until
+remount rather than trusting potentially unsynchronized allocation state. See
+[the capacity contract](microsd.md#capacity-without-stopping-playback) for supported
+geometry, freshness and unperformed board measurements. The USB-stick compatibility
+backend retains its separate VFS capacity implementation. Neither backend formats
+removable media; a stick is never written, and only files in the card's `odrig`
+folder change as the core asks. Unsupported hosts report unavailable capacity;
+the standalone image remains its existing trial, not a complete player.

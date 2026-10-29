@@ -98,6 +98,13 @@ Every function receives `ctx` as its first argument.
 | `drive_bind` | `int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name)`: optional; gives the place to the file of the drive's folder with this name, so that `drive_name` gives the name and `drive/<place>` opens it. Returns 1, or 0 when that drive is not plugged in any more or the name is not one of the drive. Without it every drive is listed. |
 | `drive_writable` | `int drive_writable(void *ctx, uint32_t drive)`: optional; 1 when the core may change the files of that drive with the storage functions, by the names `drive/<name>`, 0 otherwise. Without it the drive is read only. |
 
+Capacity callbacks must meet the 50 ms per-call budget and must not start or wait
+for an allocation-table scan under a lock playback needs. The microSD firmware
+returns a cached pair or unavailable immediately when its storage guard is busy.
+Mounted presence and write capability do not depend on known capacity. Unknown
+upload preflight capacity is not a promise that a file fits: the existing write,
+validation and catalog transaction must still fail safely on out-of-space.
+
 The core has at most one file open. It reads a file from its first byte towards its last,
 never goes back, and closes it before it opens another. It reads `mapping.json` and
 `show.json` twice each at startup, and reads no clock. With the storage functions it

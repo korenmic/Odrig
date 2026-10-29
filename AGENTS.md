@@ -137,6 +137,7 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Miniature matrix debug mode**, seed 57: planned; app and firmware project the full canvas onto the purchased 10x6 display, with exact approved wiring documented and hardware acceptance checks retained.
 - **Persistent animation brightness overrides**, seed 58: planned; a checkbox saves an animation's brightness independently of the global default.
 - **Message clock widgets and clocks-only mode**, seed 59: planned; seven Hebrew message widgets, exclusive clock playback and ignored file/folder support in both clock modes.
+- **Cross-platform firmware builds**, seed 60: planned for later; compile the default microSD firmware locally on Windows while preserving the macOS pipeline. The owner deferred firmware compilation in the seeds 56–59 run.
 
 The state of every seed is in the `state.json` of its folder.
 

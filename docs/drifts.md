@@ -12091,3 +12091,38 @@ folders of its own previews are gone, by their process ids, and no longer that n
 folder appeared meanwhile.
 
 **Resolution.** `converter/tests/docs.test.js`, `tests/emulator/test_preview.py`.
+
+## Seed 56: capacity work that does not hold playback's filesystem lock
+
+**Question.** Moving `SD.totalBytes()` and `SD.usedBytes()` to another task still
+lets `f_getfree` hold resources needed by reads. How is capacity discovered without
+making unknown capacity mean an absent or read-only card?
+
+**Answer.** Keep mounted generation and write capability independent. The query
+tries the guard without waiting and copies only a complete cache. The card worker
+reads at most one raw 512-byte sector per slice, validates a FAT16/FAT32 volume
+and counts its free allocation units with 64-bit totals. It releases the guard
+and yields between slices. Unsupported/ambiguous partition layouts remain unknown
+rather than counting a different volume; no catalog or animation scan is needed.
+This is bounded discovery, not proof of physical transfer latency or board FPS.
+
+**Resolution.** `firmware/usermod/odrig_sd_capacity.h`,
+`firmware/usermod/odrig_drive.cpp`, `docs/microsd.md` and the seed 56 spec.
+
+## Seed 56: failed writes and stale storage observations
+
+**Question.** Can a raw FAT rescan immediately after a failed write publish exact
+free bytes, and can the app retain its last absent report after losing the target?
+
+**Answer.** Neither is trusted as current information. A failed mutation may leave
+dirty FatFs state newer than media, so capacity remains unavailable until remount;
+ordinary safe writes and catalog access are not disabled merely for unknown space.
+The shared client discards its cached space report on a connection failure, as on
+a refused query or target change. A missing current report says information is
+unavailable; a fresh present card can separately report unknown byte counts.
+The owner deferred this run's firmware compilation to future seed 60; final APK
+build/delivery follows all four software seeds. Physical cold-card/phone acceptance
+remains open and cannot be inferred from the host and browser suites.
+
+**Resolution.** `firmware/usermod/odrig_drive.cpp`, `app/www/client.js`,
+`app/www/capacity.js`, `docs/android-app.md` and seed 56's verification note.
