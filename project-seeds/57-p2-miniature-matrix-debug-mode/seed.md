@@ -69,9 +69,9 @@ build, flash, change a board or instruct the owner to wire an unapproved circuit
    timeout leaves state unknown until read back. Reconnecting or changing targets
    reads that target's state and never enables a mode automatically from a stored
    checkbox. Older firmware is shown as unsupported, not silently treated as off.
-3. Proposed shared command: `debug mini on|off`, with an explicit miniature-mode
-   state/capability in the status reply. Its final addition awaits owner approval
-   below. The same semantics reach the board and emulator through every existing
+3. Approved shared command: `debug mini on|off`, with an explicit miniature-mode
+   state/capability in the status reply. The owner approved this command on
+   2026-10-29. The same semantics reach the board and emulator through every existing
    route and `odrigctl`; no new transport or command family beyond this proposal.
 4. Mode is off at boot, held only in RAM and shared by all clients. Losing the app
    connection does not change it; disabling or rebooting does. No mode setting is
@@ -129,10 +129,11 @@ build, flash, change a board or instruct the owner to wire an unapproved circuit
     supply, enable pins and part/package when required. Matrix DOUT is an output
     for chaining and stays unused here; it is not connected to an ESP input. Do
     not present a XIAO header pin number as an ESP32-S3 header pin number.
-14. Proposed data output is GPIO1, temporarily replacing snake 1, with the full-size
+14. Approved data output is GPIO1, temporarily replacing snake 1, with the full-size
     wall disconnected for this mode. Proposed power/signal arrangement is an
     owner-approved regulated 5 V source and an appropriate 3.3-to-5 V data buffer.
-    These remain proposals until approved below. Determine the actual component
+    The command and GPIO1 arrangement are approved; power/signal conditioning
+    still needs verification and the owner's informed approval below. Determine the actual component
     and its pin numbers from primary documentation before publishing the table.
     Never assume an ESP GPIO supplies matrix power or that 5 V is safe on a GPIO.
 15. Instructions explicitly cover power-off rewiring, required assembly, verified
@@ -169,20 +170,23 @@ the full installation. Seed 56 remains separate.
 
 ## Open Questions Requiring The Owner
 
-These three choices were presented to the owner with recommended answers. Until
-answered, this seed is **not** ready for S2S with zero open questions; an implementer
-must not treat the proposed command or hardware as approved.
+On 2026-10-29 the owner explicitly approved the shared command `debug mini on|off`
+and GPIO1 with the full wall disconnected. These are settled.
 
-1. Approve the shared command `debug mini on|off` and explicit reported mode state?
-   Recommended: yes. Alternative: owner supplies another command name/contract.
-2. Approve GPIO1 as the temporary miniature output with the full wall disconnected?
-   Recommended: yes. Alternative: simultaneous wall output is needed and the scope
-   and a safe output allocation must be agreed first.
-3. Approve the regulated 5 V supply and suitable 3.3-to-5 V level-shifter arrangement?
-   Recommended: allow that arrangement. Alternative: the owner identifies existing
-   parts first and the compatible wiring plan is established from them. No supply
-   capacity, direct-drive compatibility or permission to solder the ESP board is
-   assumed. Assembly of the purchased matrix is a separate owner check.
+The earlier third question was unclear: the owner asked whether to use the ESP's
+5 V pin or its 3V3 pin and said either is acceptable. The matrix's specified power
+is **5 V at VCC**, not the ESP's 3V3 output. GPIO1 is the separate data signal.
+The owner's statement does not prove available supply current, safe simultaneous
+USB power paths or the matrix's input-high threshold, and is not approval to buy
+or require an unidentified signal-level converter.
+
+One hardware item remains before zero-question S2S: establish the exact matrix
+revision's data-level requirements and this board's safe 5 V source, then obtain
+approval of the concrete circuit based on the parts the owner actually has. Prefer
+the existing hardware when supported by primary specifications; do not require a
+level shifter by assumption. If an additional component is necessary, identify it
+and ask the owner plainly before fixing it into the wiring plan. Never suggest
+putting 5 V onto an ESP GPIO. Assembly remains a separate owner check.
 
 ## Definition Of Done
 
