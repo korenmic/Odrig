@@ -1,0 +1,10 @@
+{
+  "number": 56,
+  "slug": "56-p1-sd-capacity-without-blocking-playback",
+  "state": "remaining",
+  "title": "SD capacity without blocking playback",
+  "priority": "P1",
+  "addedAt": "2026-10-29",
+  "addedCommit": "pending-local",
+  "summary": "Make the first SD free-space query bounded and non-blocking, report mounted presence independently of cached capacity, keep the cache generation-safe through mutations and remounts, distinguish stale/unknown storage in the shared app, and verify the reproduced 10.6-second stall is gone."
+}
