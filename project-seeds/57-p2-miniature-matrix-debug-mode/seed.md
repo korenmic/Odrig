@@ -63,6 +63,13 @@ its external positive supply to the ESP's USB-derived 5 V rail.
   group in the README to avoid confusing the two boards' header numbering.
   The photograph establishes visible labels, not a silicon revision, current
   rating, electrical continuity, solder quality or a powered functional test.
+- Owner's ESP32-S3 pinout reference: `references/esp32s3-pinout.png`, supplied on
+  2026-10-29. It labels a separate 5V power pin, GND and GPIO1. The owner explicitly
+  confirmed the board's 5V pin exists, selected its use and instructed that this
+  settle the seed's remaining hardware planning question. Treat that as owner
+  approval of the intended wiring, not a measured current rating or proof that
+  every board pictured online has the same power circuitry. Read the actual board's
+  silkscreen; do not substitute a pin position from a differently oriented image.
 - Manufacturer-linked LED datasheet:
   https://files.seeedstudio.com/wiki/xiao-rgb-matrix/WS2812B-1010-DATASHEET.pdf .
   Its parameter table specifies a 2.8 V minimum high-input threshold at VDD=5 V,
@@ -158,7 +165,7 @@ its external positive supply to the ESP's USB-derived 5 V rail.
     wall disconnected for this mode. The owner selected ESP **5V -> matrix 5V**,
     **ESP GND -> matrix GND**, and **GPIO1 -> matrix IN** as the intended arrangement.
     Do not connect matrix 3V3, OUT or its unused XIAO header signals for this setup.
-    Before publishing this as validated wiring, establish this exact ESP board's
+    As an implementation/commissioning acceptance check, establish this exact ESP board's
     5 V rail/USB protection/current capability and remaining budget after the ESP
     and microSD load, against the matrix demand at the enforced debug cap. Check
     startup and failure states as well as typical animation demand; pin availability
@@ -169,6 +176,9 @@ its external positive supply to the ESP's USB-derived 5 V rail.
     identify the concrete part/circuit and obtain owner approval before substituting
     it; do not silently require a buffer or connect positive supply rails together.
     Never assume an ESP GPIO supplies matrix power or that 5 V is safe on a GPIO.
+    These acceptance checks do not reopen the owner's settled 5V-versus-3V3 choice
+    or block specification. Keep the intended wiring explicit while distinguishing
+    approved planning from electrical measurements still to be recorded before use.
 15. Instructions explicitly cover power-off rewiring, required assembly, verified
     supply/data compatibility, which normal display connections must be removed,
     how the checkbox is enabled and checked, and how to return to the wall. Warn
@@ -208,15 +218,19 @@ GPIO1 with the wall disconnected, and choosing the ESP's 5 V pin rather than 3V3
 for matrix power. The photograph resolves which labelled matrix pads are intended.
 These choices are settled; do not repeatedly ask the owner to choose the voltage.
 
-One electrical verification remains before claiming zero-open-question readiness
-for the complete hardware plan: confirm this exact ESP board's safe available 5 V
-current/power path for the matrix, with the intended peripherals and USB connections.
-This is a factual check, not another voltage preference. The photo of the matrix
-cannot settle it. The documented LED threshold supports direct GPIO data for that
-part; verify the correspondence rather than assuming a mandatory level converter.
-If verification requires changing the selected power arrangement or adding a part,
-present that concrete change to the owner and wait for approval. Assembly and the
-later powered acceptance test remain separate owner checks.
+None requiring an owner answer before S2S. The owner supplied the ESP pinout,
+confirmed the 5V pin and explicitly instructed that the selected 5V arrangement
+close the remaining planning question on 2026-10-29. The intended circuit is
+GPIO1 -> IN, ESP 5V -> matrix 5V and shared GND, with the normal wall disconnected.
+The documented LED threshold supports direct GPIO data for that part; verify the
+correspondence rather than assuming a mandatory level converter. The seed is ready
+for specification with zero open product questions.
+
+Current budget, USB power-path compatibility, assembly and the powered acceptance
+test remain required execution checks, not completed measurements and not open
+voltage-choice questions. Do not claim that a labelled 5V pin alone proves those
+checks. If implementation evidence requires changing the approved circuit or
+adding a part, report the concrete finding and obtain approval before that change.
 
 ## Definition Of Done
 
