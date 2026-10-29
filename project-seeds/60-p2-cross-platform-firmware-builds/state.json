@@ -1,0 +1,10 @@
+{
+  "number": 60,
+  "slug": "60-p2-cross-platform-firmware-builds",
+  "state": "remaining",
+  "title": "Cross-platform firmware builds",
+  "priority": "P2",
+  "addedAt": "2026-10-29",
+  "addedCommit": "pending-local",
+  "summary": "Make the existing firmware setup/build pipeline compile the default microSD firmware locally on Windows while preserving macOS, pinned tools, shared-cache isolation and runtime behavior. Future work approved by the owner; seeds 56-59 may skip their firmware build and continue other deliverables."
+}
