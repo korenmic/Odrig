@@ -117,7 +117,8 @@ The last seven members are the storage functions: three that write a file, `rena
 - A name the core gives any of them is 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_`
   and `.`: `mapping.json`, `show.json`, the name of an `.odrg` file, or one of the names
   the core keeps for itself, `upload.part`, `show.part`, `pending.txt`, `mapping.part`,
-  `order.txt`, `order.part`, `repeats.txt` and `repeats.part`.
+  `order.txt`, `order.part`, `repeats.txt`, `repeats.part`, `clocks.txt`, `clocks.part`,
+  `playlist.txt`, `playlist.part`, `brightness.txt` and `brightness.part`.
 - The core has at most one file being written, gives `write` at most 1,500 bytes in one
   call, and reads a file with `read_at` from offset 0 on, each call where its last call for
   that file ended; only the commands `read` and `catalog page`, and the reads of the files
@@ -289,7 +290,7 @@ setup before opting in; no host-interface struct layout changes.
 
 While active, each central miniature cell averages a 10x10 block of the original
 logical canvas. Source RGB, palette and widget layers are scaled first with the
-normal brightness rounding at `min(brightness,40)`, then their 100 samples are
+normal brightness rounding at `min(selected brightness,40)`, then their 100 samples are
 summed and divided with floor rounding. All side columns stay black. Physical
 order is `x*6+y`, bottom left, in the [README orientation](../README.md#approved-connection-and-orientation).
 The core uses three local channel sums per cell, with no per-frame allocation or
@@ -1269,3 +1270,26 @@ is free. Nothing is written while the tree has no folder and no file exists: a s
 without a card, or with a flat card, makes no storage call more than before. When the
 host fails the part is removed and nothing is refused. The start probes `playlist.part`
 with `read_at` and removes it when it is there, as it does `order.part`.
+
+## Saved animation brightness
+
+The selector in `brightness.cpp` chooses the current file's saved value or the
+runtime default before scaling. Player frames, procedural clocks, text, inserted
+clock/messages and resumed turns share it; miniature output then applies its 40
+cap. Diagnostics without an animation use the default. Power off stays black.
+There is no timing, decoding, mapping, quarantine or random-seed restart.
+
+The bounded internal settings store, retained path identities, file grammar,
+512/32 record limits, errors and recovery are specified in
+[commands.md](commands.md#saved-animation-brightness). Startup/remount fills caches;
+playback neither scans media nor reads animation bodies for preferences. Internal
+values/presence use existing item padding/flags.32 external values use 5-byte
+records beside compact 6-byte repeat records with full 32-bit positions/16-bit counts.
+The independent 128-byte reader preserves the 512-byte stack-frame compiler bound.
+
+The measured 100-item Windows host requests 131069 bytes with a drive,21 allocation
+blocks, and the Core object is 3944 bytes. Existing 128 KiB/4096 limits remain unchanged;
+no allocation is added per frame. The store streams and verifies a part before
+publishing it, keeps prior usable cache after failed updates, and discards partial
+startup application if the settings file is damaged. `dimming` is additive status;
+the existing `brightness` member remains the runtime default.

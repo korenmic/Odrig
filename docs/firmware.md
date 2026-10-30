@@ -496,10 +496,12 @@ whether it is sound is not known yet.
    `order.txt` of [show.md](show.md#the-saved-playlist-order), the saved playlist,
    `playlist.txt` of [core.md](core.md#the-saved-playlist), the saved repeats,
    `repeats.txt` of [show.md](show.md#the-saved-repeats), and the clocks' two settings,
-   `clocks.txt` of `clocks on|off` and `clocks message on|off` in
+   `clocks.txt` of `clocks on|off` and `clocks message on|off`, and saved animation
+   brightness in `brightness.txt`, described in
    [commands.md](commands.md), may be files of the folder; a folder without them keeps the
    board's, as installing animations does not change the order, the playlist, the repeats
-   or the clocks' settings the operator chose.
+   or the clocks' settings and animation brightness the operator chose. An explicitly
+   supplied settings file replaces that file; one omitted from the folder is kept.
 5. In that image it changes only what differs. A file of the folder that `/odrig` holds
    with the same bytes stays where it is, neither read nor written. A new file is written
    under its name, and a changed one under a spare name, `~0`, `~1` and so on, which then
@@ -671,7 +673,7 @@ python3 firmware/fw.py read-show build/show-from-board
 ```
 
 Copies the files of `/odrig` on the board into a folder that is new or empty, among them
-`order.txt`, `playlist.txt`, `repeats.txt` and `clocks.txt` when the board has them, prints each name with
+`order.txt`, `playlist.txt`, `repeats.txt`, `clocks.txt` and `brightness.txt` when the board has them, prints each name with
 its size, and restarts the board. The folder can then be compared with the one
 the emulator ran:
 
@@ -1429,7 +1431,9 @@ committed by one rename. Moving an animation in the saved order writes `order.pa
 renames it onto `order.txt` the same way, saving or restoring a repeat writes
 `repeats.part` and renames it onto `repeats.txt`, switching the clocks or their message on
 or off writes `clocks.part` and renames it onto `clocks.txt`, and the choice of a playlist
-writes `playlist.part` and renames it onto `playlist.txt`. What one change writes:
+writes `playlist.part` and renames it onto `playlist.txt`. Saved animation brightness
+writes `brightness.part`, closes it durably and verifies it before renaming it onto
+`brightness.txt`; no animation, show or catalog file is changed. What one change writes:
 
 | Change | What is written | Bytes |
 |---|---|---|

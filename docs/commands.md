@@ -21,7 +21,9 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `play all` | Plays the playlist, from its first animation, and makes the root playlist current. |
 | `on` | Switches the LEDs on. |
 | `off` | Switches the LEDs off: every LED is dark. Playback time keeps running. |
-| `brightness <n>` | Sets brightness, 0 to 255. |
+| `brightness <n>` | Sets the runtime default brightness, 0 to 255. |
+| `brightness <id> <n> save` | Saves brightness for the listed animation's file, including zero, without changing the default. |
+| `brightness <id> default` | Removes that file's saved brightness, using the latest default immediately if it is playing. |
 | `status` | Reports the current state. |
 | `fault` | Reports the latest fault of a file since the start. |
 | `space` | Reports the free and the total storage and the number of animations. |
@@ -63,15 +65,66 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 
 At power-on the LEDs are on, brightness is the value in `show.json`, and the show plays
 what [show.md](show.md) says it plays by itself: the playlist of its included animations, or
-the cycle its `start` names. What `on`, `off` and `brightness` change is not kept across a
+the cycle its `start` names. What `on`, `off` and ordinary `brightness <n>` change is not kept across a
 restart, nor is a `play` of an animation or a cycle; the playlist that `play` makes
 current, a folder of the card or the root, is kept with the time spent in its window, see
 [show.md](show.md#the-playlist). What `remove` and `upload` change is: they change the
 installed show.
 
-Brightness scales every colour value v to `(v * brightness + 127) / 255`, rounded down.
+Brightness scales every colour value v to `(v * selected + 127) / 255`, rounded down,
+where selected is the file's saved override or the runtime default. Overrides replace
+the default; they do not multiply it. A nonzero override still shows when the default
+is zero. Power off always makes every LED black. Miniature output then caps the
+selected value at 40; WLED's existing current limiter remains in force.
 
 A number in a command is written in decimal digits.
+
+## Saved animation brightness
+
+`brightness ID VALUE save` durably saves 0..255 for the listed animation's file;
+`brightness ID default` removes it. Both work for a noncurrent animation too.
+Cycles and folders are `in-use`, an unlisted ID is `unknown-id`, checking/upload
+conflicts are `busy`, a failed settings operation is `storage-error`, and a full
+settings file is `no-space`. Malformed forms/ranges are `bad-argument`.
+An unchanged save writes nothing. A successful reply means the complete setting
+was verified and published; clients then read fresh `status` to confirm it.
+
+Identity is the internal filename or the full external path, in separate namespaces,
+as for saved repeats. Internal items naming the same file share its value. The same
+external path on a replacement card inherits its value. Replacement/restoration at
+the same path retains it; a rename is a different identity. Deleted, absent and
+unlisted paths are retained indefinitely, with no eviction. Settings stay on the
+board's internal storage even when the animation is on read-only media.
+
+`brightness.txt` uses LF line endings, this header and records:
+
+```
+odrig-brightness 1
+0 f hello.odrg
+27 x night/comet.odrg
+```
+
+There may be 512 records total and at most 32 external records, including retained
+absent paths. First matching record wins. Changing/removing an existing entry works
+at capacity; adding another is refused. The tool's ordinary install preserves this
+file, an explicit copy replaces it, and read-show includes it. Neither animation
+bytes nor show/catalog bytes or generations change for a brightness edit.
+
+Publication writes `brightness.part`, closes it durably, verifies its complete
+grammar/bytes/CRC and atomically renames it. Failed operations retain the last
+usable published setting. Startup ignores an abandoned part. A missing file means
+defaults; corrupt/truncated/over-limit settings log `brightness unreadable`, use
+defaults and report `dimming.error:"settings-unreadable"`. Saves are then refused
+with `storage-error` until a deliberate repair/replacement. Restore a known-good
+file, or deliberately reset all overrides to the header alone; ordinary brightness
+commands do not repair or erase settings. Preserve a copy before such maintenance.
+
+`status.brightness` always reports the runtime default. `dimming.value` reports
+the selected value before blackout/mini cap and `dimming.saved` is null or the
+override, including zero. They refer to the same animation/file as status. Off is
+still unconditionally black; returning from a clock/message selects the resumed
+file's override or latest default without restarting its timing. Missing/null
+`dimming` means no override support, and ordinary default commands remain usable.
 
 ## Status reply
 

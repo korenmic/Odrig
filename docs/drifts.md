@@ -12290,3 +12290,26 @@ identity regression. Fixed startup allocations remain below the existing bounds:
 Core3944 bytes and the100-item drive case131069 bytes, with full position/count
 domains preserved. Independent128-byte settings reads keep compiler stack frames
 within the existing512-byte limit.
+
+## 2026-10-30 — bounded saved brightness and app confirmation
+
+Saved brightness uses internal namespace/path records retained even for absent files,
+with 512 total and 32 external records and no eviction. A 128-byte independent reader
+preserves decoder ownership and the 512-byte stack-frame bound. Existing item padding,
+full-domain 6-byte repeat records,5-byte brightness records and private-field alignment
+keep the 100-item drive allocation 131069 bytes and Core 3944 without raising limits.
+One selector supplies player and miniature output; `status.brightness` stays the
+runtime default and additive `dimming` aligns with the status file identity.
+
+The app captures target epoch, animation ID/file and mode. Dirty or already-entered
+numeric edits require later status before capture; every override release commits
+its final value, with unchanged writes elided in the core. Only valid status restores
+status freshness after communication failure. Other command replies cannot make old
+override data editable. Firmware tools preserve/replace/read back brightness.txt.
+These technical resolutions do not close electrical, board or phone acceptance;
+firmware compilation remains deferred to the separately planned seed 60.
+
+Integrated verification also showed that a held brightness draft must be discarded
+when status freshness is lost, even if the same file returns after recovery. The
+controller's edit binding includes freshness, so releasing an interrupted drag
+cannot resend the discarded value. The failing70-versus20 regression then passed.

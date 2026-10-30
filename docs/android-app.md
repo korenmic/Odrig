@@ -18,9 +18,10 @@ a top bar with the app's name and whether the installation answers.
   row and expands it again. Under them the panel says what plays, the animation on the
   LEDs with its id and its file name, before them the square of its preview as a row has
   it, hidden while nothing plays, while a test shows and while the list does not hold the
-  animation yet, `ON` or `OFF`, the brightness and the refreshes a second, the line `Set
-  the brightness to` with a field that holds the brightness as a number, and the big
-  slider for it under them: the field and the slider follow each other both ways. The
+  animation yet, `ON` or `OFF`, the selected brightness and the refreshes a second,
+  `Default brightness` or `This animation's brightness` beside its numeric field,
+  and the shortened slider with `Override for this animation` beside it. The field
+  and slider follow each other both ways, and the current file is named. The
   panel shows no line of what plays, such as `Playlist` or `Cycle 3`, and no words `On`
   and `Off`. Under the name of the animation on the LEDs stands its bar while a
   playlist turn plays it, the root's or a folder's, and the level shown holds it: its row menu's
@@ -109,7 +110,7 @@ a top bar with the app's name and whether the installation answers.
   travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-forty-two command lines and no other, each as `POST /odrig` to the address that is set:
+forty-four command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -118,7 +119,9 @@ forty-two command lines and no other, each as `POST /odrig` to the address that 
 | Taps a row of the list, or presses `Play this folder` inside a folder | `play <id>` |
 | Presses `Play this folder` at the root | `play all` |
 | Presses the power icon while the LEDs are off, or while they are on | `on`, `off` |
-| Moves the slider, or enters a brightness in its field | `brightness <n>` |
+| Moves the slider, or enters a brightness with the override unchecked | `brightness <n>` |
+| Checks the brightness override, or commits an edit while checked | `brightness <id> <n> save` |
+| Unchecks the brightness override | `brightness <id> default` |
 | Nothing: at boot, reconnect, return to the app, entering Animations or Upload, every ten seconds while either is visible, and after upload or deletion | `space` |
 | Chooses Delete in a row's menu and then `Remove it` | `remove <id>` |
 | Chooses Ignore in playlist or Restore to playlist in a row's menu | `ignore <id> <0-or-1>` |
@@ -336,6 +339,35 @@ emulator. The phone check remains open: actual tapping/readback, another client'
 change, disconnect/reconnect, restart with mode off, failure recovery, readability
 outside Settings, and the matrix/board observations. No phone acceptance or new
 firmware build is implied by the web tests.
+
+### Saved animation brightness controls
+
+Animations places **Override for this animation** beside the shortened slider and
+names the current file. Unchecked, its slider/number field edits **Default brightness**
+with ordinary throttled commands. Checked, it edits **This animation's brightness**;
+a drag commits one durable save when released. Zero is a valid saved value, and
+power off does not replace the editable value with a cap or blackout value.
+
+Checking captures the target-confirmed selected value. Unchecking removes the
+override and immediately uses the latest default. Valid dirty numeric text is
+committed and read back first; invalid text blocks the switch. An Enter/Done edit
+already in flight is also confirmed before capture. A reply acknowledges a command;
+only subsequent status confirms its setting. The checkbox is never stored on the
+phone. Reload, reconnect and changes from another client follow target status.
+
+Input captures target epoch, animation ID, full file and mode. Identity changes
+cancel unsent edits; queued commands validate the capture, sent commands retain it,
+and late replies cannot repaint another identity. Missing/null capability retains
+default controls but disables overrides. Unknown or malformed status, no known file,
+and damaged settings explain why saving is unavailable. A non-status reply cannot
+restore status freshness after a failure. Uncertain saves are not automatically
+repeated; readback determines what the target kept.
+
+Storage identity, limits, corruption recovery and default/zero precedence are in
+[commands.md](commands.md#saved-animation-brightness). Browser/emulator proof is in
+the seed 58 verification document. Board/phone acceptance remains open, including
+restart retention and removing an override at brightness 40 or less. Firmware
+compilation is deferred to seed 60; the final APK follows all 56–59 software.
 
 ### Playback and storage
 
@@ -1167,7 +1199,7 @@ By programs, on a Mac:
   `This board` chosen instead, each refusal in words, and no choice for a card it cannot
   write; `Delete` of a card's animation, one with a fault among them, and none on a card
   that cannot be written; the storage lines and the badges of both kinds of card.
-- That the web code sends the forty-two lines above and no other, and names no address
+- That the web code sends the forty-four lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted

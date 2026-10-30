@@ -87,6 +87,13 @@ the entry links to it.
   line of JSON. See
   [commands.md](../docs/commands.md).
 
+- **default brightness**: The runtime brightness initialized from the show. An ordinary
+  brightness command changes it until restart; it is used when an animation has no override.
+- **animation brightness override**: A saved 0..255 value for a file, replacing the default
+  whenever that file plays. Zero is present, not missing. It stays on internal storage,
+  even for a read-only card's animation. See
+  [commands.md](../docs/commands.md#saved-animation-brightness).
+
 ## The programs
 
 - **converter**: The command-line tool in `converter/`, written in JavaScript and started

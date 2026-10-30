@@ -210,6 +210,18 @@ class BrightnessControls(unittest.TestCase):
         self.assertEqual(seen["recovered"]["slider"], 128)
         self.assertEqual(target.sent(), [])
 
+    def test_uncertainty_discards_a_held_override_instead_of_resending_it(self):
+        target = Target(self, saved=20)
+        def malformed():
+            target.malformed = True
+        def recover():
+            target.malformed = False
+        seen = run(target, [dict(slide=70), dict(step=True, until=dict(unknown=True, disabled=True)),
+            dict(step=True, until=dict(unknown=False, disabled=False), look="recovered"),
+            dict(release=True, wait=300)], steps=[malformed, recover])
+        self.assertEqual(seen["recovered"]["number"], "20")
+        self.assertEqual(target.sent(), [])
+
     def test_other_command_replies_cannot_revalidate_a_failed_brightness_status(self):
         target = Target(self, saved=20)
         def malformed():

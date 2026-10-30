@@ -11,6 +11,7 @@ GROUPS = ("The installation", "What is played", "The programs", "How the work is
 WORDS = (
     "board", "pin", "canvas", "strip", "leg", "snake", "mapping", "bench build", "target",
     "animation", "frame", "refresh", "source", "JSON frames", "ODRG", "generator", "show", "item", "cycle", "playlist", "turn", "clock break", "installed file set", "command",
+    "default brightness", "animation brightness override",
     "converter", "Python library", "core", "host", "emulator", "firmware", "command tool", "operators' app", "preview", "collection",
     "owner", "seed", "spec", "task", "drift",
 )

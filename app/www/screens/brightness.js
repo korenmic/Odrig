@@ -74,13 +74,14 @@ function cancelEdit() {
 export function draw(state) {
   const status = state.status;
   const current = snapshot();
-  const changed = binding !== key(current);
+  const currentBinding = JSON.stringify([key(current), state.statusFresh]);
+  const changed = binding !== currentBinding;
   if (pending !== null && key(pending.snapshot, false) !== key(current, false)) {
     pending.finish(false);
     pending = null;
   }
   if (changed) {
-    binding = key(current);
+    binding = currentBinding;
     cancelEdit();
     note = null;
     unconfirmedAt = -1;

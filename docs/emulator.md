@@ -830,6 +830,8 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] on
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] off
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] brightness N
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] brightness ID N save
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] brightness ID default
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] status
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] fault
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] space
@@ -1571,3 +1573,14 @@ The controller follows confirmed status and never restores a locally saved mini
 setting after reload, target change or reconnect. These virtual/browser checks
 do not prove the [physical wiring](../README.md#miniature-display-debug-mode),
 electrical readiness, actual LED order, frame rate or behavior on an Android phone.
+
+## Saved animation brightness
+
+`odrigctl` sends `brightness N`, `brightness ID N save` and `brightness ID default`
+over the same serial/TCP/HTTP routes. The emulator's shared core keeps
+`brightness.txt` internally, including preferences for `--drive-read-only` paths;
+animation/show/catalog bytes do not change. Status reports the runtime default in
+`brightness` and the selected/saved value in `dimming`. Restart and remount rebuild
+the same path-based caches as the board. Limits and deliberate corruption recovery
+are in [commands.md](commands.md#saved-animation-brightness). These host checks do
+not prove board timing, firmware compilation or phone/LED acceptance.

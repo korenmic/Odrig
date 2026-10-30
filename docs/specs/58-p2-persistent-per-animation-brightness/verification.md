@@ -149,3 +149,54 @@ layout and the real emulator. No clean aggregate exit is claimed: its recorded
 five failures were corrected/rechecked, and all other assertions passed with19
 emulator platform skips. Logs are `build/seed58-task3-*.log`. Final cumulative
 verification and documentation remain task4; board/phone acceptance stays open.
+
+## Deterministic persistence and transition smoke
+
+The shared emulator binding and real folder host passed 114 virtual 20ms ticks across
+two boots. Saved zero and a second file's 19 survived restart while the runtime
+default 83 reverted to the show's 128. Removing an override selected the latest
+default 83 immediately. Off stayed black while status retained the editable selected
+value; miniature mode rebooted off and used 19 or its 40 cap after selection. Normal
+output was 10800 bytes and miniature output 180 bytes. Exact miniature SHA-256:
+
+- At 19: `52d462cb61d6ece01d968fc599a347c273fe4a93d350f1ded2bcad18536e93eb`.
+- At 40: `a2905446947302d726f2807c4235f45f4c78c4f9a4ab2916599b87015d0dad33`.
+
+Original mapping/show/animation bytes were unchanged; only brightness.txt was added,
+and explicit removals left its header alone. Evidence is `build/seed58-smoke.json`.
+The first smoke harness attempt needed a str-to-Path conversion; no product
+assertion failed. Virtual ticks are not a board frame-rate measurement.
+
+Integrated review also reproduced a held-edit uncertainty fault: after malformed
+status/recovery, the draft 70 remained instead of the confirmed 20. The controller
+now includes status freshness in its edit binding, dropping the interrupted draft
+and preventing its later release from resending it. This corrects requirement 4.4
+within the existing scope; the new regression was seen failing before the fix.
+
+## Cumulative supported verification
+
+Run `20261030-141126-97636` discovered all eight supported suites:
+
+| Suite | Tests | Result |
+|---|---:|---|
+| JavaScript converter | 1581 | Passed |
+| Python library/converter | 552 | Passed |
+| Core | 986 | Passed, 1 skip |
+| Test runner | 22 | Passed |
+| Mapping | 43 | Passed |
+| Onboarding | 88 | Initial exact-vocabulary failure; all 88 passed after adding the two documented terms in reading order |
+| Emulator/command tool | 649 | 19 platform skips; one Windows socket error passed unchanged in its final recheck |
+| Shared app | 396 | Passed |
+
+The aggregate exit was nonzero because of that vocabulary contract and
+`WinError10055` in `TheApp.test_the_address_app_gives_the_apps_index`. Both are
+verified by `seed58-task4-onboarding-final.log` and `seed58-task4-resource-final.log`.
+The final controller, including the additional uncertainty regression, passed all
+20 brightness and 20 existing control cases in `seed58-task4-controls-final.log`.
+Documentation contracts passed 37 cases in `seed58-task4-docs-final.log`.
+The drift log change is append-only. No failure is left unverified; no clean
+initial aggregate exit, full firmware build, board timing or phone acceptance is
+claimed. Firmware compilation remains the separately planned seed60. Final APK,
+dedicated persistent key and Drive replacement follow seed59, as requested.
+
+Software tasks 1–4 are complete. Task5 stays unchecked for the later owner session.

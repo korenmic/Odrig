@@ -133,9 +133,9 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Previews at once, each as soon as it is known**, seed 49: by name and size from the default catalog, and keys kept on the phone.
 - **A brightness field beside the slider, and a bar for the animation playing now**, seed 47 and seed 48: built; the phone checks are open, and seed 48's `repeat` needs its firmware on the board.
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
-- **Nonblocking SD capacity reporting**, seed 56: planned; avoid a cold free-space query freezing playback and command replies.
+- **Nonblocking SD capacity reporting**, seed 56: software built; cold capacity scanning is bounded and cached. Board timing and phone acceptance remain open.
 - **Miniature matrix debug mode**, seed 57: software built; app and firmware source project the full canvas onto the purchased 10x6 display, with exact approved wiring documented. Firmware compilation, electrical commissioning and board/phone acceptance remain open.
-- **Persistent animation brightness overrides**, seed 58: planned; a checkbox saves an animation's brightness independently of the global default.
+- **Persistent animation brightness overrides**, seed 58: software built; a checkbox saves brightness by file independently of the runtime default. Board and phone acceptance are open.
 - **Message clock widgets and clocks-only mode**, seed 59: planned; seven Hebrew message widgets, exclusive clock playback and ignored file/folder support in both clock modes.
 - **Cross-platform firmware builds**, seed 60: planned for later; compile the default microSD firmware locally on Windows while preserving the macOS pipeline. The owner deferred firmware compilation in the seeds 56–59 run.
 

@@ -21,7 +21,7 @@
   failures, unsupported/unknown/reconnect states and320px/landscape/pinned layouts
   against stand-ins and real emulator. Run app/emulator suites by discovery.
 
-- [ ] 4. Document brightness preferences and record integrated verification.
+- [x] 4. Document brightness preferences and record integrated verification.
   Update command/core/app/emulator/firmware/storage docs and vocabulary, append
   technical resolutions and record limits/recovery/default-zero behavior. Run
   supported suites and deterministic emulator persistence/transition smoke. Keep
