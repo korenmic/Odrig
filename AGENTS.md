@@ -136,7 +136,7 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Nonblocking SD capacity reporting**, seed 56: software built; cold capacity scanning is bounded and cached. Board timing and phone acceptance remain open.
 - **Miniature matrix debug mode**, seed 57: software built; app and firmware source project the full canvas onto the purchased 10x6 display, with exact approved wiring documented. Firmware compilation, electrical commissioning and board/phone acceptance remain open.
 - **Persistent animation brightness overrides**, seed 58: software built; a checkbox saves brightness by file independently of the runtime default. Board and phone acceptance are open.
-- **Message clock widgets and clocks-only mode**, seed 59: planned; seven Hebrew message widgets, exclusive clock playback and ignored file/folder support in both clock modes.
+- **Message clock widgets and clocks-only mode**, seed 59: software built; seven complete Hebrew message widgets, exclusive clock playback and persistent own/ancestor exclusions in both clock modes. Board and phone acceptance remain open.
 - **Cross-platform firmware builds**, seed 60: planned for later; compile the default microSD firmware locally on Windows while preserving the macOS pipeline. The owner deferred firmware compilation in the seeds 56–59 run.
 
 The state of every seed is in the `state.json` of its folder.

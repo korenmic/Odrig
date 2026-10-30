@@ -32,6 +32,27 @@ def message_file(messages=(('hello', 0),), tab=1):
 
 
 class MessageClock(unittest.TestCase):
+    def test_delivered_message_assets_match_converter_at_each_caption_and_loop(self):
+        from odrig import messageclock
+        folder = support.ROOT / 'collection/card/clocks/message'
+        paths = sorted(folder.glob('v7-*.odrgx'))
+        self.assertEqual(len(paths), 7)
+        for path in paths:
+            data = path.read_bytes()
+            decoded = messageclock.decode(data)
+            times, at = [0, 300, 600, 2000, 2250, 2500], 0
+            for message in decoded['messages']:
+                times.extend([at, at + 700, at + message['duration'] - 1])
+                if message['flags'] & 4:
+                    times.extend([at + 3499, at + 3500, at + 5000])
+                at += message['duration']
+            times.extend([at, at + 700])
+            for seed in (12345, 0xffffffff):
+                with self.subTest(path=path.name, seed=seed):
+                    pictures = support.rendered(data, times, seed)
+                    self.assertEqual(pictures, converter_pictures(path, times, seed))
+                    self.assertEqual(pictures[0], pictures[-2])
+
     def test_valid_message_clock_is_accepted_by_the_shared_decoder(self):
         decoded, = support.decode_each([message_file()])
         self.assertIsNone(decoded.reason)

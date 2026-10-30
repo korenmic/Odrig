@@ -31,7 +31,7 @@
   reconnect, other clients, small/landscape layouts and real emulator behavior.
   Run app/emulator suites by discovery.
 
-- [ ] 5. Generate and deliver the seven widgets with integrated proof.
+- [x] 5. Generate and deliver the seven widgets with integrated proof.
   Build reproducible source masks/metadata, exact Hebrew sequences, widget/GIF/.md
   assets and thumbnail entries, preserving the old message. Visually compare with
   the retained HTML at fixed times/seeds; document font/decoration adaptations.

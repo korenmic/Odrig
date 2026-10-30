@@ -1,0 +1,1166 @@
+{
+  "seed": 12345,
+  "stepMs": 20,
+  "samples": [
+    {
+      "tab": 1,
+      "seed": 12345,
+      "t": 700,
+      "section": 1,
+      "index": 0,
+      "elapsed": 0.7000000000000003,
+      "motionTime": 0.7000000000000003,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        0
+      ],
+      "caption": "זה לא הזמן"
+    },
+    {
+      "tab": 1,
+      "seed": 12345,
+      "t": 6800,
+      "section": 1,
+      "index": 1,
+      "elapsed": 6.799999999999943,
+      "motionTime": 6.799999999999943,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        3
+      ],
+      "caption": "זה המרחב"
+    },
+    {
+      "tab": 1,
+      "seed": 12345,
+      "t": 12900,
+      "section": 1,
+      "index": 2,
+      "elapsed": 12.899999999999814,
+      "motionTime": 12.899999999999814,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        5,
+        6
+      ],
+      "caption": "זו התודעה"
+    },
+    {
+      "tab": 1,
+      "seed": 12345,
+      "t": 19000,
+      "section": 1,
+      "index": 3,
+      "elapsed": 18.999999999999684,
+      "motionTime": 18.975830857142554,
+      "stopAt": 18.3199999999997,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        5,
+        9
+      ],
+      "caption": "תרגישו את זה זז"
+    },
+    {
+      "tab": 1,
+      "seed": 12345,
+      "t": 21700,
+      "section": 1,
+      "index": 3,
+      "elapsed": 21.699999999999626,
+      "motionTime": 20.059893924197972,
+      "stopAt": 18.3199999999997,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        6,
+        0
+      ],
+      "caption": "תרגישו את זה זז"
+    },
+    {
+      "tab": 1,
+      "seed": 12345,
+      "t": 21900,
+      "section": 1,
+      "index": 3,
+      "elapsed": 21.899999999999622,
+      "motionTime": 20.05999999999972,
+      "stopAt": 18.3199999999997,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        6,
+        0
+      ],
+      "caption": "תרגישו את זה זז"
+    },
+    {
+      "tab": 1,
+      "seed": 12345,
+      "t": 23300,
+      "section": 1,
+      "index": 3,
+      "elapsed": 23.299999999999592,
+      "motionTime": 20.05999999999972,
+      "stopAt": 18.3199999999997,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        6,
+        0
+      ],
+      "caption": "תרגישו את זה זז"
+    },
+    {
+      "tab": 1,
+      "seed": 12345,
+      "t": 25100,
+      "section": 1,
+      "index": 4,
+      "elapsed": 25.099999999999554,
+      "motionTime": 20.05999999999972,
+      "stopAt": 18.3199999999997,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        6,
+        0
+      ],
+      "caption": "מרגישים?"
+    },
+    {
+      "tab": 1,
+      "seed": 12345,
+      "t": 31200,
+      "section": 1,
+      "index": 5,
+      "elapsed": 31.199999999999424,
+      "motionTime": 20.05999999999972,
+      "stopAt": 18.3199999999997,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        6,
+        0
+      ],
+      "caption": "זז לכם?"
+    },
+    {
+      "tab": 2,
+      "seed": 12345,
+      "t": 700,
+      "section": 2,
+      "index": 0,
+      "elapsed": 0.7000000000000003,
+      "motionTime": 0.7000000000000003,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        0
+      ],
+      "caption": "זה לא הזמן"
+    },
+    {
+      "tab": 2,
+      "seed": 12345,
+      "t": 6800,
+      "section": 2,
+      "index": 1,
+      "elapsed": 6.799999999999943,
+      "motionTime": 6.799999999999943,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        3
+      ],
+      "caption": "זו הסימטריה"
+    },
+    {
+      "tab": 2,
+      "seed": 12345,
+      "t": 12900,
+      "section": 2,
+      "index": 2,
+      "elapsed": 12.899999999999814,
+      "motionTime": 12.899999999999814,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        5,
+        6
+      ],
+      "caption": "זו הגאומטריה"
+    },
+    {
+      "tab": 2,
+      "seed": 12345,
+      "t": 19000,
+      "section": 2,
+      "index": 3,
+      "elapsed": 18.999999999999684,
+      "motionTime": 18.999999999999684,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        5,
+        9
+      ],
+      "caption": "זה המרחק"
+    },
+    {
+      "tab": 3,
+      "seed": 12345,
+      "t": 700,
+      "section": 3,
+      "index": 0,
+      "elapsed": 0.7000000000000003,
+      "motionTime": 0.7000000000000003,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        0
+      ],
+      "caption": "זה לא הזמן"
+    },
+    {
+      "tab": 3,
+      "seed": 12345,
+      "t": 6800,
+      "section": 3,
+      "index": 1,
+      "elapsed": 6.799999999999943,
+      "motionTime": 6.799999999999943,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        3
+      ],
+      "caption": "זו הטמפרטורה."
+    },
+    {
+      "tab": 3,
+      "seed": 12345,
+      "t": 12900,
+      "section": 3,
+      "index": 2,
+      "elapsed": 12.899999999999814,
+      "motionTime": 12.899999999999814,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        5,
+        6
+      ],
+      "caption": "הזמן חם"
+    },
+    {
+      "tab": 3,
+      "seed": 12345,
+      "t": 19000,
+      "section": 3,
+      "index": 3,
+      "elapsed": 18.999999999999684,
+      "motionTime": 18.999999999999684,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        5,
+        9
+      ],
+      "caption": "מתחמם"
+    },
+    {
+      "tab": 3,
+      "seed": 12345,
+      "t": 25100,
+      "section": 3,
+      "index": 4,
+      "elapsed": 25.099999999999554,
+      "motionTime": 25.099999999999554,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        6,
+        2
+      ],
+      "caption": "רותח"
+    },
+    {
+      "tab": 3,
+      "seed": 12345,
+      "t": 31200,
+      "section": 3,
+      "index": 5,
+      "elapsed": 31.199999999999424,
+      "motionTime": 31.199999999999424,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        6,
+        5
+      ],
+      "caption": "הזמן נשרף"
+    },
+    {
+      "tab": 4,
+      "seed": 12345,
+      "t": 700,
+      "section": 4,
+      "index": 0,
+      "elapsed": 0.7000000000000003,
+      "motionTime": 0.7000000000000003,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        0
+      ],
+      "caption": "מה אתם מחפשים?"
+    },
+    {
+      "tab": 4,
+      "seed": 12345,
+      "t": 6800,
+      "section": 4,
+      "index": 1,
+      "elapsed": 6.799999999999943,
+      "motionTime": 6.799999999999943,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        3
+      ],
+      "caption": "את השעה?"
+    },
+    {
+      "tab": 4,
+      "seed": 12345,
+      "t": 12900,
+      "section": 4,
+      "index": 2,
+      "elapsed": 12.899999999999814,
+      "motionTime": 12.899999999999814,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        5,
+        6
+      ],
+      "caption": "היא הייתה פה קודם"
+    },
+    {
+      "tab": 4,
+      "seed": 12345,
+      "t": 19000,
+      "section": 4,
+      "index": 3,
+      "elapsed": 18.999999999999684,
+      "motionTime": 18.999999999999684,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        5,
+        9
+      ],
+      "caption": "פספסתם"
+    },
+    {
+      "tab": 4,
+      "seed": 12345,
+      "t": 25100,
+      "section": 4,
+      "index": 4,
+      "elapsed": 25.099999999999554,
+      "motionTime": 25.099999999999554,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        6,
+        2
+      ],
+      "caption": "נסו שוב"
+    },
+    {
+      "tab": 4,
+      "seed": 12345,
+      "t": 31200,
+      "section": 4,
+      "index": 5,
+      "elapsed": 31.199999999999424,
+      "motionTime": 31.199999999999424,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        6,
+        5
+      ],
+      "caption": "לאט יותר"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 700,
+      "section": 5,
+      "index": 0,
+      "elapsed": 0.7000000000000003,
+      "motionTime": 0.7000000000000003,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        0
+      ],
+      "caption": "עשר"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 2700,
+      "section": 5,
+      "index": 1,
+      "elapsed": 2.700000000000002,
+      "motionTime": 2.700000000000002,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        1
+      ],
+      "caption": "תשע"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 4700,
+      "section": 5,
+      "index": 2,
+      "elapsed": 4.699999999999988,
+      "motionTime": 4.699999999999988,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        2
+      ],
+      "caption": "שמונה"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 6700,
+      "section": 5,
+      "index": 3,
+      "elapsed": 6.699999999999945,
+      "motionTime": 6.699999999999945,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        3
+      ],
+      "caption": "שבע"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 8700,
+      "section": 5,
+      "index": 4,
+      "elapsed": 8.699999999999903,
+      "motionTime": 8.699999999999903,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        4
+      ],
+      "caption": "שש"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 10700,
+      "section": 5,
+      "index": 5,
+      "elapsed": 10.69999999999986,
+      "motionTime": 10.69999999999986,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        5
+      ],
+      "caption": "חמש"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 12700,
+      "section": 5,
+      "index": 6,
+      "elapsed": 12.699999999999818,
+      "motionTime": 12.699999999999818,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        5,
+        6
+      ],
+      "caption": "ארבע"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 14700,
+      "section": 5,
+      "index": 7,
+      "elapsed": 14.699999999999775,
+      "motionTime": 14.699999999999775,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        5,
+        7
+      ],
+      "caption": "שלוש"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 16700,
+      "section": 5,
+      "index": 8,
+      "elapsed": 16.699999999999733,
+      "motionTime": 16.699999999999733,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        5,
+        8
+      ],
+      "caption": "שתיים"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 18700,
+      "section": 5,
+      "index": 9,
+      "elapsed": 18.69999999999969,
+      "motionTime": 18.69999999999969,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        5,
+        9
+      ],
+      "caption": "אחת"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 20700,
+      "section": 5,
+      "index": 10,
+      "elapsed": 20.699999999999648,
+      "motionTime": 20.699999999999648,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        6,
+        0
+      ],
+      "caption": "אפס"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 22700,
+      "section": 5,
+      "index": 11,
+      "elapsed": 22.699999999999605,
+      "motionTime": 22.699999999999605,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        6,
+        1
+      ],
+      "caption": "קטע"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 28800,
+      "section": 5,
+      "index": 12,
+      "elapsed": 28.799999999999475,
+      "motionTime": 28.799999999999475,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        6,
+        4
+      ],
+      "caption": "לא קרה כלום"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 34900,
+      "section": 5,
+      "index": 13,
+      "elapsed": 34.89999999999986,
+      "motionTime": 34.89999999999986,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        6,
+        7
+      ],
+      "caption": "יודעים למה?"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 41000,
+      "section": 5,
+      "index": 14,
+      "elapsed": 41.00000000000081,
+      "motionTime": 41.00000000000081,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        7,
+        0
+      ],
+      "caption": "כי זה לא הזמן"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 47100,
+      "section": 5,
+      "index": 15,
+      "elapsed": 47.100000000001764,
+      "motionTime": 47.100000000001764,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        7,
+        3
+      ],
+      "caption": "זה המקום"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 53200,
+      "section": 5,
+      "index": 16,
+      "elapsed": 53.20000000000272,
+      "motionTime": 53.20000000000272,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        7,
+        6
+      ],
+      "caption": "המקום עליו אתם עומדים"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 59300,
+      "section": 5,
+      "index": 17,
+      "elapsed": 59.30000000000367,
+      "motionTime": 59.30000000000367,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        8,
+        5,
+        9,
+        7,
+        9
+      ],
+      "caption": "מה איתו"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 65400,
+      "section": 5,
+      "index": 18,
+      "elapsed": 65.40000000000413,
+      "motionTime": 65.40000000000413,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        7,
+        5,
+        9,
+        8,
+        2
+      ],
+      "caption": "סתם מקום"
+    },
+    {
+      "tab": 5,
+      "seed": 12345,
+      "t": 71500,
+      "section": 5,
+      "index": 19,
+      "elapsed": 71.50000000000291,
+      "motionTime": 71.50000000000291,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        7,
+        5,
+        9,
+        8,
+        5
+      ],
+      "caption": "אבל בטוח שהוא לא זמן"
+    },
+    {
+      "tab": 6,
+      "seed": 12345,
+      "t": 700,
+      "section": 6,
+      "index": 0,
+      "elapsed": 0.7000000000000003,
+      "motionTime": 0.7000000000000003,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        0
+      ],
+      "caption": "הזמן עצר"
+    },
+    {
+      "tab": 6,
+      "seed": 12345,
+      "t": 6800,
+      "section": 6,
+      "index": 1,
+      "elapsed": 6.799999999999943,
+      "motionTime": 6.799999999999943,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        3
+      ],
+      "caption": "אל תסתכלו עכשיו"
+    },
+    {
+      "tab": 6,
+      "seed": 12345,
+      "t": 12900,
+      "section": 6,
+      "index": 2,
+      "elapsed": 12.899999999999814,
+      "motionTime": 12.899999999999814,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        5,
+        6
+      ],
+      "caption": "הכול בשליטה"
+    },
+    {
+      "tab": 6,
+      "seed": 12345,
+      "t": 19000,
+      "section": 6,
+      "index": 3,
+      "elapsed": 18.999999999999684,
+      "motionTime": 18.999999999999684,
+      "stopAt": -1,
+      "frozen": 5.888327109002542,
+      "digits": [
+        2,
+        0,
+        5,
+        6,
+        5,
+        9
+      ],
+      "caption": "שום דבר לא זז"
+    },
+    {
+      "tab": 7,
+      "seed": 12345,
+      "t": 700,
+      "section": 7,
+      "index": 0,
+      "elapsed": 0.7000000000000003,
+      "motionTime": 0.7000000000000003,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        0
+      ],
+      "caption": "זה לא הזמן"
+    },
+    {
+      "tab": 7,
+      "seed": 12345,
+      "t": 6800,
+      "section": 7,
+      "index": 1,
+      "elapsed": 6.799999999999943,
+      "motionTime": 6.799999999999943,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        5,
+        3
+      ],
+      "caption": "או שזה הזמן למות"
+    },
+    {
+      "tab": 7,
+      "seed": 12345,
+      "t": 12900,
+      "section": 7,
+      "index": 2,
+      "elapsed": 12.899999999999814,
+      "motionTime": 12.899999999999814,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        5,
+        6
+      ],
+      "caption": "או שזה הזמן רק לשלם את המחיר"
+    },
+    {
+      "tab": 7,
+      "seed": 12345,
+      "t": 19000,
+      "section": 7,
+      "index": 3,
+      "elapsed": 18.999999999999684,
+      "motionTime": 18.999999999999684,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        5,
+        9
+      ],
+      "caption": "על כל טעות ועוד טעות"
+    },
+    {
+      "tab": 7,
+      "seed": 12345,
+      "t": 25100,
+      "section": 7,
+      "index": 4,
+      "elapsed": 25.099999999999554,
+      "motionTime": 25.099999999999554,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        6,
+        6,
+        2
+      ],
+      "caption": "ועוד טעות"
+    },
+    {
+      "tab": 7,
+      "seed": 12345,
+      "t": 31200,
+      "section": 7,
+      "index": 5,
+      "elapsed": 31.199999999999424,
+      "motionTime": 31.199999999999424,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        6,
+        5
+      ],
+      "caption": "כמה טעויות סעמק"
+    },
+    {
+      "tab": 7,
+      "seed": 12345,
+      "t": 37300,
+      "section": 7,
+      "index": 6,
+      "elapsed": 37.30000000000023,
+      "motionTime": 37.30000000000023,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        6,
+        8
+      ],
+      "caption": "מתי כבר נפסיק לטעות"
+    },
+    {
+      "tab": 7,
+      "seed": 12345,
+      "t": 43400,
+      "section": 7,
+      "index": 7,
+      "elapsed": 43.400000000001185,
+      "motionTime": 43.400000000001185,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        7,
+        7,
+        1
+      ],
+      "caption": "אף פעם"
+    },
+    {
+      "tab": 7,
+      "seed": 12345,
+      "t": 49500,
+      "section": 7,
+      "index": 8,
+      "elapsed": 49.50000000000214,
+      "motionTime": 49.50000000000214,
+      "stopAt": -1,
+      "frozen": null,
+      "digits": [
+        1,
+        9,
+        5,
+        8,
+        7,
+        4
+      ],
+      "caption": "כי זה אף פעם לא הזמן."
+    }
+  ]
+}

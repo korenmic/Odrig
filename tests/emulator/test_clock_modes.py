@@ -76,3 +76,45 @@ class ClockModes(unittest.TestCase):
         self.assertEqual(json.loads(self.emulator.command('ignore 60007 0')), dict(ok=True))
         self.wait_for(lambda state: state['file'] in CLOCK_FILES)
         self.assertEqual({p.relative_to(folder).as_posix(): p.read_bytes() for p in folder.rglob('*') if p.is_file()}, before)
+
+
+class DeliveredMessages(unittest.TestCase):
+    def test_real_assets_manual_play_and_ancestor_inclusion_on_live_emulator(self):
+        from tests.core.test_mini import files_for
+        from tests.core.test_clocks import clock_of
+        from tests.core.test_clock_modes import mode_file
+        root = pathlib.Path(support.entered(self, tempfile.TemporaryDirectory()))
+        source = {**files_for(), 'clocks.txt': mode_file('only')}
+        folder = support.installed(root / 'show', source)
+        assets = support.ROOT / 'collection/card/clocks/message'
+        card = {'clocks/c.odrgx': clock_of(canvas=(60, 60)),
+                **{'clocks/message/' + p.name: p.read_bytes() for p in assets.glob('v7-*.odrgx')}}
+        self.assertEqual(len(card), 8)
+        top = support.entered(self, a_drive(card))
+        emulator = support.entered(self, support.Emulator(folder, '--drive', top, tcp_port=0))
+        def wait_for(predicate):
+            end = time.monotonic() + 10
+            while time.monotonic() < end:
+                state = emulator.status()
+                if predicate(state): return state
+                time.sleep(0.02)
+            self.fail(f'expected state; got {state}')
+        state = wait_for(lambda s: s['file'] == 'clocks/c.odrgx')
+        clocks = state['clock_only']['folder']
+        items = json.loads(emulator.command(f'list in {clocks}'))['items']
+        messages, = [i['id'] for i in items if i.get('playlist') == 'clocks/message']
+        items = json.loads(emulator.command(f'list in {messages}'))['items']
+        countdown, = [i['id'] for i in items if i.get('file', '').endswith('v7-countdown.odrgx')]
+        for line in (f'ignore {messages} 1', f'play {countdown}'):
+            self.assertEqual(json.loads(emulator.command(line)), dict(ok=True))
+        state = wait_for(lambda s: s['file'] == 'clocks/message/v7-countdown.odrgx')
+        self.assertFalse(state['clock_message'])
+        self.assertEqual(json.loads(emulator.command('play all')), dict(ok=False, error='in-use'))
+        self.assertEqual(json.loads(emulator.command(f'ignore {clocks} 1')), dict(ok=True))
+        self.assertEqual(json.loads(emulator.command(f'play {clocks}')), dict(ok=True))
+        wait_for(lambda s: s['clock_only']['state'] == 'no-clocks')
+        self.assertEqual(json.loads(emulator.command(f'ignore {clocks} 0')), dict(ok=True))
+        wait_for(lambda s: s['file'] == 'clocks/c.odrgx')
+        actual = {p.relative_to(pathlib.Path(top, 'odrig')).as_posix(): p.read_bytes()
+                  for p in pathlib.Path(top, 'odrig').rglob('*') if p.is_file()}
+        self.assertEqual(actual, card)

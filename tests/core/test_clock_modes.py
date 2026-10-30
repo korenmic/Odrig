@@ -253,6 +253,27 @@ class OnlyBoundary(unittest.TestCase):
 
 
 class MessageBags(unittest.TestCase):
+    def test_each_delivered_message_finishes_its_complete_loop_in_both_modes(self):
+        from odrig import messageclock
+        from .test_mini import files_for
+        from .test_clocks import clock_of
+        folder = support.ROOT / 'collection/card/clocks/message'
+        paths = sorted(folder.glob('v7-*.odrgx'))
+        self.assertEqual(len(paths), 7)
+        for path in paths:
+            data = path.read_bytes()
+            loop = messageclock.decode(data)['loopMs']
+            for mode, begin, after in (('only', 2000, 'clocks/c.odrgx'), ('between', 7000, 'picture.odrg')):
+                with self.subTest(file=path.name, mode=mode):
+                    source = files_for()
+                    show = json.loads(source['show.json']); show['min_seconds'] = 1
+                    source.update({'show.json': json.dumps(show), 'clocks.txt': mode_file(mode, True)})
+                    card = {'clocks/c.odrgx': clock_of(canvas=(60, 60)),
+                            'clocks/message/' + path.name: data}
+                    run = on_card(source, card, at_times(begin + 700, begin + loop - 100, begin + loop + 100))
+                    self.assertEqual([state['file'] for state in states_of(run)],
+                                     ['clocks/message/' + path.name] * 2 + [after])
+
     def test_both_modes_exhaust_independent_clock_and_message_bags(self):
         card = {**CARD, 'clocks/message/n.odrg': CARD['clocks/message/m.odrg'],
                 'clocks/message/o.odrg': CARD['clocks/message/m.odrg'],

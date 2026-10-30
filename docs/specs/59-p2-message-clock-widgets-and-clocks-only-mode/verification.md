@@ -206,3 +206,55 @@ narrow/landscape and refused-external-inclusion checks also passed together.
 No observed failure remains unresolved. These logs distinguish the initially
 failed complete runs from their successful focused rechecks; the integrated asset
 task performs the next fresh all-supported-suite pass.
+
+## Task 5 — delivered widgets and integrated proof
+
+The seven actual ODRGX widgets, matching GIFs and standard readmes are tracked
+under `collection/card/clocks/message/`, with seven new thumbnail keys. The pinned
+generator reproduces every encoded byte using the existing authored Hebrew/font
+tables. The earlier message's three hashes are unchanged. The 21 files were copied
+to the share resolved from `ODRIG_ANIMATIONS` in the ignored `env`, and every file
+was read back byte-for-byte; `source/delivery.json` records their SHA-256 hashes.
+No physical card or board was written.
+
+Observed before generation: all seven missing-asset regressions failed. During
+visual comparison, the first digit atlas was too large; the independent digit-size
+check failed with `glyph 0 is too tall` before correcting scale and centering.
+The final focused converter source/preview/reproducibility/size checks all pass (9).
+
+The retained HTML's own text rasterizer/timeline/clock/motion runs with fixed seed
+12345 and 20ms steps. All 55 captions plus three additional stop samples give 58
+source/portable pairs. All seven contact sheets were inspected. The representative
+comparison and source states are retained beside the generator, with explicit
+font, wrap, alpha4, background and analytic-integration adaptations. No system-font
+or Hebrew-support addition was made. Stop samples keep frozen digits and square
+fully lit; countdown's three zero subtitles and the longest two-line captions are
+present. Full LED/phone acceptance remains task6.
+
+Actual delivered assets match shared C++/converter RGB at caption/roll/stop/loop
+boundaries for two seeds. Every actual complete loop finishes in both Between and
+Only scheduling. A live emulator plays the real countdown with automatic messages
+disabled, refuses outside playback, applies own/ancestor exclusions, recovers on
+inclusion and leaves its card bytes unchanged. These four focused core/browser/
+emulator checks pass. A fresh discovered all-supported-suite run follows below.
+
+### Fresh all-supported-suite result
+
+Run `20261030-231103-188896` discovered all eight currently supported suites,
+with four workers and bounded core/emulator/app concurrency. Every suite passed:
+
+| Suite | Tests | Seconds | Result |
+|---|---:|---:|---|
+| core | 1035 | 354 | OK(skipped=1) |
+| converter-npm | 1595 | 69 | OK |
+| mapping | 43 | 50 | OK |
+| runner | 22 | 11 | OK |
+| converter | 552 | 38 | OK |
+| onboarding | 88 | 8 | OK |
+| emulator | 656 | 667 | OK(skipped=19) |
+| app | 420 | 1211 | OK |
+
+The documented platform skips remain skips; no test failure remains. This clean
+full run also rechecks all app/emulator corrections from task4. Firmware setup
+and compilation on Windows are the following seed60 scope, not a claimed build
+here. Task6 remains unchecked for physical catalog deployment, LEDs and phone.

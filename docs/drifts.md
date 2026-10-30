@@ -12399,3 +12399,24 @@ its own and inherited exclusions are shown distinctly for files and folders.
 **Resolution.** `app/www/commands.js`, `client.js`, `screens/clocks.js`,
 `screens/show.js`, `core/src/commands.cpp`, `docs/android-app.md`, `docs/commands.md`,
 and the shared app/core/emulator mode regressions.
+
+## Seed 59: reproducible message masks and source comparison
+
+**Question.** How can the retained browser animation become bounded widgets without
+system fonts or losing full sequences, and how is its presentation checked?
+
+**Answer.** Pin the reference and existing authored font hashes, parse the seven
+data-only sequences, and area-sample reusable alpha4 caption/digit masks. Retain
+every Hebrew character and source role. Use the approved deterministic virtual
+time/random model and analytic slowdown. Instrument the retained page only at its
+clock/random/final decorative canvas boundaries and compare 58 fixed-time pairs.
+Existing font metrics and quantization change letter shapes and some wrap points;
+physical pixels omit the decorative unlit grid. An oversized first digit atlas was
+observed and reduced to the reference's 12-pixel size inside its 16-row wheel window.
+
+**Resolution.** The generator, manifest, review, representative comparison and
+21-file share-readback hashes are beside the retained reference under the seed's
+`source/`. Converter/core/browser tests independently verify source captions,
+flags, bytes, actual runtime pixels and complete loops. The old message and its
+companions are unchanged. Physical card installation, LED and phone checks remain
+open; final APK/FW delivery follows seed60, as the owner subsequently requested.
