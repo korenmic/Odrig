@@ -37,3 +37,34 @@ compiler or package installation was changed, and no board was reached.
 
 Full legacy firmware fixture/runner portability belongs to task3. No firmware image,
 optional variant, macOS/Linux build, APK or signing-key delivery is claimed here.
+
+## Task 2 — portable build configuration and provenance
+
+Observed before fixes: both generated projects rejected real spaced paths;
+Windows checksum output used CRLF; PlatformIO compilation had no explicit job bound.
+The discovered host suite now passes all28 tests with resource warnings as errors.
+Generated include/forced-include arguments retain complete normalized paths, while
+dependency specifications and ordinary INI path values remain complete strings.
+Every existing kind keeps its environment, base/newer family, patch choice, output
+name, image/checksum validation and provenance handoff in isolated build tests.
+Concurrent builds of one checkout serialize before source mutation/compilation.
+
+The actual pinned PlatformIO6.1.17 local dependency manager was inspected and
+exercised on Windows: `symlink://` writes a `.pio-link` JSON reference, not a
+privileged filesystem link. A real integration test installs a library at a spaced
+path with `os.symlink` forbidden and observes a subsequent source edit immediately.
+Therefore the existing linking mechanism is retained on all hosts; copied-library
+refresh/deletion is unnecessary. No fallback copy or administrator requirement is
+introduced.
+
+The image's `.sha256` uses explicit UTF-8/LF. A new `.bin.build.json` companion
+records committed/dirty tracked source identity, host, selected environment/tools,
+vendor manifest identities, source/configuration hashes and exact image size/hash.
+It excludes generated core builds and operator Wi-Fi settings. Tests verify changed
+current-source fingerprints, exact bytes, dirty-state reporting and atomic UTF-8/LF
+publication. Compiler paths/timestamps/ELF metadata can differ between hosts; source
+and image properties are the stated comparison, not a binary-identity promise.
+
+These are configuration, lifecycle and provenance checks, with simulated compilation
+for variant mapping. Actual default/image/symbol and cross-host build proof follows
+tasks4–5; no real firmware image or physical acceptance is claimed by task2.

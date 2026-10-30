@@ -8,7 +8,7 @@
   failing first; verify setup selection, integrity/failure/reuse/locking and real
   dependency installation without global writes. Set seed state in_progress.
 
-- [ ] 2. Make the existing firmware build variants portable and traceable.
+- [x] 2. Make the existing firmware build variants portable and traceable.
   Handle quoted/spaced native paths and unprivileged local dependencies, refresh
   copied current sources, serialize checkout builds and clean owned descendants.
   Preserve all eight environment/output mappings and runtime flags. Keep image

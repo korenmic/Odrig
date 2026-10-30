@@ -29,9 +29,9 @@ build_flags = -g
   -DBOARD_HAS_PSRAM
   -D CONFIG_ASYNC_TCP_USE_WDT=0
   -D CONFIG_ASYNC_TCP_STACK_SIZE=8192
-  -I@REPO@/firmware/standalone/platform
-  -I@REPO@/firmware/usermod
-  -I@REPO@/core/include
+  -I"@REPO@/firmware/standalone/platform"
+  -I"@REPO@/firmware/usermod"
+  -I"@REPO@/core/include"
 
 [env:odrig_standalone_probe]
 extends = env:odrig_standalone

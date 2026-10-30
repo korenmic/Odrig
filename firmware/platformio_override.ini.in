@@ -21,9 +21,9 @@ build_flags = ${common.build_flags} ${esp32s3.build_flags}
   -D ARDUINO_USB_CDC_ON_BOOT=1
   -DBOARD_HAS_PSRAM
   -D WLED_DISABLE_ADALIGHT
-  -I@REPO@/core/include
-  -I@REPO@/firmware/usermod/wled
-  -I@REPO@/firmware/usb_host_msc/include
+  -I"@REPO@/core/include"
+  -I"@REPO@/firmware/usermod/wled"
+  -I"@REPO@/firmware/usb_host_msc/include"
 
 [env:odrig_probe]
 extends = env:odrig
@@ -43,7 +43,7 @@ build_flags = ${env:odrig.build_flags}
   -D WLED_DISABLE_INFRARED
   -D WLED_USE_SHARED_RMT
   -D ESP32_ARDUINO_NO_RGB_BUILTIN
-  -include @REPO@/firmware/newer/odrig_newer.h
+  -include "@REPO@/firmware/newer/odrig_newer.h"
   -D ODRIG_DRIVE_SD_SPI
   -D ODRIG_SD_SCK=39
   -D ODRIG_SD_MISO=40

@@ -37,3 +37,11 @@ def scripts(venv, system=None):
 def program(venv, name, system=None):
     system = sys.platform if system is None else system
     return scripts(venv, system) / (name + ('.exe' if system == 'win32' else ''))
+
+
+def config_path(folder):
+    """A complete INI path; individual compiler arguments are quoted by the template."""
+    value = pathlib.Path(folder).resolve().as_posix()
+    if any(c in value for c in ('\r','\n','\0','"')):
+        raise Failure('build-failed', 'a build path contains a character not representable in its configuration')
+    return value

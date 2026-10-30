@@ -38,6 +38,7 @@ WLED = WORK / "WLED"
 STANDALONE = WORK / "standalone"
 OUT = WORK / "out"
 STORAGE = WORK / "storage"
+BUILD_LOCK = WORK / "build.lock"
 
 # The newer USB software, beside the build known good: its Python environment, PlatformIO's
 # folder with the platform, the framework and the compilers, and the build cache.

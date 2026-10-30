@@ -12439,3 +12439,23 @@ WLED staging implement this boundary. Seventeen discovered host tests pass after
 seven observed failures. Real Windows base/newer pinned setup and two concurrent
 idempotent repeats pass. Firmware compilation and other-host proof remain later
 tasks; no hardware, firmware runtime, global installation or signing key changed.
+
+## Seed 60: portable local dependencies and build identity
+
+**Question.** Must Windows copy the core instead of linking it, and how are spaced
+paths and cross-host build identity preserved without changing firmware behavior?
+
+**Answer.** The pinned PlatformIO uses portable `.pio-link` JSON references for
+`symlink://`, requiring no OS link privilege and always reading current sources.
+Keep it. Normalize configuration paths and quote individual compiler arguments;
+retain complete dependency/INI values. Serialize checkout build mutations, bound
+compiler jobs and use the owned process helper. Retain every kind/flag/output and
+the partition-size guard. Publish UTF-8/LF checksums and source/host/toolchain/input/
+image provenance, excluding generated builds and operator secrets. Compare source
+and meaningful image properties; host-specific metadata can change binary bytes.
+
+**Resolution.** Build/host/project generation and `fwtool/provenance.py` carry the
+implementation. All28 discovered host checks pass, including actual unprivileged
+spaced-path package linking, immediate current-source visibility, all eight variant
+mappings and checkout serialization. Actual image/cross-host proof remains later
+tasks. No runtime firmware source, command, GPIO or hardware change was made.
