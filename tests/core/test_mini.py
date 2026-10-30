@@ -58,7 +58,7 @@ class Miniature(unittest.TestCase):
     def test_host_description_escaping_is_bounded_with_miniature_status(self):
         run = support.start(files_for(), [*ENABLE, support.line(0, "status")], ["--about", "\x01" * 95])
         status = replies(run)[-1]
-        self.assertEqual(status["host"], "\x01" * 42)
+        self.assertEqual(status["host"], "\x01" * 26)
         self.assertTrue(status["mini"]["on"])
         self.assertTrue(run.lines[-1].endswith("}"))
         self.assertLessEqual(len(run.lines[-1][6:]) + 1, 1024)

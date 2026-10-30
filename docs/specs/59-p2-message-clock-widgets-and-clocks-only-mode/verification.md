@@ -85,3 +85,59 @@ The focused 19-case run passed the cold-start, clock/message exclusions,
 HTTP/TCP persistence, manual-turn and preview checks. Onboarding passed all 88
 checks and public documentation all 38. Task 2 is software-verified; physical
 board/phone acceptance remains open.
+
+
+## Exclusive mode and complete message bags
+
+The initial mode checks observed `clocks only` rejected as `bad-argument` and
+missing mode metadata. The implemented mode now passes 25 focused core tests and
+four real-emulator HTTP/TCP/CLI tests. These cover durable restart, strict legacy
+migration, no-op writes, every failed save/readback and storage cut, missing or
+excluded faces staying dark, re-inclusion, remount with changed IDs, quarantine
+and runtime media failure. The exclusive scheduler retains the normal playlist
+path and window, refuses outside playback and output-taking diagnostics, permits
+inside manual files and folders, and cannot escape through content cleanup.
+Entering Only also ends an existing mapping diagnostic without later restoring it.
+
+A further remount regression observed the saved `night` playlist becoming root
+after an intermediate card lacked that folder, even when a later card restored it.
+Tree publication now retains the saved normal path and held window while Only is
+active. On exit it resolves that path on the current card; a folder still missing
+then correctly falls back to root. Both the restored and missing cases are covered.
+
+Independent face and message permutations exhaust their eligible direct children
+before reshuffling in both enabled modes. Nested unrelated files are not automatic
+candidates. A procedural message with a 54.9-second loop completes that whole loop
+in Between and Only; the existing message remains supported. Ignored manual messages
+remain explicitly playable with the message flag off. The read-only-card emulator
+test verifies that mode/inclusion changes do not alter external media bytes.
+
+Version-1 settings are read without eager rewriting; changed settings write
+version 2, close and verify the full part, then rename. All 61 pure firmware-storage
+tests passed, including preservation and readback of the new settings form.
+All 88 onboarding and 72 focused documentation/settings compatibility tests passed.
+
+Status retains its 1,024-byte bound with complete supported 99-byte ASCII file and
+deep folder names, escaped host descriptions and Only metadata. Escaped control
+descriptions use the reserved 160-byte budget; ordinary 95-byte ASCII descriptions
+remain complete. No UTF-8 filename or new language support is introduced.
+
+The warnings-as-errors build retains its 512-byte stack-frame guard. Core is
+3,712 bytes, Checker 2,208 and DriveIndex 716. Actual allocations are 125,177 bytes
+in 18 blocks for the target, 130,965 in 21 with a drive, 77,637 in 13 without a
+store, and 88,466 in 17 for the benchmark. No allocation block, per-frame state,
+public 512-byte quarantine fingerprint, supported domain or memory limit changed.
+
+The first full compatibility run exposed expected old version-1 write assertions,
+status-key/reference normalization, the prior escaped-host budget and command/help
+inventories. Those fixtures now reflect the approved additive mode contract while
+retaining legacy reads and their strict malformed-file checks. Final complete-run results are recorded below.
+
+
+The final discovered core run completed all 1,033 tests successfully (one expected
+skip), and the emulator completed all 655 successfully (19 expected skips), after
+the remount fix and all compatibility-fixture updates. Its combined result has
+1,668 passing checks and 20 skips with no failures. The earlier failed runs and
+the 20 successful emulator rechecks remain separately identified in local logs.
+All 130 focused mode, status, command and folder checks also passed. No board was
+flashed or used, and physical output/phone acceptance remains open.

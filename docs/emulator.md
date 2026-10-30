@@ -1545,10 +1545,13 @@ tool sends the words as they are typed. The emulator keeps the saved repeats in
 `repeats.txt` of its show folder through its host, as the board does in its storage: it
 has no code of its own for them.
 
-`clocks on` and `clocks off` switch the clocks between the animations on and off, and
-`clocks message on` and `clocks message off` the message after each clock; the tool takes
-those four forms only. The emulator keeps the two settings in `clocks.txt` of its show
-folder through its host, as the board does in its storage.
+`clocks on`, `clocks off`, and `clocks only` select Between animations, Off and Clocks
+only. `clocks message on|off` remains independent. The emulator and every command-tool
+transport use the shared core for mode boundaries and separate clock/message bags.
+The host keeps version-2 settings in `clocks.txt`; valid version-1 settings still load.
+Only rejects outside playback and output-taking diagnostics, retains the normal playlist
+for exit, and stays dark when no eligible faces exist. See
+[commands.md](commands.md#clocks-between-the-animations) for status and recovery.
 
 The shared core handles `ignore ID 0|1` and `remove many IDS` unchanged on HTTP, serial and TCP; odrigctl accepts both. Space reports internal quota and optional external capacity from the mounted folder filesystem. External files are changed only on a drive with a catalog that the emulator may write (`--drive` without `--drive-read-only`).
 

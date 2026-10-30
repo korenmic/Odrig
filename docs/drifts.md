@@ -12329,3 +12329,45 @@ provenance. This does not permit a later automatic selection of the excluded fil
 **Resolution.** The shared eligibility helper and turn provenance in
 `core/src/ignored.cpp` and `core/src/player.cpp`, the inclusion contract in
 `docs/commands.md`, and `tests/core/test_external_inclusion.py` carry the answer.
+
+
+## Seed 59: exclusive playback and preserved normal selection
+
+**Question.** How do explicit folder play, playlist windows, durable migration and
+bounded status replies work while Clocks only owns playback?
+
+**Answer.** Keep the normal playlist path and hold its elapsed window independently
+of the exclusive scheduler. Global restart and Play on Clocks restart its clock bag;
+Play on an inside subfolder explicitly plays its first physically available file,
+then returns to the clock/message program. Inside manual files remain available
+when ignored or messages are disabled. Outside play and output-taking mapping tests
+are refused. Leaving Only resolves the saved normal path again, falling back to
+root when needed, without restoring a transient diagnostic or paused break.
+
+Read version-1 Off/Between settings without rewriting them; the next changed
+setting writes and verifies the complete version-2 file before publication.
+Independent message permutations complete one whole message loop in either enabled
+mode. Reserve the new mode metadata inside the existing 1,024-byte reply by limiting
+escaped host description output to 160 bytes. Ordinary 95-byte ASCII descriptions
+and the complete supported file and folder paths are retained.
+
+**Resolution.** `core/src/breaks.cpp`, `core/src/player.cpp`,
+`core/src/commands.cpp`, `docs/commands.md`, `docs/show.md` and
+`docs/specs/59-p2-message-clock-widgets-and-clocks-only-mode/verification.md`.
+
+
+## Seed 59: temporary media changes retain the normal playlist
+
+**Question.** Should a temporary card without the normal playlist erase its saved
+path while Clocks only is active?
+
+**Answer.** No. Only holds the normal path and elapsed window until exit. Tree
+publication may resolve a transient root current-folder record, but must not clear
+that saved path or reset its window. On exit, the normal resolver either finds the
+folder on the current medium or deliberately chooses root with a fresh window.
+A regression observed `night` becoming root after an intermediate card lacked it;
+the central resolver now applies that fallback only outside Only. Restoration
+after changed IDs and the still-missing exit case both pass.
+
+**Resolution.** `core/src/order.cpp`, `tests/core/test_clock_modes.py` and
+`docs/specs/59-p2-message-clock-widgets-and-clocks-only-mode/verification.md`.

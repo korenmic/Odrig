@@ -52,6 +52,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `repeat <id> default` | Removes the animation's saved repeat: its turns play its own count again, the one in progress too. |
 | `clocks on` | Switches the clocks between the animations on, and saves it. |
 | `clocks off` | Switches them off, and saves it. |
+| `clocks only` | Plays only the resolved Clocks subtree, and saves the mode. |
 | `clocks message on` | Switches the message after each clock on, and saves it. |
 | `clocks message off` | Switches it off, and saves it. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation; with the file's CRC-32 after `<bytes>`, answers `unchanged` when the last upload installed that file. |
@@ -129,7 +130,7 @@ file's override or latest default without restarting its timing. Missing/null
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"dimming":{"value":128,"saved":null,"error":null},"mini":{"supported":false,"on":false,"pending":false,"requested":false,"error":null,"brightness":40},"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"left":86399}
+{"ok":true,"on":true,"brightness":128,"dimming":{"value":128,"saved":null,"error":null},"mini":{"supported":false,"on":false,"pending":false,"requested":false,"error":null,"brightness":40},"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"clock_mode":"off","clock_only":null,"left":86399}
 ```
 
 | Member | Meaning |
@@ -154,7 +155,9 @@ file's override or latest default without restarting its timing. Missing/null
 | `saved` | The saved repeat of the animation whose turn is reported, 1 to 65,535, or `null` when it has none or no turn is reported. A reply without `repeat`, `loop` and `saved` comes from a player before them. |
 | `file` | The name of the file of the animation `animation` names: an item's file, or a drive's file by its path from the card's folder `odrig`, `night/comet.odrg`; `null` while `animation` is. So a client names what plays without the list that holds it. A reply without `file` comes from a player before it. |
 | `playlist` | The path of the card's folder whose playlist is current while `playing` is its id, `night/deep`; `null` otherwise. |
-| `clocks`, `clock_message` | The two settings in force, `true` or `false`: the clocks between the animations, and the message after each clock, see [Clocks between the animations](#clocks-between-the-animations). A reply without them comes from a player before them. |
+| `clocks`, `clock_message` | Compatibility booleans: `clocks` is true in either enabled mode, and `clock_message` enables the message after a clock. A reply without them comes from a player before them. |
+| `clock_mode` | `off`, `between`, or `only`. Older targets without this member support the existing boolean Off/Between interface. |
+| `clock_only` | `null` outside Only; otherwise `{"folder":ID_OR_NULL,"state":STATE}`, with state `playing`, `no-card`, `missing-folder`, or `no-clocks`. The folder is resolved from the active tree/catalog, never remembered by transient ID. In Only, `playing` names that folder and `playlist` is `clocks` while a turn plays. |
 | `left` | The whole seconds left in the window of the current playlist, 86,400 down to 0: the 24 hours of running time it plays for before the next playlist of the card's folders is current, see [show.md](show.md#the-playlist). 0 from the window's end until the turn in progress ends. Reported whatever the card holds, a fresh 86,400 each time a playlist becomes current. A reply without `left` comes from a player before it. |
 
 `checked`, `to_check` and `unavailable` are 0, and `checking` is `null`, while the show
@@ -795,9 +798,9 @@ clocks message on
 {"ok":true}
 ```
 
-`clocks on` switches the clocks between the animations on, and `clocks off` switches them
-off; `clocks message on` switches the message after each clock on, and `clocks message off`
-off. Both settings are off until they are switched on, and both are kept across a restart.
+`clocks on` selects Between animations, `clocks off` selects Off, and `clocks only`
+selects Clocks only. The independent `clocks message on|off` setting controls a message
+after each clock in both enabled modes. Mode and message setting survive restart.
 Each line replies `{"ok":true}` once its setting is saved; a setting already in force
 writes nothing and replies the same. While both are off the player plays as
 [show.md](show.md) says without them. `status` reports them as `clocks` and
@@ -807,20 +810,38 @@ The settings are kept in `clocks.txt` of the board's own storage, beside `order.
 `repeats.txt`, in three lines each ended by LF and nothing more:
 
 ```
-odrig-clocks 1
-clocks on
+odrig-clocks 2
+mode between
 message off
 ```
 
-The second line is `clocks on` or `clocks off`, the third `message on` or `message off`. The
-file is written whole as `clocks.part` and renamed, so a power cut leaves the old settings
-or the new ones; a `clocks.part` is removed at the start. The file is read once, at the
-start: a missing file is both settings off, and a file out of that form is both off, with
-the log saying `clocks unreadable` once; the next change writes it anew. No show names it.
+The second line is `mode off`, `mode between` or `mode only`; the third is `message on`
+or `message off`. Valid version-1 files (`odrig-clocks 1`, `clocks on|off`, then the
+message line) still load, mapping on to Between and off to Off. The next changed setting
+writes version 2; a no-op does not rewrite an old file. A missing file means Off/message
+off. A malformed file recovers the same defaults and logs `clocks unreadable`.
 
-- `bad-argument`: the words are not one of the four lines.
+Saving closes and reads back all of `clocks.part` before one atomic rename. A failure
+preserves published bytes and active settings; an abandoned part is removed at startup.
+No animation, catalog or show file is rewritten for a mode change.
+
+Only stops outside playback and runs direct files of `clocks` in a shuffled bag, with
+one complete direct message from its independent bag after each clock when enabled.
+It has no five-turn/five-minute break recursion. Messages finish a complete declared
+loop, including loops longer than 30 seconds. Own and ancestor Ignore choices apply
+to automatic candidates and are rechecked after changes. Without eligible faces, Only
+stays dark and reports why; it does not fall back to ordinary animations.
+
+Browsing remains unrestricted. Outside file/folder/cycle play and output-taking mapping
+diagnostics return `in-use` without changing playback. `play all` restarts Clocks.
+An explicit inside file remains playable even when ignored or when automatic messages
+are off; an inside subfolder starts its first available file, then the exclusive program
+continues. These actions do not overwrite the saved normal playlist. Leaving Only
+restores its valid path, else root, with its window held and no paused break restored.
+
+- `bad-argument`: the words are not one of the five forms.
 - `show-invalid`: the show is invalid.
 - `busy`: while a rebuild of a catalog runs, until the player has read every installed
   animation after a start, and while an upload is open.
-- `storage-error`: the file could not be written, or the board's storage cannot be
+- `storage-error`: the file could not be written or verified, or the board's storage cannot be
   changed. Nothing changes.

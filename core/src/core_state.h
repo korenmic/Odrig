@@ -599,6 +599,13 @@ struct Core {
 
     uint32_t message_files;
 
+    uint32_t clocks_id;
+    uint32_t clocks_ordinal;
+
+    uint32_t message_order_key;
+    uint32_t message_order_next;
+    uint32_t message_order_count;
+
     // The order of the clocks: the key of its permutation, the place of the next clock in
     // it, and the number of clocks it was drawn for; a new one is drawn once it is used up.
     uint32_t order_key;
@@ -713,6 +720,7 @@ struct Core {
     uint8_t ignored_present;
     uint8_t turn_manual : 1;
     uint8_t break_manual : 1;
+    uint8_t only_dirty : 1;
 
     // Whether the saved repeats of a drive without a catalog are to be read before its files
     // are checked.

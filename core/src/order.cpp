@@ -257,7 +257,7 @@ void tree_find_current(Core &core) {
         const uint32_t found = drive_folder_with_path(core, core.playlist_path);
         if (found != kNoFolder) {
             core.current = found;
-        } else {
+        } else if (core.clocks_on != kClocksOnly) {
             // The card has no playlist of the saved path: the root is current, with a fresh
             // window, and is saved as such at the next refresh.
             core.playlist_path[0] = '\0';

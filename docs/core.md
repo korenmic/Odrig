@@ -954,7 +954,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,688 |
+| The core object | fixed | 3,712 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -972,13 +972,13 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
 | Miniature state and physical RGB, only for a 60x60 canvas | fixed | 188 |
-| **Total** | | **125,153** |
+| **Total** | | **125,177** |
 
 That is about 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-45,776 of them. The example show on the two-leg mapping asks for 88,442 bytes. A host
+45,776 of them. The example show on the two-leg mapping asks for 88,466 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,613 bytes for the target file. A host with a drive
+of the check and the saved order: 77,637 bytes for the target file. A host with a drive
 is asked for three blocks more, after the three of the check: the table of a drive
 without a catalog, 12 bytes for each of 256 places, 3,072 bytes; the boot's memory of 16
 files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive's index,
@@ -989,7 +989,7 @@ a table of 33 records of 8 bytes and 104 bytes of room for the current playlist'
 368, the saved repeats of32 drive files at6 bytes each (192), and32 brightness
 preferences at5 bytes each (160), followed by128 external exclusion records at5 bytes
 each (640). Positions retain all32 bits. With it
-the target file takes 130,941 bytes, below 131,072. The clocks between the animations add
+the target file takes 130,965 bytes, below 131,072. The clocks between the animations add
 no block: their settings, their counts, the paused turn and the key and the place of their
 order are fields of the core object, and the order is a permutation computed from its key. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
@@ -1290,8 +1290,8 @@ values/presence use existing item padding/flags.32 external values use 5-byte
 records beside compact 6-byte repeat records with full 32-bit positions/16-bit counts.
 The independent 128-byte reader preserves the 512-byte stack-frame compiler bound.
 
-The measured 100-item Windows host requests 130941 bytes with a drive,21 allocation
-blocks, and the Core object is 3688 bytes. Existing 128 KiB/4096 limits remain unchanged;
+The measured 100-item Windows host requests 130965 bytes with a drive,21 allocation
+blocks, and the Core object is 3712 bytes. Existing 128 KiB/4096 limits remain unchanged;
 no allocation is added per frame. The store streams and verifies a part before
 publishing it, keeps prior usable cache after failed updates, and discards partial
 startup application if the settings file is damaged. `dimming` is additive status;
@@ -1306,3 +1306,14 @@ turn provenance prevents an Ignore change from cutting a manual jump. Settings r
 at publication/remount boundaries; failed saves preserve both published bytes and cache.
 The existing order block grows by640 bytes, while the two source caches and index cache
 shrink by256 bytes each. No frame allocates memory and no ID/path/count domain shrinks.
+
+
+The clock mode is Off, Between or Only. Version-2 settings preserve version-1 reads;
+each changed setting closes and verifies its part before rename. Only has a separate
+scheduler using the existing turn/break fields, cached resolved Clocks identity and
+an independent three-word message permutation. It retains the normal playlist path
+and holds its window, guards shared play and diagnostic entries, and retries dark
+selection only after relevant changes. No per-frame allocation or additional block
+is introduced. `status` adds explicit mode/reason metadata within its unchanged
+1,024-byte bound; escaped host descriptions use at most160 bytes, while ordinary
+95-byte ASCII descriptions and supported full file/folder paths remain intact.

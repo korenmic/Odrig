@@ -16,7 +16,7 @@
   stale/current candidates, index refill boundaries and fixed memory. Run core,
   emulator and relevant pure firmware-tool suites by discovery.
 
-- [ ] 3. Implement persistent clocks-only mode and complete message bags.
+- [x] 3. Implement persistent clocks-only mode and complete message bags.
   Add approved command/CLI/status, v1 migration/v2 atomic settings, separate shuffled
   message bag in both enabled modes, complete message turns, and shared enforcement
   at every play/diagnostic/automatic/resume/cleanup entry. Preserve prior normal

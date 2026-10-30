@@ -359,6 +359,20 @@ class Commands(Temporary):
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(expected, **{"brightness.txt": replacement}))
 
+    def test_three_state_clocks_are_preserved_and_read_back_without_schema_conversion(self):
+        saved = b"odrig-clocks 2\nmode only\nmessage on\n"
+        self.old = support.storage_image(dict(support.WLED_FILES, **{"/odrig/clocks.txt": saved}))
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        installed = self.on_the_board(esptool)
+        expected = dict(storage.folder_files(self.show), **{"clocks.txt": saved})
+        self.assertEqual(storage.show_of(installed), expected)
+        with support.no_board(self.esptool(installed, failing_verifies=1)):
+            result = support.run_main("read-show", self.folder / "copy")
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(support.files_of(self.folder / "copy"), expected)
+
     def test_external_inclusion_is_preserved_replaced_and_read_back(self):
         saved = b"odrig-ignored 1\nf night/comet.odrg\nd clocks/message\n"
         self.old = support.storage_image(dict(support.WLED_FILES, **{"/odrig/ignored.txt": saved}))

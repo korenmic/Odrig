@@ -522,6 +522,29 @@ void pause_for_break(Core &core) {
 // While the clocks are on, a break's turns come between the playlist's: at the end of a
 // turn once 5 turns are counted, or within one where 5 minutes of the playlist's time are.
 ODRIG_NOINLINE Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn) {
+    if (core.clocks_on == kClocksOnly) {
+        for (uint32_t step = 0; step < 128; ++step) {
+            if (core.playing == kNothing || core.turn_item == kNothing) { *in_turn = 0; return kNone; }
+            const uint64_t length = length_of(core, core.turn_item);
+            if (length == 0) return kLoopMismatch;
+            const uint64_t duration = current_turn_ms(core);
+            const uint64_t elapsed = now >= core.zero ? now - core.zero : 0;
+            if (elapsed < duration) { *in_turn = elapsed; return kNone; }
+            core.zero += duration;
+            const uint32_t message = core.break_phase == kBreakClock && (core.break_message || core.clock_message_on)
+                ? breaks_message(core, core.zero) : kNothing;
+            const uint32_t next = message != kNothing ? message : breaks_pick(core, core.zero);
+            close_stream(core);
+            if (next == kNothing) { player_halt(core); *in_turn = 0; return kNone; }
+            core.turn_item = core.shown = next;
+            core.break_phase = message != kNothing ? kBreakMessage : kBreakClock;
+            core.break_message = core.clock_message_on;
+            core.turn_repeat = message != kNothing ? 1 : 0;
+            core.turn_manual = 0;
+            ++core.turn_number;
+        }
+        return kPendingWork;
+    }
     bool rounds_taken = false;
     for (;;) {
         const uint64_t elapsed = now - core.zero;
@@ -597,7 +620,7 @@ ODRIG_NOINLINE Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn)
         core.turn_repeat = 0;
         if (core.break_phase == kBreakClock) {
             // The clock's turn ended: the message plays once after it, else the break ends.
-            const uint32_t message = core.break_message || core.clock_message_on ? breaks_message(core) : kNothing;
+            const uint32_t message = core.break_message || core.clock_message_on ? breaks_message(core, core.zero) : kNothing;
             if (message != kNothing) {
                 core.break_phase = kBreakMessage;
                 core.turn_item = message;
@@ -719,7 +742,7 @@ Shown advance(Core &core, uint64_t now) {
         close_stream(core);
         drive_faulted(core, animation - kDriveBase, reason);
         player_drive_changed(core);
-        return kShowsBefore;
+        return core.clocks_on == kClocksOnly && core.playing == kNothing ? kShowsNothing : kShowsBefore;
     }
     if (reason != kNone) {
         // The file cannot be played: it is quarantined, this refresh keeps the picture
@@ -811,6 +834,11 @@ uint32_t player_first_animation(const Core &core) {
 }
 
 uint32_t player_first_in_playlist(const Core &core) {
+    if (core.clocks_on == kClocksOnly) {
+        for (uint32_t i = 0; i < core.clocks_files; ++i)
+            if (drive_automatic(core, core.clocks_first + i)) return kDriveBase + core.clocks_first + i;
+        return kNothing;
+    }
     const uint32_t first = first_in(core, current_range(core));
     return first != kNothing ? first : first_in(core, root_range(core));
 }
@@ -823,6 +851,7 @@ void player_playlist_chosen(Core &core, uint64_t at) {
 }
 
 bool player_window_passed(Core &core, uint64_t now) {
+    if (core.clocks_on == kClocksOnly) return false;
     if (now < window_end(core)) {
         return false;
     }
@@ -832,12 +861,31 @@ bool player_window_passed(Core &core, uint64_t now) {
 }
 
 uint32_t player_window_left(const Core &core) {
-    const uint64_t since = core.latest > core.window_started ? core.latest - core.window_started : 0;
+    const uint64_t since = core.clocks_on != kClocksOnly && core.latest > core.window_started ? core.latest - core.window_started : 0;
     const uint64_t spent = core.window_spent + since;
     return spent < kWindowMs ? static_cast<uint32_t>((kWindowMs - spent) / 1000) : 0;
 }
 
 void player_jump(Core &core, uint32_t item) {
+    if (core.clocks_on == kClocksOnly) {
+        if (!breaks_position_allowed(core, item)) { player_only_restart(core); return; }
+        close_stream(core);
+        cut_break(core);
+        core.resume_item = kNothing;
+        core.playing = kPlaylist;
+        core.turn_item = core.shown = item;
+        const uint32_t position = item - kDriveBase;
+        core.break_phase = position >= core.message_first && position - core.message_first < core.message_files ? kBreakMessage :
+            position >= core.clocks_first && position - core.clocks_first < core.clocks_files ? kBreakClock : kBreakNone;
+        core.break_message = core.clock_message_on;
+        core.turn_repeat = core.break_phase == kBreakMessage ? 1 : 0;
+        core.turn_manual = 1;
+        core.zero = core.latest;
+        core.zero_pending = 1;
+        ++core.turn_number;
+        core.only_dirty = 0;
+        return;
+    }
     const uint32_t cut = core.playing == kPlaylist ? core.turn_item : kNothing;
     core.resume_item = cut != kNothing && cut != item && plays(core, cut) && !in_range(range_in_use(core), item) ? cut : kNothing;
     player_play_all(core, item);
@@ -845,6 +893,7 @@ void player_jump(Core &core, uint32_t item) {
 }
 
 void player_drive_joined(Core &core, uint32_t place) {
+    if (core.clocks_on == kClocksOnly) { core.only_dirty = 1; return; }
     if (core.playing == kNothing && !core.invalid && !core.mapping_test && drive_automatic(core, place)) {
         player_play_all(core, kDriveBase + place);
     }
@@ -949,6 +998,7 @@ void player_drive_shifted(Core &core, uint32_t position, int32_t delta) {
 }
 
 void player_drive_changed(Core &core) {
+    if (core.clocks_on == kClocksOnly) { core.only_dirty = 1; player_only_refresh(core); return; }
     if (core.stream_open && is_drive(core.stream_item) &&
         !(core.playing == kPlaylist && !core.turn_manual ? plays(core, core.stream_item) : drive_plays(core, core.stream_item - kDriveBase))) {
         close_stream(core);
@@ -987,6 +1037,7 @@ void player_start(Core &core) {
     if (core.invalid) {
         return;
     }
+    if (core.clocks_on == kClocksOnly) { player_only_restart(core); return; }
     if (core.has_start && core.items[core.start_item].is_cycle && item_usable(core, core.start_item)) {
         player_play_cycle(core, core.start_item);
         return;
@@ -1077,6 +1128,7 @@ void player_halt(Core &core) {
 }
 
 void player_play_cycle(Core &core, uint32_t item) {
+    if (core.clocks_on == kClocksOnly) { player_only_restart(core); return; }
     turn_cut(core);
     counts_hold(core);
     core.cycle_start_entry = 0;
@@ -1088,6 +1140,7 @@ void player_play_cycle(Core &core, uint32_t item) {
 }
 
 void player_play_all(Core &core, uint32_t from) {
+    if (core.clocks_on == kClocksOnly) { player_only_restart(core); return; }
     turn_cut(core);
     close_stream(core);
     core.turn_repeat = 0;
@@ -1130,6 +1183,7 @@ void player_file_replaced(Core &core, uint32_t item) {
 }
 
 void player_item_added(Core &core) {
+    if (core.clocks_on == kClocksOnly) { core.only_dirty = 1; return; }
     if (core.playing == kNothing) {
         const uint32_t first = player_first_in_playlist(core);
         if (first != kNothing) player_play_all(core, first);
@@ -1147,6 +1201,7 @@ void player_inclusion_changed(Core &core, uint32_t item) {
 }
 
 void player_external_inclusion_changed(Core &core) {
+    if (core.clocks_on == kClocksOnly) { core.only_dirty = 1; player_only_refresh(core); return; }
     if (core.playing == kPlaylist) {
         if (core.break_back != kNothing && !core.break_manual && !plays(core, core.break_back)) core.break_paused = 0;
         if (core.break_phase != kBreakNone && !plays(core, core.turn_item)) player_break_leave(core);
@@ -1154,6 +1209,56 @@ void player_external_inclusion_changed(Core &core) {
         if (core.turn_item == kNothing) player_halt(core);
     }
     if (core.playing == kNothing) player_item_added(core);
+}
+
+void player_only_restart(Core &core) {
+    if (core.clocks_on != kClocksOnly) return;
+    const uint32_t first = !core.invalid && !core.mapping_test ? breaks_pick(core, core.latest) : kNothing;
+    cut_break(core);
+    close_stream(core);
+    core.resume_item = kNothing;
+    core.resume_seed = 0;
+    core.break_back = kNothing;
+    core.break_manual = 0;
+    core.turn_manual = 0;
+    core.turn_repeat = 0;
+    core.only_dirty = 0;
+    if (first == kNothing) { player_halt(core); return; }
+    core.playing = kPlaylist;
+    core.turn_item = core.shown = first;
+    core.break_phase = kBreakClock;
+    core.break_message = core.clock_message_on;
+    core.zero = core.latest;
+    core.zero_pending = 1;
+    ++core.turn_number;
+}
+
+void player_only_refresh(Core &core) {
+    if (core.clocks_on != kClocksOnly) return;
+    core.only_dirty = 0;
+    const uint32_t item = core.playing == kPlaylist ? core.turn_item : kNothing;
+    if (item != kNothing && breaks_position_allowed(core, item) && drive_plays(core, item - kDriveBase) &&
+        (core.turn_manual || (drive_automatic(core, item - kDriveBase) &&
+         (core.break_phase == kBreakClock || breaks_has_face(core))))) return;
+    player_only_restart(core);
+}
+
+void player_clock_mode_changed(Core &core, uint8_t previous) {
+    if (core.clocks_on == kClocksOnly) {
+        const uint64_t elapsed = core.latest > core.window_started ? core.latest - core.window_started : 0;
+        const uint64_t spent = core.window_spent + elapsed;
+        core.window_spent = static_cast<uint32_t>(spent < kWindowMs ? spent : kWindowMs);
+        core.window_started = core.latest;
+        player_only_restart(core);
+    } else if (previous == kClocksOnly) {
+        core.window_started = core.latest;
+        core.resume_item = kNothing;
+        player_halt(core);
+        tree_find_current(core);
+        const uint32_t first = player_first_in_playlist(core);
+        if (first == kNothing) player_halt(core);
+        else player_play_all(core, first);
+    }
 }
 
 void player_item_leaves(Core &core, uint32_t item) {
@@ -1216,6 +1321,7 @@ int player_poll(Core &core, uint64_t now_ms) {
     }
     // A drive plugged in or pulled out is taken up or dropped before the picture is made.
     drive_touch(core);
+    if (core.clocks_on == kClocksOnly && core.only_dirty && !core.invalid) player_only_refresh(core);
     // The window's end while a cycle or nothing plays: the next playlist is current, and
     // what plays goes on; under a test it waits for the test's end.
     if (!core.mapping_test && !core.invalid && core.playing != kPlaylist && player_window_passed(core, now) && core.playing == kNothing) {

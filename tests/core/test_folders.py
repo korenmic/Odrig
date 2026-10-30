@@ -157,7 +157,7 @@ class WhatPlaysAndTheOrderOfALevel(unittest.TestCase):
                                  ("all", 1, "four.odrg", None)])
         nothing = replies(support.start(show_of([], {}), asked(0, "status")))[0]
         self.assertEqual((nothing["file"], nothing["playlist"]), (None, None))
-        self.assertEqual(list(nothing)[-5:], ["file", "playlist", "clocks", "clock_message", "left"])
+        self.assertEqual(list(nothing)[-7:], ["file", "playlist", "clocks", "clock_message", "clock_mode", "clock_only", "left"])
 
     def test_order_get_gives_the_root_level_and_order_get_in_a_folders(self):
         lines = ("order get", "order get in 60007", "order get in 60008", "order get in 60010", "order get in 60008 1", "order get in 1", "order get in 60001",

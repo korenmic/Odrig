@@ -182,7 +182,9 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.number(mini_brightness(core));
     reply.text("}");
     reply.text(",\"playing\":");
-    if (core.playing == kPlaylist && core.tree_known && core.current != 0) {
+    if (core.clocks_on == kClocksOnly && core.playing == kPlaylist && core.clocks_id != 0) {
+        reply.number(core.clocks_id);
+    } else if (core.playing == kPlaylist && core.tree_known && core.current != 0) {
         // The playlist of a folder of the drive, while the drive is in and holds it.
         reply.number(core.current_folder.id);
     } else {
@@ -228,7 +230,7 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
         about[sizeof about - 1] = '\0';
         uint32_t about_length = 0;
         while (about[about_length] != '\0') ++about_length;
-        while (json_escaped(about, nullptr) > 256) {
+        while (json_escaped(about, nullptr) > 160) {
             --about_length;
             while (about_length != 0 && (static_cast<uint8_t>(about[about_length]) & 0xC0u) == 0x80u) --about_length;
             about[about_length] = '\0';
@@ -285,7 +287,9 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
         reply.text("null");
     }
     reply.text(",\"playlist\":");
-    if (core.playing == kPlaylist && core.tree_known && core.current != 0 && drive_folder_path(core, core.current, name, sizeof name) != 0) {
+    if (core.clocks_on == kClocksOnly && core.playing == kPlaylist && core.clocks_id != 0) {
+        reply.text("\"clocks\"");
+    } else if (core.playing == kPlaylist && core.tree_known && core.current != 0 && drive_folder_path(core, core.current, name, sizeof name) != 0) {
         reply.text("\"");
         reply.escaped(name);
         reply.text("\"");
@@ -295,11 +299,50 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     // The settings of the clocks between the animations.
     reply.text(core.clocks_on != 0 ? ",\"clocks\":true" : ",\"clocks\":false");
     reply.text(core.clock_message_on != 0 ? ",\"clock_message\":true" : ",\"clock_message\":false");
+    reply.text(",\"clock_mode\":\"");
+    reply.text(breaks_mode(core));
+    reply.text("\",\"clock_only\":");
+    if (core.clocks_on == kClocksOnly) {
+        reply.text("{\"folder\":");
+        if (core.clocks_id != 0) reply.number(core.clocks_id);
+        else reply.text("null");
+        reply.text(",\"state\":\"");
+        reply.text(breaks_only_state(core));
+        reply.text("\"}");
+    } else reply.text("null");
     // The seconds left in the current playlist's window, the last member.
     reply.text(",\"left\":");
     reply.number(player_window_left(core));
     reply.text("}\n");
     return reply.length;
+}
+
+uint32_t play_only(Core &core, uint32_t id, bool all, Reply &reply) {
+    if (all || (core.clocks_id != 0 && id == core.clocks_id)) {
+        player_only_restart(core);
+        return succeed(reply);
+    }
+    uint32_t value = 0;
+    const uint8_t kind = drive_find(core, id, &value);
+    uint32_t item = kNothing;
+    if (kind == 'f') {
+        item = kDriveBase + value;
+        if (!breaks_position_allowed(core, item)) return refuse(reply, "in-use");
+        const DriveRow *row = drive_row(core, value);
+        if (row == nullptr || !row->listed) return refuse(reply, "unknown-id");
+        if (row->fault != kNone) return refuse(reply, "unavailable");
+    } else if (kind == 'd') {
+        if (!breaks_folder_allowed(core, value)) return refuse(reply, "in-use");
+        IndexFolder folder;
+        if (drive_folder(core, value, folder)) {
+            for (uint32_t position = folder.first; position < folder.last; ++position) {
+                if (drive_plays(core, position)) { item = kDriveBase + position; break; }
+            }
+        }
+        if (item == kNothing) { player_only_restart(core); return succeed(reply); }
+    } else return refuse(reply, "in-use");
+    player_jump(core, item);
+    return succeed(reply);
 }
 
 // The most words a command has. A line with more is no valid command.
@@ -593,10 +636,10 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         // `clocks on`, `clocks off`, `clocks message on` and `clocks message off`.
         const bool message = words.count == 3 && words.is(1, "message");
         const uint32_t last = message ? 2 : 1;
-        if ((words.count != 2 && !message) || !(words.is(last, "on") || words.is(last, "off"))) {
+        if ((words.count != 2 && !message) || !(words.is(last, "on") || words.is(last, "off") || (!message && words.is(last, "only")))) {
             return refuse(reply, "bad-argument");
         }
-        return breaks_command(core, message, words.is(last, "on"), reply);
+        return breaks_command(core, message, words.is(last, "only") ? kClocksOnly : words.is(last, "on") ? kClocksBetween : kClocksOff, reply);
     }
     if (words.is(0, "brightness")) {
         uint32_t value = 0;
@@ -623,6 +666,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
+        if (core.clocks_on == kClocksOnly) return play_only(core, id, all, reply);
         // The root for `play all`; else an item of the show, an animation of the drive or
         // a folder of the drive's tree.
         uint32_t folder = all ? 0 : kNoFolder;

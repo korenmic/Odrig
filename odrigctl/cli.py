@@ -68,7 +68,7 @@ def parser():
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it. "
                     "With --log and no command it prints the lines of the target's log as they arrive, until it is stopped.",
-        epilog="Commands: play ID, play all, on, off, brightness N, brightness ID N save, brightness ID default, status, fault, space, list, list in ID [FROM], read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping cross on|off, mapping test on|off, mapping test snake N, order get [FROM], order get in ID [FROM], order move REV ID BEFORE, repeat ID N, repeat ID N save, repeat ID default, clocks on|off, clocks message on|off, upload ID FILE, upload --external FILE, debug mini on|off. ID and N are sent as they are typed; list and order get without FROM print a reply for each part.",
+        epilog="Commands: play ID, play all, on, off, brightness N, brightness ID N save, brightness ID default, status, fault, space, list, list in ID [FROM], read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping cross on|off, mapping test on|off, mapping test snake N, order get [FROM], order get in ID [FROM], order move REV ID BEFORE, repeat ID N, repeat ID N save, repeat ID default, clocks on|off|only, clocks message on|off, upload ID FILE, upload --external FILE, debug mini on|off. ID and N are sent as they are typed; list and order get without FROM print a reply for each part.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
@@ -78,7 +78,7 @@ def parser():
     made.add_argument("--log", action="store_true", help="print each line of the target's log as it arrives, until stopped, and send nothing; with --port or --tcp, and no command")
     made.add_argument("--external", action="store_true", help="with upload: send the FILE to the target's drive, which takes no ID")
     made.add_argument("command", metavar="COMMAND", nargs="?", choices=list(COMMANDS), help=", ".join(COMMANDS))
-    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, or ID N save or ID default of brightness, the ID and the N of repeat with save after them or default in the place of N, the ID and the OFFSET of read, rebuild internal, rebuild external or cancel of catalog, on, off, message on or message off of clocks, the ID and the FILE of upload, the FILE of upload --external")
+    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, or ID N save or ID default of brightness, the ID and the N of repeat with save after them or default in the place of N, the ID and the OFFSET of read, rebuild internal, rebuild external or cancel of catalog, on, off, only, message on or message off of clocks, the ID and the FILE of upload, the FILE of upload --external")
     return made
 
 
@@ -150,8 +150,8 @@ def checked(made, arguments):
         return [arguments.command, *arguments.arguments]
     if arguments.command == "clocks":
         words = arguments.arguments
-        if words not in (["on"], ["off"], ["message", "on"], ["message", "off"]):
-            made.error("clocks takes on, off, message on, or message off")
+        if words not in (["on"], ["off"], ["only"], ["message", "on"], ["message", "off"]):
+            made.error("clocks takes on, off, only, message on, or message off")
         return [arguments.command, *words]
     if arguments.command == "order":
         words = arguments.arguments

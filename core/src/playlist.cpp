@@ -1,4 +1,5 @@
 #include "playlist.h"
+#include "breaks.h"
 
 #include "drive.h"
 #include "file_source.h"
@@ -33,7 +34,7 @@ uint32_t put_number(char *into, uint32_t at, uint64_t value) {
 
 // The milliseconds spent in the current playlist's window, at most the window.
 uint64_t spent_in_window(const Core &core) {
-    const uint64_t since = core.latest > core.window_started ? core.latest - core.window_started : 0;
+    const uint64_t since = core.clocks_on != kClocksOnly && core.latest > core.window_started ? core.latest - core.window_started : 0;
     const uint64_t spent = core.window_spent + since;
     return spent < kWindowMs ? spent : kWindowMs;
 }
