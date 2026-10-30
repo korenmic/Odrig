@@ -89,6 +89,11 @@ function progressOf(reply) {
 // null from a target that does not report them.
 export async function status() {
   const reply = await carriedOut("status");
+  const mini = reply.mini;
+  const miniSound = mini === undefined || (mini !== null && typeof mini === "object" &&
+    typeof mini.supported === "boolean" && (mini.on === null || typeof mini.on === "boolean") &&
+    typeof mini.pending === "boolean" && typeof mini.requested === "boolean" &&
+    (mini.error === null || typeof mini.error === "string") && whole(mini.brightness, 0, 255));
   const named = (value) => value === undefined || value === null || typeof value === "string";
   const sound =
     typeof reply.on === "boolean" &&
@@ -108,7 +113,7 @@ export async function status() {
     countOrNull(reply.saved, MOST_SAVED) &&
     (reply.clocks === undefined || typeof reply.clocks === "boolean") &&
     (reply.clock_message === undefined || typeof reply.clock_message === "boolean");
-  if (!sound) {
+  if (!sound || !miniSound) {
     throw new Failure("bad-reply", address());
   }
   return {
@@ -132,6 +137,7 @@ export async function status() {
     saved: reply.saved ?? null,
     clocks: reply.clocks ?? null,
     clockMessage: reply.clock_message ?? null,
+    mini: mini === undefined ? null : {...mini},
   };
 }
 
@@ -323,6 +329,11 @@ export async function repeatSave(id, loops) {
 // Switches the clocks between the animations on or off.
 export async function clocks(on) {
   await carriedOut(`clocks ${on ? "on" : "off"}`);
+}
+
+// Requests a temporary output change; status confirms its physical completion.
+export async function debugMini(on) {
+  await carriedOut(`debug mini ${on ? "on" : "off"}`);
 }
 
 // Switches the message after each clock on or off.

@@ -11,6 +11,7 @@
 <p id="app-name">odrig</p>
 <p id="top-link" class="pill" role="status">Checking</p>
 </header>
+<p id="mini-indicator" class="pill" role="status" hidden></p>
 <main>
 <section id="animations" hidden>
 <div id="now-panel" class="panel">
@@ -199,6 +200,12 @@
 <label class="check" for="clocks"><input id="clocks" type="checkbox"><span><span class="title">Clocks between animations</span><span class="small">After every 5 animations, and at least every 5 minutes, a clock of the card's folder clocks plays; an animation cut for it goes on where it was.</span></span></label>
 <label class="check" for="clock-message"><input id="clock-message" type="checkbox"><span><span class="title">The message after each clock</span><span class="small">The animation of clocks/message flashes once after every clock, while clocks between animations is on.</span></span></label>
 <p id="clocks-said" role="status" aria-live="polite" hidden></p>
+</div>
+<div id="mini-panel" class="panel">
+<h2>Miniature display</h2>
+<label class="check" for="debug-mini"><input id="debug-mini" type="checkbox" disabled><span><span class="title">Miniature display debug mode</span><span class="small">The full canvas fits on the central 6 &times; 6 pixels of the 10 &times; 6 matrix, at brightness 40 or less. Power off before rewiring: disconnect the full wall; matrix 5V to board 5V, GND to GND, IN to GPIO1. Follow the README wiring and power checks. This mode resets off on reboot.</span></span></label>
+<p id="mini-said" role="status" aria-live="polite">Reading the miniature mode&hellip;</p>
+<button id="mini-restore" type="button" hidden>Restore normal outputs</button>
 </div>
 <div id="catalogs" class="panel">
 <h2>Catalogs</h2>

@@ -912,6 +912,10 @@ export function clockMessage(on) {
   return requestOperation("clocks", () => commands.clockMessage(on));
 }
 
+export function debugMini(on) {
+  return requestOperation("mini", () => commands.debugMini(on));
+}
+
 // Names the function that is told of every refusal of what the operator asked for.
 export function onRefusal(handler) {
   refused = handler;

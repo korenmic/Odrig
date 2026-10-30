@@ -12191,3 +12191,29 @@ Host tests are not a firmware build or physical transfer/power proof.
 
 **Resolution.** `firmware/usermod/odrig_mini_output.h`, `odrig_usermod.cpp`,
 `odrig_leds.cpp`, `emulator/binding.py`, `emulator/hub.py` and `docs/emulator.md`.
+
+## Seed 57: the app's confirmed miniature state
+
+**Question.** What does the checkbox show while a request is accepted but output
+setup has not completed, or a reply is lost?
+
+**Answer.** It keeps the last status value while the serialized request and its
+first subsequent status are outstanding, then follows the host's pending state.
+Only a fresh status establishes the mode; a successful command reply does not
+check the box. A connection failure invalidates the snapshot until a newer status
+arrives, including when another kind of reply reestablishes contact first.
+Missing or unsupported capability is explicitly unavailable, never treated as off.
+An output failure shows unknown, permits an explicit retry and offers Restore
+normal outputs. Target changes clear all local request state. Reopening the app
+reads status and never enables or retries the mode automatically. An indication
+outside Settings names active miniature output and its brightness cap.
+
+The first browser pass exposed a null-member crash with legacy firmware, then
+passed after the missing capability was handled throughout the drawing path.
+The app message-table check first counted20 command error codes against19;
+the approved `unsupported` refusal now has its own explanation and coverage.
+The tests also distinguish command acceptance from physical acknowledgement and
+exercise the same controls against the running emulator.
+
+**Resolution.** `app/www/commands.js`, `app/www/client.js`,
+`app/www/screens/mini.js` and `tests/app/test_mini.py`.

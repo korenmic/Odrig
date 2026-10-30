@@ -18,7 +18,7 @@
   changing normal recording geometry. Run discovered core/emulator suites and
   relevant host-output stand-in suites; firmware compilation is deferred.
 
-- [ ] 3. Add acknowledged miniature controls to the shared operators' app.
+- [x] 3. Add acknowledged miniature controls to the shared operators' app.
   Settings checkbox, wiring explanation and global active indication use target
   status. Cover pending/refusal/timeout/readback, unsupported firmware, target
   changes, reconnect and changes from another client without saved local state.

@@ -99,6 +99,7 @@ function kilobytes(bytes) {
 // refused, from the reason of an invalid show, when the target has said one, and from the
 // refusal itself.
 const REFUSALS = {
+  "unsupported": () => "This target cannot use miniature display mode with its current output setup.",
   "line-too-long": NOT_UNDERSTOOD,
   "unknown-command": NOT_UNDERSTOOD,
   "bad-argument": NOT_UNDERSTOOD,

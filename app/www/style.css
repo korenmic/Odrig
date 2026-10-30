@@ -94,6 +94,13 @@ main {
   color: var(--teal);
 }
 
+#mini-indicator {
+  max-width: 696px;
+  margin: 8px auto;
+  width: fit-content;
+  color: var(--text);
+}
+
 main {
   padding: 8px calc(12px + var(--bar-right)) calc(104px + var(--bar-bottom)) calc(12px + var(--bar-left));
 }
