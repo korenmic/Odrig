@@ -12420,3 +12420,22 @@ observed and reduced to the reference's 12-pixel size inside its 16-row wheel wi
 flags, bytes, actual runtime pixels and complete loops. The old message and its
 companions are unchanged. Physical card installation, LED and phone checks remain
 open; final APK/FW delivery follows seed60, as the owner subsequently requested.
+
+## Seed 60: host caches and owned setup processes
+
+**Question.** How can Windows install the pinned firmware tools without overwriting
+macOS caches, relying on Unix launchers, losing output or leaking compiler children?
+
+**Answer.** Preserve macOS toolchain paths and namespace other hosts' executable
+environments/PlatformIO caches under the shared firmware root. Keep common setup
+locking and pinned requirements; successful stamps include the host. Use native
+executables and explicit UTF-8/CRT streams. Own a suspended Windows child before
+resuming it, close its job at parent exit, and close every pipe on interruption;
+Unix uses owned process groups. Clone/copy into uniquely created sibling folders
+and publish only completed copies, never delete a preexisting contributor partial.
+
+**Resolution.** `fwtool/host.py`, `process.py`, paths/environment/setup/launcher and
+WLED staging implement this boundary. Seventeen discovered host tests pass after
+seven observed failures. Real Windows base/newer pinned setup and two concurrent
+idempotent repeats pass. Firmware compilation and other-host proof remain later
+tasks; no hardware, firmware runtime, global installation or signing key changed.

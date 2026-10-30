@@ -14,7 +14,7 @@ import signal
 import subprocess
 import sys
 
-from . import Failure, board, build, env, flasher, journal, partitions, paths, stock, toolchain
+from . import Failure, board, build, env, flasher, host, journal, partitions, paths, process, stock, toolchain
 
 SUITES = {"test": "tests/firmware", "test-board": "tests/board", "test-air": "tests/air"}
 
@@ -101,6 +101,8 @@ def _setup(arguments):
         print(step)
     print(f"work folder: {paths.WORK}")
     print(f"toolchains: {paths.SHARED}")
+    print(f"host: {'-'.join(host.supported())}")
+    print(f"host toolchains: {paths.HOST_ROOT}")
     for name, version in versions.items():
         print(f"{name}: {version}")
     return 0
@@ -672,8 +674,17 @@ def launch(argv):
         toolchain.python_environment()
     except Failure as failure:
         return report(failure)
+    except KeyboardInterrupt:
+        return report(Failure("cancelled", "cancelled by an interrupt"))
+    except OSError as error:
+        return report(Failure("setup-failed", str(error)))
     command = [str(paths.PYTHON), "-m", "fwtool.cli", *argv]
-    return subprocess.run(command, env=module_environment()).returncode
+    try:
+        return process.run(command, env=module_environment()).returncode
+    except KeyboardInterrupt:
+        return report(Failure("cancelled", "cancelled by an interrupt"))
+    except OSError as error:
+        return report(Failure("setup-failed", str(error)))
 
 
 if __name__ == "__main__":

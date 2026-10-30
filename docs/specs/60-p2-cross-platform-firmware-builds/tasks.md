@@ -1,6 +1,6 @@
 # Cross-platform firmware builds — tasks
 
-- [ ] 1. Make firmware setup host-aware and safe across shared toolchains.
+- [x] 1. Make firmware setup host-aware and safe across shared toolchains.
   Implement canonical host/executable paths, isolated non-Mac executable caches,
   pinned Python/Node setup and version reporting, explicit host/package failures,
   safe idempotent stamps and shared locking. Add owned process cleanup for setup

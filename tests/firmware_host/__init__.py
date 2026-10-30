@@ -1,0 +1,7 @@
+"""Host-only firmware setup/build checks, independent of board and installed packages."""
+import pathlib
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+if str(ROOT / 'firmware') not in sys.path:
+    sys.path.insert(0, str(ROOT / 'firmware'))
