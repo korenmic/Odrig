@@ -27,8 +27,9 @@ repository holds everything between a video or an idea and what the LEDs show:
 - the **operators' app**, `app/`: JavaScript in an Android app. It shows on a phone what
   the installation plays and steers it, with the same commands.
 
-Only the firmware tool needs the board, and the board stays with the first computer. Most
-work, and all work on animations, needs none.
+Firmware setup, building and host tests need no board and work across supported hosts.
+Operations that read or write the board still follow the board rules and stay with its
+operator. Most work, and all work on animations, needs none.
 
 ## Read in this order
 

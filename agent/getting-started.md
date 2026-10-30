@@ -6,8 +6,7 @@ computer read [On Windows](#on-windows) first.
 
 ## What you need
 
-- **A Mac, or a Windows computer**; [On Windows](#on-windows) has how the commands are
-  written there. The firmware tool runs on macOS only at present.
+- **A Mac, or a Windows computer**; [On Windows](#on-windows) has how the commands are written there. Firmware setup/build also supports Windows x64 and macOS; [host builds](../docs/firmware.md#host-builds-and-verification) gives coverage.
 - **Apple's command-line developer tools**, which bring `make`, the C++ compiler and
   `git`. `xcode-select --install` installs them.
 - **Python 3.10 or later, as `python3`.** The Python that comes with the developer tools is
@@ -21,8 +20,8 @@ computer read [On Windows](#on-windows) first.
 
 The Python library, the core's build, the emulator, the command tool, the app's tool and
 their suites work on Windows 10 and 11. The converter's own suite, `npm test --prefix
-converter`, passes there too. The firmware tool, the board and the walk-through suite stay
-with the first computer. A Windows computer needs git, Python 3.10 or later as `python`,
+converter`, passes there too. Firmware setup/build and its host-only suite also run there;
+the board and the Mac walk-through suite stay with their supported computer. A Windows computer needs git, Python 3.10 or later as `python`,
 Node.js 20 or later, and a C++ compiler. The build finds `g++` or `clang++` on the path,
 and Microsoft's C++ build tools. With none of them, unpack a GCC for Windows, such as the
 WinLibs build of MinGW-w64, into the folder `tools/` of the repository: nothing is
@@ -108,6 +107,7 @@ run fetches WLED's source and build tools, about 260 MB, into `build/firmware/`.
 against the emulator; the third, `tests/apk`, checks the app's package once it was built. The
 last, `tests/walkthrough`, follows this page and the animation guide in a fresh copy, over the
 network, and runs the five suites above through its runner: six minutes. Run it, or `tests/run.py --walkthrough`, when either page changed.
+`tests/firmware_host`, run by `python3 -m unittest discover -s tests/firmware_host -t .`, checks portable host helpers. The runner selects native firmware Python and explicitly reports unsupported APK builds; [host builds](../docs/firmware.md#host-builds-and-verification) gives setup/build and coverage.
 `tests/mapping` checks pin assignments and the diagonal, with the core test host built; `tests/runner`, run by `.venv/bin/python -m unittest discover -s tests/runner -t .`, checks the runner. `tests/app` takes 15 minutes alone and 4 in the runner. To share the toolchains of the APK and the firmware among checkouts, set the environment variable `ODRIG_TOOLS` to the full path of a folder of its own, outside the checkout; [firmware.md](../docs/firmware.md#the-work-folder) says what goes there.
 Two more suites need the board on USB and write to it: `python3 firmware/fw.py test-board`
 runs `tests/board`, and `python3 firmware/fw.py test-air --http <address>` runs

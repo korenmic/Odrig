@@ -1,0 +1,63 @@
+name: Firmware hosts
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firmware-hosts-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  firmware:
+    name: Default firmware (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: odrig source
+    env:
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: odrig source
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Pinned setup
+        run: python -X utf8 firmware/fw.py setup
+      - name: Default microSD build
+        run: python -X utf8 firmware/fw.py build
+      - name: Offline image, source and symbol inspection
+        run: python -X utf8 firmware/verify_build.py
+      - name: Firmware and runner verification by discovery
+        run: python -X utf8 tests/run.py --suites firmware,firmware-host,runner --workers 2 --slowest 5
+      - name: Newcomer walkthrough on its supported host
+        if: runner.os == 'macOS'
+        run: python -X utf8 -m unittest discover -s tests/walkthrough -t .
+      - name: Retain image and proof
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: firmware-${{ matrix.os }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            odrig source/build/firmware/out/
+            odrig source/build/firmware/WLED/.pio/build/odrig_microsd/firmware.elf
+            odrig source/build/tests/report.json
+            odrig source/build/tests/*/*.log
+            odrig source/build/tests/*/*.jsonl

@@ -12476,3 +12476,19 @@ No board checks are substituted and final APK delivery remains separately requir
 **Resolution.** `tests/firmware/compiler.py`, native firmware fixtures, `tests/run.py`
 and the runner suite carry this behavior. The verification record gives observed
 failures, native discovery results and the one privilege skip.
+
+## Seed 60: actual host proof, spaced roots and image identity
+
+**Question.** Does a successful default build prove all variants/architectures, and
+must images from normal and spaced checkouts have the same bytes?
+
+**Answer.** No. Record actual OS/architecture and variant coverage separately. Match
+current runtime/configuration inputs, ESP32-S3 image validation and linked player
+symbols; absolute compiler paths and ELF/application metadata can change bytes.
+An intentional current-source failure, restoration, retry and warm reuse show that
+the spaced checkout compiles its own current code and recovers after interruption.
+
+**Resolution.** `firmware/verify_build.py`, the read-only host matrix and the build
+verification record carry these checks and exact observed hashes/timings. Native
+host instructions replace the former Mac-only setup claim, preserving legacy Mac
+cache paths and every board rule. Remote host results and final delivery follow.

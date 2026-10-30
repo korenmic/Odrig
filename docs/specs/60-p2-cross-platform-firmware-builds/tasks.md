@@ -22,7 +22,7 @@
   Run firmware and runner suites by discovery; correct host-specific expectations
   without weakening runtime/format/board protections. No board suite is selected.
 
-- [ ] 4. Verify local builds and publish the host build matrix and documentation.
+- [x] 4. Verify local builds and publish the host build matrix and documentation.
   Actually set up/build default microSD locally, test spaced paths and setup/build
   reuse/interruption, inspect ESP32-S3 image/current symbols and provenance. Add a
   read-only Windows/macOS/Linux CI matrix for same-source host proof, with useful

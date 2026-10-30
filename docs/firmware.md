@@ -17,11 +17,14 @@ the [measurements](#measurements-on-the-board) made on the board,
 
 ## What the tool needs
 
-On the Mac before the tool runs:
+Before the tool runs:
 
-- macOS with Apple's command-line developer tools,
+- Windows10/11 x64, or macOS on Intel/Apple processors; Linux-compatible host
+  selection also covers x64/arm64, with actual coverage recorded below,
 - git,
-- Python 3.10 or later, as `python3`.
+- Python 3.10 or later, as `python3` on Unix or `python` on Windows,
+- a supported native C/C++ compiler for host verification (Apple's command-line developer tools,
+  GCC/Clang, or the core's Windows compiler selection).
 
 Everything else the tool installs itself, into the work folder, the first time a command is
 run. That first time needs a network connection; later runs do not fetch again.
@@ -60,7 +63,8 @@ at the tag name. The tool chooses none of it:
 55.03.312-1 and PlatformIO 6.2.0. The firmware reads its external animations from a
 microSD card on that software; the USB stick's build, `build --stick`, stays on the
 software known good, which WLED's files name. The newer software lives in
-`build/firmware/newer/`, so the build known good and its tools stay as they are. The first
+`build/firmware/newer/` on macOS, or the selected host namespace described below,
+so the build known good and its tools stay as they are. The first
 `build` fetches it; nothing of it is on a computer before. The sizes are those the sources state, about 700 MB in all; a line *named by its
 manifest* is a small manifest that names the real download, which is given as its release
 offers it for a Mac with Apple's processor.
@@ -90,9 +94,64 @@ of the build known good. The platform takes the other compiler, `toolchain-riscv
 only for a project with a folder `ulp`, and CMake, Ninja and ESP-IDF itself only to compile
 ESP-IDF's libraries again, which the firmware's build does not do.
 
+## Host builds and verification
+
+From the repository root on Windows, including a path containing spaces:
+
+```text
+python firmware/fw.py setup
+python firmware/fw.py build
+python firmware/verify_build.py
+python tests/run.py --suites firmware,firmware-host,runner --workers 2
+```
+
+Use `python3` on macOS/Linux. No board is needed or reached by these commands.
+The build retains the default `odrig_microsd`, vendor pins, hardware definitions
+and size limit. The platform selects native vendor archives and checks integrity;
+an unavailable archive fails, with no implicit upgrade or foreign executable reuse.
+
+macOS retains the legacy folders shown below. Windows uses
+`build/firmware/hosts/win32-x86_64/` for `venv/`, `pio/`, `pio-cache/` and `newer/`;
+Linux uses `hosts/linux-x86_64/` or `hosts/linux-arm64/`. Windows programs are under
+`venv/Scripts/`, with `.exe` suffixes; Unix uses `venv/bin/`. Setup prints the host,
+tool folder and versions. With `ODRIG_TOOLS`, host folders move under its `firmware/`;
+fetched WLED and pip/npm caches can be shared. Patched WLED, builds and outputs
+remain checkout-local. Shared setup and checkout build locks serialize mutation.
+
+Include/forced-include arguments are quoted and complete INI dependency/path values
+retain spaces. PlatformIO's `symlink://` writes `.pio-link` JSON references on
+Windows, requiring no privileged filesystem link or copied library. Current source
+edits remain visible. Compilation uses two jobs. Windows jobs or Unix process groups
+own setup/build descendants through completion, failure and interruption. No global
+compiler, persistent PATH change or unrelated-process termination is required.
+
+Each image retains its `.sha256` and adds `.bin.build.json`: committed/dirty tracked
+source, host/environment/tools, vendor manifest identities, input hashes and image
+bytes/hash. `verify_build.py` inspects the default output offline, checking the
+ESP32-S3 header, checksum/current-source provenance and linked player entry points.
+It writes `image-info.txt` and `verification.json` beside the image. It does not
+flash or claim physical acceptance. Compiler paths, timestamps and ELF/application
+metadata may change bytes across hosts; compare source/configuration identity and
+image properties rather than requiring identical binary hashes.
+
+The read-only [firmware host workflow](../.github/workflows/firmware-hosts.yml)
+builds one PR head on Windows, macOS and Linux from a spaced checkout path, then
+retains images, provenance, inspection and discovered test results. It uses no board
+or deployment secrets. Its Mac job also runs the newcomer walkthrough. The
+[verification record](specs/60-p2-cross-platform-firmware-builds/verification.md)
+distinguishes actual OS/architecture results, reuse/interruption and optional variant
+coverage. A configured job alone is not successful build evidence; Intel/arm64 and
+optional variants are not inferred from another host.
+
+All eight kinds retain their selection: default, microSD alias, probe, stock, stick,
+stick-probe, standalone and standalone-probe. Selection tests and actual compilation
+coverage are separate. Standalone remains an incomplete fallback player. Board and
+phone acceptance of runtime features remains open under the unchanged board rules.
+
 ## The work folder
 
-The work folder is `build/firmware/` under the repository root. Git ignores it, and removing
+The work folder is `build/firmware/` under the repository root. This is the retained
+macOS tool layout; Windows/Linux use the host namespaces above. Git ignores it, and removing
 it removes everything the tool installed, fetched or built.
 
 ```

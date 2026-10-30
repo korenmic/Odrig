@@ -110,7 +110,8 @@ and seed 26 for the work that came after it.
   the command tool reaches it with `--tcp` or `--http`.
 - The converter's own suite, `npm test --prefix converter`, passes on Windows too. Its
   test in Chrome starts Chrome there without a window, as everywhere.
-- The firmware tool and the board stay with the first computer.
+- Firmware setup/build and its host-only tests run on Windows x64; the board stays with its operator.
+  Read [host builds](docs/firmware.md#host-builds-and-verification) for cache paths and coverage.
 - Nothing is installed in the system. A compiler or another program that is fetched is
   unpacked into `tools/`, and a trial goes into `scratch/`. Git ignores both.
 - Code runs on macOS, Linux and Windows alike: [the rules](agent/working-rules.md#code-that-runs-on-every-computer).
@@ -134,10 +135,10 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **A brightness field beside the slider, and a bar for the animation playing now**, seed 47 and seed 48: built; the phone checks are open, and seed 48's `repeat` needs its firmware on the board.
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
 - **Nonblocking SD capacity reporting**, seed 56: software built; cold capacity scanning is bounded and cached. Board timing and phone acceptance remain open.
-- **Miniature matrix debug mode**, seed 57: software built; app and firmware source project the full canvas onto the purchased 10x6 display, with exact approved wiring documented. Firmware compilation, electrical commissioning and board/phone acceptance remain open.
+- **Miniature matrix debug mode**, seed 57: software and firmware built; app and firmware project the full canvas onto the purchased 10x6 display, with approved wiring documented. Electrical commissioning and board/phone acceptance remain open.
 - **Persistent animation brightness overrides**, seed 58: software built; a checkbox saves brightness by file independently of the runtime default. Board and phone acceptance are open.
 - **Message clock widgets and clocks-only mode**, seed 59: software built; seven complete Hebrew message widgets, exclusive clock playback and persistent own/ancestor exclusions in both clock modes. Board and phone acceptance remain open.
-- **Cross-platform firmware builds**, seed 60: planned for later; compile the default microSD firmware locally on Windows while preserving the macOS pipeline. The owner deferred firmware compilation in the seeds 56–59 run.
+- **Cross-platform firmware builds**, seed 60: host-aware setup/build and verification implemented; Windows x64 local build proof and a Windows/macOS/Linux CI matrix. Actual remote host results and final artifact delivery are recorded in its verification document. Board/phone acceptance remains open.
 
 The state of every seed is in the `state.json` of its folder.
 
