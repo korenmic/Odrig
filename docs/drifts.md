@@ -12248,3 +12248,27 @@ each of538 files. Its verification loop now reuses existing HTTP/1.1 support,
 with every file, byte, content type, cache header and rejected path still checked.
 The serving class then passed all7 cases. This changes a test fixture only;
 production server behavior and Windows settings are unchanged.
+
+## Seed 58: preference storage and compatibility
+
+**Question.** How are durable brightness overrides bounded without changing the
+existing default-brightness contract or evicting missing files?
+
+**Answer.** Use internal `brightness.txt`/`brightness.part`, path namespaces like
+saved repeats, at most512 retained records and32 external records. New entries
+beyond either limit are `no-space`; existing entries can be updated/removed and
+missing media never makes room automatically. Zero is a present value. Cache
+listed internal/external values with fixed startup memory, compacting private
+metadata without narrowing existing position/count domains or raising memory
+bounds. Publish only verified durable settings; report damaged settings and use
+defaults safely, retaining usable state on failed updates.
+
+`status.brightness` remains the runtime default. Add `dimming` selected/saved/error
+readback, before blackout/mini cap; the renderer and miniature share selection.
+The app captures target/animation identity at input start and reads back before
+claiming a saved state. The existing WLED limiter remains; seed45's planned new
+budgets are not implemented here. Owner-approved save/default command forms need
+no additional command decision. Firmware compilation stays deferred to seed60.
+
+**Resolution.** Seed58 requirements/design/tasks; all product questions were
+already answered in its seed. Physical acceptance remains a separate task.
