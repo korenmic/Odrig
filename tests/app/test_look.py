@@ -150,10 +150,13 @@ class Look(unittest.TestCase):
             self.assertGreaterEqual(field["right"] - field["left"], 44, where)
             self.assertGreaterEqual(field["bottom"] - field["top"], 48 - 0.01, where)
             self.assertEqual(level["digits"], "tabular-nums", where)
-            # The slider 8 pixels under it, across the panel.
+            # The shortened slider below the field, with its checkbox beside it.
             self.assertAlmostEqual(slider["top"] - field["bottom"], 8, delta=0.5, msg=where)
             self.assertAlmostEqual(slider["left"], level["left"], delta=0.5, msg=where)
-            self.assertAlmostEqual(slider["right"], level["right"], delta=0.5, msg=where)
+            override = level["override"]
+            self.assertAlmostEqual(override["left"] - slider["right"], 8, delta=0.5, msg=where)
+            self.assertAlmostEqual(override["right"], level["right"], delta=0.5, msg=where)
+            self.assertGreater(min(override["bottom"], slider["bottom"]), max(override["top"], slider["top"]), where)
 
     def test_nothing_scrolls_sideways(self):
         for where, size, screen in self.each():
@@ -183,7 +186,9 @@ class Touch(unittest.TestCase):
         mapping = (support.WWW / "screens" / "mapping.js").read_text(encoding="utf-8")
         self.assertIn('"ArrowUp"', mapping)
         self.assertIn('"ArrowDown"', mapping)
-        self.assertEqual({name.name for name in support.WWW.rglob("*.js") if "pointerdown" in name.read_text(encoding="utf-8")}, {"reorder.js", "mapping.js"})
+        # Brightness coordinates focus before a checkbox tap; its change/Enter handlers
+        # perform edits without requiring any pointer gesture.
+        self.assertEqual({name.name for name in support.WWW.rglob("*.js") if "pointerdown" in name.read_text(encoding="utf-8")}, {"reorder.js", "mapping.js", "brightness.js"})
         # A right click has one listener, which stops its menu outside the fields and does
         # nothing else.
         start = (support.WWW / "main.js").read_text(encoding="utf-8")

@@ -37,11 +37,12 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 // null while none is known; `keysVersion` grows when they change. `catalogNone` says that
 // the target keeps no catalogs, and `pagesRefused` that it reads no page of one: a target
 // from before either. `statusCount` counts the replies to `status`, so that a screen can wait
-// for the first one after a command.
+// for the first one after a command. `statusFresh` requires a valid status after the
+// latest communication failure; replies to other commands cannot restore it.
 export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, level: {path: "", id: null}, rootNames: null,
   animations: null, cycles: [], folders: [], space: null,
   listVersion: 0, listBusy: false, order: null, orderVersion: 0, orderKnown: true, catalog: null, keys: {internal: null, external: null}, keysVersion: 0,
-  catalogNone: false, pagesRefused: false, statusCount: 0};
+  catalogNone: false, pagesRefused: false, statusCount: 0, statusFresh: false};
 
 const watchers = new Set();
 // What the operator asked for and was not sent yet, in its order: each a kind and the
@@ -143,6 +144,7 @@ function failed(error) {
   state.link = "no-answer";
   state.failure = error;
   state.space = null;
+  state.statusFresh = false;
 }
 
 async function askStatus() {
@@ -159,6 +161,7 @@ async function askStatus() {
     }
     heard();
     state.status = reply;
+    state.statusFresh = true;
     state.statusCount += 1;
     const named = reply.animation;
     const here = typeof reply.file === "string" && parentOf(reply.file) === state.level.path && (state.level.id === null || reply.file.includes("/"));
@@ -569,14 +572,17 @@ async function give(request) {
     const reply = await request.carry();
     if (asked !== target) {
       request.reject?.(new Error("the address changed"));
+      request.settle?.(false);
       return;
     }
     heard();
     request.confirm?.(reply);
     request.resolve?.(reply);
+    request.settle?.(true);
   } catch (error) {
     if (asked !== target) {
       request.reject?.(new Error("the address changed"));
+      request.settle?.(false);
       return;
     }
     if (error instanceof commands.Refusal) {
@@ -592,6 +598,7 @@ async function give(request) {
       failed(error);
     }
     request.reject?.(error);
+    request.settle?.(false);
   }
   if (request.kind === "remove" || request.kind === "ignore" || request.kind === "order") {
     listing = null;
@@ -721,6 +728,7 @@ export function begin() {
   state.link = "checking";
   state.failure = null;
   state.status = null;
+  state.statusFresh = false;
   state.heardAt = null;
   state.since = Date.now();
   state.answered = false;
@@ -841,12 +849,13 @@ async function askRootPart() {
 
 // Takes something the operator asked for. A brightness that still waits is replaced by a
 // newer one, at its place.
-function want(kind, carry, confirm) {
+function want(kind, carry, confirm, settle) {
   const waiting = kind === "brightness" ? wanted.findIndex((request) => request.kind === kind) : -1;
   if (waiting === -1) {
-    wanted.push({kind, carry, confirm});
+    wanted.push({kind, carry, confirm, settle});
   } else {
-    wanted[waiting] = {kind, carry, confirm};
+    wanted[waiting].settle?.(false);
+    wanted[waiting] = {kind, carry, confirm, settle};
   }
   next();
 }
@@ -885,8 +894,31 @@ export function switchOff() {
   want("off", () => commands.off());
 }
 
-export function setBrightness(value) {
-  want("brightness", () => commands.brightness(value));
+function capturedBrightness(snapshot, carry) {
+  if (snapshot !== null && (snapshot.version !== target || state.link !== "answers" || !state.statusFresh ||
+      state.status?.animation !== snapshot.animation || state.status?.file !== snapshot.file ||
+      (state.status?.dimming?.saved != null) !== snapshot.override)) {
+    throw new commands.Refusal("stale", "brightness");
+  }
+  return carry();
+}
+
+export function setBrightness(value, snapshot = null) {
+  return new Promise((settle) => {
+    want("brightness", () => capturedBrightness(snapshot, () => commands.brightness(value)), undefined, settle);
+  });
+}
+
+export function brightnessValue(value, snapshot) {
+  return requestOperation("brightness-edit", () => capturedBrightness(snapshot, () => commands.brightness(value)));
+}
+
+export function brightnessSave(id, value, snapshot) {
+  return requestOperation("brightness-edit", () => capturedBrightness(snapshot, () => commands.brightnessSave(id, value)));
+}
+
+export function brightnessDefault(id, snapshot) {
+  return requestOperation("brightness-edit", () => capturedBrightness(snapshot, () => commands.brightnessDefault(id)));
 }
 
 // The loops of an animation's turn in progress, for that turn alone; the loops kept for
@@ -947,6 +979,7 @@ function requestOperation(kind, carry, confirm) {
 function cancelWaiting() {
   for (const request of wanted) {
     request.reject?.(new Error("the request was cancelled"));
+    request.settle?.(false);
   }
   wanted.length = 0;
 }

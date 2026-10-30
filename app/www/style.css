@@ -416,6 +416,29 @@ button[aria-pressed="true"] {
   font-variant-numeric: tabular-nums;
 }
 
+#level-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#level-controls > input {
+  flex: 1 1 100px;
+  min-width: 80px;
+  width: auto;
+}
+
+#level-controls .check {
+  flex: 0 1 180px;
+  min-width: 0;
+  min-height: 48px;
+  margin: 0;
+}
+
+#level-file {
+  overflow-wrap: anywhere;
+}
+
 input[type="range"] {
   padding: 0;
   border: 0;

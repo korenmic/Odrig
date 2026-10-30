@@ -14,7 +14,7 @@
   bytes/default behavior unchanged. Run emulator suite and relevant pure firmware
   tool tests; full firmware build remains deferred and no board is written.
 
-- [ ] 3. Add identity-safe override controls to the shared app.
+- [x] 3. Add identity-safe override controls to the shared app.
   Add adjacent checkbox, default/animation labels and file identity. Integrate
   numeric/slider commit rules, confirmed capture/readback, coalesced durable edits
   and captured identities. Cover input transitions, late replies, other clients,

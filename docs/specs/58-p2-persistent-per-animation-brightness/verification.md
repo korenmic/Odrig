@@ -103,3 +103,49 @@ case passed in isolation. Discovered emulator run `20261030-132015-4012` passed
 Existing firmware/emulator host filename access already accepts both brightness
 settings names; no host protocol or transport is added. Shared app controls and
 the final documentation/integrated proof remain queued.
+
+## Shared app controls
+
+The shared Controller/APK code has one slider/number/checkbox controller. The
+shortened slider and labelled checkbox remain adjacent at320px and landscape
+sizes, with48px touch room, no horizontal overflow and the unchanged pinned-panel
+threshold. Labels distinguish the default from this animation's brightness and
+name the current file. Zero remains editable while power is off. Missing/null
+capability, malformed/unknown status, no animation and damaged settings explicitly
+disable override changes; old targets retain ordinary default controls.
+
+Edits capture target epoch, animation ID, full file and mode. Identity transitions
+cancel unsent work, and queued mutations validate the capture before sending.
+Sent commands retain their target/file; late replies cannot repaint another one.
+Valid dirty text is committed and read back before mode changes, invalid text
+blocks them, and an already-entered numeric command is also confirmed first.
+Override drags save once on release; default controls retain200ms throttling and
+queue coalescing. Replies acknowledge commands, while subsequent status confirms
+the setting. Communication failure invalidates status freshness; another command's
+reply cannot restore it. Recovery reads status without automatically resending.
+
+The first browser regressions failed because the controls were absent. Further
+observed faults were: entering default0 and immediately capturing saved128;
+releasing the same override value after a fast external change sent onlyone
+command instead oftwo; another command's reply briefly re-enabled malformed-status
+controls; and at320px the checkbox wrapped beneath the slider. Each case passed
+after its correction. The core still makes unchanged durable saves write-free.
+
+Discovered run `20261030-134205-199536` ran394 app and649 emulator tests. Four app
+failures were the old full-width-slider/pointer-file contracts, an ASCII source
+check and the allowed command list. The layout contract now checks the exact8px
+gap, shared row, field alignment and panel edges; the focus coordinator remains
+usable by ordinary change/Enter handlers. A Unicode escape preserves ASCII source
+with the same displayed label, and only the approved save/default forms were
+added to the command allowlist. The emulator failure was Windows socket exhaustion
+(`WinError10055`) during an existing upload test's emulator startup.
+
+All five failed cases were covered by passing final rechecks:51 tests for all19
+brightness cases, the20 existing controls, Look/Touch and the unchanged upload
+case; plus7 web-scope tests. The brightness cases include dirty/entered text,
+queued identity changes, stale target replies, refusal, lost replies/reconnect,
+other controllers, unsupported/error states, reload, off/zero, narrow/landscape
+layout and the real emulator. No clean aggregate exit is claimed: its recorded
+five failures were corrected/rechecked, and all other assertions passed with19
+emulator platform skips. Logs are `build/seed58-task3-*.log`. Final cumulative
+verification and documentation remain task4; board/phone acceptance stays open.

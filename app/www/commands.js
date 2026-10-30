@@ -89,6 +89,11 @@ function progressOf(reply) {
 // null from a target that does not report them.
 export async function status() {
   const reply = await carriedOut("status");
+  const dimming = reply.dimming;
+  const dimmingSound = dimming === undefined || dimming === null ||
+    (typeof dimming === "object" && whole(dimming.value, 0, 255) &&
+      (dimming.saved === null || whole(dimming.saved, 0, 255)) &&
+      (dimming.error === null || typeof dimming.error === "string"));
   const mini = reply.mini;
   const miniSound = mini === undefined || (mini !== null && typeof mini === "object" &&
     typeof mini.supported === "boolean" && (mini.on === null || typeof mini.on === "boolean") &&
@@ -113,12 +118,13 @@ export async function status() {
     countOrNull(reply.saved, MOST_SAVED) &&
     (reply.clocks === undefined || typeof reply.clocks === "boolean") &&
     (reply.clock_message === undefined || typeof reply.clock_message === "boolean");
-  if (!sound || !miniSound) {
+  if (!sound || !miniSound || !dimmingSound) {
     throw new Failure("bad-reply", address());
   }
   return {
     on: reply.on,
     brightness: reply.brightness,
+    dimming: dimming == null ? null : {...dimming},
     playing: reply.playing,
     animation: reply.animation,
     fps: reply.fps,
@@ -313,6 +319,14 @@ export async function off() {
 // Sets the brightness, 0 to 255.
 export async function brightness(value) {
   await carriedOut(`brightness ${value}`);
+}
+
+export async function brightnessSave(id, value) {
+  await carriedOut(`brightness ${id} ${value} save`);
+}
+
+export async function brightnessDefault(id) {
+  await carriedOut(`brightness ${id} default`);
 }
 
 // Gives the playlist's turn in progress of an animation so many loops, for that turn alone.

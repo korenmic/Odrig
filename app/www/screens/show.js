@@ -3,6 +3,7 @@
 // a file explorer shows them, each row with its preview, its storage badge and its menu.
 
 import * as client from "../client.js";
+import * as brightness from "./brightness.js";
 import * as capacity from "../capacity.js";
 import * as filters from "./filters.js";
 import {Refusal} from "../commands.js";
@@ -13,23 +14,6 @@ import * as reorder from "./reorder.js";
 import * as selection from "./selection.js";
 import * as tests from "./tests.js";
 
-// The shortest time between two brightness commands while the slider is moved.
-const BRIGHTNESS_EVERY_MS = 200;
-// How long after a brightness command a status does not move the slider.
-const SLIDER_RESTS_MS = 1000;
-// The brightness the field takes, and what it says of another value.
-const MOST_BRIGHTNESS = 255;
-const BRIGHTNESS_RANGE = "The brightness is 0 to 255.";
-
-// Whether the operator holds the slider, the value and the time of the newest brightness
-// command, and the timer of one that waits for its time.
-let held = false;
-let sentValue = null;
-let sentAt = -Infinity;
-let waiting = null;
-// The value in force: the brightness this phone last wrote into the field, by the slider,
-// by a value sent from the field, or by following a status; null before the first.
-let inForce = null;
 // The inclusion changes under way, by id, each with the target it was sent to.
 const pending = new Map();
 // The bar of the animation playing now: the animation it shows and what the installation
@@ -659,20 +643,16 @@ function draw(state) {
     byId("power-toggle").setAttribute("aria-pressed", "false");
   } else {
     byId("power").textContent = status.on ? "ON" : "OFF";
-    byId("brightness").textContent = `Brightness ${status.brightness}`;
+    byId("brightness").textContent = `Brightness ${status.dimming?.value ?? status.brightness}`;
     byId("playing").textContent = playing(status, state);
     drawNow(status, state);
     byId("fps").textContent = `${status.fps} refreshes a second`;
     byId("on").setAttribute("aria-pressed", String(status.on));
     byId("off").setAttribute("aria-pressed", String(!status.on));
     byId("power-toggle").setAttribute("aria-pressed", String(status.on));
-    // A status moves neither the slider nor the field while the slider is held, right
-    // after a command, while the field holds text not sent, or while it is typed into.
-    if (!held && performance.now() - sentAt >= SLIDER_RESTS_MS && !unsent() && !typingIn()) {
-      byId("level").value = String(status.brightness);
-      writeLevel(status.brightness);
-    }
+
   }
+  brightness.draw(state);
   const all = shownOrder(state);
   const here = levelOf(state, all);
   const animations = here.shown;
@@ -824,75 +804,6 @@ export function closeMenu() {
   byId("row-menu").hidden = true;
 }
 
-// Sends the slider's value as a brightness command, now or as soon as the shortest time
-// since the one before has passed. A value that was the last one sent is not sent again.
-function sendLevel() {
-  clearTimeout(waiting);
-  waiting = null;
-  const left = sentAt + BRIGHTNESS_EVERY_MS - performance.now();
-  if (left > 0) {
-    waiting = setTimeout(sendLevel, left);
-    return;
-  }
-  const value = Number(byId("level").value);
-  if (value !== sentValue) {
-    sentValue = value;
-    sentAt = performance.now();
-    client.setBrightness(value);
-  }
-}
-
-// Writes a brightness into the field, and makes it the value in force.
-function writeLevel(value) {
-  inForce = value;
-  byId("level-number").value = value === null ? "" : String(value);
-}
-
-// Whether the field holds text that differs from the value in force.
-function unsent() {
-  return byId("level-number").value !== (inForce === null ? "" : String(inForce));
-}
-
-// Whether the field is typed into: it has the focus while the phone's keyboard is open.
-function typingIn() {
-  return document.activeElement === byId("level-number") && document.body.classList.contains("typing");
-}
-
-// Shows the value in force in the field and on the slider, 0 on the slider while there is
-// none.
-function showInForce() {
-  writeLevel(inForce);
-  byId("level").value = String(inForce === null ? 0 : inForce);
-}
-
-// The field was entered or left with text not sent: a whole value from 0 to 255 that is
-// not the value in force is sent as letting go of the slider sends; anything else, and
-// anything while the app is hidden, sends nothing and shows the value in force.
-function commitLevel() {
-  const field = byId("level-number");
-  if (!unsent()) {
-    return;
-  }
-  const digits = field.value.replace(/[^0-9]/g, "");
-  const value = Number(digits);
-  if (document.hidden || digits === "" || value > MOST_BRIGHTNESS) {
-    say("level-range", !document.hidden && digits !== "" ? BRIGHTNESS_RANGE : null);
-    showInForce();
-    return;
-  }
-  say("level-range", null);
-  if (value === inForce) {
-    showInForce();
-    return;
-  }
-  byId("level").value = String(value);
-  writeLevel(value);
-  if (performance.now() - sentAt >= SLIDER_RESTS_MS) {
-    sentValue = null;
-  }
-  sendLevel();
-}
-
 // Lets another part of the screen add actions to a row's menu, draw with the screen, or
 // give the order of the rows.
 export function extend({menu, draw: drawing, order}) {
@@ -954,49 +865,7 @@ export function start(options) {
     else client.play(level.id);
   });
   byId("level-back").addEventListener("click", () => enter(null));
-  const level = byId("level");
-  const field = byId("level-number");
-  level.addEventListener("input", () => {
-    held = true;
-    // The slider wins over text not sent: the text is dropped, and the field gives up the
-    // focus only after it holds the slider's value, so that leaving it sends nothing.
-    const dropped = unsent();
-    writeLevel(Number(level.value));
-    if (dropped && document.activeElement === field) {
-      field.blur();
-    }
-    say("level-range", null);
-    sendLevel();
-  });
-  level.addEventListener("change", () => {
-    held = false;
-    writeLevel(Number(level.value));
-    say("level-range", null);
-    // The value at which the slider is let go is always sent: once more when it was
-    // sent a while ago, because somebody else may have set another since.
-    if (performance.now() - sentAt >= SLIDER_RESTS_MS) {
-      sentValue = null;
-    }
-    sendLevel();
-  });
-  // The field takes digits only, and moves the slider to each whole value up to 255 as it
-  // is typed; it sends when it is entered or left.
-  field.addEventListener("input", () => {
-    const digits = field.value.replace(/[^0-9]/g, "");
-    if (digits !== field.value) {
-      field.value = digits;
-    }
-    say("level-range", null);
-    if (digits !== "" && Number(digits) <= MOST_BRIGHTNESS) {
-      level.value = String(Number(digits));
-    }
-  });
-  field.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      commitLevel();
-    }
-  });
-  field.addEventListener("change", commitLevel);
+  brightness.start({redraw});
   // A press anywhere else closes the menu of a row, and so does Escape.
   document.addEventListener("click", (event) => {
     if (menuFor !== null && !byId("row-menu").contains(event.target)) {
