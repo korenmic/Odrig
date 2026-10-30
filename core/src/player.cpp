@@ -510,6 +510,30 @@ void pause_for_break(Core &core) {
     break_begins(core, at, paused);
 }
 
+ODRIG_NOINLINE Reason clock_only_turn(Core &core, uint64_t now, uint64_t *in_turn) {
+    for (uint32_t step = 0; step < 128; ++step) {
+        if (core.playing == kNothing || core.turn_item == kNothing) { *in_turn = 0; return kNone; }
+        const uint64_t length = length_of(core, core.turn_item);
+        if (length == 0) return kLoopMismatch;
+        const uint64_t duration = current_turn_ms(core);
+        const uint64_t elapsed = now >= core.zero ? now - core.zero : 0;
+        if (elapsed < duration) { *in_turn = elapsed; return kNone; }
+        core.zero += duration;
+        const uint32_t message = core.break_phase == kBreakClock && (core.break_message || core.clock_message_on)
+            ? breaks_message(core, core.zero) : kNothing;
+        const uint32_t next = message != kNothing ? message : breaks_pick(core, core.zero);
+        close_stream(core);
+        if (next == kNothing) { player_halt(core); *in_turn = 0; return kNone; }
+        core.turn_item = core.shown = next;
+        core.break_phase = message != kNothing ? kBreakMessage : kBreakClock;
+        core.break_message = core.clock_message_on;
+        core.turn_repeat = message != kNothing ? 1 : 0;
+        core.turn_manual = 0;
+        ++core.turn_number;
+    }
+    return kPendingWork;
+}
+
 // Moves the playlist on to the turn that a moment falls into, and gives the time since
 // that turn began. A turn begins where the one before it ended, however late the moment is.
 //
@@ -522,29 +546,7 @@ void pause_for_break(Core &core) {
 // While the clocks are on, a break's turns come between the playlist's: at the end of a
 // turn once 5 turns are counted, or within one where 5 minutes of the playlist's time are.
 ODRIG_NOINLINE Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn) {
-    if (core.clocks_on == kClocksOnly) {
-        for (uint32_t step = 0; step < 128; ++step) {
-            if (core.playing == kNothing || core.turn_item == kNothing) { *in_turn = 0; return kNone; }
-            const uint64_t length = length_of(core, core.turn_item);
-            if (length == 0) return kLoopMismatch;
-            const uint64_t duration = current_turn_ms(core);
-            const uint64_t elapsed = now >= core.zero ? now - core.zero : 0;
-            if (elapsed < duration) { *in_turn = elapsed; return kNone; }
-            core.zero += duration;
-            const uint32_t message = core.break_phase == kBreakClock && (core.break_message || core.clock_message_on)
-                ? breaks_message(core, core.zero) : kNothing;
-            const uint32_t next = message != kNothing ? message : breaks_pick(core, core.zero);
-            close_stream(core);
-            if (next == kNothing) { player_halt(core); *in_turn = 0; return kNone; }
-            core.turn_item = core.shown = next;
-            core.break_phase = message != kNothing ? kBreakMessage : kBreakClock;
-            core.break_message = core.clock_message_on;
-            core.turn_repeat = message != kNothing ? 1 : 0;
-            core.turn_manual = 0;
-            ++core.turn_number;
-        }
-        return kPendingWork;
-    }
+    if (core.clocks_on == kClocksOnly) return clock_only_turn(core, now, in_turn);
     bool rounds_taken = false;
     for (;;) {
         const uint64_t elapsed = now - core.zero;

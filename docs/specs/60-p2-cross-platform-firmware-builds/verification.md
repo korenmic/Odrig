@@ -189,3 +189,34 @@ one-task/one-proof-commit boundary without rewriting pushed history. Actual Mac
 arm64, Windows x86_64 and Linux x86_64 default compilation is observed; Mac Intel,
 Linux arm64 and optional variants are not claimed. Final artifacts are rebuilt from
 the bridge revision before delivery; the already created dedicated key is reused.
+
+## Integrity bridge 7 — checked Clang scheduling frame
+
+Run41144153561 passes the complete Windows/Linux jobs and the Mac default build,
+offline inspection and firmware647/host28/runner26 suites. Its Mac newcomer run
+then observes a real checked-core failure: Clang/ASan reports playlist_turn's frame
+as528 bytes against the unchanged512-byte warning/error bound. The seven-test
+walkthrough has one failure; its converter1595, Python552 and onboarding88 checks
+pass, while core/emulator cannot proceed past this compilation error. Original
+failure: `build/seed60-task5-mac-walkthrough-failed.log`. This is owned by the PR;
+the failed overall run is not treated as final successful CI or artifact delivery.
+
+The existing bounded clocks-only scheduling block is extracted into a separate
+ODRIG_NOINLINE clock_only_turn helper, called under the same mode condition.
+A structural comparison verifies that its body is token-identical and that the
+remainder of player.cpp is unchanged after accounting for that extraction/call.
+No algorithm, state field, arena budget,512-byte bound or sanitizer is changed.
+An early checked Mac core host build now precedes cold firmware setup in CI, so
+this compiler protection is tested before a long default build.
+
+Local strict checked host and shared library builds pass, retaining Werror and
+frame512 with the Windows compiler's supported runtime checks. All2392 discovered
+regressions pass: core1035, emulator656, firmware647, host28 and runner26, with
+the established explicit host skips. This includes existing Off/Between/Only,
+complete message-loop, playlist restoration and emulator transport cases. Proof:
+`build/seed60-task7-suites.log` and `seed60-task7-structural-review.log`.
+
+The actual updated Mac Clang/ASan bound and complete newcomer walkthrough remain
+the post-commit remote gate owned by task5. The final firmware and APK are rebuilt
+again after this committed safety repair, with its new current-input identity and
+the same persistent signer; no stale52b artifact is delivered. No board is used.

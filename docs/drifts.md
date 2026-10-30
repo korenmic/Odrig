@@ -12508,3 +12508,19 @@ do not add a runtime feature or call the failed matrix successful.
 **Resolution.** Task6 is the source-backed bridge, with observed CI failures and
 normal/actual Windows8.3 discovery proof. Task5 remains the final artifact/CI handoff
 boundary. Requirements and all board/phone limits remain unchanged.
+
+## Seed 60: checked Clang scheduling frame
+
+**Question.** The default firmware builds on all hosts, but the Mac newcomer checked
+host fails its512-byte frame bound at528 bytes in playlist_turn. What repair preserves
+both the safety rule and the existing clock/playlist behavior?
+
+**Answer.** Isolate the existing bounded clocks-only scheduler in a non-inlined helper,
+preserving its body and caller condition. Keep the limit, sanitizers and all state/
+arena budgets. Verify the full core/emulator regressions and add an early Mac checked
+host build; retain the remote target check before final handoff.
+
+**Resolution.** Task7 is the minimal committed integrity bridge between the host
+matrix and final delivery. player.cpp contains the extraction; the workflow checks
+the bound early, and the verification record retains observed failure and proof.
+Requirements, hardware choices, command list and playback semantics are unchanged.

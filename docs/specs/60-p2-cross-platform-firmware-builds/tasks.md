@@ -53,3 +53,11 @@ checkbox and commit. Earlier board/phone tasks stay unchecked.
   including an actual Windows8.3 temp root. Commit this minimal repair before task5's
   remote check gate and final delivery. This bridges the committed host matrix and
   its final handoff; no requirement or runtime behavior is added.
+
+- [x] 7. Keep checked scheduling frames within the existing Clang bound (integrity bridge).
+  The Mac newcomer run exposes a528-byte checked playlist_turn frame against the
+  unchanged512-byte limit. Isolate the bounded clocks-only scheduler without changing
+  playback behavior, memory budgets or compiler protections. Add an early Mac checked
+  core build to catch this before firmware downloads; run discovered core/emulator
+  regression suites locally and own the actual Mac check. Commit this minimal build
+  safety repair before final task5 delivery, then rebuild artifacts from that source.
