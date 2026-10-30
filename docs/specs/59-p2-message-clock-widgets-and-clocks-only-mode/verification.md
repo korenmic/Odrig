@@ -141,3 +141,68 @@ the remount fix and all compatibility-fixture updates. Its combined result has
 the 20 successful emulator rechecks remain separately identified in local logs.
 All 130 focused mode, status, command and folder checks also passed. No board was
 flashed or used, and physical output/phone acceptance remains open.
+
+
+## Shared app controls and inclusion
+
+The first browser checks observed an INPUT instead of the required mode SELECT,
+missing normalized mode metadata and command form, and rejected external folder
+inclusion fields. Further fail-first checks found no folder inclusion menu, no
+external file Ignore action, and outside Play still enabled. The shared app now
+validates explicit mode metadata, maps legacy booleans to Off/Between with Only
+unavailable, and preserves own/inherited flags for external files and folders.
+
+Both settings controls wait for fresh target confirmation after acknowledgement.
+Tests exercise refusal, contradictory status, reconnect, another controller,
+pending target changes and late old-target replies. A lost-ack regression first
+stayed on Settings after fresh status confirmed Only; recovery now opens the
+resolved folder while retaining explicit unconfirmed wording, without a false
+Saved message. Navigation occurs once per target/mode transition, and later
+browsing stays where the operator chooses. Outside Play is disabled and explained;
+the global action restarts Clocks even from an unrelated browsed folder.
+
+The UI/runtime integration review also caught raw `play all` accepted contrary to
+the seed's explicit rule16. A regression observed success instead of `in-use`.
+Raw all is now refused; global restart sends `play` with the currently resolved
+Clocks folder ID. Core and HTTP/TCP checks distinguish the two requests and
+retain the saved normal playlist. This corrects the earlier runtime interpretation.
+
+External file and folder menus save the same Ignore setting on the target even
+with read-only media. Inherited exclusions stay visible and distinct; including
+an ancestor preserves the child's own choice, and explicit inside play remains
+available. Refused saves keep the previous choice until an explicit retry.
+Narrow and landscape layouts retain full-width controls and 48-pixel new actions.
+
+A real browser against the actual emulator selected Only, manually played a message
+with automatic messages off, ignored the message folder, browsed outside with Play
+disabled, and restarted through the resolved folder ID. The event stream verified
+the requests and raw-all refusal; external card bytes were identical before and
+after. The first combined trial timed out during its initial browser connection;
+an isolated trial completed the UI and found a recorder fixture that incorrectly
+relied on proxy capture for localhost. The corrected test uses the emulator's
+authoritative event stream and checks current status before opening the browser.
+No APK was built at this stage and no phone or physical board was used.
+
+An outside-play refusal initially said the animation could not be removed. Its
+regression now checks that both Play and display-test refusals explain Clocks only,
+including when another controller changed mode before the app's next status.
+
+
+The discovered app run executed 418 checks: 412 passed, including all 19 new mode
+cases present at discovery. Six old documentation/action expectations and the
+ASCII-source constraint initially failed. Documentation/drive rechecks (13), the
+two folder/order regressions within a six-test correction run, and all seven
+source-scope checks passed after their updates. Literal display symbols now use
+JavaScript Unicode escapes, preserving visible text while keeping app source ASCII.
+The additional outside-play/display-refusal regression and existing message table
+passed all six checks after the new explanation was added.
+
+The discovered emulator run executed 655 checks with 19 expected skips; its sole
+failure was the old assertion that raw all succeeds. All four mode transport checks
+passed after that assertion was corrected, within the six-test correction run.
+All 25 current core mode tests passed again, including explicit inside restart,
+raw-all refusal and held normal-path/window restoration. The real-emulator,
+narrow/landscape and refused-external-inclusion checks also passed together.
+No observed failure remains unresolved. These logs distinguish the initially
+failed complete runs from their successful focused rechecks; the integrated asset
+task performs the next fresh all-supported-suite pass.

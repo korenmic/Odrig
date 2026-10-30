@@ -60,6 +60,7 @@ let listTimer = null;
 let listing = null;
 // The folders entered from the root down to the level shown, each `{path, id}`.
 const trail = [];
+let onlyOpened = false;
 // Whether the root's names are due while another level is shown, and the root's list that
 // is being asked for in parts for them: the ids and the files so far and the position to
 // ask for next.
@@ -163,6 +164,13 @@ async function askStatus() {
     state.status = reply;
     state.statusFresh = true;
     state.statusCount += 1;
+    if (reply.clockMode !== "only") onlyOpened = false;
+    else if (!onlyOpened && reply.clockOnly?.folder != null) {
+      onlyOpened = true;
+      trail.length = 0;
+      trail.push({path: "clocks", id: reply.clockOnly.folder});
+      toLevel();
+    }
     const named = reply.animation;
     const here = typeof reply.file === "string" && parentOf(reply.file) === state.level.path && (state.level.id === null || reply.file.includes("/"));
     if (named !== null && state.animations !== null && named !== askedFor && here && !state.animations.some((animation) => animation.id === named)) {
@@ -733,6 +741,7 @@ export function begin() {
   state.since = Date.now();
   state.answered = false;
   trail.length = 0;
+  onlyOpened = false;
   state.level = {path: "", id: null};
   state.rootNames = null;
   rootDue = false;
@@ -878,12 +887,32 @@ export function remove(animation, done) {
   want("remove", () => commands.remove(animation.id), () => done(animation));
 }
 
+export function inClockFolder(item) {
+  const path = typeof item.playlist === "string" ? item.playlist : item.external === true ? item.file : null;
+  return path === "clocks" || typeof path === "string" && path.startsWith("clocks/");
+}
+
+export function canPlay(item) {
+  return state.status?.clockMode !== "only" || inClockFolder(item);
+}
+
 export function play(id) {
-  want("play", () => commands.play(id));
+  want("play", () => {
+    if (state.status?.clockMode === "only" && id !== state.status.clockOnly?.folder) {
+      const item = [...(state.animations || []), ...state.folders].find((candidate) => candidate.id === id);
+      if (item === undefined || !inClockFolder(item)) throw new commands.Refusal("in-use", `play ${id}`);
+    }
+    return commands.play(id);
+  });
 }
 
 export function playAll() {
-  want("play", () => commands.playAll());
+  want("play", () => {
+    if (state.status?.clockMode !== "only") return commands.playAll();
+    const folder = state.status.clockOnly?.folder;
+    if (folder == null) throw new commands.Refusal("in-use", "play all");
+    return commands.play(folder);
+  });
 }
 
 export function switchOn() {
@@ -938,6 +967,10 @@ export function repeatDefault(id) {
 
 export function clocks(on) {
   return requestOperation("clocks", () => commands.clocks(on));
+}
+
+export function clockMode(mode) {
+  return requestOperation("clocks", () => commands.clockMode(mode));
 }
 
 export function clockMessage(on) {
@@ -1037,7 +1070,7 @@ export function refreshContent() {
 
 export function ignore(id, ignored) {
   return requestOperation("ignore", () => commands.ignore(id, ignored), () => {
-    const animation = state.animations?.find(item => item.id === id);
+    const animation = [...(state.animations || []), ...state.folders].find(item => item.id === id);
     if (animation) animation.ignored = ignored;
   });
 }

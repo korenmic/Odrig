@@ -63,6 +63,15 @@ export function isEditable(animation) {
   return !isExternal(animation) && typeof animation.ignored === "boolean";
 }
 
+function canIgnore(item) {
+  return typeof item.ignored === "boolean";
+}
+
+function inclusionNote(item) {
+  if (item.inheritedIgnored) return item.ignored ? "\u2298 Ignored \xb7 also excluded by a parent folder" : "\u2298 Excluded by a parent folder";
+  return item.ignored ? "\u2298 Ignored" : "";
+}
+
 // Whether an animation is on a card the target may write, so that the app may delete it.
 function onWritableCard(animation) {
   return isExternal(animation) && capacity.cardWritable(client.state.space);
@@ -138,7 +147,7 @@ function nameOf(path) {
 // in the shown order and those of them the filters show; and its sub-folders in the order
 // of the list, each with the count of the files directly in it.
 function levelOf(state, all) {
-  const folders = state.folders.map((item) => ({path: item.playlist, id: item.id, name: nameOf(item.playlist), count: item.files ?? 0}));
+  const folders = state.folders.map((item) => ({...item, path: item.playlist, name: nameOf(item.playlist), count: item.files ?? 0}));
   return {path: state.level.path, rows: all, shown: all.filter(filters.matches), folders};
 }
 
@@ -154,15 +163,36 @@ function countWords(count) {
   return count === 1 ? "1 animation" : `${count} animations`;
 }
 
+function moreButton(id, label) {
+  const more = document.createElement("button");
+  more.type = "button";
+  more.className = "more";
+  more.textContent = "\u22ef";
+  more.setAttribute("aria-haspopup", "menu");
+  more.setAttribute("aria-expanded", "false");
+  more.setAttribute("aria-label", label);
+  more.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (menuFor === id) closeMenu();
+    else openMenu(id, more);
+  });
+  return more;
+}
+
 // The row of a sub-folder of the level: its name, the count of its own files, and a way
 // in. It is no row of an animation: the filters, the moves and the selection pass it by.
 function folderRow(entry) {
-  const made = document.createElement("button");
-  made.type = "button";
+  const managed = canIgnore(entry);
+  const made = document.createElement(managed ? "div" : "button");
+  if (managed) made.setAttribute("role", "listitem");
+  else made.type = "button";
   made.className = "folder-row";
   made.dataset.path = entry.path;
   made.dataset.id = String(entry.id);
-  made.setAttribute("aria-label", `Open folder ${entry.path}`);
+  made.dataset.managed = String(managed);
+  const open = managed ? document.createElement("button") : made;
+  if (managed) { open.type = "button"; open.className = "folder-open"; }
+  open.setAttribute("aria-label", `Open folder ${entry.path}`);
   const text = document.createElement("span");
   text.className = "folder-text";
   const name = document.createElement("span");
@@ -171,12 +201,16 @@ function folderRow(entry) {
   const meta = document.createElement("span");
   meta.className = "meta";
   meta.textContent = countWords(entry.count);
-  text.append(name, meta);
+  const note = document.createElement("span");
+  note.className = "row-state";
+  note.hidden = true;
+  text.append(name, meta, note);
   const chevron = document.createElement("span");
   chevron.className = "chevron";
   chevron.setAttribute("aria-hidden", "true");
   chevron.textContent = "\u203a";
-  made.append(text, chevron);
+  open.append(text, chevron);
+  if (managed) made.append(open, moreButton(entry.id, `Actions for folder ${entry.path}`));
   made.addEventListener("click", () => enter(entry));
   return made;
 }
@@ -511,21 +545,7 @@ function row(animation) {
   badge.setAttribute("role", "img");
   badge.setAttribute("aria-label", where);
   badge.title = where;
-  const more = document.createElement("button");
-  more.type = "button";
-  more.className = "more";
-  more.textContent = "\u22ef";
-  more.setAttribute("aria-haspopup", "menu");
-  more.setAttribute("aria-expanded", "false");
-  more.setAttribute("aria-label", `Actions for ${animation.id} ${animation.file}`);
-  more.addEventListener("click", (event) => {
-    event.stopPropagation();
-    if (menuFor === animation.id) {
-      closeMenu();
-    } else {
-      openMenu(animation.id, more);
-    }
-  });
+  const more = moreButton(animation.id, `Actions for ${animation.id} ${animation.file}`);
   made.append(play, badge, more);
   if (typeof animation.fault === "string") {
     // An animation whose file had a fault: grayed, its reason in words, and no Play.
@@ -555,7 +575,7 @@ function rowKey(animation) {
 
 function keyOfChild(child) {
   if (child.classList.contains("folder-row")) {
-    return `#${child.dataset.path}|${child.dataset.id}`;
+    return `#${child.dataset.path}|${child.dataset.id}|${child.dataset.managed}`;
   }
   if (!child.classList.contains("row")) {
     return "?";
@@ -569,7 +589,7 @@ function keyOfChild(child) {
 // sub-folders.
 function drawRows(here) {
   const place = byId("animations-list");
-  const wanted = [...here.shown.map(rowKey), ...here.folders.map((entry) => `#${entry.path}|${entry.id}`)];
+  const wanted = [...here.shown.map(rowKey), ...here.folders.map((entry) => `#${entry.path}|${entry.id}|${canIgnore(entry)}`)];
   const shown = [...place.children].map(keyOfChild);
   if (shown.length === wanted.length && shown.every((key, at) => key === wanted[at])) {
     return;
@@ -601,6 +621,14 @@ function rowsState(state, animations, here) {
       continue;
     }
     made.querySelector(".meta").textContent = countWords(entry.count);
+    made.classList.toggle("ignored", entry.ignored === true || entry.inheritedIgnored === true);
+    const saving = pending.get(entry.id) === version;
+    made.dataset.saving = String(saving);
+    const note = made.querySelector(".row-state");
+    note.textContent = saving ? "Saving\u2026" : inclusionNote(entry);
+    note.hidden = note.textContent === "";
+    const more = made.querySelector(".more");
+    if (more) more.disabled = !answers() || saving;
     made.setAttribute("aria-current", String(marked !== null && (marked === entry.path || marked.startsWith(`${entry.path}/`))));
   }
   for (const made of byId("animations-list").querySelectorAll(":scope > .row")) {
@@ -612,10 +640,10 @@ function rowsState(state, animations, here) {
     made.setAttribute("aria-current", String(current));
     made.querySelector(".play").setAttribute("aria-current", String(current));
     const saving = pending.get(animation.id) === version;
-    made.classList.toggle("ignored", animation.ignored === true);
+    made.classList.toggle("ignored", animation.ignored === true || animation.inheritedIgnored === true);
     made.dataset.saving = String(saving);
     const note = made.querySelector(".row-state");
-    note.textContent = saving ? "Saving\u2026" : animation.ignored === true ? "\u2298 Ignored" : "";
+    note.textContent = saving ? "Saving\u2026" : inclusionNote(animation);
     note.hidden = note.textContent === "";
     previews.show(made.querySelector(".thumb"), previewOf(animation));
     const check = made.querySelector(".pick input");
@@ -624,7 +652,17 @@ function rowsState(state, animations, here) {
       check.disabled = selection.locked();
     }
     made.querySelector(".more").disabled = !answers();
+    const play = made.querySelector(".play");
+    const allowed = client.canPlay(animation);
+    play.disabled = typeof animation.fault === "string" || !allowed;
+    play.title = allowed ? "" : "Leave Clocks only to play an animation outside the Clocks folder.";
+    if (!allowed) play.setAttribute("aria-describedby", "only-boundary");
+    else play.removeAttribute("aria-describedby");
   }
+  const only = state.status?.clockMode === "only";
+  byId("play-all").textContent = only ? "Restart clocks" : "Play this folder";
+  byId("play-all").disabled = only && (state.status.clockOnly?.folder == null || !state.statusFresh);
+  say("only-boundary", only ? "Clocks only: browsing is unrestricted. Play outside the Clocks folder is disabled; leave Clocks only in Settings to play it." : null);
 }
 
 function draw(state) {
@@ -665,7 +703,7 @@ function draw(state) {
   byId("none").hidden = state.animations === null || all.length > 0;
   byId("filter-empty").hidden = here.rows.length === 0 || animations.length > 0;
   selection.draw(state);
-  if (menuFor !== null && !animations.some((animation) => animation.id === menuFor)) {
+  if (menuFor !== null && !animations.some((animation) => animation.id === menuFor) && !here.folders.some((folder) => folder.id === menuFor)) {
     closeMenu();
   } else if (menuFor !== null) {
     fillMenu();
@@ -708,10 +746,11 @@ async function include(animation, included) {
 function actions(animation) {
   const items = [];
   const free = answers() && !selection.locked();
-  if (isEditable(animation)) {
+  if (canIgnore(animation)) {
     const saving = pending.get(animation.id) === client.targetVersion();
     items.push(animation.ignored ? {label: "Restore to playlist", act: () => include(animation, true), disabled: !free || saving}
       : {label: "Ignore in playlist", act: () => include(animation, false), disabled: !free || saving});
+    if (animation.inheritedIgnored) items.push({note: "Excluded by a parent folder. This choice changes only this file's own setting."});
   }
   for (const extra of extensions.menu) {
     items.push(...extra(animation));
@@ -722,7 +761,8 @@ function actions(animation) {
   } else if (onWritableCard(animation)) {
     items.push({label: "Delete", act: () => selection.askOne(animation), disabled: !free, danger: true});
   } else if (isExternal(animation)) {
-    items.push({note: "External storage is read-only: this animation cannot be ignored or deleted from the app."});
+    items.push({note: canIgnore(animation) ? "External storage is read-only: this animation cannot be deleted. Inclusion is saved on the target." :
+      "External storage is read-only: this animation cannot be ignored or deleted from the app."});
   } else {
     items.push({note: "This installation's software does not let the app change this animation."});
   }
@@ -730,13 +770,19 @@ function actions(animation) {
 }
 
 function fillMenu() {
-  const animation = (client.state.animations || []).find((item) => item.id === menuFor);
+  const animation = [...(client.state.animations || []), ...client.state.folders].find((item) => item.id === menuFor);
   const menu = byId("row-menu");
   if (animation === undefined) {
     closeMenu();
     return;
   }
-  const items = actions(animation);
+  const folder = typeof animation.playlist === "string";
+  const saving = pending.get(animation.id) === client.targetVersion();
+  const items = folder ? [
+    {label: animation.ignored ? "Include folder" : "Ignore folder", act: () => include(animation, animation.ignored === true),
+      disabled: !answers() || selection.locked() || saving},
+    ...(animation.inheritedIgnored ? [{note: "Excluded by a parent folder. Including this folder does not override that ancestor."}] : []),
+  ] : actions(animation);
   const key = JSON.stringify(items.map((item) => [item.label, item.note, item.disabled]));
   if (menu.dataset.key === key) {
     return;
@@ -861,7 +907,7 @@ export function start(options) {
   // The level's button: the root's playlist at the root, the folder's inside one.
   byId("play-all").addEventListener("click", () => {
     const level = client.state.level;
-    if (level.id === null) client.playAll();
+    if (client.state.status?.clockMode === "only" || level.id === null) client.playAll();
     else client.play(level.id);
   });
   byId("level-back").addEventListener("click", () => enter(null));

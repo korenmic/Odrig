@@ -152,11 +152,12 @@ export function draw(state) {
   let note = "Manual tests through the saved mapping. They never play by themselves.";
   if (!supported) note = "This installation's software has no test animations.";
   else if (editable === false) note = "These tests need the 60 \u00d7 60 installation of twenty three-column snakes; this installation's mapping is another one.";
+  if (state.status?.clockMode === "only") note = "Leave Clocks only in Settings before starting a display test.";
   byId("tests-note").textContent = note;
   for (const button of byId("tests-grid").children) {
     const snake = Number(button.dataset.snake);
     button.setAttribute("aria-pressed", String(on === snake));
-    button.disabled = !answers || sending || !supported || editable !== true;
+    button.disabled = !answers || sending || !supported || editable !== true || state.status?.clockMode === "only";
   }
   byId("test-now").hidden = on === null;
   byId("test-now-text").textContent = on === null ? "" : `Test: ${name(on)} is showing. Normal playback is paused.`;

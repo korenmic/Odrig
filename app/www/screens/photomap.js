@@ -136,10 +136,13 @@ function drawChoices() {
 export function draw() {
   const current = mapping.mapping();
   const editable = current !== null && current.editable === true;
+  const only = client.state.status?.clockMode === "only";
   setHidden(byId("photo-take"), !editable);
   setHidden(byId("show-diagonal"), !editable || current.test === true);
+  setDisabled(byId("show-diagonal"), only);
+  byId("show-diagonal").title = only ? "Leave Clocks only before starting a display test." : "";
   setDisabled(byId("from-photo"), busy || !editable);
-  setText(byId("photo-advice"), busy ? "Reading the photo\u2026" : ADVICE);
+  setText(byId("photo-advice"), busy ? "Reading the photo\u2026" : ADVICE + (only ? " Leave Clocks only before starting a diagonal." : ""));
   setHidden(byId("photo-result"), shown === null);
   const error = problem;
   setText(byId("photo-error"), error);

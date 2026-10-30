@@ -54,11 +54,14 @@ class ClockModes(unittest.TestCase):
     def test_browsing_stays_open_but_outside_play_and_diagnostics_are_refused_on_both_transports(self):
         self.only()
         self.assertIn(1, [item['id'] for item in json.loads(self.emulator.command('list'))['items']])
-        for command in ('play 1', 'play 60001', 'mapping test on', 'mapping test snake 1'):
+        for command in ('play 1', 'play 60001', 'play all', 'mapping test on', 'mapping test snake 1'):
             self.assertEqual(json.loads(self.emulator.command(command)), dict(ok=False, error='in-use'))
             with support.Lines(self.emulator.tcp) as port:
                 self.assertEqual(json.loads(port.ask(command)), dict(ok=False, error='in-use'))
-        self.assertEqual(json.loads(self.emulator.command('play all')), dict(ok=True))
+        folder = self.emulator.status()['clock_only']['folder']
+        self.assertEqual(json.loads(self.emulator.command(f'play {folder}')), dict(ok=True))
+        with support.Lines(self.emulator.tcp) as port:
+            self.assertEqual(json.loads(port.ask(f'play {folder}')), dict(ok=True))
         self.assertEqual(self.emulator.status()['clock_mode'], 'only')
 
     def test_excluding_and_reincluding_faces_stays_in_only_without_changing_the_card(self):

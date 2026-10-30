@@ -24,7 +24,7 @@
   Verify all transport/bag/inclusion transitions, timing, reply/memory bounds and
   regression compatibility. Run core/emulator and settings-tool verification.
 
-- [ ] 4. Add shared mode dropdown and external inclusion controls.
+- [x] 4. Add shared mode dropdown and external inclusion controls.
   Implement confirmed Off/Between/Only UI, old-target fallback, once-only navigation,
   unrestricted browsing, inside/outside Play states and inherited folder/file
   exclusions. Cover target changes, late replies, pending/refusal/uncertainty,

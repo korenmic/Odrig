@@ -454,7 +454,8 @@ off, the player plays as the rest of this page says.
 complete message, then the next clock. It does not run normal breaks or folder-window
 rotation. The normal playlist path and its window stay saved, and leaving Only resumes
 that valid playlist, else root, without restoring a paused break. A global restart
-targets Clocks; an explicit inside file or subfolder is a manual turn before the
+uses `play <resolved-clocks-folder-id>`; raw `play all` is refused. An explicit inside
+file or subfolder is a manual turn before the
 exclusive program continues. Outside play and output-taking diagnostics are refused.
 
 Only remains selected when media is absent, Clocks is missing or no face is eligible.

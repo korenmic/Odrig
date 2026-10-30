@@ -72,7 +72,7 @@ class TheAppsPage(unittest.TestCase):
             self.assertIn(folder, setup)
         self.assertIn("accepts that one licence and no other", flat(setup))
 
-    def test_the_lines_the_app_sends_are_the_forty_four_of_its_table(self):
+    def test_the_lines_the_app_sends_match_its_action_table(self):
         table = section(self.text, "What it is")
         lines = [span for row in table.splitlines() if row.startswith("| ") for span in re.findall(r"`([^`]+)`", row.split("|")[2])]
         self.assertEqual(lines, ["status", "list 0", "list <next>", "play <id>", "play all", "on", "off", "brightness <n>", "brightness <id> <n> save", "brightness <id> default", "space", "remove <id>", "ignore <id> <0-or-1>", "remove many <ids>",
@@ -80,13 +80,13 @@ class TheAppsPage(unittest.TestCase):
                                  "read <id> <offset>", "upload begin <id> <file> <bytes>", "upload expect <crc32>", "mapping get", "mapping set <revision> <pins>",
                                  "mapping cross on", "mapping cross off", "mapping test on",
                                  "mapping test off", "mapping test snake <n>", "order get", "order get <next>", "order move <revision> <id> <before>", "repeat <id> <n>",
-                                 "repeat <id> <n> save", "repeat <id> default", "clocks on", "clocks off", "clocks message on", "clocks message off", "fault", "catalog",
+                                 "repeat <id> <n> save", "repeat <id> default", "clocks off", "clocks on", "clocks only", "clocks message on", "clocks message off", "fault", "catalog",
                                  "catalog page <storage> <page> <offset>", "catalog rebuild internal", "catalog rebuild external", "catalog cancel"])
-        self.assertIn("It sends forty-four command lines and no other", self.said)
+        self.assertIn("The table maps its actions to command lines", self.said)
 
     def test_every_message_of_the_app_is_on_the_page(self):
         refusals = [["line-too-long", "on", None], ["show-invalid", "play all", "`<reason>`"], ["unknown-id", "play `<id>`", None], ["unknown-id", "play all", None], ["weird", "on", None],
-                    ["busy", "remove `<id>`", None], ["in-use", "remove `<id>`", None], ["storage-error", "space", None],
+                    ["busy", "remove `<id>`", None], ["in-use", "remove `<id>`", None], ["in-use", "play `<id>`", None], ["in-use", "mapping test on", None], ["in-use", "ignore 1 1", None], ["storage-error", "space", None],
                     ["in-use", "upload begin 1 a.odrg 1", None], ["no-upload", "upload data 0 AA", None], ["bad-offset", "upload data 0 AA", None],
                     ["read-only", "remove `<id>`", None], ["read-only", "upload begin external a.odrg 1", None], ["read-only", "catalog rebuild external", None],
                     ["in-use", "repeat 9 5 save", None], ["no-space", "repeat 1 5 save", None], ["stale", "repeat 1 5", None]]
@@ -100,7 +100,7 @@ class TheAppsPage(unittest.TestCase):
         self.assertIn(found["silence"][3].replace("75", "12"), said)
         self.assertIn("The installed show is invalid: <reason>.", said)
         rows = [row.split("`")[1] for row in messages.splitlines() if row.startswith("| `")]
-        self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "unavailable", "busy", "in-use",
+        self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "unavailable", "busy", "in-use", "in-use", "in-use", "in-use",
                                 "read-only", "read-only", "read-only", "storage-error", "in-use", "in-use", "no-space", "no-space", "no-space", "no-upload", "bad-checksum",
                                 "bad-file", "mapping-conflict", "order-conflict", "stale", "stale", "unsupported-character", "does-not-fit", "no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"])
         self.assertIn("`Removed animation <id> <file>.`", said)

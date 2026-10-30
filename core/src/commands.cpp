@@ -318,7 +318,8 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
 }
 
 uint32_t play_only(Core &core, uint32_t id, bool all, Reply &reply) {
-    if (all || (core.clocks_id != 0 && id == core.clocks_id)) {
+    if (all) return refuse(reply, "in-use");
+    if (core.clocks_id != 0 && id == core.clocks_id) {
         player_only_restart(core);
         return succeed(reply);
     }

@@ -142,7 +142,7 @@ setTimeout(() => client.keptKeysReady(), KEPT_WAIT_MS);
 uploadScreen.start({message});
 authoring.start({message, go});
 settingsScreen.start();
-clocksScreen.start();
+clocksScreen.start({go});
 miniScreen.start();
 photomap.start();
 catalogs.start({message});

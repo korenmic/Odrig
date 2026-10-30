@@ -833,7 +833,8 @@ to automatic candidates and are rechecked after changes. Without eligible faces,
 stays dark and reports why; it does not fall back to ordinary animations.
 
 Browsing remains unrestricted. Outside file/folder/cycle play and output-taking mapping
-diagnostics return `in-use` without changing playback. `play all` restarts Clocks.
+diagnostics return `in-use` without changing playback. Raw `play all` is also refused;
+the app restarts Clocks with `play <resolved-clocks-folder-id>`.
 An explicit inside file remains playable even when ignored or when automatic messages
 are off; an inside subfolder starts its first available file, then the exclusive program
 continues. These actions do not overwrite the saved normal playlist. Leaving Only

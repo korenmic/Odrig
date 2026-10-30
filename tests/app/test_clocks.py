@@ -8,11 +8,11 @@ from .test_look import SIZES, apart, contrast
 from .test_target import entered
 
 OK = (200, '{"ok":true}\n')
-LABELS = ["Clocks between animations", "The message after each clock"]
-SMALLS = ["After every 5 animations, and at least every 5 minutes, a clock of the card's folder clocks plays; an animation cut for it goes on where it was.",
-          "The animation of clocks/message flashes once after every clock, while clocks between animations is on."]
-SAVED = {"clocks on": "Saved: a clock plays between the animations.", "clocks off": "Saved: no clock plays between the animations.",
-         "clocks message on": "Saved: the message flashes after each clock.", "clocks message off": "Saved: no message after the clocks."}
+LABELS = ["Clocks", "The message after each clock"]
+SMALLS = ["Between animations inserts a clock after every 5 animations or 5 minutes. Clocks only restricts playback to the external clocks folder.",
+          "One complete animation from clocks/message plays after each clock in either enabled mode."]
+SAVED = {"clocks on": "Saved: a clock plays between the animations.", "clocks off": "Saved: clocks are off.",
+         "clocks message on": "Saved: a complete message plays after each clock.", "clocks message off": "Saved: no message after the clocks."}
 REFUSED = {"busy": "The target is busy checking or uploading files. Try again after it finishes.",
            "show-invalid": "The target has an invalid show. Fix its show before changing the clocks.",
            "storage-error": "The target could not save the setting. The setting in force is shown."}
@@ -79,7 +79,7 @@ class AgainstTheEmulator(unittest.TestCase):
         self.assertEqual(seen["followed"]["checked"], [False, True])
         status = json.loads(emulator.command("status"))
         self.assertEqual((status["clocks"], status["clock_message"]), (False, True))
-        self.assertEqual((folder / "clocks.txt").read_bytes(), b"odrig-clocks 1\nclocks off\nmessage on\n")
+        self.assertEqual((folder / "clocks.txt").read_bytes(), b"odrig-clocks 2\nmode off\nmessage on\n")
 
 
 class ThePanel(unittest.TestCase):

@@ -100,6 +100,15 @@ export async function status() {
     typeof mini.pending === "boolean" && typeof mini.requested === "boolean" &&
     (mini.error === null || typeof mini.error === "string") && whole(mini.brightness, 0, 255));
   const named = (value) => value === undefined || value === null || typeof value === "string";
+  const hasClockMode = reply.clock_mode !== undefined;
+  const clockMode = hasClockMode ? reply.clock_mode : typeof reply.clocks === "boolean" ? (reply.clocks ? "between" : "off") : null;
+  const only = reply.clock_only;
+  const modeSound = !hasClockMode ? only === undefined :
+    ["off", "between", "only"].includes(clockMode) && typeof reply.clocks === "boolean" && reply.clocks === (clockMode !== "off") &&
+    (clockMode === "only" ? only !== null && typeof only === "object" &&
+      (only.folder === null || whole(only.folder, 1, MOST_ID)) &&
+      ["playing", "no-card", "missing-folder", "no-clocks"].includes(only.state) &&
+      (only.state !== "playing" || only.folder !== null) : only === null);
   const sound =
     typeof reply.on === "boolean" &&
     whole(reply.brightness, 0, 255) &&
@@ -118,7 +127,7 @@ export async function status() {
     countOrNull(reply.saved, MOST_SAVED) &&
     (reply.clocks === undefined || typeof reply.clocks === "boolean") &&
     (reply.clock_message === undefined || typeof reply.clock_message === "boolean");
-  if (!sound || !miniSound || !dimmingSound) {
+  if (!sound || !miniSound || !dimmingSound || !modeSound) {
     throw new Failure("bad-reply", address());
   }
   return {
@@ -143,6 +152,9 @@ export async function status() {
     saved: reply.saved ?? null,
     clocks: reply.clocks ?? null,
     clockMessage: reply.clock_message ?? null,
+    hasClockMode,
+    clockMode,
+    clockOnly: hasClockMode && only !== null ? {...only} : null,
     mini: mini === undefined ? null : {...mini},
   };
 }
@@ -186,22 +198,26 @@ export async function list(from = 0, folder = null) {
         whole(item.id, 1, MOST_ID) &&
         (item.files === undefined || (typeof item.playlist === "string" && whole(item.files, 0, MOST_ID))) &&
         (item.ignored === undefined || typeof item.ignored === "boolean") &&
+        (item.inherited_ignored === undefined || typeof item.inherited_ignored === "boolean") &&
         (item.external === undefined || typeof item.external === "boolean") &&
         (item.type === undefined || typeof item.type === "string") &&
         (item.fault === undefined || typeof item.fault === "string") &&
         ((typeof item.file === "string" && item.playlist === undefined && (item.bytes === null || whole(item.bytes, 0, MOST_BYTES))) ||
           (typeof item.playlist === "string" && item.playlist.length > 0 && item.external === true && item.file === undefined && item.cycle === undefined &&
-            item.bytes === undefined && item.ignored === undefined && item.type === undefined && item.fault === undefined) ||
+            item.bytes === undefined && item.type === undefined && item.fault === undefined) ||
           (Array.isArray(item.cycle) && item.file === undefined && item.playlist === undefined && item.ignored === undefined && item.external === undefined &&
-            item.type === undefined && item.fault === undefined)),
+            item.inherited_ignored === undefined && item.type === undefined && item.fault === undefined)),
     );
   if (!sound) {
     throw new Failure("bad-reply", address());
   }
   return {
     items: reply.items.map((item) => (typeof item.file === "string" ? {id: item.id, file: item.file, bytes: item.bytes, ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
+      ...(item.inherited_ignored === undefined ? {} : {inheritedIgnored: item.inherited_ignored}),
       ...(item.external === undefined ? {} : {external: item.external}), ...(item.type === undefined ? {} : {type: item.type}),
-      ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist, ...(item.files === undefined ? {} : {files: item.files})} :
+      ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist, ...(item.files === undefined ? {} : {files: item.files}),
+      ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
+      ...(item.inherited_ignored === undefined ? {} : {inheritedIgnored: item.inherited_ignored})} :
       {id: item.id, cycle: true})),
     next: reply.next,
   };
@@ -343,6 +359,12 @@ export async function repeatSave(id, loops) {
 // Switches the clocks between the animations on or off.
 export async function clocks(on) {
   await carriedOut(`clocks ${on ? "on" : "off"}`);
+}
+
+// Selects one of the installation's clock playback modes.
+export async function clockMode(mode) {
+  if (!["off", "between", "only"].includes(mode)) throw new RangeError("unknown clock mode");
+  await carriedOut(`clocks ${mode === "between" ? "on" : mode}`);
 }
 
 // Requests a temporary output change; status confirms its physical completion.

@@ -103,21 +103,23 @@ class OnlyBoundary(unittest.TestCase):
         show = json.loads(SHOW4['show.json'])
         show['items'].append({'id': 9, 'cycle': [1], 'seconds': 3})
         source = {**SHOW4, 'show.json': json.dumps(show), 'clocks.txt': mode_file('only')}
-        commands = ['play 1', 'play 9', 'play 60001', 'play 60002', 'mapping test on', 'mapping test snake 1']
+        commands = ['play 1', 'play 9', 'play 60001', 'play 60002', 'play all', 'mapping test on', 'mapping test snake 1']
         run = on_card(source, CARD, asked(20, 'status', *commands, 'status'))
         answers = replies(run)
         self.assertEqual(answers[1:-1], [dict(ok=False, error='in-use')] * len(commands))
         self.assertEqual(answers[0]['animation'], answers[-1]['animation'])
         self.assertEqual(answers[-1]['clock_mode'], 'only')
 
-    def test_play_all_and_inside_folder_jumps_preserve_the_saved_normal_playlist(self):
+    def test_inside_restart_and_refused_global_play_preserve_the_saved_normal_playlist(self):
         source = {**SHOW4, 'playlist.txt': 'odrig-playlist 1\nnight\n1234\n'}
         card = {**CARD, 'night/comet.odrg': CARD['a.odrg']}
-        script = asked(0, 'status', 'clocks only') + asked(20, 'status', 'play all')
+        script = asked(0, 'status', 'clocks only') + asked(20, 'status', 'play all', 'play 60008')
         script += asked(40, 'status') + asked(4000000, 'status', 'clocks off') + asked(4000020, 'status')
         with a_drive(card) as top:
             run, kept = support.start_and_keep(source, script, ['--drive', top])
         states = states_of(run)
+        self.assertEqual([reply for reply in replies(run) if 'on' not in reply],
+                         [dict(ok=True), dict(ok=False, error='in-use'), dict(ok=True), dict(ok=True)])
         self.assertEqual(states[0]['playlist'], 'night')
         self.assertEqual([state['playlist'] for state in states[1:-1]], ['clocks'] * 3)
         self.assertEqual(states[-1]['playlist'], 'night')

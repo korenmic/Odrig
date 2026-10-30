@@ -161,7 +161,8 @@ map to Off/Between with Only unavailable. The dropdown and message checkbox foll
 confirmed status and target epochs, handling pending/refusal/timeout honestly.
 Entering Only opens the resolved folder once per target/mode transition; ordinary
 browsing then stays where the operator chooses. Disable outside Play with an
-explanation; global restart targets the resolved folder. Core enforcement remains
+explanation; global restart sends `play <resolved-clocks-folder-id>`, while raw
+`play all` is refused as the seed requires. Core enforcement remains
 authoritative even for stale lists or another client. Folder and external row
 menus expose own Ignore/Include and distinguish inherited exclusions.
 

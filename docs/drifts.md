@@ -12371,3 +12371,31 @@ after changed IDs and the still-missing exit case both pass.
 
 **Resolution.** `core/src/order.cpp`, `tests/core/test_clock_modes.py` and
 `docs/specs/59-p2-message-clock-widgets-and-clocks-only-mode/verification.md`.
+
+
+## Seed 59: explicit restart and confirmed app state
+
+**Question.** Which request should the app's global restart send in Only, and when
+may a mode change be shown as saved or trigger initial folder navigation?
+
+**Answer.** Seed59's rule16 explicitly refuses raw `play all`; its global restart
+instead sends `play` with the folder ID freshly resolved in `clock_only`. The
+initial runtime implementation had accepted raw `play all`, and a UI integration
+regression observed success rather than `in-use`. The command guard and transport
+checks now enforce the seed's exact boundary; the app never substitutes a remembered
+numeric ID. The earlier commands-page sentence permitting raw `play all` is superseded.
+
+Command acknowledgement alone does not publish the selected mode as confirmed:
+wait for a newer fresh status. Contradictory status shows the reported choice.
+A lost reply stays explicitly unconfirmed, but authoritative later status may
+recover the mode and its initial navigation without claiming the command reply
+was received. Pending replies from a previous target cannot update the new target.
+Open Clocks once per target/mode entry, waiting for a resolved folder if necessary;
+later browsing and reconnect in the same mode do not force it open again.
+Old targets map booleans to Off/Between and cannot select Only. External inclusion
+uses the same existing setting and command, independently of card write capability;
+its own and inherited exclusions are shown distinctly for files and folders.
+
+**Resolution.** `app/www/commands.js`, `client.js`, `screens/clocks.js`,
+`screens/show.js`, `core/src/commands.cpp`, `docs/android-app.md`, `docs/commands.md`,
+and the shared app/core/emulator mode regressions.

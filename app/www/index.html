@@ -89,6 +89,7 @@
 </div>
 <p id="order-note" class="small" role="status" aria-live="polite"></p>
 <div id="level-head" class="folder-head"><button id="level-back" type="button" hidden>Back</button><h2 id="level-title">Root</h2><button id="play-all" type="button">Play this folder</button></div>
+<p class="small" id="only-boundary" hidden></p>
 <div id="animations-list" role="list" aria-labelledby="list-title"></div>
 <p id="none" hidden>No animation is installed.</p>
 <div id="filter-empty" hidden>
@@ -202,8 +203,11 @@
 </div>
 <div id="clocks-panel" class="panel" hidden>
 <h2>Clocks</h2>
-<label class="check" for="clocks"><input id="clocks" type="checkbox"><span><span class="title">Clocks between animations</span><span class="small">After every 5 animations, and at least every 5 minutes, a clock of the card's folder clocks plays; an animation cut for it goes on where it was.</span></span></label>
-<label class="check" for="clock-message"><input id="clock-message" type="checkbox"><span><span class="title">The message after each clock</span><span class="small">The animation of clocks/message flashes once after every clock, while clocks between animations is on.</span></span></label>
+<label class="clock-mode-label" for="clocks"><span class="title">Clocks</span><span class="small" id="clocks-description">Between animations inserts a clock after every 5 animations or 5 minutes. Clocks only restricts playback to the external clocks folder.</span></label>
+<select id="clocks" aria-describedby="clocks-description clocks-support"><option value="off">Off</option><option value="between">Between animations</option><option value="only">Clocks only</option></select>
+<p class="small" id="clocks-support" hidden></p>
+<label class="check" for="clock-message"><input id="clock-message" type="checkbox"><span><span class="title">The message after each clock</span><span class="small">One complete animation from clocks/message plays after each clock in either enabled mode.</span></span></label>
+<p id="clocks-state" role="status" hidden></p>
 <p id="clocks-said" role="status" aria-live="polite" hidden></p>
 </div>
 <div id="mini-panel" class="panel">

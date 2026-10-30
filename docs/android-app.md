@@ -101,16 +101,16 @@ a top bar with the app's name and whether the installation answers.
   clock, and uploads it, with the free internal storage above it. While the installation
   can write its card, an animation of a video or a GIF goes to the card unless
   `This board` is chosen, and the card's free storage is there too.
-- **Settings** has the checkbox `Show test animations`, the panel `Clocks` with its two
-  checkboxes, the catalogs of the board's own
+- **Settings** has the checkbox `Show test animations`, the panel `Clocks` with its mode
+  dropdown and independent message checkbox, the catalogs of the board's own
   storage and of the card with a rebuild of each, and the mapping editor: the twenty
   saved snake-to-pin assignments. It has no copy of the power or brightness controls.
 - **Target** has the address of the installation, says whether it answers, names the
   installation and the last fault it met in a file, and says how the phone's requests
   travel.
 
-The app is one more client of the commands of [commands.md](commands.md). It sends
-forty-four command lines and no other, each as `POST /odrig` to the address that is set:
+The app is one more client of the commands of [commands.md](commands.md). The table
+maps its actions to command lines, each sent as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -141,7 +141,7 @@ forty-four command lines and no other, each as `POST /odrig` to the address that
 | Presses `Repeat this` on the bar of the animation playing now, or Done or Enter in its field | `repeat <id> <n>` |
 | Presses `Save` on that bar | `repeat <id> <n> save` |
 | Presses `Restore default` on that bar | `repeat <id> default` |
-| Ticks or clears `Clocks between animations`, or `The message after each clock` | `clocks on`, `clocks off`, `clocks message on`, `clocks message off` |
+| Chooses `Off`, `Between animations` or `Clocks only`, or changes `The message after each clock` | `clocks off`, `clocks on`, `clocks only`, `clocks message on`, `clocks message off` |
 | Opens the target screen while the installation answers | `fault` |
 | Opens Settings, or waits two seconds while Settings is visible, and after it sent a rebuild or a cancel; nothing: when the target first answers, when it answers again after a silence, and after every complete list | `catalog` |
 | Nothing: after `catalog` showed a storage's catalog of another generation or number of entries than the one the app read, every page of it from offset 0 to its end, one request after the other | `catalog page <storage> <page> <offset>` |
@@ -154,7 +154,8 @@ unsupported message.
 
 Inclusion changes wait for acknowledgement before showing saved state. The list refreshes
 periodically so changes from serial or another app become visible. Older targets whose
-list lacks the inclusion flag keep playback controls but have no mutation controls.
+list lacks the inclusion flag keep playback controls but have no inclusion control.
+External deletion independently requires a writable medium.
 Deletion sends at most 32 distinct ids per batch on the existing serialized command stream.
 A refused batch preserves the remaining selection; a missing reply reports only the
 confirmed count and refreshes the list before another attempt. It never retries a lost
@@ -464,13 +465,20 @@ an invalid show, `The installed show is invalid: <reason>.`; a folder the list d
 hold yet, right after a card is put in, is named by its id until the list has come. Why a
 show is invalid is said on the target screen, and in the message of a refused play.
 
-A tap on a row plays its animation. Its `...` button opens the row's menu and plays
-nothing. The menu of an internal animation has `Ignore in playlist`, or `Restore to
-playlist` when it is ignored, `Move up`, `Move down`, `Select` and `Delete`; the menu of an
-animation of the external storage has `Move up` and `Move down`, and `Delete` while the
-installation can write its card; otherwise it says that external storage is read-only. An ignored row says `Ignored` with a sign and its name is muted; it
-keeps its place in the order and the playlist passes over it. A change of inclusion shows
-`Saving...` on the row until the installation has confirmed it.
+A tap on an available row plays its animation within the active mode's boundary.
+Its `...` button opens its menu and plays nothing. Files whose target reports inclusion
+have `Ignore in playlist` or `Restore to playlist`, including external files on read-only
+media: their preference is saved on the target, not on the card. Internal animations
+also have `Select` and `Delete`; external deletion requires a writable card. Moves keep
+their existing rules. Older targets without the inclusion flag expose no inclusion action.
+
+A folder whose inclusion is reported has its own `...` menu with `Ignore folder` or
+`Include folder`. Ignored files and folders stay browsable, with muted names and an
+`Ignored` note. An inherited exclusion says `Excluded by a parent folder`; when both
+apply it says so. The menu explains that changing the child's own choice does not
+override an ignored ancestor. A change says `Saving…` until acknowledgement, refreshes
+the list, and preserves the confirmed choice on refusal. Ignore affects automatic
+selection; explicit inside playback remains available. It never changes the card bytes.
 
 `Delete` asks `Remove animation <id> <file> from the installation?`, or for an animation
 of the card `Remove animation <id> <file>? Its file is deleted from the card.`; `Remove it`
@@ -800,23 +808,33 @@ leaves that snake with the position that shows it whole, gives position 10 no sn
 then the snake no other position shows, its own, and says `Position 10 shows no snake`;
 apply the reading, then tick the box.
 
-**Clocks.** After the first panel of Settings, the panel `Clocks` has two checkboxes in the
-form of `Snake 10 is cross-wired`. `Clocks between animations`: after every 5 animations,
-and at least every 5 minutes, a clock of the card's folder `clocks` plays, and an animation
-cut for it goes on where it was. `The message after each clock`: the animation of
-`clocks/message` flashes once after every clock, while the first is on. Each box shows what
-the installation reports, `clocks` and `clock_message` of `status`, and a tap sends at once
-`clocks on` or `clocks off`, `clocks message on` or `clocks message off`. Both boxes cannot be
-used while a line of the panel is out and while the installation does not answer. The line
-under them says `Saved: a clock plays between the animations.`, `Saved: no clock plays
-between the animations.`, `Saved: the message flashes after each clock.` or `Saved: no
-message after the clocks.`; a refusal is said there instead: `The target is busy checking or
-uploading files. Try again after it finishes.`, `The target has an invalid show. Fix its
-show before changing the clocks.` or `The target could not save the setting. The setting in
-force is shown.`, and the box shows the setting in force again. After each reply both boxes
-follow `status`, also when another controller changed them. The panel is hidden while the
-installation's `status` has no `clocks`: its software has no clocks between the animations.
-The emulator's Controller view shows the same panel.
+**Clocks.** The Settings panel has one `Clocks` dropdown: `Off`, `Between animations`,
+`Clocks only`. Between inserts a clock after five animations or five minutes and resumes
+the interrupted animation. Only plays the external `clocks` program exclusively. The
+independent `The message after each clock` checkbox inserts one complete animation from
+`clocks/message` in either enabled mode. Messages and clock faces each use their own
+shuffled bag; every eligible direct child has a turn before that bag reshuffles.
+
+The controls follow fresh target status. While a change is pending, both controls are
+disabled. A successful command acknowledgement is followed by status confirmation before
+the panel says `Saved:`. A refusal restores the reported setting and explains busy,
+invalid-show or storage failure. A lost reply is explicitly unconfirmed; a later fresh
+status shows the actual setting without claiming the reply was acknowledged. A different
+reported choice is shown as such. Reconnect and other controllers update the controls;
+changing targets clears pending state and ignores replies belonging to the old target.
+
+Selecting Only initially opens the resolved Clocks folder on Animations once. Later
+browsing may go to root or any other folder without changing playback or being forced
+back on each poll. Outside Play buttons are disabled with an explanation. `Restart clocks`
+targets the currently resolved Clocks folder ID even while another level is browsed;
+the raw `play all` command remains refused by the core. Inside files and folders remain
+manually playable when ignored or when automatic messages are off. Display tests require
+leaving Only first. Missing storage, missing Clocks or no eligible face keeps Only
+selected, with an explanation and dark output; a missing resolved folder disables restart.
+
+Older clock-capable firmware without explicit mode metadata maps its existing booleans
+to Off and Between; the Only option is unavailable, with an update explanation. A target
+without clock settings hides the panel. Browser Controller and APK use the same controls.
 
 **The test animations.** `Show test animations` in Settings, off at first and
 remembered on the phone, shows the pinned Tests group above the list of Animations: `Tests
@@ -858,6 +876,9 @@ it is dismissed with `OK` or another takes its place.
 | `unavailable` | A play of an animation whose file had a fault in this boot, or of a cycle of only such. | Animation `<id>` cannot be played until it is replaced: its file has a fault. The list says which. |
 | `busy` | A removal while the installation still reads what it has installed after a start, or while an upload is open; a rebuild while another runs or an upload is open; an upload to the card while its catalog is read. | The installation is busy. Try again in a moment. |
 | `in-use` | A removal of an animation that a cycle plays or that a USB stick holds. | Animation `<id>` cannot be removed: a cycle plays it, or it is on a USB stick. |
+| `in-use` | Play outside Clocks only, or raw `play all` in that mode. | Clocks only allows playback inside the Clocks folder. Leave Clocks only in Settings to play elsewhere. |
+| `in-use` | A display-taking mapping test while Only owns playback. | Leave Clocks only in Settings before starting a display test. |
+| `in-use` | Inclusion of an unsupported item or on older firmware. | This target does not support playlist inclusion for that item. |
 | `read-only` | A removal of an animation of the card while the installation cannot write it. | Animation `<id>` cannot be removed: the card cannot be written now. |
 | `read-only` | An upload to the card while the installation cannot write it. | The card cannot be written now. Choose This board to store the animation on the board. |
 | `read-only` | A rebuild of the catalog of a storage the installation cannot write. | That storage cannot be written now, so its catalog cannot be rebuilt. |
@@ -1056,12 +1077,15 @@ installed; the phone with mobile data on.
     too, also after a restart of the board; `Restore default` brings its own count back;
     `Ignore` moves on at once; the panel stays at the top while the list scrolls under it,
     and with the phone held sideways the whole screen scrolls.
-23. **The clocks.** With firmware that has the command `clocks`, and the card's folder
-    `clocks` filled, in Settings. *Seen:* the panel `Clocks` with its two boxes off; tick
-    `Clocks between animations`: the line says `Saved: a clock plays between the
-    animations.`, and after five animations a clock plays on the LEDs before the next;
-    tick `The message after each clock`: the message flashes after the next clock; after a
-    restart of the board both boxes are still ticked; clear both, and no clock plays.
+23. **The clocks.** With current firmware and populated `clocks` and `clocks/message`,
+    *Seen:* choose Between in Settings and enable messages. Check the clock break, complete
+    message turns and persistence after restart. Choose Only: Clocks opens once, outside
+    playback stops, and browsing elsewhere leaves outside Play disabled. Restart clocks
+    still targets Clocks. Play an inside message with automatic messages off; try Ignore
+    on a face, a message and their folders, including an inherited child choice, then
+    Include. Check dark recovery when all faces are excluded, mode restoration, reconnect
+    and another controller's changes. Repeat upright and sideways. These physical and
+    phone observations remain open until actually performed.
 24. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
@@ -1204,7 +1228,7 @@ By programs, on a Mac:
   `This board` chosen instead, each refusal in words, and no choice for a card it cannot
   write; `Delete` of a card's animation, one with a fault among them, and none on a card
   that cannot be written; the storage lines and the badges of both kinds of card.
-- That the web code sends the forty-four lines above and no other, and names no address
+- That the web code uses the documented protocol and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted
@@ -1214,6 +1238,11 @@ By programs, on a Mac:
   and the rule that allows plain HTTP.
 
 ## What is open
+
+- **Message clock modes and external inclusion on a phone and on the board.** The
+  shared browser/emulator proofs do not replace physical acceptance of all seven
+  sequences, Only boundaries, inherited exclusions, restarts and complete turns.
+  Seed59's human deployment task remains unchecked.
 
 - **Mapping and the diagonal on the real installation.** No firmware was flashed for
   this run. Seed 30 task 5 requires the owner to inspect all twenty snakes, correct an
