@@ -24,7 +24,8 @@ HOLDER = textwrap.dedent("""
 
 def holder(test, lock, seconds):
     """Starts a process that holds the lock, and returns it once it holds it."""
-    process = subprocess.Popen([sys.executable, "-c", HOLDER.format(firmware=str(FIRMWARE)), str(lock), str(seconds)], stdout=subprocess.PIPE, text=True)
+    python = getattr(sys, "_base_executable", sys.executable)
+    process = subprocess.Popen([python, "-c", HOLDER.format(firmware=str(FIRMWARE)), str(lock), str(seconds)], stdout=subprocess.PIPE, encoding="utf-8")
     test.addCleanup(process.stdout.close)
     test.addCleanup(process.wait)
     test.addCleanup(process.kill)

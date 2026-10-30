@@ -1,8 +1,9 @@
 import re
+import pathlib
 import unittest
 from unittest import mock
 
-from fwtool import paths, toolchain, wled
+from fwtool import host, paths, toolchain, wled
 
 from . import support
 
@@ -29,7 +30,7 @@ class Setup(unittest.TestCase):
     def test_nothing_is_fetched_or_installed_when_the_work_folder_has_it_all(self):
         def started(what, command):
             raise AssertionError(f"started: {what}")
-        with mock.patch.object(toolchain, "_run", started), mock.patch.object(wled.subprocess, "run", wraps=wled.subprocess.run) as git:
+        with mock.patch.object(toolchain, "_run", started), mock.patch.object(wled.process, "run", wraps=wled.process.run) as git:
             self.assertEqual(toolchain.python_environment(), [])
         commands = [call.args[0][:4] for call in git.call_args_list]
         self.assertNotIn("clone", [word for command in commands for word in command])
@@ -48,7 +49,7 @@ class Setup(unittest.TestCase):
             done = toolchain.python_environment()
         self.assertEqual(done, ["installed the Python packages"])
         self.assertEqual(ran, ["pip install -r requirements.txt", "pip install -r requirements.txt"])
-        stamp.write_text.assert_called_once_with(toolchain._wanted() + "\n")
+        stamp.write_text.assert_called_once_with(toolchain._wanted() + "\n", encoding="utf-8", newline="\n")
 
     def test_every_tool_is_taken_from_the_work_folder(self):
         asked = []
@@ -56,4 +57,4 @@ class Setup(unittest.TestCase):
             found = toolchain.versions()
         self.assertEqual(sorted(found), ["esptool", "node", "npm", "platformio", "python"])
         for program in asked:
-            self.assertTrue(program.startswith(str(paths.VENV / "bin") + "/"), program)
+            self.assertEqual(pathlib.Path(program).parent, host.scripts(paths.VENV), program)

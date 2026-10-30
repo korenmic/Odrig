@@ -171,5 +171,5 @@ class TheDrive(unittest.TestCase):
         self.assertIn("Apache License", text_of(DRIVER / "LICENCE"))
         override = text_of(FIRMWARE / "platformio_override.ini.in")
         self.assertRegex(override, r"(?m)^  usb_host_msc = symlink://@REPO@/firmware/usb_host_msc$")
-        self.assertRegex(override, r"(?m)^  -I@REPO@/firmware/usb_host_msc/include$")
+        self.assertRegex(override, r'(?m)^  -I"@REPO@/firmware/usb_host_msc/include"$')
         self.assertEqual(sorted(path.name for path in (DRIVER / "src").iterdir()), ["diskio_usb.c", "msc_host.c", "msc_host_vfs.c", "msc_scsi_bot.c"])

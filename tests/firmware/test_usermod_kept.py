@@ -6,21 +6,17 @@ import tempfile
 import unittest
 
 from . import FIRMWARE, ROOT
+from .compiler import compiled
 
 USERMOD = FIRMWARE / "usermod"
 PROGRAM = ROOT / "tests" / "firmware" / "kept" / "kept.cpp"
-FLAGS = ("-std=c++11", "-Wall", "-Wextra", "-Werror", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-g")
 
 _folder = tempfile.TemporaryDirectory()
 
 
 @functools.lru_cache(maxsize=None)
 def built():
-    program = pathlib.Path(_folder.name, "kept")
-    done = subprocess.run(["c++", *FLAGS, f"-I{USERMOD}", str(PROGRAM), "-o", str(program)], capture_output=True, text=True)
-    if done.returncode != 0:
-        raise AssertionError(f"the program of the kept record does not compile:\n{done.stderr}")
-    return program
+    return compiled([PROGRAM],pathlib.Path(_folder.name,'kept'),[USERMOD])
 
 
 def kept(case, text=None):

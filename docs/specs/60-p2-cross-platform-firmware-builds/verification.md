@@ -68,3 +68,37 @@ and image properties are the stated comparison, not a binary-identity promise.
 These are configuration, lifecycle and provenance checks, with simulated compilation
 for variant mapping. Actual default/image/symbol and cross-host build proof follows
 tasks4–5; no real firmware image or physical acceptance is claimed by task2.
+
+## Task 3 — native firmware verification and runner integration
+
+The ordinary runner discovers firmware647, firmware-host28 and runner26 tests;
+all three suites pass (701 tests, one Windows privilege skip). The firmware suite
+uses the selected native host cache interpreter, including shared tools at spaced
+paths. Proof: `build/seed60-task3-suites-verified.log` and its run report. The direct
+`tests/run.py` entry point is exercised too. No board suite or board is selected.
+
+Observed before corrections: unavailable Windows ASan/UBSan libraries, binary
+stdin translated by the Windows C runtime, Unix-only compiler/executable and path
+expectations, literal backslashes interpreted as regex escapes, and missing HOME.
+Native C/C++ fixtures now use the core's compiler/runtime-check selection, native
+executable names, binary input/output and complete normalized configuration paths.
+This Windows compiler supports undefined-behaviour traps, stack protection and
+standard-library assertions; unavailable ASan is not claimed. Other hosts retain
+the runtime checks their compiler actually supports. The 200 randomized limiter
+cases and storage/format/flash-region protections are retained.
+
+A discovered runner execution also exposed a lock-holder launcher leaving its
+child alive after kill/wait (WinError32 during temporary-directory cleanup). The
+lock fixture now starts the direct base interpreter, so kill/wait owns the process
+holding the lock. Refresh/live-mode source assertions follow the current locked
+publication and helper boundaries, without changing runtime firmware behavior.
+
+The filesystem-symlink guard alone skips with explicit WinError1314 when Windows
+denies symlink privileges. Other backup/output guards run, and the unprivileged
+PlatformIO JSON-link integration remains tested. This is not a skipped build.
+
+The runner registers host-only firmware tests, bounds the firmware suite to one
+worker and locates the correct base/native cache. With `--builds`, a canonical APK
+toolchain that has no archive for this host is explicitly reported as not run;
+the firmware build still runs and no existing APK is removed or called rebuilt.
+Actual local firmware builds, cross-host CI and final artifact delivery follow.

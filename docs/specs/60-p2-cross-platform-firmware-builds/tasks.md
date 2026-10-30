@@ -15,7 +15,7 @@
   size/checksum checks and add source/host/toolchain/input/output provenance.
   Verify fail-first path/current-source/cleanup cases and every variant mapping.
 
-- [ ] 3. Integrate portable firmware verification with the existing runner.
+- [x] 3. Integrate portable firmware verification with the existing runner.
   Port host compiler fixtures using project compiler selection, preserve available
   sanitizers and honest skips, and locate the selected host firmware environment.
   Enable Windows host-only firmware builds through existing runner switches.

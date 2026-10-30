@@ -12459,3 +12459,20 @@ implementation. All28 discovered host checks pass, including actual unprivileged
 spaced-path package linking, immediate current-source visibility, all eight variant
 mappings and checkout serialization. Actual image/cross-host proof remains later
 tasks. No runtime firmware source, command, GPIO or hardware change was made.
+
+## Seed 60: portable host verification and unavailable APK archives
+
+**Question.** How should firmware verification retain runtime checks on Windows,
+where Unix compiler names and sanitizer libraries are unavailable, and how should
+the combined runner handle a Mac-only APK archive manifest?
+
+**Answer.** Reuse the core's proven compiler/check selection, including available
+sanitizers or its existing trap/stack/assertion fallback, and retain every native
+runtime and storage/flash protection case. Skip only the filesystem-link guard
+when Windows explicitly denies link privileges. Select the host-specific firmware
+Python cache; report an unsupported APK build honestly while continuing firmware.
+No board checks are substituted and final APK delivery remains separately required.
+
+**Resolution.** `tests/firmware/compiler.py`, native firmware fixtures, `tests/run.py`
+and the runner suite carry this behavior. The verification record gives observed
+failures, native discovery results and the one privilege skip.

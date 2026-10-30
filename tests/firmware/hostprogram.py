@@ -9,11 +9,11 @@ import subprocess
 import tempfile
 
 from . import ROOT
+from .compiler import compiled
 
 SOURCES = ROOT / "firmware" / "standalone" / "src"
 PROGRAM = ROOT / "tests" / "firmware" / "host" / "host.cpp"
 PARTS = ("settings.cpp", "limit.cpp")
-FLAGS = ("-std=c++11", "-Wall", "-Wextra", "-Werror", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-g")
 
 _folder = tempfile.TemporaryDirectory()
 
@@ -21,12 +21,7 @@ _folder = tempfile.TemporaryDirectory()
 @functools.lru_cache(maxsize=None)
 def built():
     """The path of the program, compiled once for a run of the suite."""
-    program = pathlib.Path(_folder.name, "host")
-    command = ["c++", *FLAGS, f"-I{SOURCES}", str(PROGRAM), *(str(SOURCES / part) for part in PARTS), "-o", str(program)]
-    done = subprocess.run(command, capture_output=True, text=True)
-    if done.returncode != 0:
-        raise AssertionError(f"the host program does not compile:\n{done.stderr}")
-    return program
+    return compiled([PROGRAM,*(SOURCES / part for part in PARTS)],pathlib.Path(_folder.name,'host'),[SOURCES])
 
 
 def run(mode, given):
