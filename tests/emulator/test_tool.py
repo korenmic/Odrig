@@ -104,6 +104,13 @@ class AgainstTheEmulator(unittest.TestCase):
                     self.assertEqual((result.status, result.out, result.err), (status, out, ""))
         self.assertEqual((self.folder / "repeats.txt").read_bytes(), b"odrig-repeats 1\n")
 
+    def test_miniature_command_uses_each_existing_transport(self):
+        for target in self.targets.values():
+            for mode in ("on", "off"):
+                result = support.run_tool(*target, "debug", "mini", mode)
+                self.assertEqual((result.status, result.out, result.err),
+                                 (1, '{"ok":false,"error":"unsupported"}\n', ""))
+
     def test_a_refused_command_prints_the_reply_and_exits_with_1(self):
         for transport, target in self.targets.items():
             for words, code in ((("play", "99"), "unknown-id"), (("play", "abc"), "bad-argument"), (("brightness", "256"), "bad-argument"), (("brightness", "-5"), "bad-argument"),
@@ -194,7 +201,8 @@ class Session(unittest.TestCase):
         self.assertEqual(replies[support.LINES], replies["http"])
         codes = [json.loads(reply).get("error") for reply in replies["http"]]
         self.assertEqual(codes[-10:-1], ["unknown-id", "bad-argument", "bad-argument", "line-too-long", None, None, "unknown-id", "unknown-id", "unknown-id"])
-        self.assertEqual({words[0] for words in SESSION}, set(cli.COMMANDS) - {"upload"})
+        # Uploads and miniature output have their own transport scenarios.
+        self.assertEqual({words[0] for words in SESSION}, set(cli.COMMANDS) - {"upload", "debug"})
 
 
 class Unreachable(unittest.TestCase):
@@ -302,6 +310,11 @@ class Usage(unittest.TestCase):
             ["--port", "a", "clocks", "yes"],
             ["--port", "a", "clocks", "on", "now"],
             ["--port", "a", "clocks", "message", "on\n"],
+            ["--port", "a", "debug"],
+            ["--port", "a", "debug", "mini"],
+            ["--port", "a", "debug", "mini", "yes"],
+            ["--port", "a", "debug", "mini", "on\n"],
+            ["--port", "a", "debug", "mini", "on", "extra"],
         ):
             result = support.run_tool(*argv)
             self.assertEqual(result.status, 2, argv)
@@ -313,16 +326,16 @@ class Usage(unittest.TestCase):
         table = text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
         self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save",
-                                      "repeat <id> default", "clocks on", "clocks off", "clocks message on", "clocks message off", "upload begin <id> <file> <bytes>", "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel"])
+                                      "repeat <id> default", "clocks on", "clocks off", "clocks message on", "clocks message off", "upload begin <id> <file> <bytes>", "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel", "debug mini on", "debug mini off"])
         # `play all` is `play` with the word in the place of the id.
-        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog", "repeat ", "clocks ")) and command not in ("play all", "remove many <ids>", "list in <folder-id>")]
-        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog", "repeat", "clocks")],
+        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog", "repeat ", "clocks ", "debug ")) and command not in ("play all", "remove many <ids>", "list in <folder-id>")]
+        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog", "repeat", "clocks", "debug")],
                          [command.replace("<id>", "<x>").replace("<n>", "<x>").replace("<value>", "<x>").replace("<offset>", "<x>") for command in one_line])
         self.assertEqual(list(cli.COMMANDS)[-1], "upload")
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
                          {"play": ("ID",), "brightness": ("N",), "read": ("ID", "OFFSET"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "repeat": ("ID", "N", "[save]"),
-                          "clocks": ("OPERATION",), "upload": ("ID", "FILE")})
+                          "clocks": ("OPERATION",), "debug": ("mini", "on|off"), "upload": ("ID", "FILE")})
 
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),
@@ -346,6 +359,8 @@ class Usage(unittest.TestCase):
             (["status"], b"status\n"),
             (["on"], b"on\n"),
             (["off"], b"off\n"),
+            (["debug", "mini", "on"], b"debug mini on\n"),
+            (["debug", "mini", "off"], b"debug mini off\n"),
             (["play", "12"], b"play 12\n"),
             (["play", "all"], b"play all\n"),
             (["brightness", "300"], b"brightness 300\n"),

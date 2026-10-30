@@ -9,6 +9,7 @@
 #include "odrig_core.h"
 #include "order.h"
 #include "player.h"
+#include "mini.h"
 #include "playlist.h"
 #include "repeats.h"
 #include "show.h"
@@ -155,6 +156,20 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text(core.on ? "true" : "false");
     reply.text(",\"brightness\":");
     reply.number(core.brightness);
+    const Mini *mini = core.mini;
+    reply.text(",\"mini\":{\"supported\":");
+    reply.text(mini != nullptr && mini->supported ? "true" : "false");
+    reply.text(",\"on\":");
+    reply.text(mini != nullptr && mini->failed ? "null" : mini != nullptr && mini->active ? "true" : "false");
+    reply.text(",\"pending\":");
+    reply.text(mini != nullptr && mini->pending ? "true" : "false");
+    reply.text(",\"requested\":");
+    reply.text(mini != nullptr && mini->requested ? "true" : "false");
+    reply.text(",\"error\":");
+    reply.text(mini != nullptr && mini->failed ? "\"output-setup-failed\"" : "null");
+    reply.text(",\"brightness\":");
+    reply.number(mini_brightness(core));
+    reply.text("}");
     reply.text(",\"playing\":");
     if (core.playing == kPlaylist && core.tree_known && core.current != 0) {
         // The playlist of a folder of the drive, while the drive is in and holds it.
@@ -200,6 +215,13 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text(",\"host\":");
     if (core.host.about != nullptr && core.host.about(core.host.ctx, about, sizeof about) == 1) {
         about[sizeof about - 1] = '\0';
+        uint32_t about_length = 0;
+        while (about[about_length] != '\0') ++about_length;
+        while (json_escaped(about, nullptr) > 256) {
+            --about_length;
+            while (about_length != 0 && (static_cast<uint8_t>(about[about_length]) & 0xC0u) == 0x80u) --about_length;
+            about[about_length] = '\0';
+        }
         reply.text("\"");
         reply.escaped(about);
         reply.text("\"");
@@ -521,6 +543,20 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             return catalog_page(core, words.is(2, "internal") ? kInternal : kExternal, page, offset, reply);
         }
         return refuse(reply, "bad-argument");
+    }
+    if (words.is(0, "debug")) {
+        if (words.count != 3 || !words.is(1, "mini") || !(words.is(2, "on") || words.is(2, "off"))) {
+            return refuse(reply, "bad-argument");
+        }
+        Mini *mini = core.mini;
+        if (mini == nullptr || !mini->supported) return refuse(reply, "unsupported");
+        const uint8_t requested = words.is(2, "on") ? 1 : 0;
+        if (mini->pending) return requested == mini->requested ? succeed(reply) : refuse(reply, "busy");
+        if (!mini->failed && requested == mini->active) return succeed(reply);
+        mini->requested = requested;
+        mini->pending = 1;
+        if (++mini->revision == 0) ++mini->revision;
+        return succeed(reply);
     }
     if (words.is(0, "status")) {
         if (words.count != 1) {

@@ -458,7 +458,7 @@ def demo_show():
 # in the current playlist's window, which runs with the time, the counts of the turn in
 # progress, and the names of the file and the folder that play, which the tests of what
 # plays look at.
-READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "clocks", "clock_message", "left")
+READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "clocks", "clock_message", "left", "mini")
 
 
 def without_readiness(state):
@@ -1700,6 +1700,8 @@ class ReferencePlayer:
             "ok": True,
             "on": self.on,
             "brightness": self.brightness,
+            "mini": {"supported": False, "on": False, "pending": False, "requested": False,
+                     "error": None, "brightness": min(self.brightness, 40) if self.on else 0},
             "playing": self.playing,
             "animation": self.shown if self.playing is not None else None,
             "fps": self.refreshes_in[second - 1] if second >= 1 else 0,

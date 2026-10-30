@@ -1,6 +1,6 @@
 # Miniature matrix debug mode — tasks
 
-- [ ] 1. Add shared miniature state, acknowledged commands and logical projection.
+- [x] 1. Add shared miniature state, acknowledged commands and logical projection.
   Implement startup-only fixed storage, opt-in public host helpers, revision-safe
   acknowledgement/failure/retry, status and approved command syntax. Build the
   letterboxed10x6 core frame from raw logical RGB/palette/widget layers at the cap,

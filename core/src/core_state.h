@@ -370,8 +370,10 @@ struct DriveIndex {
 
 // Everything the core knows. The host holds the one object; no part of the core keeps
 // anything outside it.
+struct Mini;
 struct Core {
     odrig_host host;
+    Mini *mini;
 
     // True while odrig_core_begin runs. Memory is asked for only then.
     uint8_t starting;

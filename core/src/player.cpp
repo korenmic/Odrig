@@ -1,4 +1,5 @@
 #include "player.h"
+#include "mini.h"
 
 #include <string.h>
 
@@ -760,6 +761,7 @@ void fill_leds(Core &core) {
             *out++ = scale[colour[2]];
         }
     }
+    mini_render(core, layered ? core.window + kLayerAt : nullptr);
 }
 
 }  // namespace
@@ -1231,6 +1233,7 @@ int player_poll(Core &core, uint64_t now_ms) {
         fill_leds(core);
     } else if (shows != kShowsBefore || !core.on) {
         memset(core.led_data, 0, 3u * core.led_total);
+        mini_clear(core);
     }
     // The LED data is complete. The check of an uploaded file takes one step now, and
     // none when the host was late for this refresh. The check after the start takes its
@@ -1245,6 +1248,7 @@ int player_poll(Core &core, uint64_t now_ms) {
     playlist_touch(core, now);
     if (was_valid && core.invalid) {
         memset(core.led_data, 0, 3u * core.led_total);
+        mini_clear(core);
     }
     return 1;
 }

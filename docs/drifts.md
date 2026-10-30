@@ -12126,3 +12126,44 @@ remains open and cannot be inferred from the host and browser suites.
 
 **Resolution.** `firmware/usermod/odrig_drive.cpp`, `app/www/client.js`,
 `app/www/capacity.js`, `docs/android-app.md` and seed 56's verification note.
+
+## Seed 57: host acknowledgement and bounded miniature storage
+
+**Question.** Which host boundary avoids claiming successful physical setup from a
+command reply, and how does projection fit within the core's existing memory budget?
+
+**Answer.** A host explicitly opts into miniature support and acknowledges a matching
+request revision after clearing/checking output setup. Submission is pending; failure
+reports unknown and requires dark output until retry. Other hosts/canvases are
+unsupported. One192-byte optional startup block holds state and a180-byte physical
+image; averaging uses three local sums per10x10cell. Preview consumers reorder that
+same image, without a second projection or buffer in the core. The measured host
+allocation with a drive is131041bytes, below131072. Normal leg data is unchanged.
+The physical index x*6+y follows the manufacturer's schematic/PCB for the approved
+landscape orientation; it remains subject to a later powered corner/axis check.
+
+**Resolution.** `core/src/mini.cpp`, `core/include/odrig_core.h`, `docs/core.md`
+and the seed57 design. This records software design, not electrical acceptance.
+
+## Seed 57: status reply space
+
+**Question.** How does the additional mode state fit within the fixed1024-byte
+reply when the host description contains control characters?
+
+**Answer.** Keep the95-byte input bound and cap the encoded description at256bytes,
+truncating on a character boundary. Normal printable host descriptions are unchanged.
+The longest-status conservative check first measured1099bytes; the regression for
+95control bytes first retained all95 instead of the bounded42. The escaped limit
+leaves room for mode state without changing the public line/reply limits.
+
+**Resolution.** `core/src/commands.cpp`, `docs/commands.md` and the miniature tests.
+
+## Seed 57: unknown state during a failed-setup retry
+
+**Question.** Does submitting a retry establish a known output mode?
+
+**Answer.** No. Keep the previous failure and `on:null` while retry is pending;
+only successful host acknowledgement establishes a known mode. The regression first
+observed `on:false` before acknowledgement. Repeated setup failure remains unknown.
+
+**Resolution.** `core/src/commands.cpp` and the miniature control tests/design.

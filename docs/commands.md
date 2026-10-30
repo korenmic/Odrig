@@ -58,6 +58,8 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `upload expect <crc32>` | Lets the open upload replace its item's file only while that file is the one the client read. |
 | `upload end <crc32>` | Closes the upload and installs the animation. |
 | `upload cancel` | Discards the open upload. |
+| `debug mini on` | Requests temporary miniature output; status reports host acknowledgement. |
+| `debug mini off` | Requests restoration of normal output. |
 
 At power-on the LEDs are on, brightness is the value in `show.json`, and the show plays
 what [show.md](show.md) says it plays by itself: the playlist of its included animations, or
@@ -74,7 +76,7 @@ A number in a command is written in decimal digits.
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"left":86399}
+{"ok":true,"on":true,"brightness":128,"mini":{"supported":false,"on":false,"pending":false,"requested":false,"error":null,"brightness":40},"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"left":86399}
 ```
 
 | Member | Meaning |
@@ -331,6 +333,17 @@ seconds is discarded too: no data arrived, and no check is running.
 Playback goes on during an upload. Nothing of the show changes before `upload end`
 succeeds.
 
+## Miniature display debug mode
+
+`status.mini` reports `supported`, acknowledged `on` (null after failed setup),
+`pending`, `requested`, `error` (null or `output-setup-failed`) and effective capped
+`brightness`. A supporting host needs a60x60 canvas. `debug mini on|off` changes
+only RAM and returns acceptance; read status for completion. Opposite requests
+during setup are `busy`; the same request is idempotent. Boot is off. Unsupported
+hosts refuse the request; failed setup holds output dark until a successful retry.
+The host description is at most95input bytes and256escaped bytes, ending at a
+character boundary, so expanded status remains within the fixed reply limit.
+
 ## Error codes
 
 | Code | When |
@@ -339,6 +352,7 @@ succeeds.
 | `unknown-command` | The first word is not a command. |
 | `bad-argument` | An argument is missing, extra, not a number, out of range, or not in its form: a file name outside the naming rule, base64 that is not as described or stands for more bytes than `chunk`, a CRC-32 that is not eight hexadecimal digits, or a word after `upload` that is not `begin`, `data`, `end` or `cancel`. |
 | `show-invalid` | `play`, `list`, `read`, `remove`, `repeat`, `clocks` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
+| `unsupported` | `debug mini` needs a supporting host and an installed60x60 canvas. Judged after syntax. |
 | `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |

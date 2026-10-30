@@ -114,15 +114,15 @@ class FixedMemory(unittest.TestCase):
         self.assertEqual(run.legs, tuple((number, pin, 180) for number, pin in enumerate((*range(1, 19), 21, 47), start=1)))
         asked, blocks = run.memory
         self.assertLess(asked, 131072)
-        self.assertEqual(blocks, 17)
+        self.assertEqual(blocks, 18)
         # Every block but the core object and the decoders of the check has a size that is
         # fixed or follows from the mapping and the show: the line and the reply of the
         # byte entry, legs, the pixel of each LED, LED data, strip check, pixel buffer,
         # window, the chunk buffer, the pixel buffer and the window of the check, and the
         # tables of items, cycle entries and files, the first and the last with room for
         # 32 items more than the 100 of the show, and the saved order's key of each item.
-        tables = 2049 + 1024 + 20 * 12 + 3600 * 2 + 3600 * 3 + 8 + 10800 + 32768 + 1500 + 10800 + 32768 + 132 * 16 + 200 * 2 + 132 * 48 + 132 * 2
-        self.assertEqual(tables, 119069)
+        tables = 2049 + 1024 + 20 * 12 + 3600 * 2 + 3600 * 3 + 8 + 10800 + 32768 + 1500 + 10800 + 32768 + 132 * 16 + 200 * 2 + 132 * 48 + 132 * 2 + 192
+        self.assertEqual(tables, 119261)
         # What the compiler settles: the core object, at most 4,096 bytes, and the second
         # source and decoders, about 2,500.
         settled = asked - tables
@@ -134,7 +134,7 @@ class FixedMemory(unittest.TestCase):
         with_storage = support.start(files).memory
         for option in ("--no-storage", "--only-space"):
             without = support.start(files, options=[option]).memory
-            self.assertEqual(without[1], 12)
+            self.assertEqual(without[1], 13)
             self.assertEqual(with_storage[1] - without[1], 5)
             saved = with_storage[0] - without[0]
             self.assertGreater(saved, 1500 + 10800 + 32768 + 2000)

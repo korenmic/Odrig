@@ -19,7 +19,7 @@ from emulator import binding
 from . import BUILD_SCRIPT, LIBRARY, ROOT, support
 
 MAKEFILE = ROOT / "core" / "Makefile"
-SEVEN = ["odrig_core_begin", "odrig_core_poll", "odrig_core_leg_count", "odrig_core_leg", "odrig_core_command", "odrig_core_feed", "odrig_core_error"]
+PUBLIC_API = ["odrig_core_begin", "odrig_core_poll", "odrig_core_leg_count", "odrig_core_leg", "odrig_core_mini_support", "odrig_core_mini", "odrig_core_mini_complete", "odrig_core_command", "odrig_core_feed", "odrig_core_error"]
 
 # A library of Windows itself: its kernel, or one of the sets its C run-time is reached by.
 OF_WINDOWS = re.compile(r"\A(kernel32|ntdll|ucrtbase|msvcrt|api-ms-win-[a-z0-9-]+)\.dll\Z")
@@ -198,7 +198,7 @@ class Commands(unittest.TestCase):
             self.assertNotIn(name, text)
 
     def test_the_exports_are_the_functions_the_header_declares(self):
-        self.assertEqual(build.exports(), SEVEN)
+        self.assertEqual(build.exports(), PUBLIC_API)
         self.assertEqual(sorted(build.exports()), sorted(binding.FUNCTIONS))
 
     def test_the_shared_library_has_the_name_of_the_system(self):
@@ -211,7 +211,7 @@ class Commands(unittest.TestCase):
         command, made, definitions = build.shared_command(self.GNU, ["build/core/a.o"], "win32")
         self.assertEqual(command, ["g++", "-shared", "-static", "-o", "build/odrig_core.dll", "build/core/a.o", "build/core/odrig_core.def"])
         self.assertEqual(made, "build/odrig_core.dll")
-        self.assertEqual(definitions, "EXPORTS\n" + "".join(f"    {name}\n" for name in SEVEN))
+        self.assertEqual(definitions, "EXPORTS\n" + "".join(f"    {name}\n" for name in PUBLIC_API))
 
     def test_on_macos_the_link_is_the_one_of_the_makefile(self):
         command, made, definitions = build.shared_command(self.GNU, ["build/core/a.o"], "darwin")
@@ -221,7 +221,7 @@ class Commands(unittest.TestCase):
     def test_microsofts_link_names_every_export(self):
         command, made, definitions = build.shared_command(self.MICROSOFT, ["build/core/a.obj"], "win32")
         self.assertEqual(command[:4], ["link", "/nologo", "/DLL", "/OUT:build/odrig_core.dll"])
-        self.assertEqual([word for word in command if word.startswith("/EXPORT:")], [f"/EXPORT:{name}" for name in SEVEN])
+        self.assertEqual([word for word in command if word.startswith("/EXPORT:")], [f"/EXPORT:{name}" for name in PUBLIC_API])
         self.assertEqual((made, definitions), ("build/odrig_core.dll", None))
 
     def test_the_static_library_of_each_kind(self):
@@ -451,12 +451,12 @@ class TheLibraryOfTheSystem(unittest.TestCase):
     @unittest.skipUnless(sys.platform == "win32", "the shared library is a DLL on Windows only")
     def test_the_dll_exports_the_seven_functions_and_needs_only_libraries_of_windows(self):
         imported, exported = support.dll_tables(LIBRARY)
-        self.assertEqual(sorted(exported), sorted(SEVEN))
+        self.assertEqual(sorted(exported), sorted(PUBLIC_API))
         self.assertTrue(imported)
         for name in imported:
             self.assertRegex(name.lower(), OF_WINDOWS)
         library = ctypes.CDLL(str(LIBRARY))
-        for name in SEVEN:
+        for name in PUBLIC_API:
             self.assertTrue(hasattr(library, name), name)
 
     @unittest.skipUnless(sys.platform == "win32", "the build script builds the library on Windows only")

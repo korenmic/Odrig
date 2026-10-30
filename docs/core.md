@@ -156,6 +156,9 @@ as for a file that is not there.
 | `size_t odrig_core_command(odrig_core *core, uint64_t now_ms, const char *line, size_t length, char *reply, size_t capacity)` | Takes one command line and writes its reply. Returns the length of the reply. `capacity` must be at least `ODRIG_REPLY_MAX`; with less the core does nothing and returns 0. |
 | `void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, size_t length, odrig_reply_fn on_reply, void *reply_ctx)` | Takes bytes of a transport, cuts them into lines, answers each line, and calls `on_reply` once for each. |
 | `const char *odrig_core_error(const odrig_core *core)` | The reason the show is invalid, as a text that ends in a zero, or `NULL` when the show is valid. |
+| `void odrig_core_mini_support(odrig_core *core)` | Opts the host into checked miniature output transitions, on a 60x60 canvas. |
+| `int odrig_core_mini(const odrig_core *core, odrig_mini *out)` | Reads miniature support, revision, requested/active/pending/failure state and its borrowed 180-byte RGB buffer. The chain index is `x*6+y` in a 10x6 bottom-left coordinate system. Normal legs are unchanged. |
+| `int odrig_core_mini_complete(odrig_core *core, uint32_t revision, int success)` | Completes only the matching pending revision. A failed host setup must hold outputs dark until successful retry. No allocation or persistence. |
 
 `odrig_leg` describes one leg:
 
@@ -165,6 +168,23 @@ as for a file that is not there.
 | `pin` | The data pin the leg is wired to. |
 | `led_count` | The number of its LEDs: the strip length of the mapping file times the leg's number of strips. The strips are rows of the canvas in a row-leg file and columns in a column-leg file, see [mapping.md](mapping.md). |
 | `rgb` | Its LED data from the last refresh: `led_count * 3` bytes. The pointer stays the same for as long as the core is used; the bytes change at every refresh. |
+
+`odrig_mini` describes the temporary output:
+
+| Member | What it is |
+|---|---|
+| `revision` | Nonzero setup request number, matched by the host acknowledgement. |
+| `active` | The acknowledged miniature mode; zero at boot and after failed setup. |
+| `requested` | The desired mode of the current or most recent setup request. |
+| `pending` | One while the host clears and configures outputs. |
+| `failed` | One after failed setup, until successful retry; status stays unknown while retrying. |
+
+Its `rgb` pointer holds180bytes, with physical index `x*6+y`, x0–9 and y0–5.
+`status.mini` reports support and acknowledged state. Its extra fields retain the
+1024-byte reply limit by bounding the host description to256escaped bytes as well
+as95input bytes; ordinary printable descriptions keep their existing length.
+The host serializes these helpers with every other core call and acknowledges only
+after the outgoing bus is cleared and the new outputs are checked.
 
 `odrig_reply_fn` is the function `odrig_core_feed` calls:
 `void on_reply(void *ctx, const char *line, size_t line_length, const char *reply, size_t reply_length)`.
@@ -280,7 +300,7 @@ and `odrig_core_command` works as ever.
 
 A line that is no valid command is answered with the first code that applies, in the
 order of the table of [commands.md](commands.md): `line-too-long`, `unknown-command`,
-`bad-argument`, `show-invalid`, `no-upload`, `incomplete`, `bad-checksum`, `busy`,
+`bad-argument`, `show-invalid`, `unsupported`, `no-upload`, `incomplete`, `bad-checksum`, `busy`,
 `unknown-id`, `unavailable`, `in-use`, `read-only`, `mapping-conflict`, `stale`, `order-conflict`, `no-space`, `bad-offset`, `bad-file` and
 `storage-error`. It
 changes nothing, except that `bad-checksum`, `stale`, `bad-file` and `storage-error` discard the
@@ -894,8 +914,8 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
 
 ## Memory
 
-The core asks the host for memory only inside `odrig_core_begin`, in up to seventeen
-blocks, twenty with a drive, in the order of the table: two of a fixed size for the byte
+The core asks the host for memory only inside `odrig_core_begin`, in up to eighteen
+blocks, twenty-one with a drive, in the order of the table: two of a fixed size for the byte
 entry, five for a host whose storage can be changed, and the others sized from the mapping
 and the show. No
 command, no upload and no check asks for memory. The figures are for the target file,
@@ -904,7 +924,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 4,000 |
+| The core object | fixed | 4,008 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -921,13 +941,14 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,533** |
+| Miniature state and physical RGB, only for a 60x60 canvas | fixed | 192 |
+| **Total** | | **125,733** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 89,010 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 89,018 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,737 bytes for the target file. A host with a drive
+of the check and the saved order: 77,937 bytes for the target file. A host with a drive
 is asked for three blocks more, after the three of the check: the table of a drive
 without a catalog, 12 bytes for each of 256 places, 3,072 bytes; the boot's memory of 16
 files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive's index,
@@ -936,7 +957,7 @@ files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive'
 state, with the lines of the old table it keeps the rows' order of. The block of the saved order holds after the keys the tree of the drive's folders,
 a table of 33 records of 8 bytes and 104 bytes of room for the current playlist's path,
 368, and the saved repeats of 32 of the drive's files, 8 bytes each, 256. With it
-the target file takes 130,841 bytes, 99 percent. The clocks between the animations add
+the target file takes 131,041 bytes, below 131,072. The clocks between the animations add
 no block: their settings, their counts, the paused turn and the key and the place of their
 order are fields of the core object, and the order is a permutation computed from its key. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
@@ -944,6 +965,11 @@ the 512 bytes it last read. Picture clocks add no block either: a picture is dec
 the pixel buffer, its head, its parts and its layer live in the window of the DEFLATE
 decoder, and what reading them needs is on the stack; the suite finds the same memory for
 a show of picture clocks as for one of clocks.
+
+The miniature block holds one physical image; box averaging uses three local sums.
+No second image or decoder is allocated. If this optional last block cannot be supplied,
+normal playback stays usable and miniature support remains unavailable. Hosts opt in
+only when they implement output transitions; changing the mode never allocates memory.
 
 When the host cannot supply the first block, `odrig_core_begin` returns `NULL`. When it
 cannot supply a later one, the show is invalid with `out-of-memory`.
