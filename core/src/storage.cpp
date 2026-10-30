@@ -8,6 +8,7 @@
 #include "playlist.h"
 #include "player.h"
 #include "repeats.h"
+#include "brightness.h"
 #include "show.h"
 
 namespace odrig {
@@ -313,6 +314,7 @@ bool storage_install_upload(Core &core) {
         entered(core, position);
         // A saved repeat belongs to a file name: the item's new name has its own, or none.
         repeats_reload(core);
+        brightness_start(core);
         player_file_replaced(core, position);
     }
     core.pending_cleanup = 1;

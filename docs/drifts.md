@@ -12272,3 +12272,21 @@ no additional command decision. Firmware compilation stays deferred to seed60.
 
 **Resolution.** Seed58 requirements/design/tasks; all product questions were
 already answered in its seed. Physical acceptance remains a separate task.
+
+## Seed 58: refreshing preferences after file identity changes
+
+**Question.** Does an item's cached preference survive a change to a different
+file name merely because its numeric id stays the same?
+
+**Answer.** No. Preferences belong to paths. The upload/restore regression first
+observed `[19,19]` instead of `[19,null]`: restoring the original path correctly
+used19, but assigning a different path kept that cached value. Refresh preferences
+after durable renamed-file publication, and alongside repeat-cache refreshes after
+indexed-file publication, movement and removal. The retained settings file itself
+is unchanged by an animation rename/removal; restoring its old path still uses it.
+
+**Resolution.** `core/src/storage.cpp`, `core/src/catalog.cpp` and the brightness
+identity regression. Fixed startup allocations remain below the existing bounds:
+Core3944 bytes and the100-item drive case131069 bytes, with full position/count
+domains preserved. Independent128-byte settings reads keep compiler stack frames
+within the existing512-byte limit.

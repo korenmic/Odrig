@@ -2,11 +2,13 @@
 
 #include "core_state.h"
 #include "mini.h"
+#include "brightness.h"
 
 namespace odrig {
 
 uint8_t mini_brightness(const Core &core) {
-    return !core.on ? 0 : core.brightness < 40 ? core.brightness : 40;
+    const uint8_t selected = brightness_selected(core);
+    return !core.on ? 0 : selected < 40 ? selected : 40;
 }
 
 void mini_clear(Core &core) {

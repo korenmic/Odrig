@@ -12,6 +12,7 @@
 #include "order.h"
 #include "playlist.h"
 #include "repeats.h"
+#include "brightness.h"
 #include "text.h"
 #include "upload.h"
 
@@ -729,6 +730,10 @@ Shown advance(Core &core, uint64_t now) {
 // Writes the colour of every LED: its pixel, through the palette in a palette file, at the
 // current brightness; for a picture clock its layer's colour where the layer has one.
 void fill_leds(Core &core) {
+    const uint8_t selected = brightness_selected(core);
+    if (core.scale[255] != selected) {
+        for (uint32_t colour = 0; colour < 256; ++colour) core.scale[colour] = static_cast<uint8_t>((colour * selected + 127) / 255);
+    }
     const uint8_t *scale = core.scale;
     const uint16_t *pixel = core.led_pixel;
     uint8_t *out = core.led_data;
@@ -786,8 +791,9 @@ uint64_t clock_touch(Core &core, uint64_t now_ms) {
 
 void player_set_brightness(Core &core, uint8_t value) {
     core.brightness = value;
+    const uint8_t selected = brightness_selected(core);
     for (uint32_t colour = 0; colour < 256; ++colour) {
-        core.scale[colour] = static_cast<uint8_t>((colour * value + 127) / 255);
+        core.scale[colour] = static_cast<uint8_t>((colour * selected + 127) / 255);
     }
 }
 

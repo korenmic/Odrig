@@ -76,13 +76,14 @@ A number in a command is written in decimal digits.
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"mini":{"supported":false,"on":false,"pending":false,"requested":false,"error":null,"brightness":40},"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"left":86399}
+{"ok":true,"on":true,"brightness":128,"dimming":{"value":128,"saved":null,"error":null},"mini":{"supported":false,"on":false,"pending":false,"requested":false,"error":null,"brightness":40},"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"left":86399}
 ```
 
 | Member | Meaning |
 |---|---|
 | `on` | Whether the LEDs are switched on. |
-| `brightness` | Current brightness, 0 to 255. |
+| `brightness` | Runtime default brightness, 0 to 255, initialized from the show. An animation override does not change this value. |
+| `dimming` | Selected animation brightness before blackout/mini cap as `value`, nullable saved override as `saved` (zero is valid), and nullable settings `error`. `null` when persistence is unsupported; absent in older firmware. A damaged settings file reports `settings-unreadable`. |
 | `playing` | What is being played: `"all"` for the root playlist, the id of the card's folder whose playlist is current while the card is in and holds it, the id of a cycle, or `null`. |
 | `animation` | The id of the animation item, or of the drive's animation, on the LEDs right now, or `null`. |
 | `fps` | LED refreshes in the last full second. |

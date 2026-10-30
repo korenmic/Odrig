@@ -9,6 +9,7 @@
 #include "order.h"
 #include "player.h"
 #include "repeats.h"
+#include "brightness.h"
 #include "storage.h"
 
 namespace odrig {
@@ -1337,6 +1338,7 @@ void drive_dropped(Core &core) {
     core.repeats_due = 0;
     tree_clear(core);
     repeats_drive_found(core);
+    brightness_drive_found(core);
     player_drive_changed(core);
 }
 
@@ -1379,6 +1381,7 @@ void publish(Core &core, const Marker &marker) {
     core.catalog_looked = core.latest;
     // The drive's saved repeats, before any of its files plays.
     repeats_drive_taken(core);
+    brightness_start(core);
     if (core.playing == kNothing) {
         const uint32_t first = player_first_in_playlist(core);
         if (first != kNothing && is_drive(first)) {
@@ -1735,6 +1738,7 @@ bool catalog_install_external(Core &core, uint32_t *id) {
     // The positions of the walk after the new file moved: the saved repeats find their files
     // again.
     repeats_reload(core);
+    brightness_start(core);
     if (replaced != kNothing) {
         // What plays it plays the new file from its start.
         player_file_replaced(core, kDriveBase + replaced);
@@ -1858,6 +1862,7 @@ bool catalog_move_external(Core &core, uint32_t position, uint32_t before) {
     current_again(core);
     player_drive_moved(core, position, folder.first + to);
     repeats_reload(core);
+    brightness_start(core);
     return true;
 }
 
@@ -1890,6 +1895,7 @@ bool catalog_remove_external(Core &core, uint32_t position) {
     player_drive_shifted(core, position, -1);
     player_drive_changed(core);
     repeats_reload(core);
+    brightness_start(core);
     return true;
 }
 

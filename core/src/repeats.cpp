@@ -144,7 +144,7 @@ void apply_drive(Core &core, const Line &line, bool taking_up) {
     for (uint32_t at = 0; at < kRepeatsDriveMost; ++at) {
         if (core.repeats_drive[at].loops == 0) {
             core.repeats_drive[at].position = position;
-            core.repeats_drive[at].loops = line.loops;
+            core.repeats_drive[at].loops = static_cast<uint16_t>(line.loops);
             return;
         }
     }

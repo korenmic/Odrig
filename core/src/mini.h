@@ -8,11 +8,11 @@ struct Core;
 
 struct Mini {
     uint32_t revision;
-    uint8_t supported;
-    uint8_t active;
-    uint8_t requested;
-    uint8_t pending;
-    uint8_t failed;
+    uint8_t supported : 1;
+    uint8_t active : 1;
+    uint8_t requested : 1;
+    uint8_t pending : 1;
+    uint8_t failed : 1;
     uint8_t rgb[180];
 };
 

@@ -1,6 +1,6 @@
 # Persistent per-animation brightness — tasks
 
-- [ ] 1. Add durable core animation brightness and shared selection.
+- [x] 1. Add durable core animation brightness and shared selection.
   Implement bounded atomic path settings, retained entries/capacity, startup/remount
   caches, approved commands and additive status. Select before scaling for every
   playback/diagnostic case and miniature cap without changing default/timing.

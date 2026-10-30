@@ -276,7 +276,7 @@ board. The host sends them to the leg's pin as they are.
 
 ## Temporary miniature output
 
-For a 60x60 canvas the core reserves one optional 192-byte startup block, including
+For a 60x60 canvas the core reserves one optional 188-byte startup block, including
 one 180-byte RGB image. `odrig_core_mini_support` opts a capable host in;
 `odrig_core_mini` reads active/requested/pending/failed state, request revision and
 the image pointer; `odrig_core_mini_complete` accepts only the matching pending
@@ -293,7 +293,7 @@ normal brightness rounding at `min(brightness,40)`, then their 100 samples are
 summed and divided with floor rounding. All side columns stay black. Physical
 order is `x*6+y`, bottom left, in the [README orientation](../README.md#approved-connection-and-orientation).
 The core uses three local channel sums per cell, with no per-frame allocation or
-second decoder. The measured host allocation with a drive is 131041 bytes, below
+second decoder. The measured host allocation with a drive is 131069 bytes, below
 131072. Off, invalid or blank output clears the image.
 
 `debug mini on|off` requests a RAM-only transition. Only the host acknowledgement
@@ -952,7 +952,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 4,008 |
+| The core object | fixed | 3,944 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -969,14 +969,14 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| Miniature state and physical RGB, only for a 60x60 canvas | fixed | 192 |
-| **Total** | | **125,733** |
+| Miniature state and physical RGB, only for a 60x60 canvas | fixed | 188 |
+| **Total** | | **125,665** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 89,018 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,954 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,937 bytes for the target file. A host with a drive
+of the check and the saved order: 77,869 bytes for the target file. A host with a drive
 is asked for three blocks more, after the three of the check: the table of a drive
 without a catalog, 12 bytes for each of 256 places, 3,072 bytes; the boot's memory of 16
 files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive's index,
@@ -984,8 +984,9 @@ files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive'
 160 bytes each, the counts of the index, the folder of the last row and a rebuild's
 state, with the lines of the old table it keeps the rows' order of. The block of the saved order holds after the keys the tree of the drive's folders,
 a table of 33 records of 8 bytes and 104 bytes of room for the current playlist's path,
-368, and the saved repeats of 32 of the drive's files, 8 bytes each, 256. With it
-the target file takes 131,041 bytes, below 131,072. The clocks between the animations add
+368, the saved repeats of32 drive files at6 bytes each (192), and32 brightness
+preferences at5 bytes each (160). Positions retain all32 bits. With it
+the target file takes 131,069 bytes, below 131,072. The clocks between the animations add
 no block: their settings, their counts, the paused turn and the key and the place of their
 order are fields of the core object, and the order is a permutation computed from its key. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only

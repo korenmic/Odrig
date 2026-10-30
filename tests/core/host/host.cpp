@@ -838,7 +838,7 @@ private:
         const bool fixed = given == "mapping.json" || given == "show.json" || given == "upload.part" ||
                            given == "show.part" || given == "pending.txt" || given == "mapping.part" ||
                            given == "order.txt" || given == "order.part" || given == "repeats.txt" || given == "repeats.part" || given == "clocks.txt" || given == "clocks.part" || given == "playlist.txt" || given == "playlist.part" || given == "catalog.txt" ||
-                           given == "catalog.new" || given == "catalog.do" || page;
+                           given == "brightness.txt" || given == "brightness.part" || given == "catalog.new" || given == "catalog.do" || page;
         if (!sound || !(animation || fixed)) {
             stop("file misuse", kFileMisuse);
         }

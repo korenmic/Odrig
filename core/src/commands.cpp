@@ -12,6 +12,7 @@
 #include "mini.h"
 #include "playlist.h"
 #include "repeats.h"
+#include "brightness.h"
 #include "show.h"
 #include "upload.h"
 
@@ -156,6 +157,16 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text(core.on ? "true" : "false");
     reply.text(",\"brightness\":");
     reply.number(core.brightness);
+    reply.text(",\"dimming\":");
+    if (brightness_supported(core)) {
+        const int saved = brightness_saved(core, core.invalid || core.playing == kNothing ? kNothing : core.shown);
+        reply.text("{\"value\":");
+        reply.number(brightness_selected(core));
+        reply.text(",\"saved\":");
+        if (saved < 0) reply.text("null"); else reply.number(static_cast<uint32_t>(saved));
+        reply.text(",\"error\":");
+        reply.text(core.brightness_error ? "\"settings-unreadable\"}" : "null}");
+    } else reply.text("null");
     const Mini *mini = core.mini;
     reply.text(",\"mini\":{\"supported\":");
     reply.text(mini != nullptr && mini->supported ? "true" : "false");
@@ -588,12 +599,20 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         return breaks_command(core, message, words.is(last, "on"), reply);
     }
     if (words.is(0, "brightness")) {
-        uint32_t value;
-        if (words.count != 2 || !number_word(words, 1, 0, 255, &value)) {
-            return refuse(reply, "bad-argument");
+        uint32_t value = 0;
+        if (words.count == 2) {
+            if (!number_word(words, 1, 0, 255, &value)) return refuse(reply, "bad-argument");
+            player_set_brightness(core, static_cast<uint8_t>(value));
+            return succeed(reply);
         }
-        player_set_brightness(core, static_cast<uint8_t>(value));
-        return succeed(reply);
+        uint32_t id = 0;
+        const bool restore = words.count == 3 && words.is(2, "default");
+        const bool save = words.count == 4 && words.is(3, "save");
+        if ((!restore && !save) || !number_word(words, 1, 1, 65535, &id) ||
+            (save && !number_word(words, 2, 0, 255, &value))) return refuse(reply, "bad-argument");
+        if (core.invalid) return refuse(reply, "show-invalid");
+        if (catalog_rebuilding(core) || !check_complete(core) || core.upload.state != kUploadNone) return refuse(reply, "busy");
+        return brightness_change(core, id, restore ? -1 : static_cast<int>(value), reply);
     }
     if (words.is(0, "play")) {
         const bool all = words.count == 2 && words.is(1, "all");

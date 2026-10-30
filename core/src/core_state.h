@@ -41,9 +41,11 @@ struct LegInfo {
 struct ItemInfo {
     uint16_t id;
     uint16_t seconds;
-    uint8_t is_cycle;
+    uint8_t is_cycle : 1;
+    uint8_t has_brightness : 1;
     uint8_t ignored;
     uint8_t has_ignored;
+    uint8_t saved_brightness;
     uint32_t first;
     uint32_t count;
 };
@@ -188,11 +190,29 @@ const uint32_t kDriveListedName = 128;
 
 // A saved repeat of a file of the drive: its position in the drive's walk and its loops, 0
 // for a free entry. The core keeps kRepeatsDriveMost of them.
-struct RepeatOf {
-    uint32_t position;
-    uint32_t loops;
+struct Position32 {
+    uint16_t low;
+    uint16_t high;
+    operator uint32_t() const { return static_cast<uint32_t>(low) | static_cast<uint32_t>(high) << 16; }
+    Position32 &operator=(uint32_t value) {
+        low = static_cast<uint16_t>(value);
+        high = static_cast<uint16_t>(value >> 16);
+        return *this;
+    }
 };
+struct RepeatOf {
+    Position32 position;
+    uint16_t loops;
+};
+static_assert(sizeof(RepeatOf) == 6, "compact full-range repeat record");
 const uint32_t kRepeatsDriveMost = 32;
+
+struct BrightnessOf {
+    uint8_t position[4];
+    uint8_t value;
+};
+static_assert(sizeof(BrightnessOf) == 5, "compact brightness record");
+const uint32_t kBrightnessDriveMost = 32;
 
 // The reading of `order.txt` line by line: the entries taken so far, whether its first line
 // was read and was the header, and the line so far without its line feed. A line longer
@@ -372,23 +392,15 @@ struct DriveIndex {
 // anything outside it.
 struct Mini;
 struct Core {
+    // Fields are grouped by alignment; comments name related state across these groups.
     odrig_host host;
+
     Mini *mini;
 
-    // True while odrig_core_begin runs. Memory is asked for only then.
-    uint8_t starting;
-
-    // Whether the show is invalid, and the text that says why.
-    uint8_t invalid;
-    char error_text[kErrorTextSize];
-
-    // From the mapping file. Without a valid mapping there are no legs.
-    uint16_t width;
-    uint16_t height;
-    uint32_t leg_count;
-    uint32_t led_total;
     LegInfo *legs;
+
     uint16_t *led_pixel;    // for each LED, the position of its pixel in pixel order
+
     uint8_t *led_data;      // for each LED, red, green and blue of the last refresh
 
     // From the show file. The item table and the file table have room for
@@ -397,21 +409,10 @@ struct Core {
     // what `brightness` commands made of it since; `show_brightness` stays the value of
     // the file.
     ItemInfo *items;
-    uint32_t item_count;
-    uint32_t item_capacity;
+
     uint16_t *entries;
-    uint32_t entry_count;
+
     FileInfo *files;
-    uint32_t file_count;
-    uint8_t brightness;
-    uint8_t show_brightness;
-    uint8_t has_start;
-    uint32_t start_item;
-    // How long an animation without a number of loops plays at least, in seconds, and
-    // whether the show file says so itself.
-    uint16_t min_seconds;
-    uint8_t has_min_seconds;
-    uint8_t pending_cleanup;
 
     // A block of kChunkSize bytes for a host whose storage can be changed: a piece of an
     // upload or the text of a file the core writes, on its way to the host, and
@@ -421,26 +422,14 @@ struct Core {
     // The upload, and what its check needs, three blocks for a host whose storage can be
     // changed: the second source and decoders, a pixel buffer and a window of their own.
     Upload upload;
+
     Checker *checker;
+
     uint8_t *check_pixels;
+
     uint8_t *check_window;
 
-    // The check after the start, which reads the body of every file with the second
-    // decoders while the show plays: whether it has read them all, which is for good; the
-    // position in the file table of the file it is at; of that file, whether its header
-    // was read, the records still to decode, and the sum of the durations so far; how
-    // many refreshes in a row came without a grid time left out, counted to
-    // kCheckMostSteps; and at how many refreshes in a row the check took no step.
-    uint32_t check_at;
-    // What the file the second decoders read holds, by its header: the file of this check,
-    // of a drive's check or of an upload's check, which never read at the same time.
-    ContentHeader check_content;
-    uint32_t check_records_left;
     uint64_t check_total_ms;
-    uint8_t check_done;
-    uint8_t check_header_read;
-    uint8_t check_row;
-    uint8_t check_idle;
 
     // The drive, for a host that has one: an entry for each place of the list of a drive
     // without a catalog, the number of the drive the entries are of, 0 for none, how many
@@ -448,29 +437,22 @@ struct Core {
     // check reads by; the cursor over a drive with a catalog, and whether the drive is read
     // from its index.
     DriveEntry *drive;
-    uint32_t drive_number;
-    uint32_t drive_count;
-    uint32_t drive_check_at;
-    char drive_check_name[kDriveNameSize];
+
     DriveIndex *index;
-    uint8_t indexed;
+
     // The files of drives left out in this boot, the place the next one is written to, and
     // of the drive's file the check is at, the bytes and the CRC-32 of its first read.
     Remembered *remembered;
-    uint32_t remembered_next;
-    uint32_t drive_first_crc;
-    uint16_t drive_first_read;
 
     // The saved playlist order, for a host whose storage can be changed: for each item of
     // the item table the number of the entry of `order.txt` that names it, or
     // kOrderUnnamed. In the same block, for a host with a drive, the saved repeats of the
     // drive's files.
     uint16_t *order_items;
+
     RepeatOf *repeats_drive;
-    // Whether the saved repeats of a drive without a catalog are to be read before its files
-    // are checked.
-    uint8_t repeats_due;
-    OrderReader order_reader;
+
+    BrightnessOf *brightness_drive;
 
     // The tree of the drive's folders, for a host with a drive, in the block of the saved
     // order: the table of a drive without a catalog, the root at index 0 and the
@@ -479,83 +461,42 @@ struct Core {
     // folder, its index in the table or its ordinal in the index, 0 for the root, and its
     // record; and the room for the current playlist's path, empty for the root.
     Folder *folders;
+
     char *playlist_path;
-    uint32_t folder_count;
-    uint8_t tree_known;
-    uint32_t current;
-    IndexFolder current_folder;
-    // Whether the root plays in the current playlist's place, since that has nothing to
-    // play: judged where a turn ends. And the animation whose turn a jump outside the
-    // current playlist cut, which plays again after the jumped turn; kNothing for none.
-    uint8_t in_place;
-    uint32_t resume_item;
+
     // The current playlist's window: the moment it became current, a timestamp, and the
     // milliseconds spent in the window before that moment, from the saved file.
     uint64_t window_started;
-    uint32_t window_spent;
+
     // The saved file: when it was last written, whether a change waits to be written, and
     // whether the file exists.
     uint64_t playlist_saved;
-    uint8_t save_due;
-    uint8_t file_present;
 
-    // The two settings of `clocks.txt`: the clocks between the animations, and the message
-    // after each clock.
-    uint8_t clocks_on;
-    uint8_t clock_message_on;
-    // The clocks' folders of the drive's tree, as positions of its walk: the folder
-    // `clocks`, its subtree from `clocks_first` to before `clocks_last` and its own files,
-    // `clocks_files` from `clocks_first` on; the folder `clocks/message`, its own files,
-    // `message_files` from `message_first` on. All 0 for a folder there is none of.
-    uint32_t clocks_first;
-    uint32_t clocks_last;
-    uint32_t clocks_files;
-    uint32_t message_first;
-    uint32_t message_files;
-    // The order of the clocks: the key of its permutation, the place of the next clock in
-    // it, and the number of clocks it was drawn for; a new one is drawn once it is used up.
-    uint32_t order_key;
-    uint32_t order_next;
-    uint32_t order_count;
-    // A break: its phase, kBreakNone, kBreakClock or kBreakMessage; whether it paused a
-    // turn of the playlist; whether the message follows its clock; the turns of the
-    // playlist counted, at most 255; whether the count of the playlist's time is held, as
-    // the playlist does not play, with the time left of it then.
-    uint8_t break_phase;
-    uint8_t break_paused;
-    uint8_t break_message;
-    uint8_t break_turns;
-    uint8_t break_held;
-    // The position the playlist goes back to after the break; the paused turn's loops a
-    // `repeat` gave it, its clock's seed, 0 for none, and its time when it was paused. The
-    // seed a resumed turn of a clock takes in place of a new one, 0 for none.
-    uint32_t break_back;
-    uint32_t break_repeat;
-    uint32_t break_seed;
-    uint32_t resume_seed;
     uint64_t break_offset;
+
     // The timestamp at which 5 minutes of the playlist's time are counted, and while the
     // count is held, the time left of the 5 minutes.
     uint64_t break_due;
+
     uint64_t break_rest;
 
     uint8_t *pixels;        // the pixel buffer of the decoder
+
     uint8_t *window;        // the window of the DEFLATE decoder
 
-    // The clock. Every time is a timestamp of the host, in milliseconds.
-    uint8_t started;        // a call has carried a timestamp
     uint64_t t0;            // the power-on moment: the first timestamp
+
     uint64_t latest;        // the latest timestamp
+
     uint64_t next_due;      // the first grid time that is neither used nor skipped
-    uint8_t had_refresh;    // a refresh has been produced
+
     uint64_t last_grid;     // the grid time of the latest refresh
 
     // The refreshes produced in the running second, counted from the power-on moment, and
     // in the second before it that had any.
     uint64_t second_running;
+
     uint64_t second_before;
-    uint32_t count_running;
-    uint32_t count_before;
 
     // The byte entry, odrig_core_feed. `line` is a block of ODRIG_LINE_MAX + 1 bytes that
     // holds the first bytes of the unfinished line, a whole line and a carriage return at
@@ -563,61 +504,271 @@ struct Core {
     // ODRIG_REPLY_MAX bytes for the reply to a line. Without the two blocks the entry
     // takes no bytes.
     char *line;
+
     char *feed_reply;
-    uint16_t line_length;
-    uint8_t line_over;
 
-    // The diagnostic holds a decoded picture and a selection to resume. `mapping_snake` is the
-    // snake whose test shows, 1 to 20, or 0 for the diagonal.
-    uint8_t mapping_test;
-    uint8_t mapping_snake;
-    uint32_t mapping_saved_playing;
-    uint32_t mapping_saved_shown;
-    uint32_t cycle_start_entry;
-
-    // Playback.
-    uint8_t on;
-    uint8_t scale[256];     // what each colour value is sent as, at the current brightness
-    uint32_t playing;       // the position of the cycle being played, kPlaylist, or kNothing
-    uint32_t shown;         // the position of the animation item the latest refresh chose
-    uint8_t zero_pending;   // the item's time zero is the grid time of the next refresh
-    uint32_t noise;         // what the timestamps of the polls were mixed into
     uint64_t zero;          // the item's time zero; of the playlist, the start of the turn
-    uint32_t turn_item;     // of the playlist: the position of the animation whose turn it is
-    uint32_t turn_repeat;   // of that turn: the loops a `repeat` gave it, 0 while none did
+
     uint64_t turn_number;   // of the playlist: counts its turns, so that each opens its file anew
 
-    // The file that is open for playback: an animation item in one turn and one loop. A
-    // drawn one is held in the window, its payload read whole, and its file is closed.
-    uint8_t stream_open;
-    uint8_t stream_drawn;
-    uint32_t stream_item;
     uint64_t stream_turn;
+
     uint64_t stream_loop;
+
     uint64_t frame_end;     // where the frame in the pixel buffer ends, counted in the loop
-    uint32_t stream_records;    // the frame records of the open file that were decoded
-    // At the refresh being made: the body bytes the player may still decode, and whether
-    // it has decoded a record.
-    uint32_t catch_up_left;
-    uint8_t catch_up_begun;
-    // The seed of the turn of the clock that is open for playback.
-    uint32_t seed;
 
     FileSource file;
+
     Inflate inflate;
+
     OdrgDecoder decoder;
 
     // The latest fault of a file, kept for reporting.
     FaultContext fault;
 
+    uint64_t catalog_looked;
+
+    uint32_t leg_count;
+
+    uint32_t led_total;
+
+    uint32_t item_count;
+
+    uint32_t item_capacity;
+
+    uint32_t entry_count;
+
+    uint32_t file_count;
+
+    uint32_t start_item;
+
+    // The check after the start, which reads the body of every file with the second
+    // decoders while the show plays: whether it has read them all, which is for good; the
+    // position in the file table of the file it is at; of that file, whether its header
+    // was read, the records still to decode, and the sum of the durations so far; how
+    // many refreshes in a row came without a grid time left out, counted to
+    // kCheckMostSteps; and at how many refreshes in a row the check took no step.
+    uint32_t check_at;
+
+    // What the file the second decoders read holds, by its header: the file of this check,
+    // of a drive's check or of an upload's check, which never read at the same time.
+    ContentHeader check_content;
+
+    uint32_t check_records_left;
+
+    uint32_t drive_number;
+
+    uint32_t drive_count;
+
+    uint32_t drive_check_at;
+
+    uint32_t remembered_next;
+
+    uint32_t drive_first_crc;
+
+    OrderReader order_reader;
+
+    uint32_t folder_count;
+
+    uint32_t current;
+
+    IndexFolder current_folder;
+
+    uint32_t resume_item;
+
+    uint32_t window_spent;
+
+    // The clocks' folders of the drive's tree, as positions of its walk: the folder
+    // `clocks`, its subtree from `clocks_first` to before `clocks_last` and its own files,
+    // `clocks_files` from `clocks_first` on; the folder `clocks/message`, its own files,
+    // `message_files` from `message_first` on. All 0 for a folder there is none of.
+    uint32_t clocks_first;
+
+    uint32_t clocks_last;
+
+    uint32_t clocks_files;
+
+    uint32_t message_first;
+
+    uint32_t message_files;
+
+    // The order of the clocks: the key of its permutation, the place of the next clock in
+    // it, and the number of clocks it was drawn for; a new one is drawn once it is used up.
+    uint32_t order_key;
+
+    uint32_t order_next;
+
+    uint32_t order_count;
+
+    // The position the playlist goes back to after the break; the paused turn's loops a
+    // `repeat` gave it, its clock's seed, 0 for none, and its time when it was paused. The
+    // seed a resumed turn of a clock takes in place of a new one, 0 for none.
+    uint32_t break_back;
+
+    uint32_t break_repeat;
+
+    uint32_t break_seed;
+
+    uint32_t resume_seed;
+
+    uint32_t count_running;
+
+    uint32_t count_before;
+
+    uint32_t mapping_saved_playing;
+
+    uint32_t mapping_saved_shown;
+
+    uint32_t cycle_start_entry;
+
+    uint32_t playing;       // the position of the cycle being played, kPlaylist, or kNothing
+
+    uint32_t shown;         // the position of the animation item the latest refresh chose
+
+    uint32_t noise;         // what the timestamps of the polls were mixed into
+
+    uint32_t turn_item;     // of the playlist: the position of the animation whose turn it is
+
+    uint32_t turn_repeat;   // of that turn: the loops a `repeat` gave it, 0 while none did
+
+    uint32_t stream_item;
+
+    uint32_t stream_records;    // the frame records of the open file that were decoded
+
+    // At the refresh being made: the body bytes the player may still decode, and whether
+    // it has decoded a record.
+    uint32_t catch_up_left;
+
+    // The seed of the turn of the clock that is open for playback.
+    uint32_t seed;
+
     // The catalogs of the internal storage and of the drive.
     CatalogState catalogs[2];
+
+    uint32_t catalog_marker_crc;
+
+    uint32_t rebuild_at;
+
+    uint32_t rebuild_read;
+
+    uint32_t rebuild_total;
+
+    uint32_t rebuild_lines;
+
+    uint32_t rebuild_crc;
+
+    // From the mapping file. Without a valid mapping there are no legs.
+    uint16_t width;
+
+    uint16_t height;
+
+    // How long an animation without a number of loops plays at least, in seconds, and
+    // whether the show file says so itself.
+    uint16_t min_seconds;
+
+    uint16_t drive_first_read;
+
+    uint16_t line_length;
+
+    // True while odrig_core_begin runs. Memory is asked for only then.
+    uint8_t starting;
+
+    // Whether the show is invalid, and the text that says why.
+    uint8_t invalid;
+
+    char error_text[kErrorTextSize];
+
+    uint8_t brightness;
+
+    uint8_t show_brightness;
+
+    uint8_t has_start;
+
+    uint8_t has_min_seconds;
+
+    uint8_t pending_cleanup;
+
+    uint8_t check_done;
+
+    uint8_t check_header_read;
+
+    uint8_t check_row;
+
+    uint8_t check_idle;
+
+    char drive_check_name[kDriveNameSize];
+
+    uint8_t indexed;
+
+    uint8_t brightness_error;
+    uint8_t brightness_present;
+
+    // Whether the saved repeats of a drive without a catalog are to be read before its files
+    // are checked.
+    uint8_t repeats_due;
+
+    uint8_t tree_known;
+
+    // Whether the root plays in the current playlist's place, since that has nothing to
+    // play: judged where a turn ends. And the animation whose turn a jump outside the
+    // current playlist cut, which plays again after the jumped turn; kNothing for none.
+    uint8_t in_place;
+
+    uint8_t save_due;
+
+    uint8_t file_present;
+
+    // The two settings of `clocks.txt`: the clocks between the animations, and the message
+    // after each clock.
+    uint8_t clocks_on;
+
+    uint8_t clock_message_on;
+
+    // A break: its phase, kBreakNone, kBreakClock or kBreakMessage; whether it paused a
+    // turn of the playlist; whether the message follows its clock; the turns of the
+    // playlist counted, at most 255; whether the count of the playlist's time is held, as
+    // the playlist does not play, with the time left of it then.
+    uint8_t break_phase;
+
+    uint8_t break_paused;
+
+    uint8_t break_message;
+
+    uint8_t break_turns;
+
+    uint8_t break_held;
+
+    // The clock. Every time is a timestamp of the host, in milliseconds.
+    uint8_t started;        // a call has carried a timestamp
+
+    uint8_t had_refresh;    // a refresh has been produced
+
+    uint8_t line_over;
+
+    // The diagnostic holds a decoded picture and a selection to resume. `mapping_snake` is the
+    // snake whose test shows, 1 to 20, or 0 for the diagonal.
+    uint8_t mapping_test;
+
+    uint8_t mapping_snake;
+
+    // Playback.
+    uint8_t on;
+
+    uint8_t scale[256];     // what each colour value is sent as, at the current brightness
+
+    uint8_t zero_pending;   // the item's time zero is the grid time of the next refresh
+
+    // The file that is open for playback: an animation item in one turn and one loop. A
+    // drawn one is held in the window, its payload read whole, and its file is closed.
+    uint8_t stream_open;
+
+    uint8_t stream_drawn;
+
+    uint8_t catch_up_begun;
 
     // The reading of a drive's catalog in steps: its phase, the CRC-32 of the whole marker,
     // and when it was last looked at.
     uint8_t catalog_phase;
-    uint32_t catalog_marker_crc;
-    uint64_t catalog_looked;
 
     // A rebuild of a catalog: 0 for none, 1 + the storage's catalog it makes; the page it
     // writes, whether that page's new file is open, the file or the place it is at, the files
@@ -625,13 +776,11 @@ struct Core {
     // CRC-32 wait at the end of the chunk buffer, from kRebuildPages on. A drive's rebuild
     // keeps the rest of its state in the cursor.
     uint8_t rebuild;
+
     uint8_t rebuild_page;
+
     uint8_t rebuild_open;
-    uint32_t rebuild_at;
-    uint32_t rebuild_read;
-    uint32_t rebuild_total;
-    uint32_t rebuild_lines;
-    uint32_t rebuild_crc;
+
 };
 
 // Keeps the context of a file's fault, in place of the one before.

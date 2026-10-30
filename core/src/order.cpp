@@ -8,6 +8,7 @@
 #include "drive.h"
 #include "breaks.h"
 #include "repeats.h"
+#include "brightness.h"
 #include "storage.h"
 
 namespace odrig {
@@ -159,7 +160,8 @@ bool order_begin(Core &core) {
     // for the current playlist's path and the saved repeats of the drive's files.
     const uint32_t tree = core.drive != nullptr ? kFolderMost * sizeof(Folder) + kPlaylistPathRoom : 0;
     const uint32_t repeats = core.drive != nullptr ? kRepeatsDriveMost * sizeof(RepeatOf) : 0;
-    uint8_t *block = static_cast<uint8_t *>(arena_take(core, core.item_capacity * 2 + tree + repeats));
+    const uint32_t brightness = core.drive != nullptr ? kBrightnessDriveMost * sizeof(BrightnessOf) : 0;
+    uint8_t *block = static_cast<uint8_t *>(arena_take(core, core.item_capacity * 2 + tree + repeats + brightness));
     if (block == nullptr) {
         return false;
     }
@@ -170,6 +172,8 @@ bool order_begin(Core &core) {
         core.playlist_path = reinterpret_cast<char *>(block + core.item_capacity * 2 + kFolderMost * sizeof(Folder));
         core.playlist_path[0] = '\0';
         core.repeats_drive = reinterpret_cast<RepeatOf *>(block + core.item_capacity * 2 + tree);
+        core.brightness_drive = reinterpret_cast<BrightnessOf *>(block + core.item_capacity * 2 + tree + repeats);
+        brightness_drive_found(core);
         tree_clear(core);
         repeats_drive_found(core);
     }
@@ -291,6 +295,7 @@ void order_start(Core &core) {
     clear_items(core);
     read_whole(core);
     repeats_start(core);
+    brightness_start(core);
 }
 
 void order_reload(Core &core) {
@@ -301,6 +306,7 @@ void order_reload(Core &core) {
     clear_items(core);
     read_whole(core);
     repeats_reload(core);
+    brightness_start(core);
 }
 
 void order_item_leaves(Core &core, uint32_t position) {
