@@ -43,3 +43,45 @@ The final converter reruns resolved all initial format-number, module-export,
 module-inventory and documentation-contract failures. The aggregate first-run log
 retains those failures rather than being presented as an entirely green run.
 After the final documentation entry, all 38 documentation checks passed again.
+
+## External inclusion
+
+The initial external Ignore checks observed `in-use` refusals and missing folder
+inclusion fields. The implementation stores exclusions in internal `ignored.txt`,
+independently of the external medium and show file. Tests cover own/inherited folder
+choices, ancestor removal preserving a child's own choice, remount and reassigned
+IDs, retained absent paths, full capacity, no-op writes, malformed settings and
+manual play. Every failed write/close/rename/readback keeps published bytes and
+active choices; each storage cut recovers only a complete old or new settings file.
+
+The manual-turn check first observed an explicit jump being replaced by the next
+automatic file. Explicit-turn provenance now keeps that manual playback available.
+The cold-start exclusion regression also observed animation 60001 starting while
+all files were excluded; the newly-checked-file entry now uses shared eligibility.
+Clock and message selection use the same own/ancestor exclusion helper.
+
+The pure firmware storage-tool suite passed all 60 tests, including preserving,
+explicitly replacing and reading back the new settings file. The new regression
+first observed the file omitted before it joined the preserved settings list.
+No real board, serial port, flash or external-medium write was used.
+
+Measured host allocations are 125,153 bytes/18 blocks for the 100-item target show,
+130,941/21 with a drive, 77,613/13 without writable storage, and 88,442/17 for the
+bench example. Core is 3,688 bytes, Checker 2,208 and DriveIndex 716. The 640-byte
+exclusion cache shares the existing order allocation. Two source caches and the
+index cache each save 256 bytes; public reads and full 512-byte quarantine
+fingerprints retain their domains. The 128 KiB, 4,096-byte Core and 512-byte stack
+frame limits are unchanged.
+
+Compatibility checks exposed old external-row and fixed-pagination assumptions.
+Fixtures now include the additive flags, and catalog listing probes cover every
+item with closer page starts rather than lowering expected catalog counts.
+The procedural preview smoke waits for a nonnull rendering seed, rather than
+assuming the URL is published only after the first complete drawing.
+
+The final rebuilt-code run passed both discovered suites: core 1,008 tests
+(one expected skip), emulator 651 (19 expected skips), with no failures.
+The focused 19-case run passed the cold-start, clock/message exclusions,
+HTTP/TCP persistence, manual-turn and preview checks. Onboarding passed all 88
+checks and public documentation all 38. Task 2 is software-verified; physical
+board/phone acceptance remains open.

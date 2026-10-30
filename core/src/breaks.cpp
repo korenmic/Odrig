@@ -3,6 +3,7 @@
 #include "catalog.h"
 #include "clock.h"
 #include "drive.h"
+#include "ignored.h"
 #include "player.h"
 #include "storage.h"
 
@@ -175,7 +176,7 @@ uint32_t breaks_pick(Core &core, uint64_t at) {
             core.order_next = 0;
         }
         const uint32_t position = core.clocks_first + clock_shuffle(core.order_key, core.order_count, core.order_next++);
-        if (drive_plays(core, position)) {
+        if (drive_automatic(core, position)) {
             return kDriveBase + position;
         }
     }
@@ -184,7 +185,7 @@ uint32_t breaks_pick(Core &core, uint64_t at) {
 
 uint32_t breaks_message(const Core &core) {
     for (uint32_t position = core.message_first; position < core.message_first + core.message_files; ++position) {
-        if (drive_plays(core, position)) {
+        if (drive_automatic(core, position)) {
             return kDriveBase + position;
         }
     }

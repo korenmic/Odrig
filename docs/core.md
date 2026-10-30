@@ -118,7 +118,8 @@ The last seven members are the storage functions: three that write a file, `rena
   and `.`: `mapping.json`, `show.json`, the name of an `.odrg` file, or one of the names
   the core keeps for itself, `upload.part`, `show.part`, `pending.txt`, `mapping.part`,
   `order.txt`, `order.part`, `repeats.txt`, `repeats.part`, `clocks.txt`, `clocks.part`,
-  `playlist.txt`, `playlist.part`, `brightness.txt` and `brightness.part`.
+  `playlist.txt`, `playlist.part`, `brightness.txt`, `brightness.part`, `ignored.txt`
+  and `ignored.part`.
 - The core has at most one file being written, gives `write` at most 1,500 bytes in one
   call, and reads a file with `read_at` from offset 0 on, each call where its last call for
   that file ended; only the commands `read` and `catalog page`, and the reads of the files
@@ -650,7 +651,7 @@ its id, and asks the host for a name only when `list` writes it or a log line ne
 - The drive's cursor, a block the core takes at the start for a host with a drive, reads
   the index as the core needs it: a line of the table for a folder, a row of a folder's
   file for a file, a line of the map for an id, each by its number, the map and the table
-  by binary search. It holds a room of 512 bytes, which takes as many whole lines of a file
+   by binary search. It holds a room of 256 bytes, which takes as many whole lines of a file
   as fit in one read, with the name of the file and the offset they are from; the counts of
   the table's and the map's lines, from the marker; the last two rows read, each with its
   position, id, CRC-32, size, canvas, length, type, fault and path; the folder of the last
@@ -917,7 +918,7 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
   the bytes to the host in one `write`. With the last byte the file is closed.
 - **The check.** A file must be decoded whole before it joins the show. That is done
   beside playback, with a second source, second decoders, a pixel buffer and a window of
-  their own, which read `upload.part` back with `read_at`, 512 bytes at a time. It runs
+  their own, which read `upload.part` back with `read_at`, 256 bytes at a time. It runs
   in steps inside `odrig_core_poll`, one step after the LED data of a refresh is
   complete, and none after a refresh before which a grid time was skipped: when the host
   is late, the check waits. The first step reads the header and compares the canvas with
@@ -953,7 +954,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,944 |
+| The core object | fixed | 3,688 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -963,7 +964,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Pixel buffer | the smaller of 3 * W * H and 65,534 | 10,800 |
 | Window of the DEFLATE decoder | 32,768 | 32,768 |
 | Chunk buffer, with storage that can be changed | 1,500 | 1,500 |
-| The check: source, DEFLATE decoder, ODRG decoder | fixed | 2,464 |
+| The check: source, DEFLATE decoder, ODRG decoder | fixed | 2,208 |
 | The check: pixel buffer | as the player's | 10,800 |
 | The check: window | 32,768 | 32,768 |
 | Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
@@ -971,27 +972,29 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
 | Miniature state and physical RGB, only for a 60x60 canvas | fixed | 188 |
-| **Total** | | **125,665** |
+| **Total** | | **125,153** |
 
-That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
+That is about 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,954 bytes. A host
+45,776 of them. The example show on the two-leg mapping asks for 88,442 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,869 bytes for the target file. A host with a drive
+of the check and the saved order: 77,613 bytes for the target file. A host with a drive
 is asked for three blocks more, after the three of the check: the table of a drive
 without a catalog, 12 bytes for each of 256 places, 3,072 bytes; the boot's memory of 16
 files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive's index,
-972 bytes: the room of 512 for one read with the name of its file, the two rows read of
+716 bytes: the room of 256 for one read with the name of its file, the two rows read of
 160 bytes each, the counts of the index, the folder of the last row and a rebuild's
 state, with the lines of the old table it keeps the rows' order of. The block of the saved order holds after the keys the tree of the drive's folders,
 a table of 33 records of 8 bytes and 104 bytes of room for the current playlist's path,
 368, the saved repeats of32 drive files at6 bytes each (192), and32 brightness
-preferences at5 bytes each (160). Positions retain all32 bits. With it
-the target file takes 131,069 bytes, below 131,072. The clocks between the animations add
+preferences at5 bytes each (160), followed by128 external exclusion records at5 bytes
+each (640). Positions retain all32 bits. With it
+the target file takes 130,941 bytes, below 131,072. The clocks between the animations add
 no block: their settings, their counts, the paused turn and the key and the place of their
 order are fields of the core object, and the order is a permutation computed from its key. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
-the 512 bytes it last read. Picture clocks add no block either: a picture is decoded into
+the 256 bytes its source last read. The host API still permits512-byte reads, and drive
+quarantine still fingerprints the complete first512 bytes across refills. Picture clocks add no block either: a picture is decoded into
 the pixel buffer, its head, its parts and its layer live in the window of the DEFLATE
 decoder, and what reading them needs is on the stack; the suite finds the same memory for
 a show of picture clocks as for one of clocks.
@@ -1287,9 +1290,19 @@ values/presence use existing item padding/flags.32 external values use 5-byte
 records beside compact 6-byte repeat records with full 32-bit positions/16-bit counts.
 The independent 128-byte reader preserves the 512-byte stack-frame compiler bound.
 
-The measured 100-item Windows host requests 131069 bytes with a drive,21 allocation
-blocks, and the Core object is 3944 bytes. Existing 128 KiB/4096 limits remain unchanged;
+The measured 100-item Windows host requests 130941 bytes with a drive,21 allocation
+blocks, and the Core object is 3688 bytes. Existing 128 KiB/4096 limits remain unchanged;
 no allocation is added per frame. The store streams and verifies a part before
 publishing it, keeps prior usable cache after failed updates, and discards partial
 startup application if the settings file is damaged. `dimming` is additive status;
 the existing `brightness` member remains the runtime default.
+
+External inclusion uses `ignored.cpp`: a bounded independent reader validates
+`ignored.txt`, resolves full file paths to walk positions and folder paths to ordinals,
+and caches128 compact5-byte records beside the brightness records. Folder subtree
+ranges derive inherited exclusions. `drive_plays` remains physical/manual availability;
+`drive_automatic` adds own and ancestor exclusion for all automatic selectors. Explicit
+turn provenance prevents an Ignore change from cutting a manual jump. Settings reload
+at publication/remount boundaries; failed saves preserve both published bytes and cache.
+The existing order block grows by640 bytes, while the two source caches and index cache
+shrink by256 bytes each. No frame allocates memory and no ID/path/count domain shrinks.

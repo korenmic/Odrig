@@ -8,7 +8,7 @@
   old payload compatibility,32KiB payload and unchanged memory/stack bounds.
   Run converter, Python library, core and relevant browser/emulator suites.
 
-- [ ] 2. Extend persistent Ignore to external files and folders.
+- [x] 2. Extend persistent Ignore to external files and folders.
   Implement atomic path/kind preferences, retained128-record capacity, compact cache,
   own/inherited list state and one automatic eligibility rule. Preserve internal
   Ignore and manual availability; update firmware settings preservation/readback.

@@ -359,6 +359,28 @@ class Commands(Temporary):
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(expected, **{"brightness.txt": replacement}))
 
+    def test_external_inclusion_is_preserved_replaced_and_read_back(self):
+        saved = b"odrig-ignored 1\nf night/comet.odrg\nd clocks/message\n"
+        self.old = support.storage_image(dict(support.WLED_FILES, **{"/odrig/ignored.txt": saved}))
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        expected = dict(storage.folder_files(self.show), **{"ignored.txt": saved})
+        installed = self.on_the_board(esptool)
+        self.assertEqual(storage.show_of(installed), expected)
+        self.assertEqual(storage.other_files(installed), storage.other_files(self.old))
+        with support.no_board(self.esptool(installed, failing_verifies=1)):
+            result = support.run_main("read-show", self.folder / "copy")
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(support.files_of(self.folder / "copy"), expected)
+        replacement = b"odrig-ignored 1\nf different.odrg\n"
+        (self.show / "ignored.txt").write_bytes(replacement)
+        self.old = installed
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(expected, **{"ignored.txt": replacement}))
+
     def test_a_dry_run_says_what_would_change_and_writes_nothing(self):
         esptool = self.esptool()
         result = self.install(esptool, "--dry-run")

@@ -214,6 +214,13 @@ struct BrightnessOf {
 static_assert(sizeof(BrightnessOf) == 5, "compact brightness record");
 const uint32_t kBrightnessDriveMost = 32;
 
+struct IgnoredOf {
+    uint8_t position[4];
+    uint8_t kind;
+};
+static_assert(sizeof(IgnoredOf) == 5, "compact full-range inclusion record");
+const uint32_t kIgnoredMost = 128;
+
 // The reading of `order.txt` line by line: the entries taken so far, whether its first line
 // was read and was the header, and the line so far without its line feed. A line longer
 // than kOrderLineMost is no entry. The line's room is a catalog's longest line: the reading
@@ -348,7 +355,7 @@ struct WalkedFolder {
 // could not be read, which makes the catalog damaged at the next refresh; and a rebuild's
 // state.
 struct DriveIndex {
-    uint8_t room[kFileBufferSize];
+    uint8_t room[kFileCacheSize];
     char room_name[kIndexNameRoom];
     uint32_t room_offset;
     uint32_t room_length;
@@ -702,6 +709,10 @@ struct Core {
 
     uint8_t brightness_error;
     uint8_t brightness_present;
+    uint8_t ignored_error;
+    uint8_t ignored_present;
+    uint8_t turn_manual : 1;
+    uint8_t break_manual : 1;
 
     // Whether the saved repeats of a drive without a catalog are to be read before its files
     // are checked.

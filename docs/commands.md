@@ -36,7 +36,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `catalog cancel` | Ends a rebuild; the catalog stays as it was. |
 | `remove <id>` | Removes an item from the show. |
 | `remove many <ids>` | Atomically removes 1–32 distinct installed animations. |
-| `ignore <id> <value>` | Excludes or includes an installed animation in the automatic playlist. |
+| `ignore <id> <value>` | Excludes or includes an animation or external folder in automatic playback. |
 | `mapping get` | Reports saved pin assignments, their revision and diagnostic state. |
 | `mapping set <revision> <pins>` | Atomically saves a complete comma-separated pin permutation. |
 | `mapping cross on` | Saves snake 10 as cross-wired: its chain up column 28, up column 30, down column 29. |
@@ -510,10 +510,27 @@ The protocol is identical over HTTP, board serial and emulator serial or TCP.
 
 ## Playlist inclusion and batch deletion
 
-`ignore <id> <0|1>` persists an installed animation's automatic-playlist exclusion:
+`ignore <id> <0|1>` persists an animation's or external folder's automatic-playlist exclusion:
 1 excludes, 0 includes. It is idempotent and returns `{"ok":true}` after durability.
-`list` includes boolean `ignored` on installed animations only. Explicit play and
-cycle membership still work. Unknown ids return unknown-id; cycles/drive ids in-use.
+`list` includes boolean `ignored` on installed animations. External file and folder
+rows also carry their own `ignored` choice and boolean `inherited_ignored`, derived
+from excluded ancestors. Including a parent leaves every child's own choice intact.
+Explicit play remains available for excluded files; internal cycle membership still
+works. Unknown ids return unknown-id; cycles return in-use.
+
+External choices are saved in internal `ignored.txt`, never on the external medium:
+`odrig-ignored 1\n`, followed by `f FULL_PATH\n` or `d FULL_PATH\n` for exclusions.
+An absent record means included. Paths survive remounts and reassigned numeric IDs;
+file and folder identities are distinct, and absent paths are retained. At most 128
+records are kept, without eviction: a new exclusion at capacity returns no-space,
+while an existing exclusion can still be removed. Malformed settings discard partial
+exclusions, log `ignored unreadable`, and refuse mutations with storage-error.
+
+Saving closes and verifies `ignored.part` before atomic replacement. Failed saves
+preserve published bytes and active choices. Abandoned parts are ignored and cleaned
+at startup. Every automatic traversal, clock/message candidate and resumed automatic
+turn applies own and ancestor exclusion; a changed choice revalidates the current
+automatic turn at the next refresh. An explicit manual turn remains available.
 
 `remove many <id,id,...>` deletes 1–32 distinct installed animation items atomically
 per command. Every id is validated first; unknown ids return unknown-id; cycles,

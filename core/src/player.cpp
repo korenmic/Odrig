@@ -6,6 +6,7 @@
 #include "breaks.h"
 #include "catalog.h"
 #include "drive.h"
+#include "ignored.h"
 #include "odrig_core.h"
 #include "clock.h"
 #include "mapping_control.h"
@@ -79,7 +80,7 @@ uint64_t whole_passes(const Core &core, uint32_t animation, uint64_t turn) {
 // playlist.
 bool plays(const Core &core, uint32_t position) {
     if (is_drive(position)) {
-        return drive_plays(core, position - kDriveBase);
+        return drive_automatic(core, position - kDriveBase);
     }
     return position < core.item_count && !core.items[position].is_cycle && !core.items[position].ignored &&
            item_usable(core, position);
@@ -344,7 +345,7 @@ ODRIG_NOINLINE uint32_t drive_playing_from(const Core &core, Range range, uint32
             at = core.clocks_last - 1;
             continue;
         }
-        if (drive_plays(core, at)) {
+        if (drive_automatic(core, at)) {
             return kDriveBase + at;
         }
     }
@@ -459,6 +460,8 @@ bool break_begins(Core &core, uint64_t at, uint32_t back) {
     }
     core.break_back = back;
     core.break_phase = kBreakClock;
+    if (!core.break_paused) core.break_manual = 0;
+    core.turn_manual = 0;
     core.break_message = core.clock_message_on;
     core.turn_item = clock;
     core.turn_repeat = 0;
@@ -473,14 +476,17 @@ bool break_begins(Core &core, uint64_t at, uint32_t back) {
 // began.
 void break_ends(Core &core) {
     const bool paused = core.break_paused != 0;
+    core.turn_manual = 0;
     core.break_phase = kBreakNone;
     core.break_paused = 0;
     counts_from(core, core.zero);
     if (core.zero >= window_end(core)) {
         rotate(core, core.zero);
         core.turn_item = player_first_in_playlist(core);
-    } else if (paused && core.break_back != kNothing && plays(core, core.break_back)) {
+    } else if (paused && core.break_back != kNothing && (plays(core, core.break_back) ||
+               (core.break_manual && is_drive(core.break_back) && drive_plays(core, core.break_back - kDriveBase)))) {
         core.turn_item = core.break_back;
+        core.turn_manual = core.break_manual;
         core.zero -= core.break_offset;
         core.turn_repeat = core.break_repeat;
         core.resume_seed = core.break_seed;
@@ -500,6 +506,7 @@ void pause_for_break(Core &core) {
                         type_of(core, paused) == kTypeWidget;
     core.break_seed = seeded ? core.seed : 0;
     core.break_paused = 1;
+    core.break_manual = core.turn_manual;
     break_begins(core, at, paused);
 }
 
@@ -586,6 +593,7 @@ ODRIG_NOINLINE Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn)
             }
         }
         core.zero += turn;
+        core.turn_manual = 0;
         core.turn_repeat = 0;
         if (core.break_phase == kBreakClock) {
             // The clock's turn ended: the message plays once after it, else the break ends.
@@ -833,10 +841,11 @@ void player_jump(Core &core, uint32_t item) {
     const uint32_t cut = core.playing == kPlaylist ? core.turn_item : kNothing;
     core.resume_item = cut != kNothing && cut != item && plays(core, cut) && !in_range(range_in_use(core), item) ? cut : kNothing;
     player_play_all(core, item);
+    core.turn_manual = 1;
 }
 
 void player_drive_joined(Core &core, uint32_t place) {
-    if (core.playing == kNothing && !core.invalid && !core.mapping_test) {
+    if (core.playing == kNothing && !core.invalid && !core.mapping_test && drive_automatic(core, place)) {
         player_play_all(core, kDriveBase + place);
     }
 }
@@ -940,13 +949,15 @@ void player_drive_shifted(Core &core, uint32_t position, int32_t delta) {
 }
 
 void player_drive_changed(Core &core) {
-    if (core.stream_open && is_drive(core.stream_item) && !plays(core, core.stream_item)) {
+    if (core.stream_open && is_drive(core.stream_item) &&
+        !(core.playing == kPlaylist && !core.turn_manual ? plays(core, core.stream_item) : drive_plays(core, core.stream_item - kDriveBase))) {
         close_stream(core);
     }
     if (core.resume_item != kNothing && is_drive(core.resume_item) && !plays(core, core.resume_item)) {
         core.resume_item = kNothing;
     }
-    if (core.playing == kPlaylist && is_drive(core.turn_item) && !plays(core, core.turn_item)) {
+    if (core.playing == kPlaylist && is_drive(core.turn_item) &&
+        !(core.turn_manual ? drive_plays(core, core.turn_item - kDriveBase) : plays(core, core.turn_item))) {
         // Its animation is gone: the playlist goes on with the next one that is left.
         const uint32_t next = next_animation(core, core.turn_item);
         if (plays(core, next)) {
@@ -1080,6 +1091,7 @@ void player_play_all(Core &core, uint32_t from) {
     turn_cut(core);
     close_stream(core);
     core.turn_repeat = 0;
+    core.turn_manual = 0;
     core.playing = kPlaylist;
     core.zero_pending = 1;
     core.turn_item = from;
@@ -1132,6 +1144,16 @@ void player_inclusion_changed(Core &core, uint32_t item) {
     } else if (core.playing == kNothing && !core.items[item].ignored) {
         player_play_all(core, item);
     }
+}
+
+void player_external_inclusion_changed(Core &core) {
+    if (core.playing == kPlaylist) {
+        if (core.break_back != kNothing && !core.break_manual && !plays(core, core.break_back)) core.break_paused = 0;
+        if (core.break_phase != kBreakNone && !plays(core, core.turn_item)) player_break_leave(core);
+        player_drive_changed(core);
+        if (core.turn_item == kNothing) player_halt(core);
+    }
+    if (core.playing == kNothing) player_item_added(core);
 }
 
 void player_item_leaves(Core &core, uint32_t item) {

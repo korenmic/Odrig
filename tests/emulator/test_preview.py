@@ -188,6 +188,10 @@ class OneAnimation(unittest.TestCase):
         started = self.preview(path, "--mapping", support.ROOT / "mapping" / "legs-20.json")
         page = started.page()
         status = answer(page, "status")
+        deadline = time.monotonic() + 10
+        while status['seed'] is None and time.monotonic() < deadline:
+            time.sleep(0.02)
+            status = answer(page, 'status')
         self.assertEqual((status['error'], status['animation']), (None, 1))
         self.assertIsInstance(status['seed'], int)
         self.assertEqual(answer(page, 'list')['items'][0]['type'], 'widget')

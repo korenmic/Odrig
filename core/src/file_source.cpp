@@ -45,15 +45,15 @@ int FileSource::refill() {
     }
     int32_t count;
     if (at_name != nullptr) {
-        count = host->read_at(host->ctx, at_name, taken, buffer, kFileBufferSize);
+        count = host->read_at(host->ctx, at_name, taken, buffer, sizeof buffer);
     } else {
-        count = host->read(host->ctx, buffer, kFileBufferSize);
+        count = host->read(host->ctx, buffer, sizeof buffer);
     }
     if (count == 0) {
         stopped = -kEnd;
         return stopped;
     }
-    if (count < 0 || count > static_cast<int32_t>(kFileBufferSize)) {
+    if (count < 0 || count > static_cast<int32_t>(sizeof buffer)) {
         stopped = -kReadError;
         return stopped;
     }
@@ -67,8 +67,9 @@ int FileSource::refill() {
 }
 
 int32_t FileSource::look(uint32_t want) {
+    if (want > sizeof buffer) return -1;
     while (is_open && stopped == 0 && length < want) {
-        const size_t room = kFileBufferSize - length;
+        const size_t room = sizeof buffer - length;
         int32_t count;
         if (at_name != nullptr) {
             count = host->read_at(host->ctx, at_name, taken, buffer + length, room);

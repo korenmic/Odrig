@@ -15,6 +15,7 @@
 #include "reasons.h"
 #include "repeats.h"
 #include "brightness.h"
+#include "ignored.h"
 #include "show.h"
 #include "storage.h"
 #include "upload.h"
@@ -303,6 +304,7 @@ void drive_step(Core &core) {
         core.repeats_due = 0;
         repeats_drive_taken(core);
         brightness_start(core);
+        ignored_start(core);
         return;
     }
     while (core.drive_check_at < core.drive_count && core.drive[core.drive_check_at].state != kDriveToCheck) {
@@ -566,6 +568,7 @@ void drive_take_listed(Core &core, int32_t *listed) {
     // The drive's saved repeats are read again, before its files are checked.
     repeats_drive_found(core);
     brightness_drive_found(core);
+    ignored_drive_found(core);
     core.repeats_due = core.drive_count != 0 && core.repeats_drive != nullptr ? 1 : 0;
     // The playlist goes on after an animation that left.
     player_drive_changed(core);

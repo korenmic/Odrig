@@ -43,10 +43,13 @@ def read_at_names(run):
     return [line.split(" ")[1] for line in run.lines if line.startswith("read_at ")]
 
 
+LIST_STARTS = tuple(range(0, 80, 5))
+
+
 def listing(time):
-    """A refresh and `list` from every tenth position on, which together hold every item of a
+    """A refresh and `list` from every fifth position on, which together hold every item of a
     show and a drive of up to 80 items."""
-    return asked(time, *(f"list {start}" for start in range(0, 80, 10)))
+    return asked(time, *(f"list {start}" for start in LIST_STARTS))
 
 
 def externals(run):
@@ -56,8 +59,8 @@ def externals(run):
         if "items" not in reply:
             continue
         found.append({item["file"] for item in reply["items"] if item.get("external")})
-    # Eight replies for each listing.
-    return [set().union(*found[at:at + 8]) for at in range(0, len(found), 8)]
+    count = len(LIST_STARTS)
+    return [set().union(*found[at:at + count]) for at in range(0, len(found), count)]
 
 
 DENSE = {"sun.odrg": support.dense_clip(*CANVAS, 20), "moon.odrg": support.dense_clip(*CANVAS, 30), "Star Dust 2.ODRG": loop_of(3, 7)}

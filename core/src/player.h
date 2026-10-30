@@ -107,6 +107,7 @@ void player_file_replaced(Core &core, uint32_t item);
 // its turn comes. When nothing plays, the playlist starts from its first animation.
 void player_item_added(Core &core);
 void player_inclusion_changed(Core &core, uint32_t item);
+void player_external_inclusion_changed(Core &core);
 
 // The item at this position is about to leave the item table, and every item after it
 // moves up by one. When it is the animation whose turn it is in the playlist, the

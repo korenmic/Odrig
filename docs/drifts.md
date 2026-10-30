@@ -12313,3 +12313,19 @@ Integrated verification also showed that a held brightness draft must be discard
 when status freshness is lost, even if the same file returns after recovery. The
 controller's edit binding includes freshness, so releasing an interrupted drag
 cannot resend the discarded value. The failing70-versus20 regression then passed.
+
+
+## Seed 59: external exclusions and explicit turns
+
+**Question.** The player represents an explicit animation jump as a playlist turn.
+Does an external Ignore change cut that explicit turn, and may a newly checked
+excluded file start automatically while nothing plays?
+
+**Answer.** Own and ancestor exclusions apply to every automatic selection and
+revalidation, including the first file that finishes checking. Explicit manual
+turns remain available and finish normally; a paused explicit turn retains that
+provenance. This does not permit a later automatic selection of the excluded file.
+
+**Resolution.** The shared eligibility helper and turn provenance in
+`core/src/ignored.cpp` and `core/src/player.cpp`, the inclusion contract in
+`docs/commands.md`, and `tests/core/test_external_inclusion.py` carry the answer.
