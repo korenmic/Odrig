@@ -1,6 +1,6 @@
 # Message clock widgets and clocks-only mode — tasks
 
-- [ ] 1. Add the bounded message-clock widget format and shared renderer.
+- [x] 1. Add the bounded message-clock widget format and shared renderer.
   Implement subtype6 source/encode/decode and strict JS/Python/C++ validation,
   deterministic elapsed/seed rendering and existing app preview integration.
   Document byte layout/math. Prove malformed/truncated inputs, every timing/stop/

@@ -615,6 +615,11 @@ shows its preview and plays it. The app does not make one, and does not change o
 `Edit` reads the file and, in place of the form, says `This clock is made from a picture:
 it cannot be edited here.`
 
+A generated message clock also previews, plays and uploads as a widget. Its `Edit`
+opens no form and says `Generated message clocks can be previewed and uploaded, but
+cannot be edited in this form.` Its caption masks and timeline belong to its generated
+source, rather than the ordinary clock fields.
+
 The animations of a microSD card or a USB drive plugged into the installation are rows
 too, with the badge `ex`, each with its id from 60001 up and its file's name on the
 medium, and a tap plays one as it plays an installed animation; see

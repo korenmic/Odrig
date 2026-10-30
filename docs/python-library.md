@@ -188,6 +188,7 @@ package, is [converter.md](converter.md), "Tests".
 | Call | Result |
 |---|---|
 | `odrig.odrg.decode(data)` | The decoder: the canvas size, the palette size, whether the body is compressed, and for every frame record its duration, the picture after it and its mode byte. |
+| `odrig.messageclock.decode(data)` | Strict reading of a generated message-clock container: caption text, flags, durations, static masks and digit atlas. Catalog admission also validates this payload. Conversion and rendering remain in JavaScript and the core. |
 | `odrig.odrg.encode(animation, compressed=True)` | The bytes of the ODRG file of an animation, as the converter writes them; the suites use it to make small files. |
 | `odrig.jsonframes.read(path)`, `loads(data)`, `dumps(animation)`, `write(path, animation)` | JSON frames files, read strictly and written in the canonical layout. |
 | `odrig.mapping.read(path)` | The kind, the canvas size and the legs of a mapping file: for each leg its number, its pin, its `first_led`, its strips in chain order, and the end each strip starts at when the leg has `starts`, else `None`. |

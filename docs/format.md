@@ -368,7 +368,8 @@ are of frames; the converter writes it with two spaces of indent.
 The payload of the type 3 is a widget: a clock that the player draws. Its first byte names
 the widget: 1 `analog`, 2 `digital` and 3 `melting` have the 20 bytes of this table; 4
 `picture-dial` and 5 `picture-display` carry a picture of their own, as
-["Picture clocks"](#picture-clocks) says. A widget's payload has at most 32,768 bytes.
+["Picture clocks"](#picture-clocks) says. Subtype 6 is a
+[message clock](#message-clocks). A widget's payload has at most 32,768 bytes.
 
 | Offset | Size | Field | Values |
 |---:|---:|---|---|
@@ -444,6 +445,74 @@ colours, and the pivot, the hands and the marks take the hands' colour.
   seconds of real time. A crown and a ring of the rim's colour sit at 12 o'clock. The
   formulas are those of `core/src/clock.cpp` and `converter/lib/draw.js`, which give the
   same pixels.
+
+### Message clocks
+
+A `message-clock` is a generated 60 x 60 canvas with Hebrew captions above an imaginary
+rolling clock and a moving white square. Its loop is the complete caption sequence,
+not a fixed clock duration. All multibyte integers below are little-endian.
+
+| Offset | Size | Field | Values |
+|---:|---:|---|---|
+| 0 | 1 | Widget | 6 |
+| 1 | 1 | Version | 1 |
+| 2 | 1 | Sequence | 1 to 7 |
+| 3 | 1 | Caption count | 1 to 24 |
+| 4 | 4 | Loop | Sum of caption durations, milliseconds |
+| 8 | 2 | Text bytes | 1 to 4,096 |
+| 10 | 2 | Reserved | 0 |
+| 12 | 4 | Mask offset | 24 + 12 * count + text bytes |
+| 16 | 4 | Glyph offset | Mask offset + 900 * count |
+| 20 | 4 | Payload bytes | Glyph offset + 3,968 |
+
+The header is followed by `count` records of 12 bytes: duration u32, flags u8,
+reserved zero u8, text offset u16, text length u16, reserved zero u16. Text offsets
+start at zero and are contiguous. Each caption has 1 to 256 strict UTF-8 bytes,
+without U+0000–001F or U+007F–009F. Then come the concatenated texts, the masks and
+the glyph atlas, with no gaps or trailing bytes. The maximum payload is 29,976 bytes;
+the existing 32,768-byte player window is sufficient.
+
+Flags are countdown (1), zero subtitle (2), gradual motion stop (4), square freeze
+(8), and increased random digit changes (16). Countdown and zero subtitle are
+mutually exclusive and belong only to sequence 5; stop belongs only to sequence 1
+and occurs at most once; freeze and increased changes belong only to sequence 6,
+with at most one freeze. All other bits are zero. Countdown records last 2,000 ms;
+every other record lasts 6,100 ms. Header and container loops must both equal the sum.
+
+Each caption mask covers the upper half of the canvas, with 900 alpha4 bytes. The atlas has 62 glyphs of
+8 x 16 alpha4 pixels, 64 bytes each: ten digits for each of six numeric positions,
+then the two colons. Masks and glyphs are top-down, left-to-right, high nibble first.
+This compiled-mask order is separate from the ordinary bottom-up RGB picture order.
+Numeric origins are x = 2, 9, 23, 30, 43, 50; colon origins 16 and 36; all start at
+y = 34 and are clipped to 16 rows. The square covers three columns and rows 57–59.
+
+Rendering uses elapsed modulo the complete loop, restarting both motion and seeded
+random choices. Xorshift32, with zero seed replaced by 1, chooses the initial second
+of an imaginary day. Every 2,000 motion milliseconds the seconds roll forward; the
+minute and hour changes are chosen with probabilities .14/.045, or .48/.25 during
+the increased-changes caption. Both probability draws precede direction draws.
+Digits carry modulo ten as in the source animation; subsequent random times need
+not be conventional 24-hour times. A roll lasts 500 motion milliseconds with
+smoothstep interpolation. No wall clock or network clock is read.
+
+After a motion stop at S, motion time is
+`S + u - floor(u^3 / 12250000) + floor(u^4 / 85750000000)`, with
+`u = clamp(elapsed - S, 0, 3500)`. Before S it is elapsed. Once stopped, digit rolls
+settle fully and remain lit. Freeze holds only the square at its position when the
+caption begins. Its centre is the rounded `29.5 + 26.5*cos(motion*2*pi/4000)`, using
+the shared interpolated sine table. Text continues independently: 600 ms fade in,
+5,000 ms hold, 500 ms fade out; countdown text is steady. A blue sweep lasts 1,500 ms
+every 9,000 ms, centre `1.35*phase/1500 - .15` of the width, half-width .07,
+RGB 90/205/255. Values below four are black; sweep colouring requires alpha at least
+eight. Remaining lit pixels are white on black.
+
+The strict JSON source has exactly `version` (1), `type` (`"widget"`), `width` (60),
+`height` (60), `widget` (`"message-clock"`), `tab` (1–7), `messages`, and `glyphs`.
+Each message has exactly `text`, integer `flags`, and `mask`; masks and glyphs are
+lowercase hexadecimal strings of exactly twice their byte lengths. The converter
+validates the compiled payload as well as the source and round-trips it canonically.
+The shared app previews and uploads these generated widgets, but its ordinary clock
+form cannot edit them.
 
 ### The JSON source of a clock
 

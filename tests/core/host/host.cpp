@@ -1164,7 +1164,7 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
     uint64_t total_ms = 0;
     if (reason == odrig::kNone && odrig::is_drawn(content.type)) {
         // A text or a widget is read and checked whole, as the core reads it.
-        std::vector<uint8_t> payload(odrig::kLargestTextPayload);
+        std::vector<uint8_t> payload(odrig::kLargestWidget);
         std::vector<uint8_t> pixels(3u * content.width * content.height);
         const odrig::Picture picture = {&decoder, &inflate, window.data(), pixels.data()};
         reason = odrig::drawn_read(&file, content, payload.data(), picture);
@@ -1249,7 +1249,7 @@ int render(const std::string &path, const std::vector<std::string> &times, uint3
     if (reason == odrig::kNone && !odrig::is_drawn(content.type)) {
         reason = odrig::kUnknownType;
     }
-    std::vector<uint8_t> payload(odrig::kLargestTextPayload);
+    std::vector<uint8_t> payload(odrig::kLargestWidget);
     // A picture clock's picture: its palette indices, as the player's pixel buffer holds them.
     std::vector<uint8_t> indices(3u * content.width * content.height);
     if (reason == odrig::kNone) {

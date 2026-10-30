@@ -153,6 +153,20 @@ export default async function (app) {
   const settings = app.settings;
   await ready(app);
   const seen = {};
+  if (settings.mode === "generated") {
+    const {previews} = await modules(app);
+    previews.makeOwn(new Uint8Array(settings.bytes));
+    await app.until(() => previews.sourceOf(settings.key) !== null, "the generated widget preview", 15000);
+    const source = previews.sourceOf(settings.key);
+    const image = new app.frame.contentWindow.Image();
+    image.src = source;
+    await image.decode();
+    seen.size = [image.naturalWidth, image.naturalHeight];
+    const bytes = new Uint8Array(await (await app.frame.contentWindow.fetch(source)).arrayBuffer());
+    seen.signature = Array.from(bytes.subarray(0, 6));
+    seen.message = app.text("message-text");
+    return seen;
+  }
   if (settings.mode === "start") {
     await storeKeys(app, [settings.defaultKey, "0badcafe-12"]);
     await app.reload();

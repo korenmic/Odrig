@@ -77,6 +77,7 @@ export const MENDED_ELSEWHERE = "Fix it on a computer: the card is read-only her
 
 // The words in place of the form of a clock that is made from a picture.
 export const PICTURE_CLOCK = "This clock is made from a picture: it cannot be edited here.";
+export const MESSAGE_CLOCK = "Generated message clocks can be previewed and uploaded, but cannot be edited in this form.";
 
 // The line of the show screen while the target does not answer.
 export function ofSilence(seconds) {
