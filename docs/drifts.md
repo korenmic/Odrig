@@ -12167,3 +12167,27 @@ only successful host acknowledgement establishes a known mode. The regression fi
 observed `on:false` before acknowledgement. Repeated setup failure remains unknown.
 
 **Resolution.** `core/src/commands.cpp` and the miniature control tests/design.
+
+## Seed 57: output setup and paired preview delivery
+
+**Question.** How are physical setup and preview delivery kept consistent without
+holding command replies or implementing the planned current-budget controls?
+
+**Answer.** The main loop clears and drains the old output, checks readiness again
+before setup, checks every new output, then clears and drains it before acknowledging.
+Failure keeps decoded frames from the outputs and allows an explicit retry. The
+refresh producer publishes under the common lock, after probe measurements; hardware
+operations and transfer waits remain outside it. Host regressions first found setup
+attempted during a resumed transfer and a stale20-output summary after selecting one.
+The existing WLED limiter stays enabled and counts the selected60LED bus. Seed45
+remains planned; its separate core/app budget controls are not supplied by this work.
+
+The emulator acknowledges virtual setup and publishes the core's physical RGB beside
+the corresponding normal frame in one coalesced slot. The browser only reorders those
+60pixels. Slow clients cannot accumulate a separate preview queue; normal canvas and
+ODRR geometry are unchanged. WLED's pinned transfer/limiter interface was checked at
+[29b389df1c1aaec6ff53aea742d17063b985906c](https://github.com/wled/WLED/blob/29b389df1c1aaec6ff53aea742d17063b985906c/wled00/bus_manager.cpp).
+Host tests are not a firmware build or physical transfer/power proof.
+
+**Resolution.** `firmware/usermod/odrig_mini_output.h`, `odrig_usermod.cpp`,
+`odrig_leds.cpp`, `emulator/binding.py`, `emulator/hub.py` and `docs/emulator.md`.

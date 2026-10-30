@@ -773,8 +773,8 @@ The page learns everything it shows from one stream of server-sent events, `GET 
 and from the mapping file of the show, `GET /show/mapping.json`, which is served byte for
 byte (404 when the folder has none). Another program may read both in the same way.
 
-The stream is a response of type `text/event-stream` that stays open. It has five kinds of
-event:
+The stream is a response of type `text/event-stream` that stays open. Its regular
+playback and miniature-preview events are:
 
 ```
 event: hello
@@ -791,6 +791,9 @@ data: {"animation":1,"start":40020,"turn":40020,"length":5100}
 
 event: frame
 data: 123460 <base64 of the refresh>
+
+event: mini
+data: {"active":false}
 ```
 
 | Event | What it carries |
@@ -800,13 +803,18 @@ data: 123460 <base64 of the refresh>
 | `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
 | `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |
 | `position` | Where the animation on the LEDs stands, for the [seek bar](#seeking): its id, the start of the loop that shows and the start of its turn, both on the clock of the frames' timestamps, and the loop's length in milliseconds; each `null` while unknown, and all four `null` while nothing plays or a cycle plays. It is sent to a new connection after the latest status, and at every change: a turn's start, a loop's start, a seek, a length learned. |
+| `mini` | Only for a supporting60x60 target. `active` is the acknowledged virtual-output mode. When true, `rgb` is180bytes encoded in base64, in physical index `x*6+y` of the10x6 miniature; when false, `rgb` is omitted. The page flips y for its top-down canvas. Projection is the core's, not a second renderer. |
 
 A new connection gets `hello`, the log entries kept so far, the latest status, the latest
 position, and then everything that happens. The emulator keeps the last 500 log entries.
 
 Log, status and position events are never dropped. Refreshes do not queue: each connection has one
 place for the newest refresh, and a newer one replaces it, so a page that cannot keep up
-skips refreshes and does not fall behind. What the system has already taken for a
+skips refreshes and does not fall behind. The matching miniature picture shares that
+same newest-frame slot;
+the two cannot drift apart or build an unbounded preview queue. Normal `frame` and
+ODRR data retain their original leg order and installed canvas, even in miniature mode.
+What the system has already taken for a
 connection, about half a megabyte on a Mac, is sent as it is. A connection with nothing to
 send for 15 seconds is sent the comment line `: keep-alive`.
 

@@ -146,7 +146,8 @@ uint32_t odrig_core_leg_count(const odrig_core *core);
 int odrig_core_leg(const odrig_core *core, uint32_t index, odrig_leg *out);
 
 /* Temporary 10x6 output state. RGB holds 60 pixels in physical chain order,
- * index=x*6+y with bottom-left coordinates. It lives until the next core call.
+ * index=x*6+y with bottom-left coordinates. The pointer stays valid for the core's
+ * lifetime; its bytes may change at a poll or output acknowledgement.
  * Normal legs and canvas geometry remain unchanged. */
 typedef struct odrig_mini {
     uint32_t revision;

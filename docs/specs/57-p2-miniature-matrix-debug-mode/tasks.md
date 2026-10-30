@@ -9,7 +9,7 @@
   independent projection vectors, mapping permutations, boot/control/failure,
   brightness/off and memory bounds. Run discovered core and emulator suites.
 
-- [ ] 2. Integrate safe firmware output transitions and emulator miniature preview.
+- [x] 2. Integrate safe firmware output transitions and emulator miniature preview.
   Switch only between normal cached legs and oneGPIO1/60LED source, clear outgoing
   buses, wait without the core lock, check setup before ack, retain current limits
   and dark output on failure. Test the host transition controller using stand-ins,

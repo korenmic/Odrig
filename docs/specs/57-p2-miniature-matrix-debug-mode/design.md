@@ -51,8 +51,10 @@ report failure through the core, allowing an explicit retry. Common core calls r
 serialized. Commands, network, SD worker and both USB routes remain serviced.
 
 The existing output adapter's current limiting takes lengths/pins from the selected
-source: miniature has60 active LEDs. Preserve global and per-snake budgets; do not
-write WLED settings or change physical wiring. A standalone/custom host remains
+source: miniature has60 active LEDs. Preserve the existing WLED global limiter and
+its proportional bus budgets; do not write settings or change physical wiring.
+Seed45's new core/app current budgets remain planned and are not implemented here.
+A standalone/custom host remains
 unsupported unless it implements the transition contract.
 
 ## Emulator and app
