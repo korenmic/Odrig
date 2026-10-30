@@ -1549,3 +1549,25 @@ those four forms only. The emulator keeps the two settings in `clocks.txt` of it
 folder through its host, as the board does in its storage.
 
 The shared core handles `ignore ID 0|1` and `remove many IDS` unchanged on HTTP, serial and TCP; odrigctl accepts both. Space reports internal quota and optional external capacity from the mounted folder filesystem. External files are changed only on a drive with a catalog that the emulator may write (`--drive` without `--drive-read-only`).
+
+## Miniature preview
+
+For a 60x60 installed canvas, send `debug mini on` through the existing command
+tool or use **Settings → Miniature display debug mode** in the shared controller.
+The binding opts the virtual host into the core protocol and acknowledges setup
+with the same revision helpers as the firmware. It has no hardware transfer to
+wait for. `status.mini` remains the common authority for all clients. Other canvas
+sizes honestly report unsupported. Turning mini off or restarting clears the preview.
+
+The LEDs page shows a 10-column by 6-row preview only while active. Its picture
+comes from the core's 180-byte RGB buffer via the `mini` event, coalesced with the
+corresponding normal frame. The page only reorders `x*6+y` and flips the vertical
+axis for the browser; it does not decode or average again. Side columns are black.
+Brightness is capped at 40 even if the normal requested brightness is higher.
+Palette, RGB, text and clock/widget content retain their full logical canvas.
+The ordinary LEDs image and ODRR recordings keep their normal geometry and data.
+
+The controller follows confirmed status and never restores a locally saved mini
+setting after reload, target change or reconnect. These virtual/browser checks
+do not prove the [physical wiring](../README.md#miniature-display-debug-mode),
+electrical readiness, actual LED order, frame rate or behavior on an Android phone.

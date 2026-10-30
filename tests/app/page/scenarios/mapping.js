@@ -45,7 +45,7 @@ export default async function(app) {
   app.press("Settings");
   await app.until(() => app.shown() === "settings", "Settings");
   if (app.settings.unsupported) {
-    await app.until(() => app.says("does not support|only supports"), "unsupported mapping explanation");
+    await app.until(() => /does not support|only supports/.test(app.text("mapping-error") ?? ""), "unsupported mapping explanation");
     return {error: app.text("mapping-error"), count: app.doc.querySelectorAll("#mapping-pins > .map-pin").length};
   }
   await app.until(() => pins(app).length === 20 && !handleOf(app, pins(app)[0]).disabled, "twenty movable pins");

@@ -309,6 +309,36 @@ Store. It asks for no permission that the phone shows a question for.
 
 ## Using it
 
+### Miniature display control
+
+Settings has **Miniature display debug mode**, with the 10x6 explanation and the
+[root README wiring](../README.md#miniature-display-debug-mode). Use it only for
+the approved matrix assembly, with the full wall disconnected and its electrical
+checks complete. It does not change the installed 60x60 canvas or saved mapping.
+
+The checkbox shows `status.mini.on`, not a locally saved preference. It retains
+the last confirmed value while submitting a request, disables while a request or
+physical setup is pending, and waits for fresh status after acceptance. Active
+mode is also named outside Settings, with its brightness cap of 40. Other clients'
+changes appear through status polling. An absent or unsupported capability is
+explicitly unavailable, rather than off.
+
+Refusal leaves the confirmed setting visible. A lost reply or disconnection makes
+the state unknown until a newer status arrives; contact through another command
+alone does not validate an old status. Reconnect, changing targets and restarting
+the app only read the mode, and never enable or retry it automatically. Output
+setup failure is unknown and dark; a deliberate checkbox tap retries on, or
+**Restore normal outputs** requests off. Follow the README's power and restored
+brightness precautions before a physical transition. Reboot is always normal mode.
+
+Automated Chrome tests exercise these controls against stand-ins and the real
+emulator. The phone check remains open: actual tapping/readback, another client's
+change, disconnect/reconnect, restart with mode off, failure recovery, readability
+outside Settings, and the matrix/board observations. No phone acceptance or new
+firmware build is implied by the web tests.
+
+### Playback and storage
+
 1. Join the phone to the installation's Wi-Fi network, `odrig`, in the phone's Wi-Fi
    settings; [wifi.md](wifi.md) has the network. The app joins no network itself.
 2. Start the app. It begins on the target screen with the installation's address,

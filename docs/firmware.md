@@ -2303,3 +2303,32 @@ backend retains its separate VFS capacity implementation. Neither backend format
 removable media; a stick is never written, and only files in the card's `odrig`
 folder change as the core asks. Unsupported hosts report unavailable capacity;
 the standalone image remains its existing trial, not a complete player.
+
+## Temporary miniature output
+
+The default WLED host opts into the shared core's miniature mode on a 60x60 canvas.
+Its alternate source is one 60-LED GRB bus on GPIO1; the normal source metadata is
+kept for restoration. Only this selected source is refreshed while mini is active.
+Neither the normal mapping nor persistent WLED/current settings change.
+
+A staged main-loop controller pauses new refresh requests and discards queued
+frame copies, clears the outgoing buses, waits for their transfer, configures and
+checks the selected source, then clears/drains the new buses before acknowledging
+the core's matching request revision. Readiness is checked again before setup.
+No transfer wait or WLED setup occurs under the core lock. Commands and background
+work continue between stages. Failed setup suppresses normal frames, keeps the
+available outputs dark and reports unknown mode until an explicit successful retry.
+
+The existing WLED current limiter remains enabled and counts the selected source's
+60 active LEDs. The planned separate wall/per-snake core/app budgets of seed 45 are
+not implemented here. Brightness is capped at 40 in the core only while miniature
+output is used; boot and restored normal output can use a higher normal brightness.
+The cap cannot establish power readiness at startup or after a failed transition.
+
+Use only the [approved connection and acceptance boundaries](../README.md#miniature-display-debug-mode).
+Hardware operation remains through the normal firmware tool and command routes.
+The host controller and actual output adapter were exercised with stand-ins, not
+with physical buses. No firmware compilation, flash, transfer timing measurement,
+electrical check or 20–50 FPS board observation was performed for this feature.
+Compilation in this run is deferred by the owner to the future cross-platform
+firmware seed 60; that work is not a prerequisite for the remaining software seeds.

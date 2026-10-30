@@ -12217,3 +12217,34 @@ exercise the same controls against the running emulator.
 
 **Resolution.** `app/www/commands.js`, `app/www/client.js`,
 `app/www/screens/mini.js` and `tests/app/test_mini.py`.
+
+## Seed 57: operator orientation and power boundaries
+
+**Question.** What does source evidence establish before a powered matrix check?
+
+**Answer.** The manufacturer's schematic and PCB establish a derived chain:
+DIN to LED116,60 parts through LED39, rotated into landscape front view with IN
+at left. Indices rise up each column, `x*6+y`; the rear view reverses left/right.
+The manufacturer's linked LED datasheet gives2.8V input-high minimum at5V, which
+supports the already approved direct3.3V data plan for the documented part.
+Neither fact proves that the received assembly matches or that the actual board's
+5V path, protection, concurrent USB paths or current budget are ready. Those
+checks include boot and failed/restored normal output, where the miniature-only
+brightness cap cannot protect the assembly. Keep the full wall disconnected and
+power off before changing wires. No new circuit or supply is introduced.
+
+**Resolution.** The root README pin table, operator sequence and source links;
+`docs/mapping.md`, `docs/firmware.md` and the retained human acceptance task.
+
+The integrated documentation audit first found the vocabulary's approved-command
+list missing `debug`; both its entry and coverage now include the miniature form.
+The mapping browser's unsupported wait also first read a null mapping error:
+its whole-page text search matched the new miniature explanation before mapping
+had answered. Waiting on the mapping error itself preserves the independent
+mapping assertion rather than depending on another panel's timing.
+
+The catalog-serving test met WinError10055 twice while opening a connection for
+each of538 files. Its verification loop now reuses existing HTTP/1.1 support,
+with every file, byte, content type, cache header and rejected path still checked.
+The serving class then passed all7 cases. This changes a test fixture only;
+production server behavior and Windows settings are unchanged.

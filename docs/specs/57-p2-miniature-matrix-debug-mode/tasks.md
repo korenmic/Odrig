@@ -24,7 +24,7 @@
   changes, reconnect and changes from another client without saved local state.
   Run discovered app and emulator suites with browser/emulator integration.
 
-- [ ] 4. Document exact approved miniature wiring and record integrated verification.
+- [x] 4. Document exact approved miniature wiring and record integrated verification.
   Add the essential root README pin table, source-derived orientation, safe
   transitions/reboot and electrical acceptance boundaries. Update core, commands,
   mapping, app, emulator and firmware docs; append design resolutions to drifts.

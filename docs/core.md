@@ -274,6 +274,34 @@ board. The host sends them to the leg's pin as they are.
 - Every byte is 0 while the show is invalid, nothing is playing, or the LEDs are switched
   off.
 
+## Temporary miniature output
+
+For a 60x60 canvas the core reserves one optional 192-byte startup block, including
+one 180-byte RGB image. `odrig_core_mini_support` opts a capable host in;
+`odrig_core_mini` reads active/requested/pending/failed state, request revision and
+the image pointer; `odrig_core_mini_complete` accepts only the matching pending
+revision and the host's setup result. These helpers share the caller's normal
+serialization with other core calls. The pointer belongs to the core until close;
+its contents change on polling and acknowledgement, so copy it under that same lock.
+A host that does not opt in, another canvas or unavailable startup storage reports
+unsupported. Ordinary playback still works. Custom hosts must implement safe output
+setup before opting in; no host-interface struct layout changes.
+
+While active, each central miniature cell averages a 10x10 block of the original
+logical canvas. Source RGB, palette and widget layers are scaled first with the
+normal brightness rounding at `min(brightness,40)`, then their 100 samples are
+summed and divided with floor rounding. All side columns stay black. Physical
+order is `x*6+y`, bottom left, in the [README orientation](../README.md#approved-connection-and-orientation).
+The core uses three local channel sums per cell, with no per-frame allocation or
+second decoder. The measured host allocation with a drive is 131041 bytes, below
+131072. Off, invalid or blank output clears the image.
+
+`debug mini on|off` requests a RAM-only transition. Only the host acknowledgement
+changes the confirmed mode; failure reports `on:null` until a successful retry.
+The normal leg API, pin permutations, cross-wiring and recording geometry remain
+intact. No animation, mapping, show, catalog or persistent setting is written.
+Miniature mode starts off on every boot. See [the command contract](commands.md#miniature-display-debug-mode).
+
 ## Command lines
 
 The commands and their replies are those of [commands.md](commands.md). The core is the

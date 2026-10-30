@@ -341,6 +341,18 @@ succeeds.
 only RAM and returns acceptance; read status for completion. Opposite requests
 during setup are `busy`; the same request is idempotent. Boot is off. Unsupported
 hosts refuse the request; failed setup holds output dark until a successful retry.
+For example, `debug mini on` may answer `{"ok":true}` while a following status
+still reports `"pending":true,"on":false`. Completion is a later status with
+`"pending":false,"on":true,"error":null`. Repeating the pending request is
+idempotent; `debug mini off` during that pending enable is refused as `busy`.
+An explicit on or off retry after failure is allowed. Unsupported capability is
+the `unsupported` refusal, not a successful off setting. Status brightness is
+the effective miniature cap, zero while power is off; ordinary `brightness` still
+reports the requested normal value. No setting file is changed. Reboot is off.
+Every existing serial, TCP and HTTP route carries these same command lines;
+`odrigctl debug mini on` and `odrigctl debug mini off` validate the two forms.
+Read [the wiring and reboot boundaries](../README.md#miniature-display-debug-mode)
+before a physical check. Firmware compilation and physical acceptance are open.
 The host description is at most95input bytes and256escaped bytes, ending at a
 character boundary, so expanded status remains within the fixed reply limit.
 
