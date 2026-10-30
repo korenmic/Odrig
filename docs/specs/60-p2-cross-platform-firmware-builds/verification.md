@@ -154,3 +154,38 @@ and registry retain the original150/200-line caps. The final firmware doc check 
 passes after keeping its developer-tools phrase intact. Earlier task3 and seed59
 full-suite evidence remains above; no unnecessary app/runtime rerun was added.
 Physical, electrical, board and phone acceptance remains open.
+
+## Integrity bridge 6 — actual cross-host proof and canonical fixture paths
+
+PR35's first host run41142210975 actually builds and inspects the default firmware
+on all three hosts from clean committed5c823c0. All have input fingerprint
+`d055794f3cdbbf80a932589cb26606944fc5247b69431b939fc023cea13cbf43`.
+
+| Actual host | Image bytes | Image SHA256 |
+|---|---:|---|
+| win32/x86_64 | 1879216 | `a8b4f482b325c0ca016e3b041d2deabfaaced38f36465d943de741c7641cc509` |
+| darwin/arm64 | 1879216 | `8dec6b2b3d628ab88ebf38b676daf4d551a3b748959cd77fa996b5ba19d82fa5` |
+| linux/x86_64 | 1879232 | `fa5179b80f640e25db7be0e1dca75f7039c882cc241ca979130dc06aea35c18c` |
+
+Each host passes offline image/current-player inspection and its647-test firmware
+suite. Linux's complete job passes. Windows and Mac fail the same three new fixture
+expectations: Windows TEMP uses RUNNER~1, which resolves to runneradmin; Mac /var
+resolves to /private/var. The product correctly emits canonical paths, while tests
+compared their alternate spelling. The failed matrix is a PR-caused test regression,
+not successful final CI. The Mac walkthrough did not run after this failed step.
+
+The repair changes only expected configuration/cache paths to their canonical
+identity, retaining the same tests/assertions and production behavior. The affected
+host28 + runner26 suites pass by discovery normally and again with a real local
+Windows8.3 temporary root (54 tests in each run). Original failed records and host
+artifacts are retained under `build/seed60-ci-initial/`; repair proof is in
+`seed60-task5-ci-fixtures-verified.log` and `seed60-task5-shortpaths.log`.
+
+TACTIC's integrity bridge separates this necessary committed CI repair from the
+existing final delivery task. The planned requirements/scope remain unchanged:
+task6 is this minimal bridge; task5 stays unchecked until the committed repair's
+remote checks, final artifacts and handoff are complete. This permits a truthful
+one-task/one-proof-commit boundary without rewriting pushed history. Actual Mac
+arm64, Windows x86_64 and Linux x86_64 default compilation is observed; Mac Intel,
+Linux arm64 and optional variants are not claimed. Final artifacts are rebuilt from
+the bridge revision before delivery; the already created dedicated key is reused.

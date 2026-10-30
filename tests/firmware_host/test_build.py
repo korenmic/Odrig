@@ -17,21 +17,21 @@ class PortableConfiguration(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='odrig-fw-config-') as folder:
             root=pathlib.Path(folder,'source with spaces');root.mkdir()
             text=wled.override_text(root)
-            self.assertIn('symlink://'+root.as_posix()+'/core',text)
+            self.assertIn('symlink://'+root.resolve().as_posix()+'/core',text)
             include=next(line.strip() for line in text.splitlines() if '/core/include' in line)
-            self.assertEqual(shlex.split(include),['-I'+str(root/'core'/'include').replace('\\','/')])
+            self.assertEqual(shlex.split(include),['-I'+(root.resolve()/'core'/'include').as_posix()])
             forced=next(line.strip() for line in text.splitlines() if 'odrig_newer.h' in line)
-            self.assertEqual(shlex.split(forced),['-include',(root/'firmware'/'newer'/'odrig_newer.h').as_posix()])
+            self.assertEqual(shlex.split(forced),['-include',(root.resolve()/'firmware'/'newer'/'odrig_newer.h').as_posix()])
 
     def test_standalone_paths_with_spaces_preserve_the_same_source_and_partition_file(self):
         with tempfile.TemporaryDirectory(prefix='odrig-fw-standalone-') as folder:
             root=pathlib.Path(folder,'source with spaces');root.mkdir()
             checkout=pathlib.Path(folder,'WLED with spaces');checkout.mkdir()
             text=standalone.project_text(root,checkout)
-            self.assertIn('src_dir = '+(root/'firmware'/'standalone'/'src').as_posix(),text)
-            self.assertIn('board_build.partitions = '+(checkout/'tools'/'WLED_ESP32_16MB_9MB_FS.csv').as_posix(),text)
+            self.assertIn('src_dir = '+(root.resolve()/'firmware'/'standalone'/'src').as_posix(),text)
+            self.assertIn('board_build.partitions = '+(checkout.resolve()/'tools'/'WLED_ESP32_16MB_9MB_FS.csv').as_posix(),text)
             include=next(line.strip() for line in text.splitlines() if '/core/include' in line)
-            self.assertEqual(shlex.split(include),['-I'+(root/'core'/'include').as_posix()])
+            self.assertEqual(shlex.split(include),['-I'+(root.resolve()/'core'/'include').as_posix()])
 
     def test_checksum_companion_is_utf8_with_lf_on_every_host(self):
         with tempfile.TemporaryDirectory(prefix='odrig-fw-checksum-') as folder:

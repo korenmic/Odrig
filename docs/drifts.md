@@ -12492,3 +12492,19 @@ the spaced checkout compiles its own current code and recovers after interruptio
 verification record carry these checks and exact observed hashes/timings. Native
 host instructions replace the former Mac-only setup claim, preserving legacy Mac
 cache paths and every board rule. Remote host results and final delivery follow.
+
+## Seed 60: canonical path fixtures and the committed CI bridge
+
+**Question.** The default builds succeed on all hosts, but the first Windows/Mac
+matrix fails tests comparing short/alias TEMP paths to canonical product paths.
+How can this be repaired before final delivery without bundling tasks or rewriting
+published commits?
+
+**Answer.** Normalize expected path identity in the three existing fixtures. Treat
+the failed checks as this PR's regression. Use TACTIC's minimal integrity bridge to
+commit that test repair before resuming the existing delivery task and remote gate;
+do not add a runtime feature or call the failed matrix successful.
+
+**Resolution.** Task6 is the source-backed bridge, with observed CI failures and
+normal/actual Windows8.3 discovery proof. Task5 remains the final artifact/CI handoff
+boundary. Requirements and all board/phone limits remain unchanged.

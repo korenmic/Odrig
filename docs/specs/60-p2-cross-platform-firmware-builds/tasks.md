@@ -41,7 +41,15 @@
   physical acceptance, tick this task only after delivery, then self-audit, notify
   and disable the completion heartbeat. Set seed completed when its proof holds.
 
-Self-review: five sequential proof boundaries cover requirements1–3 and all seed
+Self-review: five planned proof boundaries cover requirements1–3 and all seed
 criteria. Software implementation precedes final artifacts; actual remote host
 evidence follows the committed matrix. Each task has its own verification,
 checkbox and commit. Earlier board/phone tasks stay unchecked.
+
+- [x] 6. Normalize canonical paths in CI fixtures (integrity bridge).
+  The actual host matrix exposes alternate path spellings in Windows8.3 temporary
+  folders and Mac /var aliases. Compare canonical current-source/configuration/cache
+  paths in the affected existing tests, retain all assertions, and verify by discovery
+  including an actual Windows8.3 temp root. Commit this minimal repair before task5's
+  remote check gate and final delivery. This bridges the committed host matrix and
+  its final handoff; no requirement or runtime behavior is added.

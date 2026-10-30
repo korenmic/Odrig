@@ -42,7 +42,7 @@ class HostSelection(unittest.TestCase):
             python=firmware_host.program(firmware_host.tool_root(tools/'firmware')/'venv','python')
             python.parent.mkdir(parents=True);python.touch()
             with mock.patch.dict(os.environ,{'ODRIG_TOOLS':str(tools)}):
-                self.assertEqual(self.runner(root).firmware_python(),python)
+                self.assertEqual(self.runner(root).firmware_python(),python.resolve())
 
     def test_unsupported_apk_build_is_reported_without_blocking_the_firmware_build(self):
         with tempfile.TemporaryDirectory(prefix='odrig-runner-build-host-') as directory:
