@@ -76,3 +76,30 @@ No assertion or error case is left unverified; a clean aggregate exit is not cla
 Local evidence is in `build/seed58-task1-*.log`; these are host/browser checks,
 not firmware compilation, electrical measurements or board/phone acceptance.
 Firmware tools, CLI integration and shared app controls are later queued tasks.
+
+## Command tool and settings transfers
+
+The CLI now accepts `brightness ID VALUE save` and `brightness ID default`, with
+all forms in its help. The ordinary one-value command still sends values as typed
+and retains the target's refusal/exit status. Malformed forms and line breaks are
+usage errors. The new transport regression first failed with CLI exit2 instead
+of0 because the saved form was rejected. It now passes through the existing HTTP
+and line transports, including saved zero, default restoration, unknown IDs and
+out-of-range values. Every original animation/show/catalog byte is unchanged.
+
+`brightness.txt` joins the firmware tool's preserved settings. A show folder may
+explicitly replace it, an ordinary install keeps the board's copy, and read-show
+copies it back. Before the change, folder validation rejected the file and an
+ordinary install dropped the saved values. The new round-trip fixture also needed
+its second write applied atop the first installed image; after that fixture
+correction, preservation, explicit replacement, readback and unchanged outside
+files all pass. These are memory images and a recorded esptool stand-in, with no
+board write or firmware build.
+
+Verification: focused CLI/transport8 tests passed. The pure firmware storage
+module ran59 tests:58 passed in the full run, and the corrected new round-trip
+case passed in isolation. Discovered emulator run `20261030-132015-4012` passed
+649 tests with19 platform skips, exit0. Logs are `build/seed58-task2-*.log`.
+Existing firmware/emulator host filename access already accepts both brightness
+settings names; no host protocol or transport is added. Shared app controls and
+the final documentation/integrated proof remain queued.

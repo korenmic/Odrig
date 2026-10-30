@@ -128,6 +128,12 @@ class ShowFolders(Temporary):
         (self.show / "clocks.txt").write_bytes(b"odrig-clocks 1\nclocks on\nmessage off\n")
         self.assertEqual(storage.folder_files(self.show)["clocks.txt"], b"odrig-clocks 1\nclocks on\nmessage off\n")
 
+    def test_saved_brightness_is_included_without_changing_show_or_catalog_bytes(self):
+        before = storage.folder_files(self.show)
+        saved = b"odrig-brightness 1\n0 f hello.odrg\n27 x night/comet.odrg\n"
+        (self.show / "brightness.txt").write_bytes(saved)
+        self.assertEqual(storage.folder_files(self.show), dict(before, **{"brightness.txt": saved}))
+
     def test_a_folder_without_its_mapping_is_refused_with_the_converters_reason(self):
         (self.show / "mapping.json").unlink()
         self.assertEqual(self.reason(), "mapping-missing")
@@ -330,6 +336,28 @@ class Commands(Temporary):
             result = support.run_main("read-show", self.folder / "copy")
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(support.files_of(self.folder / "copy"), dict(storage.folder_files(self.show), **{"clocks.txt": clocks}))
+
+    def test_saved_brightness_is_preserved_replaced_and_read_back(self):
+        saved = b"odrig-brightness 1\n0 f hello.odrg\n27 x night/comet.odrg\n"
+        self.old = support.storage_image(dict(support.WLED_FILES, **{"/odrig/brightness.txt": saved}))
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        expected = dict(storage.folder_files(self.show), **{"brightness.txt": saved})
+        installed = self.on_the_board(esptool)
+        self.assertEqual(storage.show_of(installed), expected)
+        self.assertEqual(storage.other_files(installed), storage.other_files(self.old))
+        with support.no_board(self.esptool(installed, failing_verifies=1)):
+            result = support.run_main("read-show", self.folder / "copy")
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(support.files_of(self.folder / "copy"), expected)
+        replacement = b"odrig-brightness 1\n19 f hello.odrg\n"
+        (self.show / "brightness.txt").write_bytes(replacement)
+        self.old = installed
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(expected, **{"brightness.txt": replacement}))
 
     def test_a_dry_run_says_what_would_change_and_writes_nothing(self):
         esptool = self.esptool()

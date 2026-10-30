@@ -111,6 +111,31 @@ class AgainstTheEmulator(unittest.TestCase):
                 self.assertEqual((result.status, result.out, result.err),
                                  (1, '{"ok":false,"error":"unsupported"}\n', ""))
 
+    def test_saved_brightness_uses_each_transport_without_changing_content_or_default(self):
+        before = support.files_of(self.folder)
+        for target in self.targets.values():
+            for words, status, out in (
+                (("brightness", "1", "0", "save"), 0, OK),
+                (("play", "1"), 0, OK),
+                (("brightness", "83"), 0, OK),
+                (("brightness", "3", "default"), 1, '{"ok":false,"error":"in-use"}\n'),
+                (("brightness", "99", "7", "save"), 1, '{"ok":false,"error":"unknown-id"}\n'),
+                (("brightness", "1", "256", "save"), 1, '{"ok":false,"error":"bad-argument"}\n'),
+            ):
+                result = support.run_tool(*target, *words)
+                self.assertEqual((result.status, result.out, result.err), (status, out, ""))
+            reply = json.loads(support.run_tool(*target, "status").out)
+            self.assertEqual(reply["brightness"], 83)
+            self.assertEqual(reply["dimming"], {"value": 0, "saved": 0, "error": None})
+            self.assertEqual((self.folder / "brightness.txt").read_bytes(), b"odrig-brightness 1\n0 f hello.odrg\n")
+            result = support.run_tool(*target, "brightness", "1", "default")
+            self.assertEqual((result.status, result.out, result.err), (0, OK, ""))
+            reply = json.loads(support.run_tool(*target, "status").out)
+            self.assertEqual(reply["dimming"], {"value": 83, "saved": None, "error": None})
+        after = support.files_of(self.folder)
+        self.assertEqual({name: after[name] for name in before}, before)
+        self.assertEqual(set(after) - set(before), {"brightness.txt"})
+
     def test_a_refused_command_prints_the_reply_and_exits_with_1(self):
         for transport, target in self.targets.items():
             for words, code in ((("play", "99"), "unknown-id"), (("play", "abc"), "bad-argument"), (("brightness", "256"), "bad-argument"), (("brightness", "-5"), "bad-argument"),
@@ -281,6 +306,11 @@ class Usage(unittest.TestCase):
             ["--port", "a", "dance"],
             ["--port", "a", "play"],
             ["--port", "a", "brightness"],
+            ["--port", "a", "brightness", "1", "2"],
+            ["--port", "a", "brightness", "1", "2", "keep"],
+            ["--port", "a", "brightness", "1", "2", "save", "extra"],
+            ["--port", "a", "brightness", "1\r", "default"],
+            ["--port", "a", "brightness", "1", "2\n", "save"],
             ["--port", "a", "status", "1"],
             ["--port", "a", "on", "now"],
             ["--port", "a", "play", "1", "2"],
@@ -364,6 +394,9 @@ class Usage(unittest.TestCase):
             (["play", "12"], b"play 12\n"),
             (["play", "all"], b"play all\n"),
             (["brightness", "300"], b"brightness 300\n"),
+            (["brightness", "60001", "0", "save"], b"brightness 60001 0 save\n"),
+            (["brightness", "abc", "300", "save"], b"brightness abc 300 save\n"),
+            (["brightness", "1", "default"], b"brightness 1 default\n"),
             (["play", "abc"], b"play abc\n"),
             (["brightness", " 7"], b"brightness  7\n"),
             (["play", "1" * 70], b"play " + b"1" * 70 + b"\n"),
@@ -393,6 +426,10 @@ class Usage(unittest.TestCase):
         said = " ".join(cli.parser().format_help().split())
         self.assertIn("Commands: play ID, play all, on, off,", said)
         self.assertIn("the word all of play", said)
+
+    def test_help_names_each_brightness_form(self):
+        said = " ".join(cli.parser().format_help().split())
+        self.assertIn("brightness N, brightness ID N save, brightness ID default", said)
 
     def test_no_option_tells_the_emulator_from_the_board(self):
         options = {option for action in cli.parser()._actions for option in action.option_strings}

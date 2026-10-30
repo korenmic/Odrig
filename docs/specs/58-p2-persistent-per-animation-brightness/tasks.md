@@ -8,7 +8,7 @@
   domains. Test identity/zero/default, corruption, every storage-call cut, no-op,
   exhaustion, clocks/resume, read-only media and bounds. Run core/emulator suites.
 
-- [ ] 2. Integrate preference preservation and existing command routes.
+- [x] 2. Integrate preference preservation and existing command routes.
   Extend odrigctl forms/help and firmware settings inclusion/preservation, explicit
   replacement/readback and emulator/transport contracts. Prove animation/catalog
   bytes/default behavior unchanged. Run emulator suite and relevant pure firmware
