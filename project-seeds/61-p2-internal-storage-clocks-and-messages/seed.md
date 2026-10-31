@@ -10,8 +10,9 @@ Preserve the existing `clocks/message/` name; do not introduce a parallel `msgs/
 or `msg/` convention.
 
 For matching paths and file types present in both storages, prefer the SD copy by
-default. A persistent checkbox in the existing clock settings switches preference
-between SD and internal storage. Keep each source's files and manual identity intact.
+default. A persistent dropdown in the existing clock settings offers the explicit
+choices `SD card` and `Internal storage`. Keep each source's files and manual
+identity intact.
 
 Implementation also includes attempting to deploy the seven approved message
 widgets to the board's internal storage through the project's managed content
@@ -39,9 +40,10 @@ requested trying to place the messages in internal storage during this seed's
 implementation. A physical installation attempt must distinguish an uploaded file
 from a collection copy, an archive or an emulator fixture.
 
-The owner subsequently chose SD precedence and requested a checkbox for these
-same-file-type duplicate situations. The approved default is SD-first; clearing
-the checkbox selects internal-first. This resolves the seed's precedence question.
+The owner chose SD precedence and requested a dropdown with named options for
+these same-file-type duplicate situations. The approved default is `SD card`;
+selecting `Internal storage` gives the internal copy precedence. This resolves
+the seed's precedence question.
 
 Related work:
 
@@ -90,8 +92,8 @@ Related work:
    including extension, and the same validated file/animation type available from
    the catalog. A shared basename, folder name or file type alone is not a collision.
    Matching copies contribute one automatic candidate, including when their bytes
-   differ: prefer SD by default, or internal storage when the checkbox below is
-   cleared. Different paths or different file types remain separate candidates.
+   differ: prefer SD by default, or internal storage when `Internal storage` is
+   selected. Different paths or different file types remain separate candidates.
    Determine eligibility for each physical copy first, then apply preference to
    the eligible copies. A missing, ignored, quarantined or unavailable preferred
    copy does not block an eligible copy in the other storage; an excluded copy
@@ -135,10 +137,12 @@ Related work:
     step prevents completion, preserve existing data and report the exact unperformed
     deployment/check rather than marking it successful.
 
-12. Add one checkbox to the existing Clocks panel in Settings, labelled
-    `Prefer SD for matching clock/message files`, with a short explanation that it
-    applies when the same relative path and file type exist in both storages.
-    Checked means SD-first and is the default; unchecked means internal-first.
+12. Add one dropdown to the existing Clocks panel in Settings, labelled
+    `Preferred storage for matching clock/message files`, with a short explanation
+    that it applies when the same relative path and file type exist in both storages.
+    Provide exactly two named options: `SD card` means SD-first and is the default;
+    `Internal storage` means internal-first. Keep this control distinct from the
+    existing Off/Between/Only mode dropdown.
     Apply it to clock faces and messages in both Between and Only modes, without
     changing ordinary playlist selection or explicit storage-specific manual play.
     It chooses precedence, not whether either storage is enabled. Persist it
@@ -149,7 +153,7 @@ Related work:
     Refresh effective candidates before the next selection when the preference
     changes, preserving the current message's complete loop and the existing safe
     rules for removal/quarantine. Rebuild neither catalog and rewrite neither copy
-    merely because the checkbox changes.
+    merely because the preferred-storage selection changes.
 
 ## Technical Constraints
 
@@ -169,17 +173,19 @@ Related work:
 
 ## Open Questions Requiring The Owner
 
-None. The owner selected SD precedence on 2026-10-31 and requested a checkbox for
-same-path/same-type duplicates. SD-first is the checked default; unchecked selects
-internal-first. Internal path/catalog representation, bounded lookup, compatible
-settings encoding and use of existing transports are specification work. The
-repository's approval requirement for any new command spelling still applies
-before implementation; no unapproved command syntax is invented by this seed.
+None. The owner selected SD precedence on 2026-10-31 and requested a dropdown with
+named options for same-path/same-type duplicates. `SD card` is the default;
+`Internal storage` selects internal-first. Internal path/catalog representation,
+bounded lookup, compatible settings encoding and use of existing transports are
+specification work. The repository's approval requirement for any new command
+spelling still applies before implementation; no unapproved command syntax is
+invented by this seed.
 
 ## Definition Of Done
 
 1. Requirements/design/tasks state the compatible internal-path model, effective
-   clock set, SD-first default, persistent preference checkbox, migration and bounds.
+   clock set, SD-first default, persistent preference dropdown with both named
+   options, migration and bounds.
 2. Core/emulator regressions demonstrate SD faces with internal messages, internal
    clocks without SD, both modes and message toggles, complete-loop exhaustion,
    Only boundaries, same-path/same-type duplicates with identical and different
