@@ -121,23 +121,13 @@ commands of Windows.
 
 ## What is coming
 
-These are planned as seeds and are not in the repository yet. Do not describe them as present, and do not build on them.
+These entries cover features not in the repository yet or not yet merged, and the
+cancelled fallback. A seed's merged implementation is completed. Unperformed
+physical checks remain recorded in its spec and verification documents without
+keeping the seed in progress.
 
-- **A USB drive, and one USB port for it or a computer**, seeds 20 and 21: built; neither tried on the board.
-- **A USB log on the serial port, and a bigger animation space**, seeds 23 and 24: built; their checks on the board are open.
-- **A second firmware that does not use WLED**, seed 12: a fallback for the event; paused.
-- **The app's count of animations, and app mapping with a diagonal check**, seeds 28 and 30: merged; the owner's LED check is open.
-- **Toggles and filters in the playlist**, seeds 29 and 39: merged; the owner's phone checks are open.
-- **Bounded decoding and boot-local quarantine**, seeds 31 and 32: no bad file freezes the board; bad files grayed.
-- **Managed catalogs, and ODRGX text and clock animations in them**, seeds 35 and 37: built; the board session and the owner's checks are open.
-- **A microSD card as the external storage**, seed 38: `build` makes it; the board session is open.
-- **Previews at once, each as soon as it is known**, seed 49: by name and size from the default catalog, and keys kept on the phone.
-- **A brightness field beside the slider, and a bar for the animation playing now**, seed 47 and seed 48: built; the phone checks are open, and seed 48's `repeat` needs its firmware on the board.
-- **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
-- **Nonblocking SD capacity reporting**, seed 56: software built; cold capacity scanning is bounded and cached. Board timing and phone acceptance remain open.
-- **Miniature matrix debug mode**, seed 57: software and firmware built; app and firmware project the full canvas onto the purchased 10x6 display, with approved wiring documented. Electrical commissioning and board/phone acceptance remain open.
-- **Persistent animation brightness overrides**, seed 58: software built; a checkbox saves brightness by file independently of the runtime default. Board and phone acceptance are open.
-- **Message clock widgets and clocks-only mode**, seed 59: software built; seven complete Hebrew message widgets, exclusive clock playback and persistent own/ancestor exclusions in both clock modes. Board and phone acceptance remain open.
+- **A second firmware that does not use WLED**, seed 12: cancelled by the owner; do not resume its unfinished tasks.
+- **Current limits for the wall and each snake**, seed 45: implemented in open PR #15; not yet merged.
 - **Internal-storage clocks and messages**, seed 61: planned; recognize matching clock/message paths in internal storage and SD, with a later managed upload attempt of the seven approved messages. A persistent dropdown chooses SD card (default) or Internal storage for matching path/type duplicates; owner product questions are resolved.
 - **Board time and a daily on/off schedule**, seed 64: planned; read/set time over existing transports, default On 18:00/Off 06:00, ignore schedule until time is valid, and APK Settings with automatic phone-time sync on by default. Three owner decisions remain.
 

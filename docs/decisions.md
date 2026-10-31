@@ -857,3 +857,9 @@ are in [format.md](format.md), "Measured sizes".
   a lock for their setup; each checkout keeps its own WLED copy and outputs. `--builds`
   builds the APK and the firmware beside the suites. Nothing is flashed, uploaded or
   installed by a test run.
+
+- 2026-10-31: The owner defines merged seed implementation as completed.
+  Unperformed physical board/phone checks remain unticked and unverified in the
+  specs and verification records, but do not keep a merged seed in progress.
+  The owner cancelled the standalone fallback firmware seed; its unfinished work
+  is retained as history and is not scheduled for completion.

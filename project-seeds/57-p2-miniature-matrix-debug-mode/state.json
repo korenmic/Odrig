@@ -1,10 +1,10 @@
 {
   "number": 57,
   "slug": "57-p2-miniature-matrix-debug-mode",
-  "state": "in_progress",
+  "state": "completed",
   "title": "Miniature matrix debug mode",
   "priority": "P2",
   "addedAt": "2026-10-29",
   "addedCommit": "pending-local",
-  "summary": "Software implemented: acknowledged shared app controls, logical 60x60-to-10x6 projection, safe GPIO1-only host transitions, emulator preview and exact approved wiring documentation. Host/browser verification is recorded in the spec. Firmware compilation is deferred to future seed60. Electrical commissioning, actual power/USB paths, powered board behavior and phone acceptance remain open; state stays in_progress until observed."
+  "summary": "Software implemented: acknowledged shared app controls, logical 60x60-to-10x6 projection, safe GPIO1-only host transitions, emulator preview and exact approved wiring documentation. Host/browser verification is recorded in the spec. Firmware compilation was completed in seed60. Electrical commissioning, actual power/USB paths, powered board behavior and phone acceptance remain open; these checks remain unverified separately from merged implementation completion."
 }

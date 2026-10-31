@@ -16,10 +16,10 @@ are explained in [vocabulary.md](vocabulary.md).
   `docs/specs/` with the seed's name: `requirements.md` says what must hold, as numbered
   criteria that can be checked; `design.md` says how; `tasks.md` lists the steps in order,
   each with a checkbox. The spec is one commit and leaves the seed's state as it is.
-- **One task, one commit.** The commit that does a task holds its code, its tests and the
-  tick in its checkbox in `tasks.md`, and nothing of another task. Its subject is
-  `Seed <number> task <number>: <the task's title>`. The first task of a spec sets the
-  seed's state to `in_progress` and the last sets it to `completed`.
+- **One task, one commit.** Commit only its code, tests and `tasks.md` checkbox tick;
+  subject: `Seed <number> task <number>: <the task's title>`. The first task sets
+  `in_progress`; implementation merged into `master` sets `completed`, with physical
+  checks still unticked and unverified. Owner cancellation sets `cancelled`; do not resume.
 - **A question met on the way is answered, not asked.** When a seed, a spec or a document
   leaves a point open, or two of them disagree, decide it yourself and add an entry at the
   end of [drifts.md](../docs/drifts.md): the heading `## Seed <number>: <subject>`, then

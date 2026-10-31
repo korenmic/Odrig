@@ -86,3 +86,9 @@ On 2026-10-16:
    not only to start and play. What it must have is the list of
    `docs/firmware-additions.md`. Before this seed's open tasks go on, its spec takes every
    line of that list marked *No* in its column "Seed 12".
+
+## Owner cancellation
+
+On 2026-10-31 the owner cancelled this seed. Do not resume its unfinished
+implementation or acceptance tasks. Existing code and unchecked tasks are retained
+as records; cancellation does not claim that the fallback was completed.
