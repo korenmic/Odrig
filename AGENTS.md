@@ -137,7 +137,7 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Miniature matrix debug mode**, seed 57: planned; app and firmware project the full canvas onto the purchased 10x6 display, with exact approved wiring documented and hardware acceptance checks retained.
 - **Persistent animation brightness overrides**, seed 58: planned; a checkbox saves an animation's brightness independently of the global default.
 - **Message clock widgets and clocks-only mode**, seed 59: planned; seven Hebrew message widgets, exclusive clock playback and ignored file/folder support in both clock modes.
-- **Ready-made animation uploads**, seed 63: planned; upload ODRG/ODRGX bytes without conversion into the explored folder; the mixed top-level view's destination needs an owner answer.
+- **Ready-made animation uploads**, seed 63: planned; upload ODRG/ODRGX without conversion into the explored folder, with selectable storage, External default and Internal fallback while absent External is grayed out. Owner product questions are resolved.
 - **Board time and a daily on/off schedule**, seed 64: planned; read/set time over existing transports, default On 18:00/Off 06:00, ignore schedule until time is valid, and APK Settings with automatic phone-time sync on by default. Three owner decisions remain.
 
 The state of every seed is in the `state.json` of its folder.
