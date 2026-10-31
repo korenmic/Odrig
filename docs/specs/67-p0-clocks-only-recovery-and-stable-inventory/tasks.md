@@ -4,7 +4,7 @@ Requirements/design reviewed against the seed and host contracts. Execution orde
 67.1–67.3,66.1–66.2,65 after its owner answer, then68 integration/delivery. Each
 numbered task is one proof commit; state becomes in_progress with the first task.
 
-- [ ] 1. Fail closed on uncertain saved clock settings
+- [x] 1. Fail closed on uncertain saved clock settings
   - First observe actual-core regressions for initial/partial read failure and malformed
     settings. Separate genuinely missing settings from uncertain IO. Add bounded retry,
     dark effective Only, explicit uncertainty and atomic operator recovery. Check memory.

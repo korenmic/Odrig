@@ -505,7 +505,7 @@ class ChangedBetweenTheReadings(unittest.TestCase):
         files = {"mapping.json": json.dumps(first), "second.json": json.dumps(second)}
         run = support.start(files, ["error", "poll 0"], ["--swap-after", "mapping.json", "1", "second.json", "--trace-files"])
         self.assertEqual(run.opened[0], ("schedule.txt", 0))
-        self.assertEqual([opened for opened in run.opened if not opened[0].startswith("catalog") and opened[0] != "schedule.txt"][:2], [("mapping.json", 1), ("mapping.json", 1)])
+        self.assertEqual([opened for opened in run.opened if not opened[0].startswith("catalog") and opened[0] not in ("schedule.txt", "clocks.txt")][:2], [("mapping.json", 1), ("mapping.json", 1)])
         self.assertEqual(run.core, "ok")
         return run
 

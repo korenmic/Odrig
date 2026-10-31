@@ -240,6 +240,7 @@ file's override or latest default without restarting its timing. Missing/null
 | `clocks`, `clock_message` | Compatibility booleans: `clocks` is true in either enabled mode, and `clock_message` enables the message after a clock. A reply without them comes from a player before them. |
 | `clock_mode` | `off`, `between`, or `only`. Older targets without this member support the existing boolean Off/Between interface. |
 | `clock_only` | `null` outside Only; otherwise `{"folder":ID_OR_NULL,"state":STATE}`, with state `playing`, `no-card`, `missing-folder`, or `no-clocks`. The folder is resolved from the active tree/catalog, never remembered by transient ID. In Only, `playing` names that folder and `playlist` is `clocks` while a turn plays. |
+| `clock_error` | Optional `unreadable` when saved policy cannot be established. The effective mode is fail-closed Only, output is dark and the saved mode is unconfirmed. Omitted when confirmed. The board retries at most once a second; an explicit clock-mode save can replace corrupt settings. A message-only change cannot guess the lost policy. |
 | `left` | The whole seconds left in the window of the current playlist, 86,400 down to 0: the 24 hours of running time it plays for before the next playlist of the card's folders is current, see [show.md](show.md#the-playlist). 0 from the window's end until the turn in progress ends. Reported whatever the card holds, a fresh 86,400 each time a playlist becomes current. A reply without `left` comes from a player before it. |
 
 `checked`, `to_check` and `unavailable` are 0, and `checking` is `null`, while the show
@@ -929,7 +930,12 @@ The second line is `mode off`, `mode between` or `mode only`; the third is `mess
 or `message off`. Valid version-1 files (`odrig-clocks 1`, `clocks on|off`, then the
 message line) still load, mapping on to Between and off to Off. The next changed setting
 writes version 2; a no-op does not rewrite an old file. A missing file means Off/message
-off. A malformed file recovers the same defaults and logs `clocks unreadable`.
+off when the host authoritatively reports no such file. Unreadable or malformed saved
+settings fail closed: effective Only, dark output, `clock_error:"unreadable"` and
+`clocks unreadable` in the log. Independent bounded reads retry at most once a second.
+A valid read restores the saved mode; an explicit mode command atomically replaces
+the policy and clears the error, even if it chooses Only. A message-only change is
+refused with `storage-error` until the saved mode is established.
 
 Saving closes and reads back all of `clocks.part` before one atomic rename. A failure
 preserves published bytes and active settings; an abandoned part is removed at startup.
