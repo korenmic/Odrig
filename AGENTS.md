@@ -131,6 +131,10 @@ keeping the seed in progress.
 - **Internal-storage clocks and messages**, seed 61: planned; recognize matching clock/message paths in internal storage and SD, with a later managed upload attempt of the seven approved messages. A persistent dropdown chooses SD card (default) or Internal storage for matching path/type duplicates; owner product questions are resolved.
 - **Board time and a daily on/off schedule**, seed 64: ready for S2S; read/set time over existing transports, default On 18:00/Off 06:00, and ignore scheduling while time is invalid. APK auto-sync defaults on and waits for the next connection at least 15 minutes after the last confirmed sync. Follow the phone's zone/DST; manual On/Off overrides until explicitly returned to scheduling. No open product questions remain.
 
+- **Quarter-turn output rotation**, seed 65: proposed0/90/180/270-degree output setting; shared-command approval and rectangular fitting policy remain open.
+- **Clocks-only browsing boundary**, seed 66: planned; visible navigation stays inside the resolved Clocks subtree, with no open owner product questions.
+- **Clocks-only recovery and stable inventory**, seed 67: planned; locally reproduced automatic root fallback, saved-mode read-error root playback and reconnect cache invalidation; no open owner product questions.
+
 The state of every seed is in the `state.json` of its folder.
 
 ## The owner's workflow
