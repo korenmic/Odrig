@@ -15,7 +15,7 @@ previously delivered seeds56–60; seed61 is not a dependency or part of this ru
     suites, firmware_host tests and the core memory/stack checks.
   - Requirements:2.3–2.4,3.1–3.4.
 
-- [ ] 2. Add ready-made upload preparation and visible storage/folder choices
+- [x] 2. Add ready-made upload preparation and visible storage/folder choices
   - Implement bounded read-only ODRG/ODRGX preparation, exact encoded-byte sending,
     content-key preview reuse and honest fallback without full compressed expansion.
   - Add the dropdown, per-form External default/absence/redetection behavior,

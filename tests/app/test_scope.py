@@ -8,7 +8,7 @@ from . import support
 CONVERTER_LIBRARY = support.ROOT / "converter" / "lib"
 # The lines the app may send: the words of a command, with its number left open.
 LINES = {"status", "list", "list <n>", "play <n>", "play all", "on", "off", "brightness <n>", "brightness <n> <n> save", "brightness <n> default", "space", "remove <n>", "remove many <n>", "ignore <n> <n>",
-         "upload begin <n> <n> <n>", "upload data <n> <n>", "upload end <n>", "upload cancel", "mapping get", "mapping set <n> <n>", "mapping test <n>", "mapping cross <n>",
+         "upload begin <n> <n> <n>", "upload begin <n> <n> <n> <n>", "upload data <n> <n>", "upload end <n>", "upload cancel", "mapping get", "mapping set <n> <n>", "mapping test <n>", "mapping cross <n>",
          "order get", "order get <n>", "list in <n> <n>", "order get in <n>", "order get in <n> <n>", "order move <n> <n> <n>", "mapping test snake <n>", "read <n> <n>", "upload expect <n>", "fault",
          "upload begin external <n> <n>", "catalog", "catalog page <n> <n> <n>", "catalog rebuild <n>", "catalog cancel", "repeat <n> <n>", "repeat <n> <n> save",
          "repeat <n> default", "clocks <n>", "clocks message <n>", "debug mini <n>"}

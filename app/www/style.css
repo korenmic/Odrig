@@ -920,6 +920,7 @@ label.button {
 }
 
 #preview,
+#ready-preview,
 #author-preview {
   display: block;
   width: 100%;
@@ -928,6 +929,16 @@ label.button {
   background: var(--back);
   border: 1px solid var(--edge);
   border-radius: 12px;
+}
+
+#ready-preview {
+  max-width: 280px;
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+
+#upload-storage option:disabled {
+  color: #8b93a7;
 }
 
 /* Settings. */

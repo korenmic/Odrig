@@ -12624,3 +12624,25 @@ transport. Nested publication updates both the folder and its parent's count row
 the global file positions and id map in the existing atomic catalog transaction.
 The app will require the absent-destination guard for all new external uploads.
 No new command-list spelling, animation format or internal-folder model is added.
+
+## Seed 63: internal creation confirmation before any data
+
+**Question.** A fresh root list finds an unused internal id, but another controller
+can claim it before begin. How does a new upload avoid silently replacing it?
+
+**Answer.** Use the existing CRC-bearing internal begin form and include a
+`replacing` boolean in its chunk reply. The app requires explicit false for new
+files and otherwise cancels before sending data; absent confirmation explains
+that older firmware needs updating. The ordinary five-argument begin and
+explicit CRC-guarded text/clock edits keep their existing behavior. The boolean
+describes the transaction the core opened and is stable while that transaction
+blocks other content changes. No command spelling or user choice is added.
+
+**Resolution.** commands.md, the shared core and app implement the confirmation.
+Fail-first browser proof saw the unguarded app report Uploaded despite a begin
+that said replacing:true; the guarded flow sends no data in that case.
+
+An unused id is insufficient when an unreferenced physical file has the chosen
+basename. CRC-bearing new internal uploads also refuse that collision before
+opening a part. A fail-first host regression confirmed the missing refusal; no
+file outside the show's listing is implicitly replaced by new-file creation.

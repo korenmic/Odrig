@@ -104,8 +104,11 @@
 <div class="panel">
 <label id="choose" class="button primary" for="media">Choose a video or a GIF</label>
 <input id="media" type="file" accept="video/*,image/gif" hidden>
+<label class="button" for="ready-file">Choose a ready-made animation</label>
+<input id="ready-file" type="file" accept=".odrg,.odrgx" hidden>
 <div id="chosen" hidden>
 <p id="media-name"></p>
+<div id="media-controls">
 <p>Fit it to the canvas</p>
 <div class="three">
 <button id="fit-fill" type="button" aria-pressed="true">Fill</button>
@@ -120,16 +123,19 @@
 <button id="make" type="button" class="primary">Make the animation</button>
 <p id="making" hidden></p>
 <button id="stop-making" type="button" hidden>Stop</button>
+</div>
 <div id="made" hidden>
 <canvas id="preview"></canvas>
+<img id="ready-preview" class="ready-preview" alt="Animation preview" hidden>
+<p id="ready-preview-note" class="small" hidden></p>
 <p id="made-facts"></p>
-<div id="store-on" hidden>
-<p>Store on</p>
-<div class="pair" role="group" aria-label="Store on">
-<button id="store-card" type="button" aria-pressed="true">The card</button>
-<button id="store-board" type="button" aria-pressed="false">This board</button>
-</div>
-<p class="small">The board's own storage keeps one or two animations to fall back on; the others belong on the card.</p>
+<div id="store-on">
+<label for="upload-storage">Storage</label>
+<select id="upload-storage" aria-describedby="upload-destination-reason"><option value="external">External storage</option><option value="internal">Internal storage</option></select>
+<label for="upload-name">Filename</label>
+<input id="upload-name" type="text" maxlength="32" autocomplete="off" spellcheck="false">
+<p id="upload-destination" role="status"></p>
+<p id="upload-destination-reason" class="small"></p>
 </div>
 <button id="upload-made" type="button" class="primary">Upload to the installation</button>
 <p id="uploading" hidden></p>

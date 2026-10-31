@@ -392,6 +392,14 @@ succeeds.
 
 ### External folder destinations and guarded creation
 
+A CRC-bearing internal begin that opens a transaction includes `replacing:false`
+for an unused id, `replacing:true` for an existing item, beside `chunk`. A new-file
+client requires false and otherwise cancels before any data; this closes the race
+between listing free ids and begin. A new CRC-bearing internal upload also refuses
+`in-use` when its physical filename exists outside the show. The five-argument
+internal form and the
+idempotent `unchanged` reply retain their behavior. No command spelling is added.
+
 The existing `upload begin external <file> <bytes> [<crc32>]` also accepts the
 full canonical path of a file in an existing indexed folder. Its basename keeps
 the internal32-byte naming rule; its folders and full path obey the catalog's

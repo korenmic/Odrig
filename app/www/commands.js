@@ -249,8 +249,15 @@ export async function remove(id) {
 
 // Opens the upload of a file of some bytes as the item with this id. Gives the most bytes
 // one `upload data` may carry.
-export async function uploadBegin(id, file, bytes) {
-  const reply = await carriedOut(`upload begin ${id} ${file} ${bytes}`);
+export async function uploadBegin(id, file, bytes, createCrc = null) {
+  const line = `upload begin ${id} ${file} ${bytes}${createCrc === null ? "" : " " + createCrc}`;
+  const reply = createCrc === null
+    ? await carriedOut(`upload begin ${id} ${file} ${bytes}`)
+    : await carriedOut(`upload begin ${id} ${file} ${bytes} ${createCrc}`);
+  if (createCrc !== null && reply.replacing !== false) {
+    try { await uploadCancel(); } catch (_) { /* An unchanged upload opens no transaction. */ }
+    throw new Refusal(reply.replacing === true || reply.unchanged === true ? "stale" : "unsupported", line);
+  }
   if (!whole(reply.chunk, 1, MOST_BYTES)) {
     throw new Failure("bad-reply", address());
   }
@@ -260,7 +267,8 @@ export async function uploadBegin(id, file, bytes) {
 // Opens the upload of a file of some bytes to the external storage, which gives the
 // animation its id when the upload ends. Gives the most bytes one `upload data` may carry.
 export async function uploadBeginExternal(file, bytes) {
-  const reply = await carriedOut(`upload begin external ${file} ${bytes}`);
+  const encoded = file.split("/").map(encodeURIComponent).join("/");
+  const reply = await carriedOut(`upload begin external ${encoded} ${bytes}`);
   if (!whole(reply.chunk, 1, MOST_BYTES)) {
     throw new Failure("bad-reply", address());
   }

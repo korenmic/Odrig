@@ -18,12 +18,14 @@ export default async function (app) {
   await app.until(() => app.text("media-name") !== null, "the name of the file");
   app.press("Make the animation");
   await app.until(() => app.text("made-facts") !== null, "the animation", 30000);
-  // The choice of the storage, each button with whether it is chosen, or null without one.
+  // The named storage choices, including absence, come from the same dropdown.
   const store = app.text("store-on") === null ? null
-    : [...app.doc.querySelectorAll("#store-on button")].map((button) => `${button.textContent}${button.getAttribute("aria-pressed") === "true" ? " (chosen)" : ""}`);
+    : [...app.byId("upload-storage").options].map(option => `${option.textContent}${option.selected ? " (chosen)" : ""}${option.disabled ? " (disabled)" : ""}`);
   const cardSpace = app.text("upload-card-space");
   if (settings.store !== undefined) {
-    app.press(settings.store);
+    const selector = app.byId("upload-storage");
+    selector.value = settings.store;
+    selector.dispatchEvent(new app.frame.contentWindow.Event("change", {bubbles: true}));
   }
   app.press("Upload to the installation");
   const seen = {store, cardSpace};

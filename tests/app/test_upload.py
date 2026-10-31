@@ -29,7 +29,7 @@ def target(**upload):
 
 
 def begun(line):
-    return (200, '{"ok":true,"chunk":1500}\n')
+    return (200, '{"ok":true,"chunk":1500,"replacing":false}\n')
 
 
 def taken(line):

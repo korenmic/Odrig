@@ -122,7 +122,7 @@ const REFUSALS = {
       : `Animation ${line.split(" ")[1]} cannot be removed: a cycle plays it, or it is on a USB stick.`,
   "read-only": (line) =>
     line.startsWith("catalog ") ? "That storage cannot be written now, so its catalog cannot be rebuilt." :
-    line.startsWith("upload ") ? "The card cannot be written now. Choose This board to store the animation on the board." :
+    line.startsWith("upload ") ? "The card cannot be written now. Choose Internal storage to store the animation on the board." :
     `Animation ${line.split(" ")[1]} cannot be removed: the card cannot be written now.`,
   "mapping-conflict": () => "Mapping changed on the target. Reload before saving.",
   "order-conflict": () => "The order changed on the installation since the app read it. The list is read again; move the animation again.",
