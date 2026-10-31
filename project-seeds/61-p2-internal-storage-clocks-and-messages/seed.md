@@ -9,6 +9,10 @@ clock faces on the card, without requiring a second copy of those messages there
 Preserve the existing `clocks/message/` name; do not introduce a parallel `msgs/`
 or `msg/` convention.
 
+For matching paths and file types present in both storages, prefer the SD copy by
+default. A persistent checkbox in the existing clock settings switches preference
+between SD and internal storage. Keep each source's files and manual identity intact.
+
 Implementation also includes attempting to deploy the seven approved message
 widgets to the board's internal storage through the project's managed content
 tools, verifying the stored bytes and their selection/playback. Creating this
@@ -34,6 +38,10 @@ SD file be recognized by the corresponding clock setting. The owner also explici
 requested trying to place the messages in internal storage during this seed's
 implementation. A physical installation attempt must distinguish an uploaded file
 from a collection copy, an archive or an emulator fixture.
+
+The owner subsequently chose SD precedence and requested a checkbox for these
+same-file-type duplicate situations. The approved default is SD-first; clearing
+the checkbox selects internal-first. This resolves the seed's precedence question.
 
 Related work:
 
@@ -78,13 +86,21 @@ Related work:
    boundary; an unrelated internal file does not. Browsing remains unrestricted.
    Leaving Only restores ordinary playback according to the existing rules.
 
-6. Resolve duplicate paths explicitly rather than weighting identical copied
-   messages twice or binding a selection to whichever transient numeric id appears
-   first. Detect the same relative path with different bytes and apply the approved
-   precedence policy. Preserve storage identity for reads, edits, brightness,
-   inclusion, quarantine and deletion; merging playback eligibility must not make
-   an operation target the other storage's file. Settle the precedence question
-   below before completing S2S.
+6. Resolve automatic-playback duplicates by the same normalized full relative path,
+   including extension, and the same validated file/animation type available from
+   the catalog. A shared basename, folder name or file type alone is not a collision.
+   Matching copies contribute one automatic candidate, including when their bytes
+   differ: prefer SD by default, or internal storage when the checkbox below is
+   cleared. Different paths or different file types remain separate candidates.
+   Determine eligibility for each physical copy first, then apply preference to
+   the eligible copies. A missing, ignored, quarantined or unavailable preferred
+   copy does not block an eligible copy in the other storage; an excluded copy
+   itself is never selected. Preserve existing storage-specific inclusion semantics.
+   Preserve storage identity for manual play, reads, edits, brightness, inclusion,
+   quarantine and deletion; preference must not make an operation target the other
+   storage's file. Do not delete, overwrite, synchronize or rename either source to
+   resolve a playback duplicate, and do not inspect whole animation bodies merely
+   to compare already-known paths/types.
 
 7. Preserve own/inherited Ignore semantics, saved brightness, quarantine and
    availability when selecting from either storage. Card insertion/removal,
@@ -119,6 +135,22 @@ Related work:
     step prevents completion, preserve existing data and report the exact unperformed
     deployment/check rather than marking it successful.
 
+12. Add one checkbox to the existing Clocks panel in Settings, labelled
+    `Prefer SD for matching clock/message files`, with a short explanation that it
+    applies when the same relative path and file type exist in both storages.
+    Checked means SD-first and is the default; unchecked means internal-first.
+    Apply it to clock faces and messages in both Between and Only modes, without
+    changing ordinary playlist selection or explicit storage-specific manual play.
+    It chooses precedence, not whether either storage is enabled. Persist it
+    atomically with the existing internal clock settings, restore it across boot,
+    reconnect and firmware/show updates, and migrate settings without the field to
+    SD-first. All clients must observe the installation's acknowledged value; the
+    shared app handles pending/refused/timed-out saves and older firmware honestly.
+    Refresh effective candidates before the next selection when the preference
+    changes, preserving the current message's complete loop and the existing safe
+    rules for removal/quarantine. Rebuild neither catalog and rewrite neither copy
+    merely because the checkbox changes.
+
 ## Technical Constraints
 
 - The internal catalog currently follows the show's flat filename rule; external
@@ -137,23 +169,26 @@ Related work:
 
 ## Open Questions Requiring The Owner
 
-1. When an eligible internal file and an SD file have the same relative path but
-   different contents, which copy should automatic clock/message playback prefer?
-   Options are internal-first or SD-first. Identical copies should contribute one
-   logical automatic candidate; manual browsing must retain their storage identities.
-   This precedence is not established by the request and must not be silently
-   invented during implementation.
+None. The owner selected SD precedence on 2026-10-31 and requested a checkbox for
+same-path/same-type duplicates. SD-first is the checked default; unchecked selects
+internal-first. Internal path/catalog representation, bounded lookup, compatible
+settings encoding and use of existing transports are specification work. The
+repository's approval requirement for any new command spelling still applies
+before implementation; no unapproved command syntax is invented by this seed.
 
 ## Definition Of Done
 
-1. The owner has settled duplicate precedence, and requirements/design/tasks state
-   the compatible internal-path model, effective clock set, persistence and bounds.
+1. Requirements/design/tasks state the compatible internal-path model, effective
+   clock set, SD-first default, persistent preference checkbox, migration and bounds.
 2. Core/emulator regressions demonstrate SD faces with internal messages, internal
    clocks without SD, both modes and message toggles, complete-loop exhaustion,
-   Only boundaries, duplicates, Ignore/brightness/quarantine and storage changes.
+   Only boundaries, same-path/same-type duplicates with identical and different
+   bytes, both precedence settings, missing/ineligible preferred sources,
+   non-colliding paths/types, Ignore/brightness/quarantine and storage changes.
 3. Catalog/content tests demonstrate old internal data compatibility, path validation,
    atomic updates/recovery, preserved unrelated files and accurate stored-byte reads.
-   App/command tests demonstrate consistent source/path and acknowledged mode state.
+   App/command tests demonstrate consistent source/path, acknowledged mode and
+   preference state, persistence/default migration and failed preference saves.
 4. Relevant discovered suites pass on Windows, and needed artifacts are built from
    the completed software through the repository pipeline with explicit provenance.
 5. The requested seven-file internal deployment has been attempted through managed
