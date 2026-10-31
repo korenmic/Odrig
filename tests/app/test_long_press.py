@@ -9,7 +9,7 @@ from .test_storage import SPACE
 TYPED = {"text", "number", "search", "url", "email", "tel", "password", "date", "time", "datetime-local", "month", "week"}
 # The fields of the page: the brightness, the start and the length of a part of a video,
 # the forms of a text and of a clock, and the address.
-FIELDS = ["#level-number", "#start", "#length", "#text-words", "#text-speed", "#text-pause", "#clock-seconds", "#clock-speed-min", "#clock-speed-max", "#address"]
+FIELDS = ["#level-number", "#start", "#length", "#upload-name", "#text-words", "#text-speed", "#text-pause", "#clock-seconds", "#clock-speed-min", "#clock-speed-max", "#address"]
 LOOKS = ("animations", "upload", "question", "target", "message")
 
 

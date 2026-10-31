@@ -76,7 +76,7 @@ class TheAppsPage(unittest.TestCase):
         table = section(self.text, "What it is")
         lines = [span for row in table.splitlines() if row.startswith("| ") for span in re.findall(r"`([^`]+)`", row.split("|")[2])]
         self.assertEqual(lines, ["status", "list 0", "list <next>", "play <id>", "play all", "on", "off", "brightness <n>", "brightness <id> <n> save", "brightness <id> default", "space", "remove <id>", "ignore <id> <0-or-1>", "remove many <ids>",
-                                 "upload begin <id> <file> <bytes>", "upload data <offset> <base64>", "upload end <crc32>", "upload begin external <file> <bytes>", "upload cancel",
+                                 "upload begin <id> <file> <bytes> <crc32>", "upload data <offset> <base64>", "upload end <crc32>", "upload begin external <file> <bytes>", "upload expect 00000000", "upload cancel",
                                  "read <id> <offset>", "upload begin <id> <file> <bytes>", "upload expect <crc32>", "mapping get", "mapping set <revision> <pins>",
                                  "mapping cross on", "mapping cross off", "mapping test on",
                                  "mapping test off", "mapping test snake <n>", "order get", "order get <next>", "order move <revision> <id> <before>", "repeat <id> <n>",

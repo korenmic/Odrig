@@ -231,13 +231,15 @@ class TheCard(unittest.TestCase):
         media.mkdir()
         cls.media = support.make_media(media)
 
-    def target(self, read_only=False, **upload):
+    def target(self, read_only=False, external_count=1, **upload):
         def answer(line):
             word = line.split(b" ")[1].decode("ascii")
             reply = upload.get(word, OK)
             return reply(line) if callable(reply) else reply
 
-        return {"status": (200, WITH_A_CANVAS % ""), "list": listed((60001, "card.odrg")), "space": space(read_only), "upload": answer}
+        catalogs = Catalogs({"state": "ok", "generation": 1, "entries": 2, "uncataloged": 0},
+                            {"state": "ok", "generation": 1, "entries": external_count, "writable": not read_only})
+        return {"status": (200, WITH_A_CANVAS % ""), "list": listed((60001, "card.odrg")), "space": space(read_only), "catalog": catalogs.catalog, "upload": answer}
 
     def uploaded(self, stand_in, **settings):
         return support.run("uploads", address=stand_in.address, settings={"rows": 3, "file": "clip.gif", **settings}, media=self.media).seen
@@ -250,8 +252,9 @@ class TheCard(unittest.TestCase):
         with support.StandIn(self.target(begin=begun, data=taken, end=ended)) as stand_in:
             found = self.uploaded(stand_in)
             lines = self.uploads(stand_in)
-        self.assertEqual(found["store"], ["The card (chosen)", "This board"])
+        self.assertEqual(found["store"], ["External storage (chosen)", "Internal storage"])
         self.assertEqual(found["cardSpace"], "External storage: free 3.1 GB of 31.9 GB.")
+        self.assertIn(b"upload expect 00000000", lines)
         self.assertRegex(lines[0].decode("ascii"), r"^upload begin external clip\.odrg [0-9]+$")
         self.assertRegex(lines[-1].decode("ascii"), r"^upload end [0-9a-f]{8}$")
         self.assertEqual(found["message"], "Uploaded to the card as animation 60002 clip.odrg. It plays in the playlist.")
@@ -259,22 +262,24 @@ class TheCard(unittest.TestCase):
 
     def test_this_board_can_be_chosen_instead(self):
         with support.StandIn(self.target(begin=begun, data=taken)) as stand_in:
-            found = self.uploaded(stand_in, store="This board")
+            found = self.uploaded(stand_in, store="internal")
             lines = self.uploads(stand_in)
-        self.assertRegex(lines[0].decode("ascii"), r"^upload begin 3 clip\.odrg [0-9]+$")
+        self.assertRegex(lines[0].decode("ascii"), r"^upload begin 3 clip\.odrg [0-9]+ [0-9a-f]{8}$")
         self.assertEqual(found["message"], "Uploaded as animation 3 clip.odrg. It plays in the playlist.")
 
-    def test_a_card_that_cannot_be_written_offers_no_choice(self):
+    def test_a_detected_read_only_card_is_not_absence_or_automatic_fallback(self):
         with support.StandIn(self.target(read_only=True, begin=begun, data=taken)) as stand_in:
             found = self.uploaded(stand_in)
             lines = self.uploads(stand_in)
-        self.assertEqual((found["store"], found["cardSpace"]), (None, None))
-        self.assertRegex(lines[0].decode("ascii"), r"^upload begin 3 clip\.odrg [0-9]+$")
+        self.assertEqual(found["store"], ["External storage (chosen)", "Internal storage"])
+        self.assertIn("read-only", found["cardSpace"])
+        self.assertIn("read-only", found["message"])
+        self.assertEqual(lines, [])
         self.assertEqual(found["after"]["externalSpace"], "External storage: 1 animation, free 3.1 GB of 31.9 GB (read-only).")
 
     def test_each_refusal_of_an_upload_to_the_card_is_told_in_words(self):
         cases = (
-            ({"begin": refusal("read-only")}, "The card cannot be written now. Choose This board to store the animation on the board. (read-only)"),
+            ({"begin": refusal("read-only")}, "The card cannot be written now. Choose Internal storage to store the animation on the board. (read-only)"),
             ({"begin": refusal("no-space")}, r"The animation needs [0-9]+ KB, and the card has 3100000 KB free. (no-space)"),
             ({"begin": refusal("busy")}, "The installation is busy. Try again in a moment. (busy)"),
         )
@@ -288,7 +293,7 @@ class TheCard(unittest.TestCase):
                     self.assertEqual(found["message"], sentence)
 
     def test_an_animation_of_a_card_that_can_be_written_can_be_deleted(self):
-        replies = dict(self.target(), list=listed((60001, "card.odrg"), (60002, "bad.odrg", "truncated")), remove=OK)
+        replies = dict(self.target(external_count=2), list=listed((60001, "card.odrg"), (60002, "bad.odrg", "truncated")), remove=OK)
         with support.StandIn(replies) as stand_in:
             found = support.run("card", address=stand_in.address, settings={"rows": 4, "id": 60001}).seen
             removed = [line for _, line in stand_in.lines if line.startswith(b"remove")]

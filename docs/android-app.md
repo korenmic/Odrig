@@ -97,10 +97,10 @@ a top bar with the app's name and whether the installation answers.
   menu works as any other's. The
   other animations and every other control work as ever, also when every animation is
   unavailable.
-- **Upload** makes an animation from a video or a GIF of the phone, or makes a text or a
-  clock, and uploads it, with the free internal storage above it. While the installation
-  can write its card, an animation of a video or a GIF goes to the card unless
-  `This board` is chosen, and the card's free storage is there too.
+- **Upload** accepts a ready-made ODRG/ODRGX animation without conversion, converts
+  video/GIF media, or makes a text/clock. New file uploads show a Storage dropdown,
+  filename and full destination before sending. External defaults when detected;
+  absent External is grayed out and Internal is selected. Both capacity lines remain visible.
 - **Settings** has the checkbox `Show test animations`, the panel `Clocks` with its mode
   dropdown and independent message checkbox, the catalogs of the board's own
   storage and of the card with a rebuild of each, and the mapping editor: the twenty
@@ -126,8 +126,8 @@ maps its actions to command lines, each sent as `POST /odrig` to the address tha
 | Chooses Delete in a row's menu and then `Remove it` | `remove <id>` |
 | Chooses Ignore in playlist or Restore to playlist in a row's menu | `ignore <id> <0-or-1>` |
 | Confirms Delete selected | `remove many <ids>` |
-| Presses `Upload to the installation` | `upload begin <id> <file> <bytes>`, then `upload data <offset> <base64>` for each piece, then `upload end <crc32>`, sent again while the installation still checks the file |
-| Presses `Upload to the installation` with `The card` chosen | `upload begin external <file> <bytes>`, then the pieces and the end as for an upload |
+| Presses `Upload to the installation` for a new internal file | `upload begin <id> <file> <bytes> <crc32>`, confirm replacing is false, then `upload data <offset> <base64>` for each piece and `upload end <crc32>`, sent again while the installation checks it |
+| Presses `Upload to the installation` with `External storage` chosen | `upload begin external <file> <bytes>`, `upload expect 00000000`, then the pieces and the end as for an upload |
 | Presses `Cancel` while it uploads | `upload cancel` |
 | Chooses Edit in the menu of a text's or a clock's row | `read <id> <offset>`, from offset 0 until the whole file is read |
 | Presses `Save` for a text or a clock it edits | `upload begin <id> <file> <bytes>`, then `upload expect <crc32>` with the CRC-32 of the file it read, then the pieces and the end as for an upload |
@@ -585,18 +585,45 @@ colours do. A video is drawn at most 1,280 pixels wide or high before it is fitt
   the list of Animations and in the playlist until it is moved, and plays when it is
   tapped.
 
-While the installation can write its card, `space` says so with `"read_only":false`, and
-Upload has `Store on` above `Upload to the installation`, with `The card`, chosen at
-first, and `This board`, and the card's free storage under the board's: the card holds the
-animations, and the board's own storage keeps one or two to fall back on. An animation for
-the card goes as `upload begin external <file> <bytes>` with the same file name, then its
-pieces and its end as above; the card gives it its id, from 60001 up, and its place in the
-playlist by its name, and the app says `Uploaded to the card as animation <id> <file>. It
-plays in the playlist.` The app does not compare its size with the card's free storage
-first: the installation refuses one that does not fit before anything is sent, and the app
-says so. While the card cannot be written, or is out, Upload has no choice and stores on
-the board, as before. Texts and clocks are stored on the board, though the card may hold
-them too.
+### Ready-made files and upload destinations
+
+`Choose a ready-made animation` accepts `.odrg` and `.odrgx`. Actual headers identify
+the format. Wrong/unsupported headers, damaged bounded containers and another canvas
+are refused in words. The exact encoded bytes are uploaded, without conversion,
+resizing or timing changes. Compressed frame bodies never inflate on the phone for
+a preview. The app reuses its content-key preview catalog/cache; otherwise it says
+that no preview is available and the target will check the complete animation.
+
+Every new ready-made or converted-media selection starts with `External storage`
+when detected, even if Internal was chosen for the previous form. Choose `Internal
+storage` for this form if desired. Absent/not-detected External stays visible,
+disabled and gray, with automatic Internal fallback. Redetection restores automatic
+External unless Internal was explicitly chosen. A detected read-only card remains
+External and refuses the upload; it never silently falls back. Empty lists and filters
+do not determine whether storage is present.
+
+The form captures the folder browsed when selecting the file, independent of playback.
+External in `night/deep` shows `External /night/deep/file.odrg`. Combined root uses
+the chosen storage root. Internal always shows its flat root, `Internal /file.odrg`,
+and explains that a browsed SD folder was not retained. Navigation cannot move the
+prepared destination. The editable basename must obey the32-byte naming rule; the
+external full path obeys the100-byte/three-level catalog rule. Folders must exist.
+
+Before sending, fresh target, storage, catalog and folder observations detect stale
+destinations and collisions. A preflight absence fallback discovered by the click
+is shown and requires another Upload click. Collisions require a different basename;
+they never silently overwrite. New external files use `upload expect 00000000` and
+internal files use CRC-bearing begin with explicit `replacing:false` confirmation
+before data. Unsupported older firmware stops with an explanation and a cancelled
+transaction. Explicit text/clock edits keep their original file and CRC stale guard.
+
+Known capacity is checked first, including the upload reserve; the target remains
+authoritative when capacity is unavailable. After begin the storage/path are frozen.
+A disconnected card stops that attempt; it does not continue in Internal. A new
+manual attempt can use the visibly updated fallback. Cancellation, failed checks
+and uncertain completion are distinct from an acknowledged installed file. After
+success the destination catalog/list/preview refresh normally. Authored texts and
+clocks remain in Internal; ready-made containers can use either selected storage.
 
 To make a text, press `Make a text` on Upload. A form opens under it: the text, written
 with English letters, digits, signs and Hebrew letters, and line feeds; its font,
@@ -895,7 +922,7 @@ it is dismissed with `OK` or another takes its place.
 | `in-use` | A display-taking mapping test while Only owns playback. | Leave Clocks only in Settings before starting a display test. |
 | `in-use` | Inclusion of an unsupported item or on older firmware. | This target does not support playlist inclusion for that item. |
 | `read-only` | A removal of an animation of the card while the installation cannot write it. | Animation `<id>` cannot be removed: the card cannot be written now. |
-| `read-only` | An upload to the card while the installation cannot write it. | The card cannot be written now. Choose This board to store the animation on the board. |
+| `read-only` | An upload to the card while the installation cannot write it. | The card cannot be written now. Choose Internal storage to store the animation on the board. |
 | `read-only` | A rebuild of the catalog of a storage the installation cannot write. | That storage cannot be written now, so its catalog cannot be rebuilt. |
 | `storage-error` | The installation could not read or write its storage. | The installation could not use its storage. |
 | `in-use` | An upload whose id or file name another item took meanwhile. | That name or id is in use on the installation. The list is asked for again; upload again. |
@@ -1077,7 +1104,7 @@ installed; the phone with mobile data on.
     clock's hands or digits move on the LEDs, the melting watch's hands bend with its
     face, and after the save the row is where it was.
 21. **The card and the catalogs.** With firmware that writes the card, and the card in.
-    On Upload, make an animation: `Store on` has `The card` chosen; upload it. *Seen:*
+    On Upload, make an animation: `Storage` has `External storage` chosen; upload it. *Seen:*
     `Uploaded to the card as animation ...`, its row with `ex`, and it plays on the LEDs
     when tapped. Choose `Delete` in its menu and `Remove it`. *Seen:* the row goes, and the
     card's free storage grows. In Settings, `Rebuild the card's catalog` and `Rebuild`.

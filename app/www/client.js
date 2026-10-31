@@ -1002,6 +1002,52 @@ export function targetVersion() {
   return target;
 }
 
+// Fresh upload observations share the serialized command stream with all controls.
+export function uploadSnapshot(level) {
+  return requestOperation("upload-preflight", async () => {
+    const asked = target;
+    const unchanged = () => { if (asked !== target) throw new Error("the target changed"); };
+    const space = await commands.space();
+    unchanged();
+    state.space = space;
+    let catalog = null;
+    try { catalog = await commands.catalog(); } catch (error) {
+      if (!(error instanceof commands.Refusal && ["unknown-command", "bad-argument"].includes(error.code))) throw error;
+    }
+    unchanged();
+    async function all(folder) {
+      const items = [];
+      let from = 0;
+      do {
+        const reply = await commands.list(from, folder);
+        unchanged();
+        items.push(...reply.items);
+        from = reply.next;
+      } while (from !== null);
+      return items;
+    }
+    const root = await all(null);
+    let items = root;
+    let folderValid = level.id === null;
+    if (level.id !== null && space.external?.present === true) {
+      let path = "";
+      for (const part of level.path.split("/")) {
+        path += (path ? "/" : "") + part;
+        const folder = items.find(row => row.playlist === path);
+        if (!folder) break;
+        if (path === level.path) folderValid = folder.id === level.id;
+        items = await all(folder.id);
+      }
+    }
+    if (catalog !== null) {
+      const after = await commands.catalog();
+      unchanged();
+      if (["internal", "external"].some(storage => after[storage].generation !== catalog[storage].generation)) throw new commands.Refusal("stale", "upload preflight");
+    }
+    return {space, catalog, root, items, folderValid};
+  });
+}
+
 function requestOperation(kind, carry, confirm) {
   return new Promise((resolve, reject) => {
     wanted.push({kind, carry, confirm, resolve, reject});

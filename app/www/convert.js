@@ -6,6 +6,26 @@
 
 import {Rejection, jsonframes, odrg, odrgx, thumbnail, timeline} from "./converter/index.js";
 
+// Inspect existing encoded files without converting or expanding compressed frames.
+export async function prepareReady(file, canvas) {
+  if (!/\.(odrg|odrgx)$/i.test(file.name)) throw new Error("Choose an .odrg or .odrgx animation file.");
+  if (!Number.isInteger(file.size) || file.size < 16 || file.size > 0xffffffff) throw new Error("The animation file size is unsupported.");
+  if (canvas?.width == null || canvas?.height == null) throw new Error("The target has not reported its canvas yet.");
+  const prefix = new Uint8Array(await file.slice(0, 36).arrayBuffer());
+  const container = odrgx.isContainer(prefix);
+  const header = container ? odrgx.readHeader(prefix) : odrg.header(prefix);
+  if (container && header.payloadSize !== file.size - odrgx.HEADER_SIZE) throw new Error("The animation container has a damaged payload size.");
+  if (header.width !== canvas.width || header.height !== canvas.height) throw new Error(`The animation canvas is ${header.width} \u00d7 ${header.height}; the target needs ${canvas.width} \u00d7 ${canvas.height}.`);
+  const frames = !container || header.type === odrgx.TYPES.frames;
+  const frameHeader = frames ? (container ? odrg.header(prefix.subarray(20)) : header) : null;
+  if (frameHeader && (frameHeader.width !== header.width || frameHeader.height !== header.height)) throw new Error("The animation container and its frames have different canvases.");
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (bytes.length !== file.size) throw new Error("The selected animation changed while it was read.");
+  if (!frames) odrgx.decode(bytes);
+  const previewSafe = !frames || (!frameHeader.compressed && bytes.length <= 65536 && frameHeader.frameCount <= 256 && frameHeader.n * frameHeader.frameCount <= 262144);
+  return {bytes, header, ready: true, previewSafe, ending: container ? ".odrgx" : ".odrg", file};
+}
+
 // The ticks of the timeline, and how far past a tick a video is sought, so that the
 // picture taken is the one on the screen at the tick even when a frame begins exactly
 // there.

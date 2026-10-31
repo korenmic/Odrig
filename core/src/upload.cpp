@@ -151,7 +151,7 @@ void upload_step(Core &core, uint64_t now) {
     check_ended(core, reason == kReadError ? kCheckStorageFailed : kCheckBadFile, reason);
 }
 
-uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, uint32_t bytes, Reply &reply) {
+uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, uint32_t bytes, Reply &reply, bool report_creation) {
     Upload &upload = core.upload;
     if (upload.state != kUploadNone) {
         return refuse(reply, "busy");
@@ -179,6 +179,10 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
         return refuse(reply, "no-space");
     }
     const odrig_host &host = core.host;
+    if (report_creation && is_new && host.read_at != nullptr) {
+        uint8_t probe = 0;
+        if (host.read_at(host.ctx, name, 0, &probe, 1) >= 0) return refuse(reply, "in-use");
+    }
     uint32_t free_bytes = 0;
     uint32_t total_bytes = 0;
     const bool told = host.space != nullptr && host.space(host.ctx, &free_bytes, &total_bytes) == 1;
@@ -207,6 +211,10 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
     upload.progress = static_cast<uint32_t>(now);
     reply.text("{\"ok\":true,\"chunk\":");
     reply.number(kChunkSize);
+    if (report_creation) {
+        reply.text(",\"replacing\":");
+        reply.text(is_new ? "false" : "true");
+    }
     reply.text("}\n");
     return reply.length;
 }
@@ -280,7 +288,7 @@ uint32_t upload_begin_known(Core &core, uint64_t now, uint32_t id, const char *n
             return reply.length;
         }
     }
-    return upload_begin(core, now, id, name, bytes, reply);
+    return upload_begin(core, now, id, name, bytes, reply, true);
 }
 
 uint32_t upload_expect(Core &core, uint32_t crc, Reply &reply) {

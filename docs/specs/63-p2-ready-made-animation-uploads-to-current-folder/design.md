@@ -34,15 +34,19 @@ publication. An occupied path returns `stale`; it never replaces a file. Nonzero
 external values are refused; existing internal expectations retain bounded
 expected-content checking for explicit replacements. The app sends the absence
 guard for every new external upload.
-Internal new uploads use a fresh id and name checked against the current root
-and retain the existing in-use protections. Existing text/clock edits are untouched.
+Internal new uploads use a fresh id/name checked against the current root and
+the existing CRC-bearing begin. Its additive replacing flag must explicitly be
+false before data; otherwise cancel. This closes a concurrent id-claim race, and
+new CRC uploads also refuse an unreferenced physical filename. Existing
+text/clock edits are untouched.
 This extends argument handling of existing command forms on all core transports;
 there is no new command-list spelling. Document the semantics and rationale in
 commands.md and an appended drift entry.
 
 ## App modules
 
-Add a small read-only ready-file helper using converter ODRG/ODRGX headers and
+Add a small read-only ready-file helper through convert.js, the sole bridge to
+the converter's ODRG/ODRGX headers and
 bounded drawn-container validation. Read headers before loading encoded bytes;
 reject sizes outside uint32. Never invoke the frames reader/inflater for a
 compressed ready-made file. A prepared result keeps the original encoded bytes,
