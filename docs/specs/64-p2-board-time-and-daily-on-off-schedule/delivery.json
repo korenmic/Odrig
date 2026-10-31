@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "seed": 64,
+  "task": 7,
+  "deliveredUtc": "2026-10-31T21:36:13.743515+00:00",
+  "apkSourceCommit": "74eb4ac21cdbc4c973f581147ad5337a20dfd704",
+  "firmwareSourceCommit": "74eb4ac21cdbc4c973f581147ad5337a20dfd704",
+  "sourceTrackedDirty": false,
+  "sourceCommitUrl": "https://github.com/korenmic/Odrig/commit/74eb4ac21cdbc4c973f581147ad5337a20dfd704",
+  "certificateSha256": "5a489ec294e53cdec085d71092cf4e7285ae08d4d43c19929d84130f3649f0f1",
+  "apk": {
+    "file": "odrig-debug.apk",
+    "bytes": 19092430,
+    "sha256": "273e64fa7bf2db869f273b0c3f06844edfb9cba8a34cd614d741cdbe3524fcc9",
+    "packagingTests": 8,
+    "cleanInstallPassed": true,
+    "publishedApkUpgradePassed": true,
+    "launchPassed": true
+  },
+  "firmware": {
+    "file": "odrig-firmware.bin",
+    "bytes": 1888176,
+    "sha256": "989106abe5099dfc484ea07cf6fc29cdbba3a1fe0564b27b0592c3e6d7408635",
+    "kind": "ESP32-S3 application image",
+    "offset": "0x10000",
+    "environment": "odrig_microsd",
+    "inputsSha256": "1bd74b30614d17e41133c69c0f3d204e0906ffe62c9e2ee842006e3adc458f45",
+    "offlineInspectionPassed": true
+  },
+  "android": {
+    "version": "16",
+    "avdReadOnly": true,
+    "originalAvdConfigUnchanged": true,
+    "nativeWifi": true,
+    "moduleWorkerTimeSync": true,
+    "pairedHours": true,
+    "manualPrecedence": true,
+    "resume": true,
+    "testTimezone": "Asia/Jerusalem",
+    "physicalPhoneAcceptance": false
+  },
+  "portable": {
+    "cases": 5239,
+    "platformSkips": 21,
+    "allLastSuiteResultsPassed": true
+  },
+  "signingBackupsVerifiedUnchanged": true,
+  "identityEvidence": {
+    "method": "in-place r+b overwrite on mounted Google Drive; bytes/size/device/inode verified",
+    "independentDriveApiFileIdLookup": false,
+    "files": [
+      {
+        "file": "odrig-debug.apk",
+        "bytes": 19092430,
+        "sha256": "273e64fa7bf2db869f273b0c3f06844edfb9cba8a34cd614d741cdbe3524fcc9",
+        "device": 428019990,
+        "inodeBefore": 11084,
+        "inodeAfter": 11084,
+        "inPlace": true
+      },
+      {
+        "file": "odrig-firmware.bin",
+        "bytes": 1888176,
+        "sha256": "989106abe5099dfc484ea07cf6fc29cdbba3a1fe0564b27b0592c3e6d7408635",
+        "device": 428019990,
+        "inodeBefore": 11087,
+        "inodeAfter": 11087,
+        "inPlace": true
+      },
+      {
+        "file": "odrig-firmware.bin.sha256",
+        "bytes": 85,
+        "sha256": "eb825790b9a4f30ad69980e362c6f05e23d5df624e13e95701096495e1309356",
+        "device": 428019990,
+        "inodeBefore": 11105,
+        "inodeAfter": 11105,
+        "inPlace": true
+      },
+      {
+        "file": "odrig-firmware.bin.build.json",
+        "bytes": 15606,
+        "sha256": "70266504a67bc42787c7a99a1d17cd051c4384f4a3efb94b1cde0858248538fa",
+        "device": 428019990,
+        "inodeBefore": 11108,
+        "inodeAfter": 11108,
+        "inPlace": true
+      },
+      {
+        "file": "odrig-firmware-verification.json",
+        "bytes": 845,
+        "sha256": "ea69bf53c5f5e18a41e80c6aeadfa83ef41456b35c47a51178ba55c875bbb78f",
+        "device": 428019990,
+        "inodeBefore": 11111,
+        "inodeAfter": 11111,
+        "inPlace": true
+      },
+      {
+        "file": "odrig-firmware-image-info.txt",
+        "bytes": 1501,
+        "sha256": "af13b612caf3c9f46bb1eb890b7ea12bd93c6516d011fefb4f047ad59fe1c3f5",
+        "device": 428019990,
+        "inodeBefore": 11114,
+        "inodeAfter": 11114,
+        "inPlace": true
+      }
+    ]
+  },
+  "physicalAcceptance": {
+    "phone": false,
+    "board": false,
+    "electrical": false,
+    "powerLoss": false
+  },
+  "prCiGate": "Exact pushed-head check results are reported separately after PR creation."
+}

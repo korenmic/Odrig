@@ -863,3 +863,21 @@ are in [format.md](format.md), "Measured sizes".
   specs and verification records, but do not keep a merged seed in progress.
   The owner cancelled the standalone fallback firmware seed; its unfinished work
   is retained as history and is not scheduled for completion.
+
+- 2026-10-31: Seed64's owner authorized autonomous protocol choices and delivery.
+  Add shared `time`, `time zone DATA` and `time set UTC REVISION` operations with
+  verified phone-zone rules, boot-local epoch validity and no per-sync flash writes;
+  the exact format and refusals are in commands.md.
+
+- 2026-10-31: The owner chose manual override always for real-time scheduling.
+  Existing manual On/Off now persist mode across reset when saved, never expire at
+  a scheduled boundary, and remain immediate even if saving fails. Add schedule
+  read/set/resume with atomic daily hours (default18:00/06:00), invalid-time bypass
+  and no per-tick writes. These protocol choices use the autonomous authorization.
+
+### Seed 64: physical identity and timing metadata integration
+
+Timing cooldowns/queued writes bind to a stable board ID, not a shared Wi-Fi address.
+The bounded identity callback and atomic guard prefix retain existing line/arena
+bounds. Ordinary show installs preserve schedule/zone files, never clock validity.
+Runtime WLED power mirroring does not create an override; external manual control does.

@@ -38,9 +38,10 @@ function byId(id) {
 }
 
 // Whether an upload cannot begin now: one is under way, another job holds the target, or
-// the target does not answer.
+// the target does not answer, or its installed names are still being read.
 function locked() {
-  return sending !== null || client.contentBusy() || client.state.link !== "answers";
+  return sending !== null || client.contentBusy() || client.state.link !== "answers" ||
+    (editing === null && client.state.rootNames === null);
 }
 
 // A colour of a colour field, `#rrggbb`, as the integer of the JSON sources.
@@ -167,6 +168,7 @@ function draw() {
     return;
   }
   byId("author-upload").disabled = made === null || reading || locked();
+  byId("author-names").hidden = editing !== null || client.state.rootNames !== null;
 }
 
 // What the form is about: its title and the words of its button.
@@ -306,7 +308,7 @@ function upload(message) {
     message(messages.ofNoSpace(bytes.length, state.space.free));
     return;
   }
-  const named = state.rootNames ?? {ids: [], files: []};
+  const named = state.rootNames;
   const saving = editing;
   const id = saving !== null ? saving.id : freeId(new Set(named.ids));
   const base = kind === "text" ? textName(made.source.text) : `clock-${made.source.widget}`;
@@ -317,7 +319,7 @@ function upload(message) {
   byId("author-upload").hidden = true;
   byId("author-cancel").hidden = false;
   sending = uploading(
-    {id, file, bytes, expect: saving === null ? null : saving.crc},
+    {id, file, bytes, create: saving === null, expect: saving === null ? null : saving.crc},
     {
       report(part) {
         shown.textContent = `Sending: ${Math.floor(part * 100)}%`;

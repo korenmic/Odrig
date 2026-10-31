@@ -81,7 +81,8 @@ class TheAppsPage(unittest.TestCase):
                                  "mapping cross on", "mapping cross off", "mapping test on",
                                  "mapping test off", "mapping test snake <n>", "order get", "order get <next>", "order move <revision> <id> <before>", "repeat <id> <n>",
                                  "repeat <id> <n> save", "repeat <id> default", "clocks off", "clocks on", "clocks only", "clocks message on", "clocks message off", "fault", "catalog",
-                                 "catalog page <storage> <page> <offset>", "catalog rebuild internal", "catalog rebuild external", "catalog cancel"])
+                                 "catalog page <storage> <page> <offset>", "catalog rebuild internal", "catalog rebuild external", "catalog cancel", "time", "guard <board-id> time", "guard <board-id> time zone <base64>", "guard <board-id> time set <utc-seconds> <zone-crc32>", "guard <board-id> schedule",
+                                 "guard <board-id> schedule set <revision> <on-HH:MM> <off-HH:MM> <on-or-off>", "guard <board-id> schedule resume <revision>"])
         self.assertIn("The table maps its actions to command lines", self.said)
 
     def test_every_message_of_the_app_is_on_the_page(self):
@@ -89,7 +90,7 @@ class TheAppsPage(unittest.TestCase):
                     ["busy", "remove `<id>`", None], ["in-use", "remove `<id>`", None], ["in-use", "play `<id>`", None], ["in-use", "mapping test on", None], ["in-use", "ignore 1 1", None], ["storage-error", "space", None],
                     ["in-use", "upload begin 1 a.odrg 1", None], ["no-upload", "upload data 0 AA", None], ["bad-offset", "upload data 0 AA", None],
                     ["read-only", "remove `<id>`", None], ["read-only", "upload begin external a.odrg 1", None], ["read-only", "catalog rebuild external", None],
-                    ["in-use", "repeat 9 5 save", None], ["no-space", "repeat 1 5 save", None], ["stale", "repeat 1 5", None]]
+                    ["in-use", "repeat 9 5 save", None], ["no-space", "repeat 1 5 save", None], ["stale", "repeat 1 5", None], ["zone-unset", "time set 1800000000 01234567", None]]
         failures = [["bad-address", ""], ["no-wifi", ""], ["no-answer", "`<address>`"], ["bad-reply", "`<address>`"]]
         found = support.run("texts", settings={"refusals": refusals, "failures": failures}).seen
         messages = section(self.text, "Messages")
@@ -101,7 +102,7 @@ class TheAppsPage(unittest.TestCase):
         self.assertIn("The installed show is invalid: <reason>.", said)
         rows = [row.split("`")[1] for row in messages.splitlines() if row.startswith("| `")]
         self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "unavailable", "busy", "in-use", "in-use", "in-use", "in-use",
-                                "read-only", "read-only", "read-only", "storage-error", "in-use", "in-use", "no-space", "no-space", "no-space", "no-upload", "bad-checksum",
+                                "read-only", "read-only", "read-only", "storage-error", "zone-unset", "in-use", "in-use", "no-space", "no-space", "no-space", "no-upload", "bad-checksum",
                                 "bad-file", "mapping-conflict", "order-conflict", "stale", "stale", "unsupported-character", "does-not-fit", "no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"])
         self.assertIn("`Removed animation <id> <file>.`", said)
         self.assertIn("`Uploaded as animation <id> <file>. It plays in the playlist.`", said)
@@ -136,8 +137,8 @@ class TheAppsPage(unittest.TestCase):
     def test_the_check_on_a_phone_is_numbered_steps_that_say_what_must_be_seen(self):
         check = section(self.text, "The check on a phone")
         steps = re.findall(r"(?m)^([0-9]+)\. \*\*([^*]+)\*\*", check)
-        self.assertEqual([int(number) for number, _ in steps], list(range(1, 25)))
-        self.assertEqual(check.count("*Seen:*"), 26)
+        self.assertEqual([int(number) for number, _ in steps], list(range(1, 26)))
+        self.assertEqual(check.count("*Seen:*"), 27)
         for expected in ("This is the owner's. No program can do it.", "python3 app/app.py install", "python -m emulator build/demo-20/show --lan", "`lan:` line",
                          "press `Board`", "Leave mobile data on", "Switch mobile data off", "**A long press.**", "in the address a word is marked",
                          "**The phone's bars.**", "wholly above Android's buttons or the line of gesture navigation", "the tabs go away and the address stays in view",

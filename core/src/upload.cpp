@@ -72,6 +72,12 @@ uint32_t base64_size(const char *text, uint32_t length) {
     return size <= kChunkSize ? size : 0;
 }
 
+uint32_t base64_read(const char *text, uint32_t length, uint8_t *bytes) {
+    const uint32_t size = base64_size(text, length);
+    if (size != 0) base64_decode(text, length, bytes);
+    return size;
+}
+
 void upload_touch(Core &core, uint64_t now) {
     if (core.upload.state != kUploadNone && static_cast<uint32_t>(now) - core.upload.progress >= kUploadQuietMs) {
         upload_discard(core);

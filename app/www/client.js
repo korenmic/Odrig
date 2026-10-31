@@ -42,7 +42,7 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, level: {path: "", id: null}, rootNames: null,
   animations: null, cycles: [], folders: [], space: null,
   listVersion: 0, listBusy: false, order: null, orderVersion: 0, orderKnown: true, catalog: null, keys: {internal: null, external: null}, keysVersion: 0,
-  catalogNone: false, pagesRefused: false, statusCount: 0, statusFresh: false};
+  catalogNone: false, pagesRefused: false, statusCount: 0, statusFresh: false, connectionVersion: 0};
 
 const watchers = new Set();
 // What the operator asked for and was not sent yet, in its order: each a kind and the
@@ -97,6 +97,7 @@ let keptUnder = null;
 let keptTaken = false;
 // Counts the targets: a reply that belongs to an earlier address is dropped.
 let target = 0;
+let connectionDue = true;
 let contentLocked = false;
 
 // Calls a function now and whenever the state changes.
@@ -164,6 +165,10 @@ async function askStatus() {
     state.status = reply;
     state.statusFresh = true;
     state.statusCount += 1;
+    if (connectionDue) {
+      connectionDue = false;
+      state.connectionVersion += 1;
+    }
     if (reply.clockMode !== "only") onlyOpened = false;
     else if (!onlyOpened && reply.clockOnly?.folder != null) {
       onlyOpened = true;
@@ -190,6 +195,7 @@ async function askStatus() {
     if (asked !== target) {
       return;
     }
+    connectionDue = true;
     failed(error);
   }
   changed();
@@ -628,6 +634,10 @@ export function keyOf(animation) {
 // after a removal the list and the space are due too.
 async function give(request) {
   const asked = target;
+  if (request.guard && !request.guard()) {
+    request.reject?.(new commands.Refusal("stale", "timing operation"));
+    return;
+  }
   try {
     const reply = await request.carry();
     if (asked !== target) {
@@ -778,6 +788,7 @@ async function next() {
 // upload to the earlier target ends.
 export function begin() {
   target += 1;
+  connectionDue = true;
   keptUnder = address();
   contentLocked = false;
   state.listVersion = 0;
@@ -1043,6 +1054,7 @@ document.addEventListener("visibilitychange", () => {
     // What was asked for and not sent is not sent later, when the app comes back.
     cancelWaiting();
   } else {
+    connectionDue = true;
     statusDue = true;
     refreshContent();
   }
@@ -1100,11 +1112,24 @@ export function uploadSnapshot(level) {
   });
 }
 
-function requestOperation(kind, carry, confirm) {
+function requestOperation(kind, carry, confirm, guard) {
   return new Promise((resolve, reject) => {
-    wanted.push({kind, carry, confirm, resolve, reject});
+    wanted.push({kind, carry, confirm, resolve, reject, guard});
     next();
   });
+}
+
+export function timingOperation(carry, version, current = () => true) {
+  const guard = () => version === target && current() && state.link === "answers" && state.statusFresh && !document.hidden;
+  return requestOperation("timing", async () => {
+    const send = async action => {
+      if (!guard()) throw new commands.Refusal("stale", "timing operation");
+      const result = await action();
+      if (!guard()) throw new commands.Refusal("stale", "timing operation");
+      return result;
+    };
+    return carry(send);
+  }, undefined, guard);
 }
 
 function cancelWaiting() {

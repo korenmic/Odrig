@@ -27,7 +27,9 @@ REPEATS_NAME = "repeats.txt"
 CLOCKS_NAME = "clocks.txt"
 BRIGHTNESS_NAME = "brightness.txt"
 IGNORED_NAME = "ignored.txt"
-KEPT_NAMES = (ORDER_NAME, PLAYLIST_NAME, REPEATS_NAME, CLOCKS_NAME, BRIGHTNESS_NAME, IGNORED_NAME)
+SCHEDULE_NAME = "schedule.txt"
+ZONE_NAME = "timezone.bin"
+KEPT_NAMES = (ORDER_NAME, PLAYLIST_NAME, REPEATS_NAME, CLOCKS_NAME, BRIGHTNESS_NAME, IGNORED_NAME, SCHEDULE_NAME, ZONE_NAME)
 # The files of the internal catalog: its marker and its pages.
 CATALOG_NAMES = (catalog.MARKER, *(catalog.page_name(number) for number in range(catalog.PAGES)))
 MARK = b"littlefs"

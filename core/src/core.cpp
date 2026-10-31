@@ -837,8 +837,11 @@ odrig_core *odrig_core_begin(const odrig_host *host) {
     }
     core->state.host = *host;
     core->state.starting = 1;
+    odrig::schedule_start(core->state);
     odrig::start(core->state);
     odrig::player_start(core->state);
+    odrig::civil_start(core->state);
+    odrig::schedule_touch(core->state, 0);
     if (core->state.width == 60 && core->state.height == 60) {
         core->state.mini = static_cast<odrig::Mini *>(odrig::host_memory(*host, sizeof(odrig::Mini)));
     }
@@ -860,6 +863,10 @@ int odrig_core_leg(const odrig_core *core, uint32_t index, odrig_leg *out) {
     out->led_count = info.count;
     out->rgb = core->state.led_data + 3u * info.first;
     return 1;
+}
+
+int odrig_core_power(const odrig_core *core) {
+    return core != nullptr && core->state.on != 0 ? 1 : 0;
 }
 
 const char *odrig_core_error(const odrig_core *core) {
