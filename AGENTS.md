@@ -134,6 +134,7 @@ keeping the seed in progress.
 - **Quarter-turn output rotation**, seed 65: proposed0/90/180/270-degree output setting; shared-command approval and rectangular fitting policy remain open.
 - **Clocks-only browsing boundary**, seed 66: planned; visible navigation stays inside the resolved Clocks subtree, with no open owner product questions.
 - **Clocks-only recovery and stable inventory**, seed 67: planned; locally reproduced automatic root fallback, saved-mode read-error root playback and reconnect cache invalidation; no open owner product questions.
+- **Clocks-only freeze and watchdog recovery**, seed 68: planned follow-up; reuse the scheduler-starvation candidate in PR39, distinguish model proof from the physical incident, and diagnose any residual freeze. No open product questions.
 
 The state of every seed is in the `state.json` of its folder.
 
