@@ -6,8 +6,11 @@ Allow a controller to read and set the board's current civil time through every
 existing command transport, including Wi-Fi/HTTP and USB serial. Use a valid board
 clock to run one daily on/off schedule, defaulting to On at 18:00 and Off at 06:00.
 The APK exposes the schedule in Settings and a visible, enabled-by-default option
-to set board time from the phone when connecting after a sufficient interval.
-When the board loses its time, ignore the schedule until time is set again.
+to set board time from the phone on the next connection once 15 minutes have elapsed
+since the last confirmed synchronization. Follow the phone's time zone and daylight
+saving. Manual On/Off always takes precedence until the operator explicitly returns
+control to the schedule. When the board loses its time, ignore the schedule until
+time is set again.
 
 ## Priority
 
@@ -68,29 +71,46 @@ those animations to show actual time is separate work.
    reset brightness or restart an animation merely to make it visible again.
 8. Settings shows the confirmed board time, whether it is valid, the schedule
    times and enabled state, and an understandable reason when scheduling is
-   disabled or awaiting synchronization. Edits belong to the selected board;
-   changing targets cancels pending work and must not apply it to another board.
+   disabled, manually overridden or awaiting synchronization. Edits belong to the
+   selected board; changing targets cancels pending work and must not apply it to
+   another board.
 9. Settings includes `Set board time from phone automatically`, enabled by
    default, as a persistent APK preference. Show whether the most recent attempt
    succeeded, failed or is unconfirmed, with its confirmed time when available.
    Turning this off stops automatic writes; it does not invalidate a previously
    valid board clock or disable the board-owned schedule. Provide a manual
    `Set time from phone now` action and a board-time read/refresh operation.
-10. On the first successful connection or reconnection after the agreed interval,
+10. On the next successful connection or reconnection once at least 15 minutes have
+    elapsed since that board's last confirmed successful synchronization,
     query clock validity and, with auto-sync enabled, send the phone's current time
-    and the agreed zone information. Always synchronize an invalid board clock
+    and its current time-zone information. Always synchronize an invalid board clock
     immediately, even if that board was synchronized shortly before it reset.
     Rate limiting is per board; a different board must not inherit another's
     cooldown. Ordinary HTTP requests/status polling are not separate connections
     and must not cause a time write on every poll. The cooldown begins only after
     an acknowledged successful set; failed/uncertain attempts do not report success
-    or enter a tight retry loop. This seed does not require periodic background
-    synchronization while the app is disconnected.
+    or enter a tight retry loop. Reaching 15 minutes alone does not trigger a write:
+    wait for the next app connection. Do not add a periodic synchronization timer
+    while connected or disconnected. Manual synchronization remains available.
 11. Other controllers can use the same read/set operations. Accepted writes are
     shared board state, not a private APK clock. Handle multiple controllers,
     disconnects and uncertain replies consistently, with re-read confirmation and
     no later replay of a queued write to the wrong target. Older firmware must be
     identified as unsupported without breaking its existing controls.
+12. Always follow the phone's time zone, including daylight-saving rules, rather
+    than a fixed Israel zone or fixed UTC offset. While disconnected, use the last
+    supplied phone zone and its rules so DST transitions do not require a connected
+    phone. With automatic synchronization enabled, reflect a changed phone zone
+    without resetting the 15-minute interval for clock synchronization. Zone changes
+    must not change playback elapsed time or create a per-poll clock-write loop.
+13. An explicit manual On or Off through any supported transport always overrides
+    the schedule. The override has no boundary-based expiry: schedule boundaries,
+    time corrections, automatic synchronization, reconnects and time-pair edits do
+    not undo it. Retain the manual choice with the persistent schedule settings
+    across reset/power loss, independently of boot-local clock validity. Settings
+    shows the override and an explicit way to return to scheduled control; only
+    that operator action releases it. With no manual override, use the schedule
+    normally when it is enabled and time is valid.
 
 ## Technical Constraints
 
@@ -101,7 +121,7 @@ those animations to show actual time is separate work.
   reply/error contracts in S2S; obtain the owner's required approval for actual
   additions to `docs/commands.md` before implementation. The current request
   authorizes the read/set-time and schedule functionality, not guessed spellings.
-- Time-zone/DST behavior is an owner question below; do not silently substitute
+- Follow the approved phone-zone/DST policy below; do not silently substitute
   UTC, a hardcoded Israel offset or whatever time WLED happens to have at boot.
 - Keep schedule configuration across resets but never persist clock validity.
   Use existing bounded storage and atomic-update conventions. Do not write flash
@@ -117,25 +137,21 @@ those animations to show actual time is separate work.
   against an owned Android emulator when possible. Physical phone/board timing
   and observed LED acceptance remain explicitly open until a person checks them.
 
+## The Owner's Answers
+
+1. "Once per 15 minutes resync on next app connect since last sync."
+2. "Follow the phone always."
+3. "Manual override always."
+
+These replace the earlier proposals. In particular, manual control does not expire
+at the next scheduled boundary. An explicit return to scheduling is required.
+
 ## Open Questions Requiring The Owner
 
-1. **Reconnect synchronization interval.** How long is "the first time in a
-   while"? Proposed default: 15 minutes since the last confirmed sync to that
-   board. Alternatives: one hour or every reconnect. Invalid time always bypasses
-   this cooldown when auto-sync is on.
-2. **Schedule time zone and daylight saving.** Follow the phone's time zone,
-   including its daylight-saving rules (proposed), or keep the board in the Israel
-   time zone, including daylight saving, regardless of the connected phone?
-   The chosen zone must define schedule behavior while offline and at DST changes;
-   it must not rely on the phone being connected at the transition.
-3. **Manual On/Off precedence.** Proposed: an explicit manual On or Off overrides
-   the schedule until the next scheduled boundary. Alternative: the schedule is
-   always authoritative and manual controls cannot override its current window.
-   Apply the chosen rule consistently to all command transports and on/off sources.
-
-The seed is **not yet ready for S2S with zero open owner questions**. These three
-product decisions remain; the proposals are not recorded as accepted. Exact wire
-forms are subsequent specification work with owner approval before coding.
+None remain for seed-to-spec. The seed is ready for S2S with zero open product
+questions. Exact wire forms, capability and error contracts are specification work;
+the repository's required owner approval of command additions still applies before
+implementation.
 
 ## Definition Of Done
 
@@ -146,7 +162,8 @@ forms are subsequent specification work with owner approval before coding.
    validation, supported/unsupported behavior and confirmed state.
 3. Deterministic tests cover default and edited overnight/same-day windows, exact
    boundaries, day rollover, time jumps, DST under the selected policy, timer
-   rollover, invalid time, reset/power loss, disconnected operation, disabled
+   rollover, invalid time, reset/power loss, persistent manual overrides and their
+   explicit release, disconnected operation, disabled
    auto-sync/schedule, reconnection cooldown, other boards and competing clients.
 4. App tests cover visible defaults, manual synchronization, target changes,
    refusal/timeouts and confirmation. Tests prove no per-poll time writes, flash
