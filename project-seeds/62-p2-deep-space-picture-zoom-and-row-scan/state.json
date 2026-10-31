@@ -1,0 +1,10 @@
+{
+  "number": 62,
+  "slug": "62-p2-deep-space-picture-zoom-and-row-scan",
+  "state": "remaining",
+  "title": "Deep-space picture at 10x zoom, scanning alternate rows",
+  "priority": "P2",
+  "addedAt": "2026-10-31",
+  "addedCommit": "pending-local",
+  "summary": "Plan a slow fixed-10x scan of the owner's unchanged 1080x1080 space picture on the 60x60 canvas: start top-left, traverse alternating rows with 10%-height descents and cover the whole image. One owner question remains: approve an extra bottom-row pass to reach the requested bottom-right endpoint, or accept the ten-row bottom-left ending. Seed and original reference only; no implementation or deployment."
+}
