@@ -44,6 +44,21 @@ It ran with four workers and completed in295 seconds. The focused scheduler/task
 contract run adds eight passing checks after the two observed red cases.
 The clean fix commit is the build source for the separate delivery proof.
 
+Clean source `317eca0c23586038772f07936f3abddef6458a65` built through fw.py on
+Windows and passed offline image/source/ELF inspection. The pinned ESP32-S3
+qio_opi SDK configuration enables watchdog initialization, panic, a five-second
+timeout and CPU0 idle checking; the scheduler runs at1000 Hz. The producer is
+pinned to CPU0, so its missing blocking opportunity matters to that watchdog.
+
+The repaired application image is1888192 bytes, SHA256
+`9743c4e8432885408699676dba66ef96329ddb3f5e8799d841901d5681ec10bb`,
+for flash offset `0x10000`. Six existing mounted Google Drive artifact/proof files
+were overwritten in place and read back with matching bytes and mounted identities.
+The APK and persistent signing backups remain unchanged. See
+[delivery.json](delivery.json). No independent Drive API file-ID lookup was made.
+The final delivery proof changes documentation only; exact pushed-head CI follows
+its push, and the PR records those results separately before final handoff.
+
 Physical acceptance remains open: run clocks only on the
 installation, confirm continuing playback and Wi-Fi/commands, and inspect `host`
 or the serial reset log if the symptom returns.

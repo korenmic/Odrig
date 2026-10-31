@@ -19,9 +19,15 @@ diagnosis and repair, based on the same source as the currently delivered firmwa
     Both accelerated native collection runs completed. Physical reset confirmation
     remains open; verification.md distinguishes the model from board evidence.
 
-- [ ] 2. Build and deliver the urgent firmware fix
+- [x] 2. Build and deliver the urgent firmware fix
   - From the clean fix commit, build/inspect firmware through fw.py and publish
     verified bytes to the existing Drive file. Retain artifact/source/hash evidence.
   - Push the isolated fix commits to the existing delivery PR; validate its exact-head
     CI and notify.
     The unchanged APK needs no rebuild. Physical confirmation remains open.
+  - Verified local delivery: clean317eca0 produced an inspected1888192-byte
+    ESP32-S3 application image; six existing Drive files were updated in place
+    and their sizes/hashes/mounted identities checked. The APK and signing backups
+    remain unchanged. delivery.json records the source/hash and physical limits.
+    This proof changes docs only. Exact pushed-head CI and final notification
+    follow its push; a green handoff is not claimed until those checks complete.
