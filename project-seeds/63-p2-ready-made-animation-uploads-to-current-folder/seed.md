@@ -127,6 +127,16 @@ above. The seed is ready for S2S with zero open product questions. Exact wire
 forms remain specification work; any actual new command spelling still needs
 explicit owner approval before implementation, as the repository requires.
 
+## Owner-authorized implementation follow-up
+
+The owner reported on 2026-10-31 that browsing Clocks can unexpectedly return to
+Root while the app populates the folder. The owner explicitly requested diagnosing
+and fixing this within this seed's existing PR as an additional task, using the
+fastest code/emulator route and notifying on completion. Tasks 5 and 6 cover the
+navigation regression, verification and updated APK delivery. A transient folder
+lookup failure must be distinguished from a confirmed removed folder; a failed
+verification must not silently discard the browsing path.
+
 ## Definition Of Done
 
 1. Requirements/design/tasks preserve the owner's resolved choice and specify

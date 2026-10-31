@@ -48,6 +48,24 @@ previously delivered seeds56–60; seed61 is not a dependency or part of this ru
     naming completed work and uploaded files. Keep physical acceptance open.
   - Requirements:4.2–4.3.
 
+- [x] 5. Keep browsed folders through transient lookup failures
+  - Diagnose the owner's Clocks-to-Root report and observe the navigation
+    regression failing before fixing it. Revalidate a refused folder by its
+    captured path before treating it as removed; preserve target/navigation
+    guards and bound retries without mixing pages from different listings.
+  - Cover transient first/later-page failures, changed folder IDs, real removal,
+    failed verification and navigation during recovery in discovered app tests.
+    Exercise the shared app against the native emulator with Clocks content.
+    Record the actual reproduction and remaining physical acceptance limits.
+
+- [ ] 6. Deliver the folder-navigation correction
+  - Build the APK from the clean task-5 source with the same persistent key,
+    verify packaging and Android AVD installation/update/launch, and overwrite
+    the existing Drive APK in place with hash/length/identity readback.
+  - Rebuild firmware only if the correction changes firmware/core sources;
+    otherwise retain the delivered firmware and state that explicitly. Record
+    delivery provenance, push to the existing PR, check CI and notify the owner.
+
 ## Owner acceptance (not claimed by automated tasks)
 
 Try the delivered APK on the operator's phone and upload on the physical board
