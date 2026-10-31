@@ -124,9 +124,9 @@ the descent size and this additional final pass.
   require access to a Mac or alter unrelated app/firmware build work.
 - Seed61's internal clock/message feature is independent of this animation.
   Do not fold it into this seed or resume it through an unrelated answer here.
-- The current request is seed creation and push with the reference only.
-  S2S, enqueue, implementation, artifact builds and board/phone checks follow
-  a later instruction. Any actual LED/phone acceptance remains the owner's check.
+- The owner authorized S2S, enqueue and implementation in a new PR after approving
+  the final pass. Keep that PR focused on this animation and the separately
+  requested upload seed's planning. Actual LED/phone acceptance remains the owner's check.
 
 ## Open Questions Requiring The Owner
 
