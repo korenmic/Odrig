@@ -38,11 +38,17 @@ mixed view does not identify a unique storage destination; Q1 resolves it.
    timing, strip container content, decode-and-re-encode, or run media conversion.
    Format checking and generating a preview are permitted read-only operations.
    A canvas mismatch is explained and refused rather than silently converted.
+   Large encoded files must not require expansion of every frame on the phone
+   merely to create a preview. Keep preflight and preview work bounded and use
+   the target's authoritative managed validation, with an honest preview fallback.
 3. Capture the destination storage and full relative folder path from the
    browsing context when the upload is prepared. Show the destination clearly
    before sending. An upload prepared in SD folder `a/b` must install
    `a/b/<filename>`, not the SD root, internal root or the current playback folder.
    Browsing context is separate from what happens to be playing.
+   Apply the explored-folder destination consistently to new ready-made uploads
+   and new converted-media uploads prepared from that context. Explicit edits or
+   replacements remain anchored to their original stored file and its stale guard.
 4. Preserve that destination while the operator navigates elsewhere or reconnects.
    Resolve it against the current storage/catalog before sending; removed media,
    missing/changed folders, stale IDs and read-only storage must cause an honest
