@@ -145,6 +145,27 @@ int odrig_core_poll(odrig_core *core, uint64_t now_ms);
 uint32_t odrig_core_leg_count(const odrig_core *core);
 int odrig_core_leg(const odrig_core *core, uint32_t index, odrig_leg *out);
 
+/* Temporary 10x6 output state. RGB holds 60 pixels in physical chain order,
+ * index=x*6+y with bottom-left coordinates. The pointer stays valid for the core's
+ * lifetime; its bytes may change at a poll or output acknowledgement.
+ * Normal legs and canvas geometry remain unchanged. */
+typedef struct odrig_mini {
+    uint32_t revision;
+    uint8_t active;
+    uint8_t requested;
+    uint8_t pending;
+    uint8_t failed;
+    const uint8_t *rgb;
+} odrig_mini;
+
+/* Opt in only when the host implements dark, checked output transitions. */
+void odrig_core_mini_support(odrig_core *core);
+/* Returns 1 for a supported host and 60x60 canvas, otherwise 0. */
+int odrig_core_mini(const odrig_core *core, odrig_mini *out);
+/* Acknowledge only the matching pending revision; stale acknowledgements return 0.
+ * Failed setup requires the host to keep all outputs dark until a successful retry. */
+int odrig_core_mini_complete(odrig_core *core, uint32_t revision, int success);
+
 /* One command line in, one reply out. The line may end with a newline, with or without a
    carriage return before it. Writes the reply, with its newline and without a terminating
    zero, to reply and returns its length. capacity must be at least ODRIG_REPLY_MAX. */

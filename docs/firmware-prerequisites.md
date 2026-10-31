@@ -4,6 +4,13 @@ What the firmware on the board must do, as agreed with the owner: one line for e
 where it comes from and how far it has come. Progress is measured against this list. A
 line counts as done only when its proof says so.
 
+Building an image needs no board. Host-aware setup/build, native caches, pinned
+vendor selection and the Windows/macOS/Linux proof matrix are described in
+[firmware host builds](firmware.md#host-builds-and-verification); the
+[build verification record](specs/60-p2-cross-platform-firmware-builds/verification.md)
+states which host/architecture and variants were actually exercised. A compiled
+image does not close any board, electrical or phone acceptance in this list.
+
 The states:
 
 - **Done**: built and shown, by the suites and, where it needs the board, on the board.

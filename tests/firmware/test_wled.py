@@ -52,7 +52,7 @@ class CommitCheck(TemporaryFolder):
 class Fetch(TemporaryFolder):
     def test_a_folder_that_is_there_is_not_fetched_again(self):
         (self.folder / "wled").mkdir()
-        with mock.patch.object(wled.subprocess, "run", side_effect=AssertionError("ran git")):
+        with mock.patch.object(wled.process, "run", side_effect=AssertionError("ran git")):
             self.assertFalse(wled.fetch(self.folder / "wled"))
 
     def test_a_missing_folder_is_cloned_at_the_tag(self):
@@ -156,12 +156,12 @@ class Override(TemporaryFolder):
         self.assertEqual(wled.TEMPLATE, support.FIRMWARE / "platformio_override.ini.in")
         self.assertIn("@REPO@", template)
         text = wled.override_text()
-        self.assertEqual(text, template.replace("@REPO@", str(support.ROOT)))
+        self.assertEqual(text, template.replace("@REPO@", support.ROOT.as_posix()))
         self.assertNotIn("@REPO@", text)
 
     def test_it_names_the_usermod_as_a_library_outside_wleds_folder(self):
         text = wled.override_text()
-        self.assertIn(f"  odrig = symlink://{support.ROOT}/firmware/usermod\n", text)
+        self.assertIn(f"  odrig = symlink://{support.ROOT.as_posix()}/firmware/usermod\n", text)
         self.assertRegex(text, r"(?m)^custom_usermods =\n  odrig = symlink://")
 
     def test_it_switches_wleds_serial_handling_off_and_leaves_the_audio_usermod_out(self):
@@ -182,10 +182,10 @@ class Override(TemporaryFolder):
         for setting in ("board", "board_build.partitions", "board_build.flash_mode", "board_upload.flash_size"):
             self.assertNotRegex(text, rf"(?m)^{setting}\s*=", setting)
 
-    def test_a_repository_path_with_a_space_is_refused(self):
+    def test_a_repository_path_with_a_space_is_supported(self):
         spaced = self.folder / "my odrig"
         spaced.mkdir()
-        self.assertEqual(support.reason_of(self, lambda: wled.override_text(root=spaced)), "build-failed")
+        self.assertIn(f'  -I"{spaced.as_posix()}/core/include"\n', wled.override_text(root=spaced))
 
     def test_the_file_is_written_into_wleds_folder_and_left_alone_when_it_is_right(self):
         path = wled.write_override(self.folder)

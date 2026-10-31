@@ -21,7 +21,9 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `play all` | Plays the playlist, from its first animation, and makes the root playlist current. |
 | `on` | Switches the LEDs on. |
 | `off` | Switches the LEDs off: every LED is dark. Playback time keeps running. |
-| `brightness <n>` | Sets brightness, 0 to 255. |
+| `brightness <n>` | Sets the runtime default brightness, 0 to 255. |
+| `brightness <id> <n> save` | Saves brightness for the listed animation's file, including zero, without changing the default. |
+| `brightness <id> default` | Removes that file's saved brightness, using the latest default immediately if it is playing. |
 | `status` | Reports the current state. |
 | `fault` | Reports the latest fault of a file since the start. |
 | `space` | Reports the free and the total storage and the number of animations. |
@@ -34,7 +36,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `catalog cancel` | Ends a rebuild; the catalog stays as it was. |
 | `remove <id>` | Removes an item from the show. |
 | `remove many <ids>` | Atomically removes 1–32 distinct installed animations. |
-| `ignore <id> <value>` | Excludes or includes an installed animation in the automatic playlist. |
+| `ignore <id> <value>` | Excludes or includes an animation or external folder in automatic playback. |
 | `mapping get` | Reports saved pin assignments, their revision and diagnostic state. |
 | `mapping set <revision> <pins>` | Atomically saves a complete comma-separated pin permutation. |
 | `mapping cross on` | Saves snake 10 as cross-wired: its chain up column 28, up column 30, down column 29. |
@@ -50,6 +52,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `repeat <id> default` | Removes the animation's saved repeat: its turns play its own count again, the one in progress too. |
 | `clocks on` | Switches the clocks between the animations on, and saves it. |
 | `clocks off` | Switches them off, and saves it. |
+| `clocks only` | Plays only the resolved Clocks subtree, and saves the mode. |
 | `clocks message on` | Switches the message after each clock on, and saves it. |
 | `clocks message off` | Switches it off, and saves it. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation; with the file's CRC-32 after `<bytes>`, answers `unchanged` when the last upload installed that file. |
@@ -58,29 +61,83 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `upload expect <crc32>` | Lets the open upload replace its item's file only while that file is the one the client read. |
 | `upload end <crc32>` | Closes the upload and installs the animation. |
 | `upload cancel` | Discards the open upload. |
+| `debug mini on` | Requests temporary miniature output; status reports host acknowledgement. |
+| `debug mini off` | Requests restoration of normal output. |
 
 At power-on the LEDs are on, brightness is the value in `show.json`, and the show plays
 what [show.md](show.md) says it plays by itself: the playlist of its included animations, or
-the cycle its `start` names. What `on`, `off` and `brightness` change is not kept across a
+the cycle its `start` names. What `on`, `off` and ordinary `brightness <n>` change is not kept across a
 restart, nor is a `play` of an animation or a cycle; the playlist that `play` makes
 current, a folder of the card or the root, is kept with the time spent in its window, see
 [show.md](show.md#the-playlist). What `remove` and `upload` change is: they change the
 installed show.
 
-Brightness scales every colour value v to `(v * brightness + 127) / 255`, rounded down.
+Brightness scales every colour value v to `(v * selected + 127) / 255`, rounded down,
+where selected is the file's saved override or the runtime default. Overrides replace
+the default; they do not multiply it. A nonzero override still shows when the default
+is zero. Power off always makes every LED black. Miniature output then caps the
+selected value at 40; WLED's existing current limiter remains in force.
 
 A number in a command is written in decimal digits.
+
+## Saved animation brightness
+
+`brightness ID VALUE save` durably saves 0..255 for the listed animation's file;
+`brightness ID default` removes it. Both work for a noncurrent animation too.
+Cycles and folders are `in-use`, an unlisted ID is `unknown-id`, checking/upload
+conflicts are `busy`, a failed settings operation is `storage-error`, and a full
+settings file is `no-space`. Malformed forms/ranges are `bad-argument`.
+An unchanged save writes nothing. A successful reply means the complete setting
+was verified and published; clients then read fresh `status` to confirm it.
+
+Identity is the internal filename or the full external path, in separate namespaces,
+as for saved repeats. Internal items naming the same file share its value. The same
+external path on a replacement card inherits its value. Replacement/restoration at
+the same path retains it; a rename is a different identity. Deleted, absent and
+unlisted paths are retained indefinitely, with no eviction. Settings stay on the
+board's internal storage even when the animation is on read-only media.
+
+`brightness.txt` uses LF line endings, this header and records:
+
+```
+odrig-brightness 1
+0 f hello.odrg
+27 x night/comet.odrg
+```
+
+There may be 512 records total and at most 32 external records, including retained
+absent paths. First matching record wins. Changing/removing an existing entry works
+at capacity; adding another is refused. The tool's ordinary install preserves this
+file, an explicit copy replaces it, and read-show includes it. Neither animation
+bytes nor show/catalog bytes or generations change for a brightness edit.
+
+Publication writes `brightness.part`, closes it durably, verifies its complete
+grammar/bytes/CRC and atomically renames it. Failed operations retain the last
+usable published setting. Startup ignores an abandoned part. A missing file means
+defaults; corrupt/truncated/over-limit settings log `brightness unreadable`, use
+defaults and report `dimming.error:"settings-unreadable"`. Saves are then refused
+with `storage-error` until a deliberate repair/replacement. Restore a known-good
+file, or deliberately reset all overrides to the header alone; ordinary brightness
+commands do not repair or erase settings. Preserve a copy before such maintenance.
+
+`status.brightness` always reports the runtime default. `dimming.value` reports
+the selected value before blackout/mini cap and `dimming.saved` is null or the
+override, including zero. They refer to the same animation/file as status. Off is
+still unconditionally black; returning from a clock/message selects the resumed
+file's override or latest default without restarting its timing. Missing/null
+`dimming` means no override support, and ordinary default commands remain usable.
 
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"left":86399}
+{"ok":true,"on":true,"brightness":128,"dimming":{"value":128,"saved":null,"error":null},"mini":{"supported":false,"on":false,"pending":false,"requested":false,"error":null,"brightness":40},"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"clock_mode":"off","clock_only":null,"left":86399}
 ```
 
 | Member | Meaning |
 |---|---|
 | `on` | Whether the LEDs are switched on. |
-| `brightness` | Current brightness, 0 to 255. |
+| `brightness` | Runtime default brightness, 0 to 255, initialized from the show. An animation override does not change this value. |
+| `dimming` | Selected animation brightness before blackout/mini cap as `value`, nullable saved override as `saved` (zero is valid), and nullable settings `error`. `null` when persistence is unsupported; absent in older firmware. A damaged settings file reports `settings-unreadable`. |
 | `playing` | What is being played: `"all"` for the root playlist, the id of the card's folder whose playlist is current while the card is in and holds it, the id of a cycle, or `null`. |
 | `animation` | The id of the animation item, or of the drive's animation, on the LEDs right now, or `null`. |
 | `fps` | LED refreshes in the last full second. |
@@ -98,7 +155,9 @@ A number in a command is written in decimal digits.
 | `saved` | The saved repeat of the animation whose turn is reported, 1 to 65,535, or `null` when it has none or no turn is reported. A reply without `repeat`, `loop` and `saved` comes from a player before them. |
 | `file` | The name of the file of the animation `animation` names: an item's file, or a drive's file by its path from the card's folder `odrig`, `night/comet.odrg`; `null` while `animation` is. So a client names what plays without the list that holds it. A reply without `file` comes from a player before it. |
 | `playlist` | The path of the card's folder whose playlist is current while `playing` is its id, `night/deep`; `null` otherwise. |
-| `clocks`, `clock_message` | The two settings in force, `true` or `false`: the clocks between the animations, and the message after each clock, see [Clocks between the animations](#clocks-between-the-animations). A reply without them comes from a player before them. |
+| `clocks`, `clock_message` | Compatibility booleans: `clocks` is true in either enabled mode, and `clock_message` enables the message after a clock. A reply without them comes from a player before them. |
+| `clock_mode` | `off`, `between`, or `only`. Older targets without this member support the existing boolean Off/Between interface. |
+| `clock_only` | `null` outside Only; otherwise `{"folder":ID_OR_NULL,"state":STATE}`, with state `playing`, `no-card`, `missing-folder`, or `no-clocks`. The folder is resolved from the active tree/catalog, never remembered by transient ID. In Only, `playing` names that folder and `playlist` is `clocks` while a turn plays. |
 | `left` | The whole seconds left in the window of the current playlist, 86,400 down to 0: the 24 hours of running time it plays for before the next playlist of the card's folders is current, see [show.md](show.md#the-playlist). 0 from the window's end until the turn in progress ends. Reported whatever the card holds, a fresh 86,400 each time a playlist becomes current. A reply without `left` comes from a player before it. |
 
 `checked`, `to_check` and `unavailable` are 0, and `checking` is `null`, while the show
@@ -331,6 +390,29 @@ seconds is discarded too: no data arrived, and no check is running.
 Playback goes on during an upload. Nothing of the show changes before `upload end`
 succeeds.
 
+## Miniature display debug mode
+
+`status.mini` reports `supported`, acknowledged `on` (null after failed setup),
+`pending`, `requested`, `error` (null or `output-setup-failed`) and effective capped
+`brightness`. A supporting host needs a60x60 canvas. `debug mini on|off` changes
+only RAM and returns acceptance; read status for completion. Opposite requests
+during setup are `busy`; the same request is idempotent. Boot is off. Unsupported
+hosts refuse the request; failed setup holds output dark until a successful retry.
+For example, `debug mini on` may answer `{"ok":true}` while a following status
+still reports `"pending":true,"on":false`. Completion is a later status with
+`"pending":false,"on":true,"error":null`. Repeating the pending request is
+idempotent; `debug mini off` during that pending enable is refused as `busy`.
+An explicit on or off retry after failure is allowed. Unsupported capability is
+the `unsupported` refusal, not a successful off setting. Status brightness is
+the effective miniature cap, zero while power is off; ordinary `brightness` still
+reports the requested normal value. No setting file is changed. Reboot is off.
+Every existing serial, TCP and HTTP route carries these same command lines;
+`odrigctl debug mini on` and `odrigctl debug mini off` validate the two forms.
+Read [the wiring and reboot boundaries](../README.md#miniature-display-debug-mode)
+before a physical check. Firmware compilation and physical acceptance are open.
+The host description is at most95input bytes and256escaped bytes, ending at a
+character boundary, so expanded status remains within the fixed reply limit.
+
 ## Error codes
 
 | Code | When |
@@ -339,6 +421,7 @@ succeeds.
 | `unknown-command` | The first word is not a command. |
 | `bad-argument` | An argument is missing, extra, not a number, out of range, or not in its form: a file name outside the naming rule, base64 that is not as described or stands for more bytes than `chunk`, a CRC-32 that is not eight hexadecimal digits, or a word after `upload` that is not `begin`, `data`, `end` or `cancel`. |
 | `show-invalid` | `play`, `list`, `read`, `remove`, `repeat`, `clocks` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
+| `unsupported` | `debug mini` needs a supporting host and an installed60x60 canvas. Judged after syntax. |
 | `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
@@ -430,10 +513,27 @@ The protocol is identical over HTTP, board serial and emulator serial or TCP.
 
 ## Playlist inclusion and batch deletion
 
-`ignore <id> <0|1>` persists an installed animation's automatic-playlist exclusion:
+`ignore <id> <0|1>` persists an animation's or external folder's automatic-playlist exclusion:
 1 excludes, 0 includes. It is idempotent and returns `{"ok":true}` after durability.
-`list` includes boolean `ignored` on installed animations only. Explicit play and
-cycle membership still work. Unknown ids return unknown-id; cycles/drive ids in-use.
+`list` includes boolean `ignored` on installed animations. External file and folder
+rows also carry their own `ignored` choice and boolean `inherited_ignored`, derived
+from excluded ancestors. Including a parent leaves every child's own choice intact.
+Explicit play remains available for excluded files; internal cycle membership still
+works. Unknown ids return unknown-id; cycles return in-use.
+
+External choices are saved in internal `ignored.txt`, never on the external medium:
+`odrig-ignored 1\n`, followed by `f FULL_PATH\n` or `d FULL_PATH\n` for exclusions.
+An absent record means included. Paths survive remounts and reassigned numeric IDs;
+file and folder identities are distinct, and absent paths are retained. At most 128
+records are kept, without eviction: a new exclusion at capacity returns no-space,
+while an existing exclusion can still be removed. Malformed settings discard partial
+exclusions, log `ignored unreadable`, and refuse mutations with storage-error.
+
+Saving closes and verifies `ignored.part` before atomic replacement. Failed saves
+preserve published bytes and active choices. Abandoned parts are ignored and cleaned
+at startup. Every automatic traversal, clock/message candidate and resumed automatic
+turn applies own and ancestor exclusion; a changed choice revalidates the current
+automatic turn at the next refresh. An explicit manual turn remains available.
 
 `remove many <id,id,...>` deletes 1–32 distinct installed animation items atomically
 per command. Every id is validated first; unknown ids return unknown-id; cycles,
@@ -698,9 +798,9 @@ clocks message on
 {"ok":true}
 ```
 
-`clocks on` switches the clocks between the animations on, and `clocks off` switches them
-off; `clocks message on` switches the message after each clock on, and `clocks message off`
-off. Both settings are off until they are switched on, and both are kept across a restart.
+`clocks on` selects Between animations, `clocks off` selects Off, and `clocks only`
+selects Clocks only. The independent `clocks message on|off` setting controls a message
+after each clock in both enabled modes. Mode and message setting survive restart.
 Each line replies `{"ok":true}` once its setting is saved; a setting already in force
 writes nothing and replies the same. While both are off the player plays as
 [show.md](show.md) says without them. `status` reports them as `clocks` and
@@ -710,20 +810,39 @@ The settings are kept in `clocks.txt` of the board's own storage, beside `order.
 `repeats.txt`, in three lines each ended by LF and nothing more:
 
 ```
-odrig-clocks 1
-clocks on
+odrig-clocks 2
+mode between
 message off
 ```
 
-The second line is `clocks on` or `clocks off`, the third `message on` or `message off`. The
-file is written whole as `clocks.part` and renamed, so a power cut leaves the old settings
-or the new ones; a `clocks.part` is removed at the start. The file is read once, at the
-start: a missing file is both settings off, and a file out of that form is both off, with
-the log saying `clocks unreadable` once; the next change writes it anew. No show names it.
+The second line is `mode off`, `mode between` or `mode only`; the third is `message on`
+or `message off`. Valid version-1 files (`odrig-clocks 1`, `clocks on|off`, then the
+message line) still load, mapping on to Between and off to Off. The next changed setting
+writes version 2; a no-op does not rewrite an old file. A missing file means Off/message
+off. A malformed file recovers the same defaults and logs `clocks unreadable`.
 
-- `bad-argument`: the words are not one of the four lines.
+Saving closes and reads back all of `clocks.part` before one atomic rename. A failure
+preserves published bytes and active settings; an abandoned part is removed at startup.
+No animation, catalog or show file is rewritten for a mode change.
+
+Only stops outside playback and runs direct files of `clocks` in a shuffled bag, with
+one complete direct message from its independent bag after each clock when enabled.
+It has no five-turn/five-minute break recursion. Messages finish a complete declared
+loop, including loops longer than 30 seconds. Own and ancestor Ignore choices apply
+to automatic candidates and are rechecked after changes. Without eligible faces, Only
+stays dark and reports why; it does not fall back to ordinary animations.
+
+Browsing remains unrestricted. Outside file/folder/cycle play and output-taking mapping
+diagnostics return `in-use` without changing playback. Raw `play all` is also refused;
+the app restarts Clocks with `play <resolved-clocks-folder-id>`.
+An explicit inside file remains playable even when ignored or when automatic messages
+are off; an inside subfolder starts its first available file, then the exclusive program
+continues. These actions do not overwrite the saved normal playlist. Leaving Only
+restores its valid path, else root, with its window held and no paused break restored.
+
+- `bad-argument`: the words are not one of the five forms.
 - `show-invalid`: the show is invalid.
 - `busy`: while a rebuild of a catalog runs, until the player has read every installed
   animation after a start, and while an upload is open.
-- `storage-error`: the file could not be written, or the board's storage cannot be
+- `storage-error`: the file could not be written or verified, or the board's storage cannot be
   changed. Nothing changes.

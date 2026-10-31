@@ -28,6 +28,7 @@ SUITES = {
     "emulator": (".venv/bin/python -m unittest discover -s tests/emulator -t .", True),
     "onboarding": (".venv/bin/python -m unittest discover -s tests/onboarding -t .", True),
     "firmware": ("python3 firmware/fw.py test", False),
+    "firmware_host": ("python3 -m unittest discover -s tests/firmware_host -t .", False),
     "app": ("python3 -m unittest discover -s tests/app -t .", False),
     "mapping": ("python3 -m unittest discover -s tests/mapping -t .", False),
     "apk": ("python3 -m unittest discover -s tests/apk -t .", False),
@@ -67,7 +68,7 @@ class GettingStarted(unittest.TestCase):
 
     def test_it_says_what_has_to_be_on_the_computer(self):
         needed = flat(self.part("What you need"))
-        for phrase in ("A Mac, or a Windows computer", "The firmware tool runs on macOS only at present", "command-line developer tools", "`make`", "`git`", "Python 3.10 or later, as `python3`",
+        for phrase in ("A Mac, or a Windows computer", "Firmware setup/build also supports Windows x64 and macOS", "command-line developer tools", "`make`", "`git`", "Python 3.10 or later, as `python3`",
                        "Node.js 20 or later, as `node`", "the `npm` that comes with it", "`node --version` has to say v20 or more"):
             self.assertIn(phrase, needed)
         package = json.loads((support.ROOT / "converter" / "package.json").read_text(encoding="utf-8"))
@@ -78,7 +79,7 @@ class GettingStarted(unittest.TestCase):
         windows = flat(self.part("On Windows"))
         for phrase in ("The Python library, the core's build, the emulator, the command tool, the app's tool and their suites work on Windows 10 and 11.",
                        f"The converter's own suite, `{CONVERTER_SUITE[1]}`, passes there too.",
-                       "The firmware tool, the board and the walk-through suite stay with the first computer.",
+                       "Firmware setup/build and its host-only suite also run there; the board and the Mac walk-through suite stay with their supported computer.",
                        "git, Python 3.10 or later as `python`, Node.js 20 or later, and a C++ compiler",
                        "`g++` or `clang++` on the path, and Microsoft's C++ build tools", "the WinLibs build of MinGW-w64",
                        "into the folder `tools/` of the repository: nothing is installed"):

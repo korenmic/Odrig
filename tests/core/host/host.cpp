@@ -838,6 +838,7 @@ private:
         const bool fixed = given == "mapping.json" || given == "show.json" || given == "upload.part" ||
                            given == "show.part" || given == "pending.txt" || given == "mapping.part" ||
                            given == "order.txt" || given == "order.part" || given == "repeats.txt" || given == "repeats.part" || given == "clocks.txt" || given == "clocks.part" || given == "playlist.txt" || given == "playlist.part" || given == "catalog.txt" ||
+                           given == "brightness.txt" || given == "brightness.part" || given == "ignored.txt" || given == "ignored.part" ||
                            given == "catalog.new" || given == "catalog.do" || page;
         if (!sound || !(animation || fixed)) {
             stop("file misuse", kFileMisuse);
@@ -1164,7 +1165,7 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
     uint64_t total_ms = 0;
     if (reason == odrig::kNone && odrig::is_drawn(content.type)) {
         // A text or a widget is read and checked whole, as the core reads it.
-        std::vector<uint8_t> payload(odrig::kLargestTextPayload);
+        std::vector<uint8_t> payload(odrig::kLargestWidget);
         std::vector<uint8_t> pixels(3u * content.width * content.height);
         const odrig::Picture picture = {&decoder, &inflate, window.data(), pixels.data()};
         reason = odrig::drawn_read(&file, content, payload.data(), picture);
@@ -1249,7 +1250,7 @@ int render(const std::string &path, const std::vector<std::string> &times, uint3
     if (reason == odrig::kNone && !odrig::is_drawn(content.type)) {
         reason = odrig::kUnknownType;
     }
-    std::vector<uint8_t> payload(odrig::kLargestTextPayload);
+    std::vector<uint8_t> payload(odrig::kLargestWidget);
     // A picture clock's picture: its palette indices, as the player's pixel buffer holds them.
     std::vector<uint8_t> indices(3u * content.width * content.height);
     if (reason == odrig::kNone) {
@@ -1360,6 +1361,38 @@ public:
 
 private:
     bool obey(const std::string &line) {
+        if (line == "mini support") {
+            guard::InCore inside;
+            odrig_core_mini_support(core_);
+            return true;
+        }
+        if (line == "mini frame") {
+            odrig_mini mini = {};
+            const int supported = odrig_core_mini(core_, &mini);
+            std::printf("mini %d %u %u %u %u %u\n", supported, mini.revision,
+                        mini.active, mini.requested, mini.pending, mini.failed);
+            if (mini.rgb != nullptr) {
+                std::string preview(180, '\0');
+                for (uint32_t y = 0; y < 6; ++y) {
+                    for (uint32_t x = 0; x < 10; ++x) {
+                        for (uint32_t c = 0; c < 3; ++c) preview[3 * (y * 10 + x) + c] = mini.rgb[3 * (x * 6 + y) + c];
+                    }
+                }
+                std::printf("preview %s\n", hex(preview).c_str());
+                std::printf("chain %s\n", hex(std::string(reinterpret_cast<const char *>(mini.rgb), 180)).c_str());
+            }
+            return true;
+        }
+        if (line.rfind("mini complete ", 0) == 0) {
+            std::istringstream args(line.substr(14));
+            uint32_t revision;
+            int success;
+            if (!(args >> revision >> success)) return false;
+            guard::InCore inside;
+            const int accepted = odrig_core_mini_complete(core_, revision, success);
+            std::printf("completed %d\n", accepted);
+            return true;
+        }
         if (line == "error") {
             print_error();
             return true;

@@ -51,13 +51,15 @@ def differing(text, wleds):
 
 class TheProject(unittest.TestCase):
     def test_the_project_file_names_the_repository_and_wleds_checkout(self):
-        text = standalone.project_text("/a/repository", "/a/work/WLED")
+        root = pathlib.Path("/a/repository").resolve().as_posix()
+        wled_root = pathlib.Path("/a/work/WLED").resolve().as_posix()
+        text = standalone.project_text(root, wled_root)
         self.assertNotIn("@", text.replace("AsyncTCP @", ""))
-        self.assertIn("src_dir = /a/repository/firmware/standalone/src\n", text)
-        self.assertEqual(setting(text, "board_build.partitions"), "/a/work/WLED/tools/WLED_ESP32_16MB_9MB_FS.csv")
-        self.assertIn("  odrig_core = symlink:///a/repository/core\n", text)
+        self.assertIn(f"src_dir = {root}/firmware/standalone/src\n", text)
+        self.assertEqual(setting(text, "board_build.partitions"), f"{wled_root}/tools/WLED_ESP32_16MB_9MB_FS.csv")
+        self.assertIn(f"  odrig_core = symlink://{root}/core\n", text)
         for folder in ("firmware/standalone/platform", "firmware/usermod", "core/include"):
-            self.assertIn(f"  -I/a/repository/{folder}\n", text)
+            self.assertIn(f'  -I"{root}/{folder}"\n', text)
 
     def test_it_is_built_for_the_board_as_wled_is_and_with_the_arduino_framework(self):
         text = TEMPLATE.read_text()
@@ -75,9 +77,12 @@ class TheProject(unittest.TestCase):
         self.assertIn("-D ODRIG_PROBE", probe)
         self.assertNotIn("ODRIG_PROBE", text.split("[env:odrig_standalone_probe]")[0])
 
-    def test_a_path_with_a_space_in_it_is_refused(self):
-        self.assertEqual(support.reason_of(self, lambda: standalone.project_text("/a/my repository", "/a/work/WLED")), "build-failed")
-        self.assertEqual(support.reason_of(self, lambda: standalone.project_text("/a/repository", "/a/my work/WLED")), "build-failed")
+    def test_paths_with_spaces_are_preserved_as_whole_values(self):
+        root = pathlib.Path("/a/my repository").resolve().as_posix()
+        wled_root = pathlib.Path("/a/my work/WLED").resolve().as_posix()
+        text = standalone.project_text(root, wled_root)
+        self.assertIn(f'  -I"{root}/core/include"\n', text)
+        self.assertEqual(setting(text, "board_build.partitions"), f"{wled_root}/tools/WLED_ESP32_16MB_9MB_FS.csv")
 
     def test_the_project_file_is_written_into_its_folder_and_left_alone_when_it_is_there(self):
         with tempfile.TemporaryDirectory() as holder:
@@ -131,7 +136,7 @@ class TheKinds(unittest.TestCase):
                 mock.patch.object(build.wled, "restore_and_patch") as patched, mock.patch.object(build.wled, "write_override") as overridden, \
                 mock.patch.object(build.wled, "check") as checked, mock.patch.object(paths, "STANDALONE", pathlib.Path(holder, "standalone")), \
                 mock.patch.object(build.standalone, "write_project", side_effect=lambda: paths.STANDALONE) as written, \
-                mock.patch.object(build.subprocess, "run", run), mock.patch.object(build, "keep", return_value=175104), \
+                mock.patch.object(build.process, "run", run), mock.patch.object(build.provenance, "write"), mock.patch.object(build, "keep", return_value=175104), \
                 mock.patch.object(build, "sha256", return_value="0" * 64):
             result = support.run_main("build", *arguments)
             folder = str(paths.STANDALONE)
@@ -150,7 +155,7 @@ class TheKinds(unittest.TestCase):
             with self.subTest(arguments=arguments):
                 result, ran, folder, (patched, overridden, checked, written) = self.build(*arguments)
                 self.assertEqual(result.status, 0, result.err)
-                self.assertEqual(ran[0][0][1:], ["-m", "platformio", "run", "-d", folder, "-e", environment])
+                self.assertEqual(ran[0][0][1:], ["-m", "platformio", "run", "-d", folder, "-e", environment, "-j", "2"])
                 self.assertEqual(ran[0][1]["env"]["PLATFORMIO_CORE_DIR"], str(paths.PIO_CORE))
                 patched.assert_not_called()
                 overridden.assert_not_called()
@@ -160,7 +165,7 @@ class TheKinds(unittest.TestCase):
 
     def test_the_other_kinds_are_built_in_wleds_folder_as_before(self):
         result, ran, _, (patched, overridden, _, written) = self.build("--stick", "--probe")
-        self.assertEqual(ran[0][0][1:], ["-m", "platformio", "run", "-d", str(paths.WLED), "-e", "odrig_probe"])
+        self.assertEqual(ran[0][0][1:], ["-m", "platformio", "run", "-d", str(paths.WLED), "-e", "odrig_probe", "-j", "2"])
         patched.assert_called_once()
         overridden.assert_called_once()
         written.assert_not_called()

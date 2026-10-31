@@ -44,7 +44,76 @@ the reference documents. Coding agents start at [AGENTS.md](AGENTS.md).
   contributors what this project is and how to work in it, with `AGENTS.md` and `CLAUDE.md`
   at the top of the repository as the way in.
 
-Hardware and power wiring are not a workstream: they are handled on site by the operators.
+Hardware and power wiring are handled on site by the operators. The approved miniature
+test connection below still needs its electrical and powered acceptance checks.
+
+## Miniature display debug mode
+
+The software can project the full 60x60 canvas onto the purchased **Seeed Studio
+6x10 RGB MATRIX for XIAO**, SKU 104030107, used landscape as 10 columns by 6 rows.
+The square picture occupies the central 6x6 pixels; the two columns at either side
+stay black. Each pixel averages a 10x10 block. Text, clocks and animations keep their
+normal canvas and timing. This is a temporary output mode, off after every reboot.
+Its firmware integration has host tests; it has **not** been built or tried on the
+board in this run. Windows firmware compilation is deferred to seed 60.
+
+### Approved connection and orientation
+
+Power off before assembly or changing wires, and disconnect the full wall. Use
+the matrix's dedicated pads, with the following intended connection:
+
+| ESP32-S3 board | Matrix pad | Purpose |
+|---|---|---|
+| **5V** | **5V / VCC** | Approved 5V power connection |
+| **GND** | **GND** | Common ground |
+| **GPIO1** | **IN / DIN** | LED data input |
+
+Leave **OUT / DOUT**, **3V3**, and the unused XIAO header pins unconnected.
+GPIO1 means the ESP board's GPIO number; it is not a XIAO `D1` label. No XIAO
+controller or second matrix is part of this connection. Inspect pad labels,
+polarity, solder joints and shorts before powering the assembly.
+
+Viewed from the **LED front**, place the IN edge at the **left** and the long
+dimension horizontally; viewed from the **rear**, that IN edge is at the **right**.
+Coordinates start at bottom left. The first LED is at that bottom-left corner;
+chain indices 0..5 run upward, 6..11 up the next column, ending at 59 at top right.
+This straight-column order, `index = x * 6 + y`, is derived from the manufacturer's
+[schematic and PCB](https://files.seeedstudio.com/wiki/xiao-rgb-matrix/EAGLE_XIAO_MATRIX.zip),
+following DIN through LED116 to LED39 and rotating to this landscape front view.
+It still needs the powered corner/axis check; it is not an observed orientation.
+
+The [manufacturer's guide](https://wiki.seeedstudio.com/rgb_matrix_for_xiao/)
+identifies the part and pads. Its linked
+[LED datasheet](https://files.seeedstudio.com/wiki/xiao-rgb-matrix/WS2812B-1010-DATASHEET.pdf),
+page 5, gives a 2.8V input-high minimum at 5V. That supports the approved direct 3.3V
+data plan for that part; actual part correspondence and signal margin remain to
+be checked. This does not establish the ESP board's 5V current capacity.
+
+### Before and during a powered check
+
+1. Have the actual board's 5V supply path, protection, total load and any simultaneous
+   USB power path checked, including startup, normal output and failed setup. No
+   electrical/current budget or assembly has been accepted by these software tests.
+   The mini brightness cap is not a power guarantee and applies only while mini is
+   active; boot and restored normal mode use normal output and its selected brightness.
+2. With the full wall disconnected and the accepted assembly powered, enable
+   **Settings → Miniature display debug mode**, or send `debug mini on` through
+   an existing command route. Read `status.mini`: wait for `pending:false`,
+   `on:true` and `error:null`. A command's `ok` alone does not confirm output setup.
+3. Mini output uses one 60-LED GRB bus on GPIO1 and brightness at most 40. Normal
+   brightness and mapping remain unchanged. The app names active mode outside
+   Settings; the emulator displays the same core-generated miniature beside its
+   normal LEDs view. Failed setup keeps output dark and the reported mode unknown;
+   an explicit retry or **Restore normal outputs** requests recovery.
+4. Power off before changing back to wall wiring. Reboot returns to normal mode.
+   If requesting `debug mini off` with the matrix still attached, first establish
+   that the restored normal output's brightness/current is safe for that assembly.
+   Do not move connectors while powered or rely on a saved local app switch.
+
+Powered corners/axes, real frame/text/widget playback from internal storage and
+microSD, clear transitions, responsive controls, 20–50 FPS, and phone readback and
+reconnect remain open. See [the verification record](docs/specs/57-p2-miniature-matrix-debug-mode/verification.md)
+and [the retained acceptance task](docs/specs/57-p2-miniature-matrix-debug-mode/tasks.md).
 
 Decisions made so far, and the questions still open, are in [docs/decisions.md](docs/decisions.md).
 The animation file formats are specified in [docs/format.md](docs/format.md), the mapping

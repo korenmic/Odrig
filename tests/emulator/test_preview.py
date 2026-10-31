@@ -180,6 +180,26 @@ class OneAnimation(unittest.TestCase):
         self.assertEqual(started.terminate(), (0, self.said_on_starting(page)))
         self.assert_nothing_left(page)
 
+    def test_a_message_clock_plays_as_a_procedural_widget(self):
+        from tests.core.test_message_clock import message_file
+        data = message_file([('hello', 0), ('still', 4)])
+        path = self.work / "message.odrgx"
+        path.write_bytes(data)
+        started = self.preview(path, "--mapping", support.ROOT / "mapping" / "legs-20.json")
+        page = started.page()
+        status = answer(page, "status")
+        deadline = time.monotonic() + 10
+        while status['seed'] is None and time.monotonic() < deadline:
+            time.sleep(0.02)
+            status = answer(page, 'status')
+        self.assertEqual((status['error'], status['animation']), (None, 1))
+        self.assertIsInstance(status['seed'], int)
+        self.assertEqual(answer(page, 'list')['items'][0]['type'], 'widget')
+        self.assertEqual(answer(page, 'read 1 0')['ok'], True)
+        self.assertEqual(path.read_bytes(), data)
+        self.assertEqual(started.terminate(), (0, self.said_on_starting(page)))
+        self.assert_nothing_left(page)
+
     def test_a_path_with_nothing_there_and_a_folder_are_refused_before_anything_starts(self):
         for path in (self.work / "absent.odrg", self.work):
             with self.subTest(path=path.name):

@@ -8,6 +8,8 @@
 #include "drive.h"
 #include "breaks.h"
 #include "repeats.h"
+#include "brightness.h"
+#include "ignored.h"
 #include "storage.h"
 
 namespace odrig {
@@ -159,7 +161,9 @@ bool order_begin(Core &core) {
     // for the current playlist's path and the saved repeats of the drive's files.
     const uint32_t tree = core.drive != nullptr ? kFolderMost * sizeof(Folder) + kPlaylistPathRoom : 0;
     const uint32_t repeats = core.drive != nullptr ? kRepeatsDriveMost * sizeof(RepeatOf) : 0;
-    uint8_t *block = static_cast<uint8_t *>(arena_take(core, core.item_capacity * 2 + tree + repeats));
+    const uint32_t brightness = core.drive != nullptr ? kBrightnessDriveMost * sizeof(BrightnessOf) : 0;
+    const uint32_t ignored = core.drive != nullptr ? kIgnoredMost * sizeof(IgnoredOf) : 0;
+    uint8_t *block = static_cast<uint8_t *>(arena_take(core, core.item_capacity * 2 + tree + repeats + brightness + ignored));
     if (block == nullptr) {
         return false;
     }
@@ -170,6 +174,9 @@ bool order_begin(Core &core) {
         core.playlist_path = reinterpret_cast<char *>(block + core.item_capacity * 2 + kFolderMost * sizeof(Folder));
         core.playlist_path[0] = '\0';
         core.repeats_drive = reinterpret_cast<RepeatOf *>(block + core.item_capacity * 2 + tree);
+        core.brightness_drive = reinterpret_cast<BrightnessOf *>(block + core.item_capacity * 2 + tree + repeats);
+        brightness_drive_found(core);
+        ignored_drive_found(core);
         tree_clear(core);
         repeats_drive_found(core);
     }
@@ -250,7 +257,7 @@ void tree_find_current(Core &core) {
         const uint32_t found = drive_folder_with_path(core, core.playlist_path);
         if (found != kNoFolder) {
             core.current = found;
-        } else {
+        } else if (core.clocks_on != kClocksOnly) {
             // The card has no playlist of the saved path: the root is current, with a fresh
             // window, and is saved as such at the next refresh.
             core.playlist_path[0] = '\0';
@@ -291,6 +298,8 @@ void order_start(Core &core) {
     clear_items(core);
     read_whole(core);
     repeats_start(core);
+    brightness_start(core);
+    ignored_start(core);
 }
 
 void order_reload(Core &core) {
@@ -301,6 +310,8 @@ void order_reload(Core &core) {
     clear_items(core);
     read_whole(core);
     repeats_reload(core);
+    brightness_start(core);
+    ignored_start(core);
 }
 
 void order_item_leaves(Core &core, uint32_t position) {

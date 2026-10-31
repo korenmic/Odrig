@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 
-from . import Failure, env, paths, standalone, toolchain, wled
+from . import Failure, env, paths, process, provenance, setuplock, standalone, toolchain, wled
 
 Kind = collections.namedtuple("Kind", "environment image")
 
@@ -35,6 +35,7 @@ STICK_OF = {"firmware": "stick", "probe": "stick-probe"}
 
 # The size of the first application partition of WLED's 16 MB layout.
 APPLICATION_SIZE = 0x300000
+BUILD_JOBS = 2
 
 
 def image_path(kind):
@@ -54,7 +55,7 @@ def sha256(path):
 
 
 def write_checksum(image):
-    checksum_path(image).write_text(f"{sha256(image)}  {image.name}\n")
+    checksum_path(image).write_text(f"{sha256(image)}  {image.name}\n", encoding='utf-8', newline='\n')
 
 
 def check_size(image, limit=APPLICATION_SIZE):
@@ -71,7 +72,7 @@ def checked_image(image):
     beside = checksum_path(image)
     if not beside.is_file():
         raise Failure("image-missing", f"{beside} is not there; build the image again")
-    written = beside.read_text().split()
+    written = beside.read_text(encoding='utf-8').split()
     if not written or written[0] != sha256(image):
         raise Failure("checksum-mismatch", f"{image.name} does not have the SHA-256 written in {beside.name}")
     return image
@@ -90,7 +91,7 @@ def keep(built, image):
 
 
 def pio_command(environment, verbose=False, folder=None, python=None):
-    command = [str(paths.PYTHON if python is None else python), "-m", "platformio", "run", "-d", str(paths.WLED if folder is None else folder), "-e", environment]
+    command = [str(paths.PYTHON if python is None else python), "-m", "platformio", "run", "-d", str(paths.WLED if folder is None else folder), "-e", environment, "-j", str(BUILD_JOBS)]
     return command + ["-v"] if verbose else command
 
 
@@ -101,6 +102,11 @@ def build(kind, verbose=False):
     toolchain.python_environment()
     if newer:
         toolchain.newer_environment()
+    with setuplock.held(paths.BUILD_LOCK):
+        return _build(kind, made, newer, verbose)
+
+
+def _build(kind, made, newer, verbose):
     if kind in WITHOUT_WLED:
         wled.check()
         folder = standalone.write_project()
@@ -109,9 +115,13 @@ def build(kind, verbose=False):
         wled.write_override()
         folder = paths.WLED
     python = paths.NEWER_PYTHON if newer else paths.PYTHON
-    done = subprocess.run(pio_command(made.environment, verbose, folder, python), env=env.child(newer=newer), stdout=sys.stderr)
+    try:
+        done = process.run(pio_command(made.environment, verbose, folder, python), env=env.child(newer=newer), stdout=sys.stderr)
+    except OSError as error:
+        raise Failure('build-failed', f'PlatformIO: {error}') from None
     if done.returncode != 0:
         raise Failure("build-failed", f"PlatformIO ended with status {done.returncode} for the environment {made.environment}")
     image = image_path(kind)
     size = keep(folder / ".pio" / "build" / made.environment / "firmware.bin", image)
+    provenance.write(kind,made.environment,image,newer)
     return image, size

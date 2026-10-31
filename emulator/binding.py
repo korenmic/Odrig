@@ -65,11 +65,22 @@ class LegRecord(Structure):
 
 
 # Every function of the header: its result and its arguments.
+class MiniRecord(Structure):
+    """`odrig_mini`, with borrowed frame pointers."""
+
+    _fields_ = [("revision", c_uint32), ("active", c_uint8), ("requested", c_uint8),
+                ("pending", c_uint8), ("failed", c_uint8),
+                ("rgb", POINTER(c_uint8))]
+
+
 FUNCTIONS = {
     "odrig_core_begin": (c_void_p, [POINTER(HostRecord)]),
     "odrig_core_poll": (c_int, [c_void_p, c_uint64]),
     "odrig_core_leg_count": (c_uint32, [c_void_p]),
     "odrig_core_leg": (c_int, [c_void_p, c_uint32, POINTER(LegRecord)]),
+    "odrig_core_mini_support": (None, [c_void_p]),
+    "odrig_core_mini": (c_int, [c_void_p, POINTER(MiniRecord)]),
+    "odrig_core_mini_complete": (c_int, [c_void_p, c_uint32, c_int]),
     "odrig_core_command": (c_size_t, [c_void_p, c_uint64, c_char_p, c_size_t, c_char_p, c_size_t]),
     "odrig_core_feed": (None, [c_void_p, c_uint64, c_char_p, c_size_t, REPLY, c_void_p]),
     "odrig_core_error": (c_char_p, [c_void_p]),
@@ -139,6 +150,7 @@ class Core:
         self._core = self._library.odrig_core_begin(ctypes.byref(self._record))
         if not self._core:
             raise failure.Failure(failure.CORE_NOT_BUILT, "the core could not start")
+        self._library.odrig_core_mini_support(self._core)
         # Successful `mapping cross` commands: each may have changed where the LEDs of a leg
         # are, which the mapping file says and the legs do not.
         self.wiring_saves = 0
@@ -254,10 +266,24 @@ class Core:
         in the core's order."""
         return b"".join(ctypes.string_at(address, size) for address, size in self._rgb)
 
+    def miniature(self):
+        """The shared physical 10x6 picture and acknowledged mode, or no capability."""
+        record = MiniRecord()
+        if not self._library.odrig_core_mini(self._core, ctypes.byref(record)):
+            return None
+        return bool(record.active), ctypes.string_at(record.rgb, 180) if record.active else b""
+
+    def _acknowledge_mini(self):
+        """Virtual outputs need no asynchronous hardware reconfiguration."""
+        record = MiniRecord()
+        if self._library.odrig_core_mini(self._core, ctypes.byref(record)) and record.pending:
+            self._library.odrig_core_mini_complete(self._core, record.revision, 1)
+
     def command(self, now_ms, line):
         """One command line in, its reply out, with the reply's newline."""
         length = self._library.odrig_core_command(self._core, now_ms, line, len(line), self._reply, REPLY_MAX)
         reply = self._reply.raw[:length]
+        self._acknowledge_mini()
         if line.startswith(b"mapping set ") and reply.startswith(b'{"ok":true'):
             self._refresh_legs()
         if line.startswith(b"mapping cross ") and reply.startswith(b'{"ok":true'):
@@ -271,6 +297,7 @@ class Core:
         self._answered = []
         self._library.odrig_core_feed(self._core, now_ms, data, len(data), self._on_reply, None)
         answered, self._answered = self._answered, []
+        self._acknowledge_mini()
         if any(line.startswith(b"mapping set ") and reply.startswith(b'{"ok":true') for line, reply, _ in answered):
             self._refresh_legs()
         self.wiring_saves += sum(line.startswith(b"mapping cross ") and reply.startswith(b'{"ok":true') for line, reply, _ in answered)

@@ -1,6 +1,8 @@
 import hashlib
 import io
 import json
+import os
+import subprocess
 import pathlib
 import shutil
 import sys
@@ -10,8 +12,56 @@ import unittest
 from unittest import mock
 
 from tests import run
+from firmware.fwtool import host as firmware_host
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+
+
+class HostSelection(unittest.TestCase):
+    def test_direct_entry_point_loads_its_host_helpers(self):
+        done = subprocess.run([sys.executable, str(ROOT / 'tests' / 'run.py'), '--help'],
+                              cwd=ROOT, capture_output=True, encoding='utf-8')
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn('--builds', done.stdout)
+
+    def runner(self,root):
+        with mock.patch.object(run,'Job',return_value=None):
+            return run.Runner(run.parser().parse_args([]),root=root,suites=[],out=io.StringIO())
+
+    def test_firmware_python_comes_from_the_current_hosts_isolated_cache(self):
+        with tempfile.TemporaryDirectory(prefix='odrig-runner-host-') as directory,mock.patch.dict(os.environ,{'ODRIG_TOOLS':''}):
+            root=pathlib.Path(directory)
+            python=firmware_host.program(firmware_host.tool_root(root/'build'/'firmware')/'venv','python')
+            python.parent.mkdir(parents=True);python.touch()
+            self.assertEqual(self.runner(root).firmware_python(),python)
+
+    def test_shared_firmware_tools_keep_host_selection_and_spaced_paths(self):
+        with tempfile.TemporaryDirectory(prefix='odrig-runner-shared-host-') as directory:
+            root=pathlib.Path(directory)
+            tools=root/'shared tools'
+            python=firmware_host.program(firmware_host.tool_root(tools/'firmware')/'venv','python')
+            python.parent.mkdir(parents=True);python.touch()
+            with mock.patch.dict(os.environ,{'ODRIG_TOOLS':str(tools)}):
+                self.assertEqual(self.runner(root).firmware_python(),python.resolve())
+
+    def test_unsupported_apk_build_is_reported_without_blocking_the_firmware_build(self):
+        with tempfile.TemporaryDirectory(prefix='odrig-runner-build-host-') as directory:
+            root=pathlib.Path(directory)
+            (root/'app').mkdir()
+            (root/'app'/'toolchain.json').write_text(json.dumps({'jdk':{},'command-line-tools':{}}),encoding='utf-8',newline='\n')
+            runner=self.runner(root)
+            runner.builds=[run.Build('apk',['app/app.py','build'],'out/app.apk'),
+                           run.Build('firmware',['firmware/fw.py','build'],'out/firmware.bin')]
+            try:
+                with mock.patch.object(run.subprocess,'Popen') as spawned:
+                    runner.start_builds()
+                self.assertEqual(spawned.call_count,1)
+                self.assertIn('firmware/fw.py',spawned.call_args.args[0])
+                self.assertIn('SKIPPED',runner.built['apk']['outcome'])
+                self.assertIn('not run',runner.out.getvalue())
+            finally:
+                for state in runner.built.values():
+                    if state.get('handle'):state['handle'].close()
 
 PASSING = """
 import time

@@ -19,14 +19,15 @@ from . import Failure, paths
 FOLDER = "/odrig"
 MAPPING_NAME = "mapping.json"
 SHOW_NAME = "show.json"
-# The saved playlist order, the saved playlist, the saved repeats and the clocks' settings,
-# which a show folder may hold beside the files of the show: the board keeps its own when the
-# folder has none.
+# Settings a show folder may hold beside its content: the board keeps its own when
+# the folder has none.
 ORDER_NAME = "order.txt"
 PLAYLIST_NAME = "playlist.txt"
 REPEATS_NAME = "repeats.txt"
 CLOCKS_NAME = "clocks.txt"
-KEPT_NAMES = (ORDER_NAME, PLAYLIST_NAME, REPEATS_NAME, CLOCKS_NAME)
+BRIGHTNESS_NAME = "brightness.txt"
+IGNORED_NAME = "ignored.txt"
+KEPT_NAMES = (ORDER_NAME, PLAYLIST_NAME, REPEATS_NAME, CLOCKS_NAME, BRIGHTNESS_NAME, IGNORED_NAME)
 # The files of the internal catalog: its marker and its pages.
 CATALOG_NAMES = (catalog.MARKER, *(catalog.page_name(number) for number in range(catalog.PAGES)))
 MARK = b"littlefs"
@@ -336,7 +337,7 @@ def folder_files(folder, check=True):
 
     The folder must be flat. With `check` it must also be a valid installed file set, as
     the readers of the converter judge it, and hold no file the show does not name besides
-    the saved playlist order and the saved playlist.
+    the saved operator settings.
     """
     folder = pathlib.Path(folder)
     if not folder.is_dir():

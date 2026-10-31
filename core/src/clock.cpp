@@ -4,6 +4,7 @@
 
 #include "fonts.h"
 #include "text.h"
+#include "message_clock.h"
 
 namespace odrig {
 
@@ -732,6 +733,7 @@ Reason clock_read(FileSource *file, const ContentHeader &header, uint8_t *into, 
     if (first != kNone) {
         return first;
     }
+    if (fixed[0] == 6) return message_clock_read(file, header, into);
     if (fixed[0] < kAnalog || fixed[0] > kPictureDisplay) {
         return kUnknownWidget;
     }
@@ -816,6 +818,7 @@ int64_t clock_virtual_time(const uint8_t *payload, uint32_t seed, uint64_t t) {
 }
 
 void clock_draw(const uint8_t *payload, uint32_t seed, uint16_t width, uint16_t height, uint64_t t, uint8_t *pixels) {
+    if (payload[0] == 6) { message_clock_draw(payload, seed, t, pixels); return; }
     const Clock clock = clock_of(payload, seed);
     const int64_t elapsed = static_cast<int64_t>(t);
     const int64_t time = fmod(virtual_time(clock, elapsed), kHalfDay);

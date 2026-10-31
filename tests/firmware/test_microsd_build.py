@@ -4,7 +4,7 @@ import os
 import unittest
 from unittest import mock
 
-from fwtool import build, paths, wled
+from fwtool import build, host, paths, wled
 
 from . import support
 
@@ -15,8 +15,8 @@ class BuildingMicroSD(unittest.TestCase):
                 mock.patch.object(build.toolchain, "newer_environment") as newer, \
                 mock.patch.object(build.wled, "restore_and_patch") as patched, \
                 mock.patch.object(build.wled, "write_override") as overridden, \
-                mock.patch.object(build.subprocess, "run", return_value=mock.Mock(returncode=status)) as ran, \
-                mock.patch.object(build, "keep", return_value=1500000) as kept, \
+                mock.patch.object(build.process, "run", return_value=mock.Mock(returncode=status)) as ran, \
+                mock.patch.object(build.provenance, "write"), mock.patch.object(build, "keep", return_value=1500000) as kept, \
                 mock.patch.object(build, "sha256", return_value="48e51d84"):
             result = support.run_main("build", "--microsd")
         return result, ran, newer, patched, overridden, kept
@@ -25,11 +25,11 @@ class BuildingMicroSD(unittest.TestCase):
         result, ran, newer, patched, overridden, kept = self.build()
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(ran.call_args.args[0], [
-            str(paths.NEWER_PYTHON), "-m", "platformio", "run", "-d", str(paths.WLED), "-e", "odrig_microsd",
+            str(paths.NEWER_PYTHON), "-m", "platformio", "run", "-d", str(paths.WLED), "-e", "odrig_microsd", "-j", "2",
         ])
         made = ran.call_args.kwargs["env"]
         self.assertEqual(made["PLATFORMIO_CORE_DIR"], str(paths.NEWER_PIO_CORE))
-        self.assertEqual(made["PATH"].split(os.pathsep)[0], str(paths.NEWER_VENV / "bin"))
+        self.assertEqual(made["PATH"].split(os.pathsep)[0], str(host.scripts(paths.NEWER_VENV)))
         newer.assert_called_once_with()
         patched.assert_called_once_with(patches=paths.PATCHES)
         overridden.assert_called_once_with()

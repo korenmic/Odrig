@@ -14,7 +14,7 @@ import signal
 import subprocess
 import sys
 
-from . import Failure, board, build, env, flasher, journal, partitions, paths, stock, toolchain
+from . import Failure, board, build, env, flasher, host, journal, partitions, paths, process, stock, toolchain
 
 SUITES = {"test": "tests/firmware", "test-board": "tests/board", "test-air": "tests/air"}
 
@@ -101,6 +101,8 @@ def _setup(arguments):
         print(step)
     print(f"work folder: {paths.WORK}")
     print(f"toolchains: {paths.SHARED}")
+    print(f"host: {'-'.join(host.supported())}")
+    print(f"host toolchains: {paths.HOST_ROOT}")
     for name, version in versions.items():
         print(f"{name}: {version}")
     return 0
@@ -400,8 +402,7 @@ def _install_show(arguments):
         present = storage.show_of(before)
         for name in storage.KEPT_NAMES:
             if name in present and name not in files:
-                # The saved order, the saved playlist, the saved repeats and the clocks'
-                # settings are the operator's choices: a folder without them keeps the board's.
+                # Operator settings are kept unless the folder explicitly replaces them.
                 files = dict(files, **{name: present[name]})
         files = storage.with_board_generation(files, present)
         for line in show_lines(present, files):
@@ -673,8 +674,17 @@ def launch(argv):
         toolchain.python_environment()
     except Failure as failure:
         return report(failure)
+    except KeyboardInterrupt:
+        return report(Failure("cancelled", "cancelled by an interrupt"))
+    except OSError as error:
+        return report(Failure("setup-failed", str(error)))
     command = [str(paths.PYTHON), "-m", "fwtool.cli", *argv]
-    return subprocess.run(command, env=module_environment()).returncode
+    try:
+        return process.run(command, env=module_environment()).returncode
+    except KeyboardInterrupt:
+        return report(Failure("cancelled", "cancelled by an interrupt"))
+    except OSError as error:
+        return report(Failure("setup-failed", str(error)))
 
 
 if __name__ == "__main__":

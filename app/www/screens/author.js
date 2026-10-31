@@ -260,6 +260,11 @@ async function edit(animation, message, go) {
     message(messages.PICTURE_CLOCK);
     return;
   }
+  if (read.type === "widget" && read.settings.widget === "message-clock") {
+    byId("author").hidden = true;
+    message(messages.MESSAGE_CLOCK);
+    return;
+  }
   fill(read);
   editing = {id: animation.id, file: animation.file, crc: crc32(bytes)};
   showForm(read.type === "widget" ? "widget" : "text");

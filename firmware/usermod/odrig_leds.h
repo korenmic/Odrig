@@ -22,8 +22,11 @@ struct OdrigLegSource {
 
 namespace OdrigLeds {
 
-// Names the source of the legs. Called once, before anything else.
+// Names the source of the legs. Changes only between cleared, drained outputs.
 void source(const OdrigLegSource &legs);
+
+// Keeps WLED from drawing without changing output resources during a transition.
+void keepLive();
 
 // Keeps WLED in its live mode and keeps the outputs those of the legs. Called from
 // setup() and at the start of every loop().

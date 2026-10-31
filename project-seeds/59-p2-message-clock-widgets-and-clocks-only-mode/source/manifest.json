@@ -1,0 +1,362 @@
+{
+  "version": 1,
+  "reference": "project-seeds/59-p2-message-clock-widgets-and-clocks-only-mode/references/led_grid_simulator_v7_tabs_v4_no_blink.html",
+  "referenceSha256": "a84cec0bd28b5d608b0d36b4a6ceb32a48d310329639fd2453643d70416b358e",
+  "font": {
+    "source": "fonts/small.txt",
+    "sha256": "62d98242ab92cbf40f894165e2d02eeef377af7a987e0c980c49873a0021470f",
+    "text": {
+      "name": "small",
+      "x": 0.8,
+      "y": 0.8888888888888888,
+      "pitch": 9,
+      "width": 58
+    },
+    "digits": {
+      "name": "large",
+      "x": 0.6,
+      "y": 0.6666666666666666
+    }
+  },
+  "adaptation": "Existing authored fonts replace Arial/monospace; area-sampled alpha4 masks, fixed 9px text spacing, no unlit-dot or browser background decorations.",
+  "files": [
+    {
+      "file": "v7-consciousness.odrgx",
+      "title": "1 · התודעה",
+      "tab": 1,
+      "loopMs": 36600,
+      "payloadBytes": 9568,
+      "captions": [
+        {
+          "text": "זה לא הזמן",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "זה המרחב",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "זו התודעה",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "תרגישו את זה זז",
+          "flags": 4,
+          "duration": 6100
+        },
+        {
+          "text": "מרגישים?",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "זז לכם?",
+          "flags": 0,
+          "duration": 6100
+        }
+      ]
+    },
+    {
+      "file": "v7-symmetry.odrgx",
+      "title": "2 · סימטריה",
+      "tab": 2,
+      "loopMs": 24400,
+      "payloadBytes": 7717,
+      "captions": [
+        {
+          "text": "זה לא הזמן",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "זו הסימטריה",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "זו הגאומטריה",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "זה המרחק",
+          "flags": 0,
+          "duration": 6100
+        }
+      ]
+    },
+    {
+      "file": "v7-temperature.odrgx",
+      "title": "3 · טמפרטורה",
+      "tab": 3,
+      "loopMs": 36600,
+      "payloadBytes": 9554,
+      "captions": [
+        {
+          "text": "זה לא הזמן",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "זו הטמפרטורה.",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "הזמן חם",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "מתחמם",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "רותח",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "הזמן נשרף",
+          "flags": 0,
+          "duration": 6100
+        }
+      ]
+    },
+    {
+      "file": "v7-the-time.odrgx",
+      "title": "4 · השעה",
+      "tab": 4,
+      "loopMs": 36600,
+      "payloadBytes": 9574,
+      "captions": [
+        {
+          "text": "מה אתם מחפשים?",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "את השעה?",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "היא הייתה פה קודם",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "פספסתם",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "נסו שוב",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "לאט יותר",
+          "flags": 0,
+          "duration": 6100
+        }
+      ]
+    },
+    {
+      "file": "v7-countdown.odrgx",
+      "title": "5 · ספירה לאחור",
+      "tab": 5,
+      "loopMs": 76900,
+      "payloadBytes": 22495,
+      "captions": [
+        {
+          "text": "עשר",
+          "flags": 1,
+          "duration": 2000
+        },
+        {
+          "text": "תשע",
+          "flags": 1,
+          "duration": 2000
+        },
+        {
+          "text": "שמונה",
+          "flags": 1,
+          "duration": 2000
+        },
+        {
+          "text": "שבע",
+          "flags": 1,
+          "duration": 2000
+        },
+        {
+          "text": "שש",
+          "flags": 1,
+          "duration": 2000
+        },
+        {
+          "text": "חמש",
+          "flags": 1,
+          "duration": 2000
+        },
+        {
+          "text": "ארבע",
+          "flags": 1,
+          "duration": 2000
+        },
+        {
+          "text": "שלוש",
+          "flags": 1,
+          "duration": 2000
+        },
+        {
+          "text": "שתיים",
+          "flags": 1,
+          "duration": 2000
+        },
+        {
+          "text": "אחת",
+          "flags": 1,
+          "duration": 2000
+        },
+        {
+          "text": "אפס",
+          "flags": 1,
+          "duration": 2000
+        },
+        {
+          "text": "קטע",
+          "flags": 2,
+          "duration": 6100
+        },
+        {
+          "text": "לא קרה כלום",
+          "flags": 2,
+          "duration": 6100
+        },
+        {
+          "text": "יודעים למה?",
+          "flags": 2,
+          "duration": 6100
+        },
+        {
+          "text": "כי זה לא הזמן",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "זה המקום",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "המקום עליו אתם עומדים",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "מה איתו",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "סתם מקום",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "אבל בטוח שהוא לא זמן",
+          "flags": 0,
+          "duration": 6100
+        }
+      ]
+    },
+    {
+      "file": "v7-the-clock.odrgx",
+      "title": "6 · השעון",
+      "tab": 6,
+      "loopMs": 24400,
+      "payloadBytes": 7727,
+      "captions": [
+        {
+          "text": "הזמן עצר",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "אל תסתכלו עכשיו",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "הכול בשליטה",
+          "flags": 16,
+          "duration": 6100
+        },
+        {
+          "text": "שום דבר לא זז",
+          "flags": 8,
+          "duration": 6100
+        }
+      ]
+    },
+    {
+      "file": "v7-mistakes.odrgx",
+      "title": "7 · הטעויות",
+      "tab": 7,
+      "loopMs": 54900,
+      "payloadBytes": 12460,
+      "captions": [
+        {
+          "text": "זה לא הזמן",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "או שזה הזמן למות",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "או שזה הזמן רק לשלם את המחיר",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "על כל טעות ועוד טעות",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "ועוד טעות",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "כמה טעויות סעמק",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "מתי כבר נפסיק לטעות",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "אף פעם",
+          "flags": 0,
+          "duration": 6100
+        },
+        {
+          "text": "כי זה אף פעם לא הזמן.",
+          "flags": 0,
+          "duration": 6100
+        }
+      ]
+    }
+  ]
+}

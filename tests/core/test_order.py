@@ -154,7 +154,7 @@ class CardEntries(unittest.TestCase):
         self.assertEqual([(item["id"], item.get("external")) for item in items if "cycle" not in item], [(1, False), (2, False), (60001, True), (60002, True), (60003, True)])
         self.assertEqual([item for item in items if "cycle" in item], [{"id": 9, "cycle": [1, 2], "seconds": 3}])
         self.assertEqual(list(items[0]), ["id", "file", "bytes", "ignored", "external", "type"])
-        self.assertEqual(list(items[3]), ["id", "file", "bytes", "external", "type"])
+        self.assertEqual(list(items[3]), ["id", "file", "bytes", "external", "type", "ignored", "inherited_ignored"])
 
 
 class OrderGet(unittest.TestCase):

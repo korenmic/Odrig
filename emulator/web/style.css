@@ -334,3 +334,6 @@ code, .value, .readout, .log td, .log th { font-family: var(--mono); }
 }
 
 .empty { margin: 0; padding: 10px 16px; color: var(--dim); }
+.mini-preview { position: absolute; top: 1rem; right: 1rem; padding: .6rem; background: #151515; border: 1px solid #666; border-radius: .5rem; color: #eee; z-index: 2; }
+.mini-preview span { display: block; margin-bottom: .4rem; font-size: .85rem; }
+.mini-preview canvas { display: block; max-width: 100%; image-rendering: pixelated; }

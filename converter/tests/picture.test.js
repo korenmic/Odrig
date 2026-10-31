@@ -121,7 +121,7 @@ test("a picture widget is refused with the reasons of the core, in their order",
   const at = P + 48;
   const cases = [
     ["unknown-widget", changed(dial, P, 0)],
-    ["unknown-widget", changed(dial, P, 6)],
+    ["unknown-widget", changed(dial, P, 7)],
     ["truncated", dial.subarray(0, P + 8)],
     ["truncated", dial.subarray(0, P + 20)],
     ["bad-settings", changed(dial, P + 1, 1)],
@@ -184,7 +184,7 @@ test("a picture widget is refused with the reasons of the core, in their order",
     const clock = odrgx.encodeWidget({width: 60, height: 60, widget: "analog", seconds: 30, face: 1, hands: 2, rim: 3, background: 0, speedMin: 60, speedMax: 600});
     assert.equal(decodeReason(changed(clock, 16, 21)), "payload-size");
     assert.equal(decodeReason(changed(clock, 16, 19)), "payload-size");
-    assert.equal(decodeReason(changed(clock, P, 6)), "unknown-widget");
+    assert.equal(decodeReason(changed(clock, P, 7)), "unknown-widget");
     assert.equal(decodeReason(clock), null);
   });
 });

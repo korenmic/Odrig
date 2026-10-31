@@ -76,6 +76,7 @@ export function measure(app) {
     label: box(doc.querySelector("#level-line label")),
     field: box(field),
     slider: box(doc.getElementById("level")),
+    override: box(doc.querySelector('label[for="level-override"]')),
     left: panelBox.left + parseFloat(panelStyle.borderLeftWidth) + parseFloat(panelStyle.paddingLeft),
     right: panelBox.right - parseFloat(panelStyle.borderRightWidth) - parseFloat(panelStyle.paddingRight),
     digits: view.getComputedStyle(field).fontVariantNumeric,

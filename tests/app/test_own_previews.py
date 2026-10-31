@@ -43,6 +43,16 @@ class OwnPreviews(unittest.TestCase):
         data = (self.show / name).read_bytes()
         return f"{zlib.crc32(data):08x}-{len(data)}"
 
+    def test_a_generated_message_clock_becomes_a_decodable_browser_preview(self):
+        from tests.core.test_message_clock import message_file
+        data = message_file([('hello', 0), ('still', 4)])
+        key = f"{zlib.crc32(data):08x}-{len(data)}"
+        seen = support.run('ownpreviews', address=self.address,
+                           settings={'mode': 'generated', 'bytes': list(data), 'key': key}).seen
+        self.assertEqual(seen['size'], [60, 60])
+        self.assertEqual(seen['signature'], list(b'GIF89a'))
+        self.assertIsNone(seen['message'])
+
     def test_an_uploaded_animation_gets_its_preview_kept_across_a_reload(self):
         seen = support.run("ownpreviews", address=self.address, settings={"file": "clip.gif", "name": "clip.odrg"}, media=self.media).seen
         self.assertRegex(seen["message"], r"\AUploaded as animation 3 clip\.odrg\.")

@@ -101,6 +101,16 @@ kept on the first computer. A source the owner gives later goes into the readme.
 
 ## Adding a later conversion
 
+The seven `card/clocks/message/v7-*.odrgx` files are complete procedural message
+widgets, one retained source tab each, with loops of 24.4 to 76.9 seconds.
+Their reproducible generator, source/font hashes, caption manifest and visual
+comparison are in
+`project-seeds/59-p2-message-clock-widgets-and-clocks-only-mode/source/`.
+Their GIFs use the same accelerated sampling as every other preview. Runtime
+playback preserves each whole sequence. The earlier `its-not-the-time` file and
+its companions remain unchanged. Share delivery is a collection copy, not an SD
+installation; a physical card update still uses managed catalog tools.
+
 A conversion is added when it is handed to the owner. A conversion that is only tried is
 not added. It goes into `long/` when it is heavy, a group of a long video or a file over
 50,000,000 bytes; else into `card/` at the path it is to have on the card, or into

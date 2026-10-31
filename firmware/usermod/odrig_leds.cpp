@@ -107,6 +107,7 @@ bool OdrigLeds::matches() {
 
 void OdrigLeds::apply() {
   if (legs() == 0) return;
+  summaryIsOld = true;
   describeOutputs();
   BusManager::getColorOrderMap().reset();
   strip.finalizeInit();
@@ -115,10 +116,14 @@ void OdrigLeds::apply() {
   BusManager::setBrightness(255);
 }
 
-void OdrigLeds::hold() {
+void OdrigLeds::keepLive() {
   if (realtimeOverride != REALTIME_OVERRIDE_NONE) realtimeOverride = REALTIME_OVERRIDE_NONE;
   if (useMainSegmentOnly) useMainSegmentOnly = false;
   if (realtimeMode != REALTIME_MODE_GENERIC) realtimeLock(65000, REALTIME_MODE_GENERIC);
+}
+
+void OdrigLeds::hold() {
+  keepLive();
   if (doInitBusses) {
     // WLED's LED settings were saved: WLED makes the outputs again in this pass of its
     // loop, from the list that is filled here.

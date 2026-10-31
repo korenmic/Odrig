@@ -41,7 +41,7 @@ class EveryCommand(Commands):
         lines = ["play 1", "play 2", "play 3", "on", "off", "brightness 0", "brightness 255", "status"]
         replies = self.replies(lines)
         self.assertEqual(replies[:7], [OK] * 7)
-        self.assertEqual(replies[7], '{"ok":true,"on":false,"brightness":255,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"left":86400}')
+        self.assertEqual(replies[7], '{"ok":true,"on":false,"brightness":255,"dimming":{"value":255,"saved":null,"error":null},"mini":{"supported":false,"on":false,"pending":false,"requested":false,"error":null,"brightness":0},"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"clock_mode":"off","clock_only":null,"left":86400}')
 
     def test_play_plays_an_animation_in_the_playlist_and_a_cycle_by_itself(self):
         for number, playing, animation in ((1, "all", 1), (2, "all", 2), (3, 3, 1)):
@@ -190,12 +190,12 @@ class LineEndings(Commands):
         printed = self.assert_as_the_reference(files, [support.line(T0, "off"), support.line(T0, "status")])
         reply = printed[-1][len("reply "):]
         # A bad file is quarantined and the show has no error. With the largest numbers and
-        # the longest name of a host, every byte of it escaped, the reply still fits into
+        # the encoded limit of a host's name, the reply still fits into
         # 1,024 bytes: of a valid show with a file of 32 characters being checked and a seed
         # of ten digits, and of an invalid one with the longest reason text the core can
         # hold, 65 characters, which has neither.
         self.assertIsNone(json.loads(reply)["error"])
-        common = len(reply) - len("null") + 1 + 2 * len("4294967295") + len(',"host":""') + 6 * 95
+        common = len(reply) - len("null") + 1 + 2 * len("4294967295") + len(',"host":""') + 256
         valid = common + 3 * 10 + len('"' + "a" * 32 + '"')
         invalid = common + len('""') + 65
         self.assertLess(max(valid, invalid), 1024)

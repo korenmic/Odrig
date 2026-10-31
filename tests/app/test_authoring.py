@@ -166,6 +166,23 @@ class EditingAnInstalledOne(unittest.TestCase):
         folder = emulator_support.installed(pathlib.Path(entered(self, tempfile.TemporaryDirectory()), "show"), files)
         return entered(self, emulator_support.Emulator(folder)), folder
 
+    def test_a_generated_message_clock_opens_no_form_and_keeps_its_bytes(self):
+        from tests.core.test_message_clock import message_file
+        from tests.core.test_mini import files_for
+        files = files_for()
+        data = message_file()
+        files["message.odrgx"] = data
+        files["show.json"] = core_support.show_text([
+            {"id": 1, "file": "picture.odrg"}, {"id": 2, "file": "message.odrgx"}], 40, 1)
+        folder = emulator_support.installed(pathlib.Path(entered(self, tempfile.TemporaryDirectory()), "show"), files)
+        emulator = entered(self, emulator_support.Emulator(folder))
+        found = support.run("author-edit", address=f"127.0.0.1:{emulator.port}",
+                            settings={"rows": 2, "edit": 2, "refused": True}).seen
+        self.assertEqual(found["message"], "Generated message clocks can be previewed and uploaded, but cannot be edited in this form.")
+        self.assertFalse(found["formShown"])
+        self.assertEqual((folder / "message.odrgx").read_bytes(), data)
+        self.assertFalse((folder / "upload.part").exists())
+
     def test_a_saved_text_keeps_its_id_its_place_and_its_inclusion(self):
         emulator, folder = self.emulator()
         found = support.run("author-edit", address=f"127.0.0.1:{emulator.port}", settings={"rows": 4, "edit": 5, "fields": [["text-words", "Hi there"]]}).seen

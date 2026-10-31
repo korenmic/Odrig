@@ -34,6 +34,9 @@ int main(void) {
     MEMBER(odrig_host, drive_list); MEMBER(odrig_host, drive_bind); MEMBER(odrig_host, drive_writable);
     printf("odrig_leg %zu\\n", sizeof(odrig_leg));
     MEMBER(odrig_leg, leg); MEMBER(odrig_leg, pin); MEMBER(odrig_leg, led_count); MEMBER(odrig_leg, rgb);
+    printf("odrig_mini %zu\\n", sizeof(odrig_mini));
+    MEMBER(odrig_mini, revision); MEMBER(odrig_mini, active); MEMBER(odrig_mini, requested);
+    MEMBER(odrig_mini, pending); MEMBER(odrig_mini, failed); MEMBER(odrig_mini, rgb);
     return 0;
 }
 """
@@ -47,7 +50,7 @@ class Declarations(unittest.TestCase):
     def test_it_declares_exactly_the_functions_of_the_header(self):
         declared = re.findall(r"\b(odrig_core_[a-z_]+)\(", header_code())
         self.assertEqual(len(declared), len(set(declared)))
-        self.assertEqual(len(declared), 7)
+        self.assertEqual(len(declared), 10)
         self.assertEqual(sorted(binding.FUNCTIONS), sorted(declared))
 
     def test_every_function_has_as_many_arguments_as_the_header_gives_it(self):
@@ -81,13 +84,13 @@ class Declarations(unittest.TestCase):
             )
             printed = subprocess.run([str(program)], capture_output=True, text=True, check=True).stdout.split("\n")
         expected = []
-        for name, record in (("odrig_host", binding.HostRecord), ("odrig_leg", binding.LegRecord)):
+        for name, record in (("odrig_host", binding.HostRecord), ("odrig_leg", binding.LegRecord), ("odrig_mini", binding.MiniRecord)):
             expected.append(f"{name} {ctypes.sizeof(record)}")
             for member, kind in record._fields_:
                 expected.append(f"{name} {member} {getattr(record, member).offset} {ctypes.sizeof(kind)}")
         self.assertEqual([line for line in printed if line], expected)
 
-    def test_the_library_offers_the_seven_functions_and_holds_every_source_of_the_core(self):
+    def test_the_library_offers_the_public_functions_and_holds_every_source_of_the_core(self):
         offered = sorted(name for name in support.exported(support.LIBRARY) if re.fullmatch(r"odrig_core_[a-z_]+", name))
         self.assertEqual(offered, sorted(binding.FUNCTIONS))
         sources = sorted(path.stem for path in (support.ROOT / "core" / "src").glob("*.cpp"))

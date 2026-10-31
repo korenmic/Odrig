@@ -35,6 +35,7 @@ import {
 import * as jsonframes from "./jsonframes.js";
 import * as odrg from "./odrg.js";
 import * as strictjson from "./strictjson.js";
+import * as messageclock from "./messageclock.js";
 import * as textlayout from "./textlayout.js";
 
 export const MAGIC = Uint8Array.of(0x4f, 0x44, 0x52, 0x58);
@@ -565,6 +566,7 @@ export function decodeWidget(data, header = readHeader(data)) {
   refuseLargeCanvas(header.width, header.height);
   const read = cursor(payloadOf(data));
   const widget = read.take(1, "the settings of the widget")[0];
+  if (widget === 6) return {header, settings: messageclock.decode(payloadOf(data), header)};
   if (widget < 1 || widget > draw.WIDGETS.length) {
     throw new Rejection(UNKNOWN_WIDGET, `widget ${widget} is none this player has`);
   }
@@ -709,6 +711,7 @@ function decodePictureWidget(widget, read, data, header) {
 // A clock as the JSON source has it: `{width, height, widget, seconds, face, hands, rim,
 // background, speedMin, speedMax}`, or a picture clock as `loadsPictureWidget` gives it.
 export function loadsWidget(top) {
+  if (top instanceof Map && top.get("widget") === "message-clock") return messageclock.load(top);
   if (top instanceof Map && draw.PICTURE_WIDGETS.includes(top.get("widget"))) {
     return loadsPictureWidget(top);
   }
@@ -853,6 +856,7 @@ export function loadsPictureWidget(top) {
 
 // The canonical JSON source of a clock or a picture clock.
 export function dumpsWidget(widget) {
+  if (widget.widget === "message-clock") return new TextEncoder().encode(`${JSON.stringify(messageclock.source(widget), null, 2)}\n`);
   let source;
   if (draw.PICTURE_WIDGETS.includes(widget.widget)) {
     source = {
@@ -888,6 +892,7 @@ export function pictureFile(width, height, palette, picture) {
 // A container of a clock or a picture clock, its loop `seconds` long.
 export function encodeWidget(widget) {
   refuseLargeCanvas(widget.width, widget.height);
+  if (widget.widget === "message-clock") return wrap("widget", 60, 60, widget.loopMs, messageclock.encode(widget));
   if (draw.PICTURE_WIDGETS.includes(widget.widget)) {
     return encodePictureWidget(widget);
   }

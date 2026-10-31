@@ -7,7 +7,7 @@ import hashlib
 import subprocess
 import sys
 
-from . import Failure, env, paths, setuplock, wled
+from . import Failure, env, host, paths, process, setuplock, wled
 
 MINIMUM_PYTHON = (3, 10)
 STAMP = paths.VENV / "odrig-requirements.sha256"
@@ -15,7 +15,10 @@ NEWER_STAMP = paths.NEWER_VENV / "odrig-requirements.sha256"
 
 
 def _run(what, command, newer=False):
-    done = subprocess.run([str(part) for part in command], capture_output=True, text=True, env=env.child(newer=newer))
+    try:
+        done = process.run([str(part) for part in command], capture_output=True, text=True, env=env.child(newer=newer))
+    except OSError as error:
+        raise Failure("setup-failed", f"{what}: {error}") from None
     if done.returncode != 0:
         raise Failure("setup-failed", f"{what} failed with status {done.returncode}: {(done.stdout + done.stderr).strip()[-600:]}")
     return done.stdout
@@ -32,6 +35,7 @@ def _waiting():
 
 def _wanted():
     digest = hashlib.sha256()
+    digest.update('/'.join(host.supported()).encode('utf-8'))
     for path in requirement_files():
         digest.update(path.read_bytes())
     return digest.hexdigest()
@@ -41,6 +45,7 @@ def python_environment():
     """Makes sure WLED's source and the Python environment with every package of the two
     requirement files are there, and the checkout's copy of WLED. Returns the steps it had
     to do."""
+    host.supported()
     if sys.version_info < MINIMUM_PYTHON:
         raise Failure("setup-failed", f"Python {'.'.join(map(str, MINIMUM_PYTHON))} or later is needed, this is {sys.version.split()[0]}")
     with setuplock.held(paths.SETUP_LOCK, waiting=_waiting):
@@ -60,10 +65,10 @@ def _python_environment():
         _run("creating the Python environment", [sys.executable, "-m", "venv", paths.VENV])
         done.append("created the Python environment")
     wanted = _wanted()
-    if not STAMP.exists() or STAMP.read_text().strip() != wanted:
+    if not STAMP.exists() or STAMP.read_text(encoding='utf-8').strip() != wanted:
         for path in requirement_files():
             _run(f"pip install -r {path.name}", [paths.PYTHON, "-m", "pip", "install", "--disable-pip-version-check", "-r", path])
-        STAMP.write_text(wanted + "\n")
+        STAMP.write_text(wanted + "\n", encoding='utf-8', newline='\n')
         done.append("installed the Python packages")
     return done
 
@@ -71,6 +76,7 @@ def _python_environment():
 def newer_environment():
     """Makes sure the newer USB software's Python environment is there with every package
     of its requirement file. Returns the steps it had to do."""
+    host.supported()
     with setuplock.held(paths.SETUP_LOCK, waiting=_waiting):
         return _newer_environment()
 
@@ -81,11 +87,11 @@ def _newer_environment():
         paths.output(paths.NEWER).mkdir(parents=True, exist_ok=True)
         _run("creating the newer software's Python environment", [sys.executable, "-m", "venv", paths.NEWER_VENV], newer=True)
         done.append("created the newer software's Python environment")
-    wanted = hashlib.sha256(paths.NEWER_REQUIREMENTS.read_bytes()).hexdigest()
-    if not NEWER_STAMP.exists() or NEWER_STAMP.read_text().strip() != wanted:
+    wanted = hashlib.sha256('/'.join(host.supported()).encode('utf-8') + paths.NEWER_REQUIREMENTS.read_bytes()).hexdigest()
+    if not NEWER_STAMP.exists() or NEWER_STAMP.read_text(encoding='utf-8').strip() != wanted:
         command = [paths.NEWER_PYTHON, "-m", "pip", "install", "--disable-pip-version-check", "-r", paths.NEWER_REQUIREMENTS]
         _run(f"pip install -r {paths.NEWER_REQUIREMENTS.name}", command, newer=True)
-        NEWER_STAMP.write_text(wanted + "\n")
+        NEWER_STAMP.write_text(wanted + "\n", encoding='utf-8', newline='\n')
         done.append("installed the newer software's Python packages")
     return done
 
@@ -97,8 +103,8 @@ def versions():
     return {
         "python": first_line([paths.PYTHON, "--version"]),
         "platformio": first_line([paths.PYTHON, "-m", "platformio", "--version"]),
-        "node": first_line([paths.VENV / "bin" / "node", "--version"]),
-        "npm": first_line([paths.VENV / "bin" / "npm", "--version"]),
+        "node": first_line([host.program(paths.VENV, "node"), "--version"]),
+        "npm": first_line([host.program(paths.VENV, "npm"), "--version"]),
         "esptool": first_line([paths.PYTHON, "-m", "esptool", "version"]),
     }
 

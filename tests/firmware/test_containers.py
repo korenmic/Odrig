@@ -98,7 +98,7 @@ class Containers(unittest.TestCase):
         (self.show / "sun.odrg").write_bytes(animation(1)[:-3])
         refused = self.refusal()
         self.assertEqual(refused.reason, "file-malformed")
-        self.assertRegex(refused.detail, rf"\A{self.show / 'sun.odrg'}: truncated: ")
+        self.assertTrue(refused.detail.startswith(f"{self.show / 'sun.odrg'}: truncated: "), refused.detail)
         (self.show / "sun.odrg").write_bytes(film())
         files = storage.folder_files(self.show)
         self.assertEqual(files["sun.odrg"], film())

@@ -66,7 +66,12 @@ class BackupGuard(unittest.TestCase):
     def test_a_link_that_leads_into_the_backup_is_refused(self):
         with tempfile.TemporaryDirectory() as folder:
             link = pathlib.Path(folder, "link")
-            link.symlink_to(paths.PROTECTED)
+            try:
+                link.symlink_to(paths.PROTECTED)
+            except OSError as error:
+                if getattr(error, "winerror", None) == 1314:
+                    self.skipTest("Windows requires symlink privileges for this filesystem-link guard check")
+                raise
             self.assertEqual(support.reason_of(self, lambda: paths.output(link / "x.bin")), "backup-protected")
 
     def test_any_other_output_path_is_passed_on(self):
