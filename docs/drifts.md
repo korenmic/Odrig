@@ -12091,3 +12091,26 @@ folders of its own previews are gone, by their process ids, and no longer that n
 folder appeared meanwhile.
 
 **Resolution.** `converter/tests/docs.test.js`, `tests/emulator/test_preview.py`.
+
+## Seed 62: scan timing, sampling and reproducible content delivery
+
+**Question.** The approved route specifies slow motion but no frame cadence or
+exact segment durations. How are those chosen while preserving the picture and
+using the existing encoder, and how is a complete playback loop demonstrated?
+
+**Answer.** Use60second horizontal passes,6.68second descents and40ms frames.
+The twenty segments last720.12seconds, followed by a40ms final crop hold.
+Bilinear pixel-centre sampling in encoded RGB provides fractional panning;
+reverse rows once into LED order. Stream the461MB JSON under build/ and let the
+existing converter's pack command encode and assemble the repeat1 demonstration
+show together. The34.41MB final binary is below the collection limit and belongs
+on SD. Preserve the original picture and use the existing GIF encoder for both
+sampled full-route and real-speed reviews. The actual shared-core emulator
+observes readiness before its playback origin, records the whole loop/restart
+and matches57LED samples against the converter reader. Physical SD/LED/phone
+acceptance remains open; copies to the share or Drive do not constitute board
+installation. No command, hardware or existing playback decision changes.
+
+**Resolution.** `docs/specs/62-p2-deep-space-picture-zoom-and-row-scan/design.md`,
+`docs/specs/62-p2-deep-space-picture-zoom-and-row-scan/verification.md` and the
+generator, review and proof sources beside the seed.

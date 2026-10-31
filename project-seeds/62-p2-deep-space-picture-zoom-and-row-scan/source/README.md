@@ -50,5 +50,21 @@ node converter/odrig.js thumbnail collection/card/space/space-scan-10x.odrg --ca
 Run discovered checks with `npm test --prefix converter`; the route tests use
 asymmetric synthetic pixels, while the content test reads the actual binary
 through its entire loop and compares independently named camera positions.
+After building the shared core, reproduce its complete-loop proof with Python3.10
+or later:
+
+```sh
+python core/build.py shared
+python project-seeds/62-p2-deep-space-picture-zoom-and-row-scan/source/verify.py build/space-scan/show build/space-scan/emulator-proof
+```
+
+The proof uses the actual emulator host, shared core and recording writer.
+It observes startup readiness before choosing its playback origin, records all
+36,012refreshes through the full loop and restart, and compares57selected
+LED pictures with the converter's independent decoder, including brightness40
+and the target wiring. The recording stays under build/. The emulator fixture
+uses64MiB of simulated storage to hold the full animation; this is not a claim
+that the board has room for it internally. Use SD on the physical installation.
+
 Emulator proof and remaining human checks are recorded in the specification's
 verification document. No physical playback is implied by these review files.

@@ -21,7 +21,7 @@ This seed's owner questions are resolved. Seed63 remains planning only.
     generating it. Run discovered converter-npm, converter and onboarding suites.
     Tick only this item and commit the content/proof together.
 
-- [ ] 3. Verify a complete emulator loop and deliver the new PR
+- [x] 3. Verify a complete emulator loop and deliver the new PR
   - Exercise the actual packed content through the shared core/emulator, including
     a complete virtual loop, final crop and restart. Compare representative LED
     pictures against the file/source at first/last and edge/descent positions.
