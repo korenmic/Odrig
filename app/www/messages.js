@@ -77,6 +77,7 @@ export const MENDED_ELSEWHERE = "Fix it on a computer: the card is read-only her
 
 // The words in place of the form of a clock that is made from a picture.
 export const PICTURE_CLOCK = "This clock is made from a picture: it cannot be edited here.";
+export const MESSAGE_CLOCK = "Generated message clocks can be previewed and uploaded, but cannot be edited in this form.";
 
 // The line of the show screen while the target does not answer.
 export function ofSilence(seconds) {
@@ -99,6 +100,7 @@ function kilobytes(bytes) {
 // refused, from the reason of an invalid show, when the target has said one, and from the
 // refusal itself.
 const REFUSALS = {
+  "unsupported": () => "This target cannot use miniature display mode with its current output setup.",
   "line-too-long": NOT_UNDERSTOOD,
   "unknown-command": NOT_UNDERSTOOD,
   "bad-argument": NOT_UNDERSTOOD,
@@ -109,8 +111,10 @@ const REFUSALS = {
     : `Animation ${line.split(" ")[1]} cannot be played until it is replaced: its file has a fault. The list says which.`,
   busy: () => "The installation is busy. Try again in a moment.",
   "in-use": (line) =>
+    line.startsWith("play ") ? "Clocks only allows playback inside the Clocks folder. Leave Clocks only in Settings to play elsewhere." :
+    line.startsWith("mapping test ") ? "Leave Clocks only in Settings before starting a display test." :
     line.startsWith("remove many ") ? "Some selected animations cannot be removed: a cycle plays them, or they are on external storage." :
-    line.startsWith("ignore ") ? "Only installed animations support playlist inclusion." :
+    line.startsWith("ignore ") ? "This target does not support playlist inclusion for that item." :
     line.startsWith("order ") ? "A cycle has no place in the order of the playlist." :
     line.startsWith("repeat ") ? "That is a cycle or a folder, which keeps no repeat." :
     line.startsWith("upload ")
@@ -118,7 +122,7 @@ const REFUSALS = {
       : `Animation ${line.split(" ")[1]} cannot be removed: a cycle plays it, or it is on a USB stick.`,
   "read-only": (line) =>
     line.startsWith("catalog ") ? "That storage cannot be written now, so its catalog cannot be rebuilt." :
-    line.startsWith("upload ") ? "The card cannot be written now. Choose This board to store the animation on the board." :
+    line.startsWith("upload ") ? "The card cannot be written now. Choose Internal storage to store the animation on the board." :
     `Animation ${line.split(" ")[1]} cannot be removed: the card cannot be written now.`,
   "mapping-conflict": () => "Mapping changed on the target. Reload before saving.",
   "order-conflict": () => "The order changed on the installation since the app read it. The list is read again; move the animation again.",

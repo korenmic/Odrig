@@ -773,8 +773,8 @@ The page learns everything it shows from one stream of server-sent events, `GET 
 and from the mapping file of the show, `GET /show/mapping.json`, which is served byte for
 byte (404 when the folder has none). Another program may read both in the same way.
 
-The stream is a response of type `text/event-stream` that stays open. It has five kinds of
-event:
+The stream is a response of type `text/event-stream` that stays open. Its regular
+playback and miniature-preview events are:
 
 ```
 event: hello
@@ -791,6 +791,9 @@ data: {"animation":1,"start":40020,"turn":40020,"length":5100}
 
 event: frame
 data: 123460 <base64 of the refresh>
+
+event: mini
+data: {"active":false}
 ```
 
 | Event | What it carries |
@@ -800,13 +803,18 @@ data: 123460 <base64 of the refresh>
 | `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
 | `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |
 | `position` | Where the animation on the LEDs stands, for the [seek bar](#seeking): its id, the start of the loop that shows and the start of its turn, both on the clock of the frames' timestamps, and the loop's length in milliseconds; each `null` while unknown, and all four `null` while nothing plays or a cycle plays. It is sent to a new connection after the latest status, and at every change: a turn's start, a loop's start, a seek, a length learned. |
+| `mini` | Only for a supporting60x60 target. `active` is the acknowledged virtual-output mode. When true, `rgb` is180bytes encoded in base64, in physical index `x*6+y` of the10x6 miniature; when false, `rgb` is omitted. The page flips y for its top-down canvas. Projection is the core's, not a second renderer. |
 
 A new connection gets `hello`, the log entries kept so far, the latest status, the latest
 position, and then everything that happens. The emulator keeps the last 500 log entries.
 
 Log, status and position events are never dropped. Refreshes do not queue: each connection has one
 place for the newest refresh, and a newer one replaces it, so a page that cannot keep up
-skips refreshes and does not fall behind. What the system has already taken for a
+skips refreshes and does not fall behind. The matching miniature picture shares that
+same newest-frame slot;
+the two cannot drift apart or build an unbounded preview queue. Normal `frame` and
+ODRR data retain their original leg order and installed canvas, even in miniature mode.
+What the system has already taken for a
 connection, about half a megabyte on a Mac, is sent as it is. A connection with nothing to
 send for 15 seconds is sent the comment line `: keep-alive`.
 
@@ -822,6 +830,8 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] on
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] off
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] brightness N
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] brightness ID N save
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] brightness ID default
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] status
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] fault
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] space
@@ -834,6 +844,7 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] order OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] repeat ID N [save]
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] clocks OPERATION
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] debug mini on|off
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload --external FILE
 ```
@@ -926,6 +937,15 @@ python -m odrigctl --http 127.0.0.1:8600 repeat 1 8 save
 python -m odrigctl --http 127.0.0.1:8600 repeat 1 default
 python -m odrigctl --http 127.0.0.1:8600 clocks off
 python -m odrigctl --http 127.0.0.1:8600 clocks message off
+```
+
+The temporary miniature command is submitted through the same routes; status reports
+support and acknowledgement, separately from submission:
+
+```
+python -m odrigctl --port build/emulator/serial debug mini on
+python -m odrigctl --tcp 127.0.0.1:8601 debug mini off
+python -m odrigctl --http 127.0.0.1:8600 debug mini on
 ```
 
 `status` names the emulator as its host: `"host":"odrig emulator on Darwin arm64"`, with the
@@ -1525,9 +1545,45 @@ tool sends the words as they are typed. The emulator keeps the saved repeats in
 `repeats.txt` of its show folder through its host, as the board does in its storage: it
 has no code of its own for them.
 
-`clocks on` and `clocks off` switch the clocks between the animations on and off, and
-`clocks message on` and `clocks message off` the message after each clock; the tool takes
-those four forms only. The emulator keeps the two settings in `clocks.txt` of its show
-folder through its host, as the board does in its storage.
+`clocks on`, `clocks off`, and `clocks only` select Between animations, Off and Clocks
+only. `clocks message on|off` remains independent. The emulator and every command-tool
+transport use the shared core for mode boundaries and separate clock/message bags.
+The host keeps version-2 settings in `clocks.txt`; valid version-1 settings still load.
+Only rejects outside playback and output-taking diagnostics, retains the normal playlist
+for exit, and stays dark when no eligible faces exist. See
+[commands.md](commands.md#clocks-between-the-animations) for status and recovery.
 
 The shared core handles `ignore ID 0|1` and `remove many IDS` unchanged on HTTP, serial and TCP; odrigctl accepts both. Space reports internal quota and optional external capacity from the mounted folder filesystem. External files are changed only on a drive with a catalog that the emulator may write (`--drive` without `--drive-read-only`).
+
+## Miniature preview
+
+For a 60x60 installed canvas, send `debug mini on` through the existing command
+tool or use **Settings → Miniature display debug mode** in the shared controller.
+The binding opts the virtual host into the core protocol and acknowledges setup
+with the same revision helpers as the firmware. It has no hardware transfer to
+wait for. `status.mini` remains the common authority for all clients. Other canvas
+sizes honestly report unsupported. Turning mini off or restarting clears the preview.
+
+The LEDs page shows a 10-column by 6-row preview only while active. Its picture
+comes from the core's 180-byte RGB buffer via the `mini` event, coalesced with the
+corresponding normal frame. The page only reorders `x*6+y` and flips the vertical
+axis for the browser; it does not decode or average again. Side columns are black.
+Brightness is capped at 40 even if the normal requested brightness is higher.
+Palette, RGB, text and clock/widget content retain their full logical canvas.
+The ordinary LEDs image and ODRR recordings keep their normal geometry and data.
+
+The controller follows confirmed status and never restores a locally saved mini
+setting after reload, target change or reconnect. These virtual/browser checks
+do not prove the [physical wiring](../README.md#miniature-display-debug-mode),
+electrical readiness, actual LED order, frame rate or behavior on an Android phone.
+
+## Saved animation brightness
+
+`odrigctl` sends `brightness N`, `brightness ID N save` and `brightness ID default`
+over the same serial/TCP/HTTP routes. The emulator's shared core keeps
+`brightness.txt` internally, including preferences for `--drive-read-only` paths;
+animation/show/catalog bytes do not change. Status reports the runtime default in
+`brightness` and the selected/saved value in `dimming`. Restart and remount rebuild
+the same path-based caches as the board. Limits and deliberate corruption recovery
+are in [commands.md](commands.md#saved-animation-brightness). These host checks do
+not prove board timing, firmware compilation or phone/LED acceptance.

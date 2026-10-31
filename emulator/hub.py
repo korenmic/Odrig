@@ -43,9 +43,9 @@ class Connection:
             self._events.append((kind, data))
             self._changed.notify()
 
-    def put_refresh(self, ms, frame):
+    def put_refresh(self, ms, frame, mini=None):
         with self._changed:
-            self._refresh = (ms, frame)
+            self._refresh = (ms, frame, mini)
             self._changed.notify()
 
     def close(self):
@@ -69,8 +69,14 @@ class Connection:
             self._events.clear()
             refresh, self._refresh = self._refresh, None
         if refresh is not None:
-            ms, frame = refresh
+            ms, frame, mini = refresh
             events.append(("frame", f"{ms} {base64.b64encode(frame).decode('ascii')}"))
+            if mini is not None:
+                active, rgb = mini
+                value = {"active": active}
+                if active:
+                    value["rgb"] = base64.b64encode(rgb).decode("ascii")
+                events.append(("mini", compact(value)))
         return events
 
 
@@ -132,12 +138,12 @@ class Hub:
             for connection in self._connections:
                 connection.put("mapping", data)
 
-    def refresh(self, ms, frame):
+    def refresh(self, ms, frame, mini=None):
         """Takes the refresh the core produced at a timestamp as the newest one."""
         with self._lock:
             self._refresh = (ms, frame)
             for connection in self._connections:
-                connection.put_refresh(ms, frame)
+                connection.put_refresh(ms, frame, mini)
 
     def connect(self, hello):
         """A connection for a page that has just opened. It starts with `hello`, the log

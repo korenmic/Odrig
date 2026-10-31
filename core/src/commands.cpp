@@ -9,8 +9,10 @@
 #include "odrig_core.h"
 #include "order.h"
 #include "player.h"
+#include "mini.h"
 #include "playlist.h"
 #include "repeats.h"
+#include "brightness.h"
 #include "show.h"
 #include "upload.h"
 
@@ -155,8 +157,34 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text(core.on ? "true" : "false");
     reply.text(",\"brightness\":");
     reply.number(core.brightness);
+    reply.text(",\"dimming\":");
+    if (brightness_supported(core)) {
+        const int saved = brightness_saved(core, core.invalid || core.playing == kNothing ? kNothing : core.shown);
+        reply.text("{\"value\":");
+        reply.number(brightness_selected(core));
+        reply.text(",\"saved\":");
+        if (saved < 0) reply.text("null"); else reply.number(static_cast<uint32_t>(saved));
+        reply.text(",\"error\":");
+        reply.text(core.brightness_error ? "\"settings-unreadable\"}" : "null}");
+    } else reply.text("null");
+    const Mini *mini = core.mini;
+    reply.text(",\"mini\":{\"supported\":");
+    reply.text(mini != nullptr && mini->supported ? "true" : "false");
+    reply.text(",\"on\":");
+    reply.text(mini != nullptr && mini->failed ? "null" : mini != nullptr && mini->active ? "true" : "false");
+    reply.text(",\"pending\":");
+    reply.text(mini != nullptr && mini->pending ? "true" : "false");
+    reply.text(",\"requested\":");
+    reply.text(mini != nullptr && mini->requested ? "true" : "false");
+    reply.text(",\"error\":");
+    reply.text(mini != nullptr && mini->failed ? "\"output-setup-failed\"" : "null");
+    reply.text(",\"brightness\":");
+    reply.number(mini_brightness(core));
+    reply.text("}");
     reply.text(",\"playing\":");
-    if (core.playing == kPlaylist && core.tree_known && core.current != 0) {
+    if (core.clocks_on == kClocksOnly && core.playing == kPlaylist && core.clocks_id != 0) {
+        reply.number(core.clocks_id);
+    } else if (core.playing == kPlaylist && core.tree_known && core.current != 0) {
         // The playlist of a folder of the drive, while the drive is in and holds it.
         reply.number(core.current_folder.id);
     } else {
@@ -200,6 +228,13 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text(",\"host\":");
     if (core.host.about != nullptr && core.host.about(core.host.ctx, about, sizeof about) == 1) {
         about[sizeof about - 1] = '\0';
+        uint32_t about_length = 0;
+        while (about[about_length] != '\0') ++about_length;
+        while (json_escaped(about, nullptr) > 160) {
+            --about_length;
+            while (about_length != 0 && (static_cast<uint8_t>(about[about_length]) & 0xC0u) == 0x80u) --about_length;
+            about[about_length] = '\0';
+        }
         reply.text("\"");
         reply.escaped(about);
         reply.text("\"");
@@ -252,7 +287,9 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
         reply.text("null");
     }
     reply.text(",\"playlist\":");
-    if (core.playing == kPlaylist && core.tree_known && core.current != 0 && drive_folder_path(core, core.current, name, sizeof name) != 0) {
+    if (core.clocks_on == kClocksOnly && core.playing == kPlaylist && core.clocks_id != 0) {
+        reply.text("\"clocks\"");
+    } else if (core.playing == kPlaylist && core.tree_known && core.current != 0 && drive_folder_path(core, core.current, name, sizeof name) != 0) {
         reply.text("\"");
         reply.escaped(name);
         reply.text("\"");
@@ -262,11 +299,51 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     // The settings of the clocks between the animations.
     reply.text(core.clocks_on != 0 ? ",\"clocks\":true" : ",\"clocks\":false");
     reply.text(core.clock_message_on != 0 ? ",\"clock_message\":true" : ",\"clock_message\":false");
+    reply.text(",\"clock_mode\":\"");
+    reply.text(breaks_mode(core));
+    reply.text("\",\"clock_only\":");
+    if (core.clocks_on == kClocksOnly) {
+        reply.text("{\"folder\":");
+        if (core.clocks_id != 0) reply.number(core.clocks_id);
+        else reply.text("null");
+        reply.text(",\"state\":\"");
+        reply.text(breaks_only_state(core));
+        reply.text("\"}");
+    } else reply.text("null");
     // The seconds left in the current playlist's window, the last member.
     reply.text(",\"left\":");
     reply.number(player_window_left(core));
     reply.text("}\n");
     return reply.length;
+}
+
+uint32_t play_only(Core &core, uint32_t id, bool all, Reply &reply) {
+    if (all) return refuse(reply, "in-use");
+    if (core.clocks_id != 0 && id == core.clocks_id) {
+        player_only_restart(core);
+        return succeed(reply);
+    }
+    uint32_t value = 0;
+    const uint8_t kind = drive_find(core, id, &value);
+    uint32_t item = kNothing;
+    if (kind == 'f') {
+        item = kDriveBase + value;
+        if (!breaks_position_allowed(core, item)) return refuse(reply, "in-use");
+        const DriveRow *row = drive_row(core, value);
+        if (row == nullptr || !row->listed) return refuse(reply, "unknown-id");
+        if (row->fault != kNone) return refuse(reply, "unavailable");
+    } else if (kind == 'd') {
+        if (!breaks_folder_allowed(core, value)) return refuse(reply, "in-use");
+        IndexFolder folder;
+        if (drive_folder(core, value, folder)) {
+            for (uint32_t position = folder.first; position < folder.last; ++position) {
+                if (drive_plays(core, position)) { item = kDriveBase + position; break; }
+            }
+        }
+        if (item == kNothing) { player_only_restart(core); return succeed(reply); }
+    } else return refuse(reply, "in-use");
+    player_jump(core, item);
+    return succeed(reply);
 }
 
 // The most words a command has. A line with more is no valid command.
@@ -372,21 +449,40 @@ bool level_words(const Core &core, const Words &words, uint32_t first, uint32_t 
     return words.count == at + 1 && number_word(words, at, 0, 0xFFFFFFFFu, from);
 }
 
-// The four `upload` commands. The words are read first, then the show is asked for.
+// Decodes a URI path argument; spaces and percent signs cannot be raw command words.
+bool external_path(const char *word, uint32_t size, char *name) {
+    uint32_t length = 0;
+    for (uint32_t at = 0; at < size; ++at) {
+        uint32_t value = static_cast<uint8_t>(word[at]);
+        if (value == '%') {
+            if (at + 2 >= size) return false;
+            value = 0;
+            for (uint32_t digit = 0; digit < 2; ++digit) {
+                const char c = word[++at];
+                const uint32_t half = c >= '0' && c <= '9' ? static_cast<uint32_t>(c - '0') :
+                    c >= 'a' && c <= 'f' ? static_cast<uint32_t>(c - 'a' + 10) :
+                    c >= 'A' && c <= 'F' ? static_cast<uint32_t>(c - 'A' + 10) : 16;
+                if (half == 16) return false;
+                value = value * 16 + half;
+            }
+        }
+        if (value < 32 || value > 126 || length >= kDrivePathRoom - 1) return false;
+        name[length++] = static_cast<char>(value);
+    }
+    name[length] = '\0';
+    const char *base = name;
+    for (uint32_t at = 0; at < length; ++at) if (name[at] == '/') base = name + at + 1;
+    return catalog_name_allowed(name, length) && is_file_name(base);
+}
+
+// Upload's words are read first, then the show is asked for.
 uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
     if (words.count >= 3 && words.is(1, "begin") && words.is(2, "external")) {
         uint32_t bytes;
         uint32_t crc = 0;
-        char name[33];
-        if ((words.count != 5 && words.count != 6) || words.size[3] < 1 || words.size[3] > 32 || !number_word(words, 4, 1, 0xFFFFFFFFu, &bytes) ||
+        char name[kDrivePathRoom];
+        if ((words.count != 5 && words.count != 6) || !external_path(words.text[3], words.size[3], name) || !number_word(words, 4, 1, 0xFFFFFFFFu, &bytes) ||
             (words.count == 6 && !crc_word(words, 5, &crc))) {
-            return refuse(reply, "bad-argument");
-        }
-        for (uint32_t at = 0; at < words.size[3]; ++at) {
-            name[at] = words.text[3][at];
-        }
-        name[words.size[3]] = '\0';
-        if (!is_file_name(name)) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {
@@ -522,6 +618,20 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         return refuse(reply, "bad-argument");
     }
+    if (words.is(0, "debug")) {
+        if (words.count != 3 || !words.is(1, "mini") || !(words.is(2, "on") || words.is(2, "off"))) {
+            return refuse(reply, "bad-argument");
+        }
+        Mini *mini = core.mini;
+        if (mini == nullptr || !mini->supported) return refuse(reply, "unsupported");
+        const uint8_t requested = words.is(2, "on") ? 1 : 0;
+        if (mini->pending) return requested == mini->requested ? succeed(reply) : refuse(reply, "busy");
+        if (!mini->failed && requested == mini->active) return succeed(reply);
+        mini->requested = requested;
+        mini->pending = 1;
+        if (++mini->revision == 0) ++mini->revision;
+        return succeed(reply);
+    }
     if (words.is(0, "status")) {
         if (words.count != 1) {
             return refuse(reply, "bad-argument");
@@ -546,18 +656,26 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         // `clocks on`, `clocks off`, `clocks message on` and `clocks message off`.
         const bool message = words.count == 3 && words.is(1, "message");
         const uint32_t last = message ? 2 : 1;
-        if ((words.count != 2 && !message) || !(words.is(last, "on") || words.is(last, "off"))) {
+        if ((words.count != 2 && !message) || !(words.is(last, "on") || words.is(last, "off") || (!message && words.is(last, "only")))) {
             return refuse(reply, "bad-argument");
         }
-        return breaks_command(core, message, words.is(last, "on"), reply);
+        return breaks_command(core, message, words.is(last, "only") ? kClocksOnly : words.is(last, "on") ? kClocksBetween : kClocksOff, reply);
     }
     if (words.is(0, "brightness")) {
-        uint32_t value;
-        if (words.count != 2 || !number_word(words, 1, 0, 255, &value)) {
-            return refuse(reply, "bad-argument");
+        uint32_t value = 0;
+        if (words.count == 2) {
+            if (!number_word(words, 1, 0, 255, &value)) return refuse(reply, "bad-argument");
+            player_set_brightness(core, static_cast<uint8_t>(value));
+            return succeed(reply);
         }
-        player_set_brightness(core, static_cast<uint8_t>(value));
-        return succeed(reply);
+        uint32_t id = 0;
+        const bool restore = words.count == 3 && words.is(2, "default");
+        const bool save = words.count == 4 && words.is(3, "save");
+        if ((!restore && !save) || !number_word(words, 1, 1, 65535, &id) ||
+            (save && !number_word(words, 2, 0, 255, &value))) return refuse(reply, "bad-argument");
+        if (core.invalid) return refuse(reply, "show-invalid");
+        if (catalog_rebuilding(core) || !check_complete(core) || core.upload.state != kUploadNone) return refuse(reply, "busy");
+        return brightness_change(core, id, restore ? -1 : static_cast<int>(value), reply);
     }
     if (words.is(0, "play")) {
         const bool all = words.count == 2 && words.is(1, "all");
@@ -568,6 +686,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
+        if (core.clocks_on == kClocksOnly) return play_only(core, id, all, reply);
         // The root for `play all`; else an item of the show, an animation of the drive or
         // a folder of the drive's tree.
         uint32_t folder = all ? 0 : kNoFolder;

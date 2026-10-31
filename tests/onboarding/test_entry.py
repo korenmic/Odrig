@@ -130,7 +130,7 @@ class EntryFile(unittest.TestCase):
                        "the converter's, the Python library's, the core's, the emulator's and the command tool's, the app's and the onboarding suite.",
                        "The converter's own suite, `npm test --prefix converter`, passes on Windows too.",
                        "That was seed 11", f"`{SEED_FOR_WINDOWS}`", "built there by `python core/build.py shared`, not by `make`",
-                       "Windows has no virtual serial port", "with `--tcp` or `--http`", "The firmware tool and the board stay with the first computer.",
+                       "Windows has no virtual serial port", "with `--tcp` or `--http`", "Firmware setup/build and its host-only tests run on Windows x64; the board stays with its operator.",
                        "Nothing is installed in the system", "unpacked into `tools/`", "a trial goes into `scratch/`", "Git ignores both",
                        "[agent/getting-started.md](agent/getting-started.md#on-windows)"):
             self.assertIn(phrase, windows)
@@ -188,7 +188,7 @@ class Bootstrap(unittest.TestCase):
             with self.subTest(part=name):
                 self.assertIn(f"the **{name}**, `{folder}`", what)
                 self.assertTrue((support.ROOT / folder).is_dir())
-        for phrase in ("60 x 60", "the board stays with the first computer"):
+        for phrase in ("60 x 60", "Firmware setup, building and host tests need no board", "stay with its operator"):
             self.assertIn(phrase, what)
 
     def test_it_gives_the_reading_order_and_then_the_documents_by_task(self):

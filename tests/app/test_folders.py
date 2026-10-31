@@ -296,11 +296,11 @@ class WithinTheLevel(WithACard, unittest.TestCase):
                  {"menus": [60002, 60003]}]
         found = support.run("folders", address=address, settings={"rows": 3, "folders": 2, "steps": steps}).seen
         self.assertEqual(found["steps"][0]["menus"]["1"][:3], ["Ignore in playlist", "Move up (disabled)", "Move down"])
-        self.assertEqual(found["steps"][0]["menus"]["60001"][:2], ["Move up", "Move down (disabled)"])
+        self.assertEqual(found["steps"][0]["menus"]["60001"][:3], ["Ignore in playlist", "Move up", "Move down (disabled)"])
         self.assertEqual(ids(found["steps"][1]), [2, 1, 60001])
         self.assertEqual(self.root_order(emulator)[0], [2, 1, 60001])
-        self.assertEqual(found["steps"][3]["menus"]["60002"][:2], ["Move up (disabled)", "Move down"])
-        self.assertEqual(found["steps"][3]["menus"]["60003"][:2], ["Move up", "Move down (disabled)"])
+        self.assertEqual(found["steps"][3]["menus"]["60002"][:3], ["Ignore in playlist", "Move up (disabled)", "Move down"])
+        self.assertEqual(found["steps"][3]["menus"]["60003"][:3], ["Ignore in playlist", "Move up", "Move down (disabled)"])
         support.run("folders", address=address, settings={"rows": 3, "folders": 2, "steps": [{"menu": [1, "Move up", [1, 2, 60001]], "rows": 3}]})
         self.assertEqual(self.root_order(emulator)[0], [1, 2, 60001])
 

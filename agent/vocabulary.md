@@ -81,10 +81,18 @@ the entry links to it.
   `read <id> <offset>`, which reads a file back, `catalog` for the catalogs of storage,
   `remove <id>`, `ignore` for playlist inclusion, `order` for the saved order of the
   playlist, `mapping` for assignments and the diagonal check, `repeat` for the loops of
-  the turn in progress, `clocks` for the clocks between the animations, and `upload`, which
+  the turn in progress, `clocks` for the clocks between the animations,
+  `debug mini on|off` for temporary miniature output, and `upload`, which
   sends a file as several lines. Each is answered by one
   line of JSON. See
   [commands.md](../docs/commands.md).
+
+- **default brightness**: The runtime brightness initialized from the show. An ordinary
+  brightness command changes it until restart; it is used when an animation has no override.
+- **animation brightness override**: A saved 0..255 value for a file, replacing the default
+  whenever that file plays. Zero is present, not missing. It stays on internal storage,
+  even for a read-only card's animation. See
+  [commands.md](../docs/commands.md#saved-animation-brightness).
 
 ## The programs
 

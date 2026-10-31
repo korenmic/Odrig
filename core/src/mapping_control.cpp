@@ -1,4 +1,5 @@
 #include "mapping_control.h"
+#include "breaks.h"
 
 #include "drive.h"
 
@@ -284,6 +285,7 @@ uint32_t mapping_test(Core &core, bool enabled, uint32_t snake, Reply &reply) {
         mapping_test_stop(core);
         return succeed(reply);
     }
+    if (core.clocks_on == kClocksOnly) return refuse(reply, "in-use");
     if (core.mapping_test && core.mapping_snake == snake) return succeed(reply);
     if (core.invalid) return refuse(reply, "show-invalid");
     if (!mapping_editable(core)) return refuse(reply, "bad-argument");

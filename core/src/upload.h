@@ -22,6 +22,13 @@ inline const char *upload_part(const Core &core) {
     return core.upload.id == 0 ? "drive/upload.part" : "upload.part";
 }
 
+// Reconstructs the external destination from its stable folder id and basename.
+// `into` has kDrivePathRoom bytes. False when the folder is no longer indexed.
+bool upload_external_name(const Core &core, char *into);
+
+// Checks both the catalog and the physical path, including uncataloged files.
+bool upload_external_absent(const Core &core);
+
 // The number of bytes a text stands for as base64 with the alphabet of RFC 4648,
 // section 5, without padding and with the unused bits of its last character zero; 0 when
 // the text is not that, or stands for no byte or for more than kChunkSize.
@@ -41,7 +48,7 @@ void upload_step(Core &core, uint64_t now);
 
 // The four commands on a valid show, with their arguments read. Each writes its reply.
 // `name` ends in a zero and is a file name; `count` is what base64_size gave for the text.
-uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, uint32_t bytes, Reply &reply);
+uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, uint32_t bytes, Reply &reply, bool report_creation = false);
 
 // `upload begin external <file> <bytes>`: opens an upload to the drive. `busy` while an
 // upload is open or the drive's catalog is read, `read-only` when the core may not change the

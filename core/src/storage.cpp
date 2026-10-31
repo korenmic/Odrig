@@ -8,6 +8,8 @@
 #include "playlist.h"
 #include "player.h"
 #include "repeats.h"
+#include "brightness.h"
+#include "ignored.h"
 #include "show.h"
 
 namespace odrig {
@@ -135,6 +137,9 @@ void storage_clear_parts(Core &core) {
     }
     if (core.host.drive != nullptr && core.host.read_at != nullptr && core.host.read_at(core.host.ctx, kPlaylistPart, 0, &probe, 1) >= 0) {
         core.host.remove(core.host.ctx, kPlaylistPart);
+    }
+    if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, kIgnoredPart, 0, &probe, 1) >= 0) {
+        core.host.remove(core.host.ctx, kIgnoredPart);
     }
     if (!catalog_left(core, kInternal)) {
         // A change of the catalog that is not finished may move the upload's part yet.
@@ -313,6 +318,8 @@ bool storage_install_upload(Core &core) {
         entered(core, position);
         // A saved repeat belongs to a file name: the item's new name has its own, or none.
         repeats_reload(core);
+        brightness_start(core);
+        ignored_start(core);
         player_file_replaced(core, position);
     }
     core.pending_cleanup = 1;

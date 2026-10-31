@@ -110,7 +110,8 @@ and seed 26 for the work that came after it.
   the command tool reaches it with `--tcp` or `--http`.
 - The converter's own suite, `npm test --prefix converter`, passes on Windows too. Its
   test in Chrome starts Chrome there without a window, as everywhere.
-- The firmware tool and the board stay with the first computer.
+- Firmware setup/build and its host-only tests run on Windows x64; the board stays with its operator.
+  Read [host builds](docs/firmware.md#host-builds-and-verification) for cache paths and coverage.
 - Nothing is installed in the system. A compiler or another program that is fetched is
   unpacked into `tools/`, and a trial goes into `scratch/`. Git ignores both.
 - Code runs on macOS, Linux and Windows alike: [the rules](agent/working-rules.md#code-that-runs-on-every-computer).
@@ -133,11 +134,11 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Previews at once, each as soon as it is known**, seed 49: by name and size from the default catalog, and keys kept on the phone.
 - **A brightness field beside the slider, and a bar for the animation playing now**, seed 47 and seed 48: built; the phone checks are open, and seed 48's `repeat` needs its firmware on the board.
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
-- **Nonblocking SD capacity reporting**, seed 56: planned; avoid a cold free-space query freezing playback and command replies.
-- **Miniature matrix debug mode**, seed 57: planned; app and firmware project the full canvas onto the purchased 10x6 display, with exact approved wiring documented and hardware acceptance checks retained.
-- **Persistent animation brightness overrides**, seed 58: planned; a checkbox saves an animation's brightness independently of the global default.
-- **Message clock widgets and clocks-only mode**, seed 59: planned; seven Hebrew message widgets, exclusive clock playback and ignored file/folder support in both clock modes.
-- **Ready-made animation uploads**, seed 63: planned; upload ODRG/ODRGX bytes without conversion into the explored folder; the mixed top-level view's destination needs an owner answer.
+- **Nonblocking SD capacity reporting**, seed 56: software built; cold capacity scanning is bounded and cached. Board timing and phone acceptance remain open.
+- **Miniature matrix debug mode**, seed 57: software and firmware built; app and firmware project the full canvas onto the purchased 10x6 display, with approved wiring documented. Electrical commissioning and board/phone acceptance remain open.
+- **Persistent animation brightness overrides**, seed 58: software built; a checkbox saves brightness by file independently of the runtime default. Board and phone acceptance are open.
+- **Message clock widgets and clocks-only mode**, seed 59: software built; seven complete Hebrew message widgets, exclusive clock playback and persistent own/ancestor exclusions in both clock modes. Board and phone acceptance remain open.
+- **Internal-storage clocks and messages**, seed 61: planned; recognize matching clock/message paths in internal storage and SD, with a later managed upload attempt of the seven approved messages. A persistent dropdown chooses SD card (default) or Internal storage for matching path/type duplicates; owner product questions are resolved.
 - **Board time and a daily on/off schedule**, seed 64: planned; read/set time over existing transports, default On 18:00/Off 06:00, ignore schedule until time is valid, and APK Settings with automatic phone-time sync on by default. Three owner decisions remain.
 
 The state of every seed is in the `state.json` of its folder.
@@ -146,5 +147,4 @@ The state of every seed is in the `state.json` of its folder.
 
 The owner plans and runs the work with workflow skills for coding agents: seed to spec,
 enqueue, implement, a task runner and notify. They live outside this repository. You do
-not need them to make animations or to contribute: the working rules describe everything
-they produce.
+not need them to make animations or to contribute: the working rules describe everything they produce.

@@ -12114,3 +12114,555 @@ installation. No command, hardware or existing playback decision changes.
 **Resolution.** `docs/specs/62-p2-deep-space-picture-zoom-and-row-scan/design.md`,
 `docs/specs/62-p2-deep-space-picture-zoom-and-row-scan/verification.md` and the
 generator, review and proof sources beside the seed.
+## Seed 56: capacity work that does not hold playback's filesystem lock
+
+**Question.** Moving `SD.totalBytes()` and `SD.usedBytes()` to another task still
+lets `f_getfree` hold resources needed by reads. How is capacity discovered without
+making unknown capacity mean an absent or read-only card?
+
+**Answer.** Keep mounted generation and write capability independent. The query
+tries the guard without waiting and copies only a complete cache. The card worker
+reads at most one raw 512-byte sector per slice, validates a FAT16/FAT32 volume
+and counts its free allocation units with 64-bit totals. It releases the guard
+and yields between slices. Unsupported/ambiguous partition layouts remain unknown
+rather than counting a different volume; no catalog or animation scan is needed.
+This is bounded discovery, not proof of physical transfer latency or board FPS.
+
+**Resolution.** `firmware/usermod/odrig_sd_capacity.h`,
+`firmware/usermod/odrig_drive.cpp`, `docs/microsd.md` and the seed 56 spec.
+
+## Seed 56: failed writes and stale storage observations
+
+**Question.** Can a raw FAT rescan immediately after a failed write publish exact
+free bytes, and can the app retain its last absent report after losing the target?
+
+**Answer.** Neither is trusted as current information. A failed mutation may leave
+dirty FatFs state newer than media, so capacity remains unavailable until remount;
+ordinary safe writes and catalog access are not disabled merely for unknown space.
+The shared client discards its cached space report on a connection failure, as on
+a refused query or target change. A missing current report says information is
+unavailable; a fresh present card can separately report unknown byte counts.
+The owner deferred this run's firmware compilation to future seed 60; final APK
+build/delivery follows all four software seeds. Physical cold-card/phone acceptance
+remains open and cannot be inferred from the host and browser suites.
+
+**Resolution.** `firmware/usermod/odrig_drive.cpp`, `app/www/client.js`,
+`app/www/capacity.js`, `docs/android-app.md` and seed 56's verification note.
+
+## Seed 57: host acknowledgement and bounded miniature storage
+
+**Question.** Which host boundary avoids claiming successful physical setup from a
+command reply, and how does projection fit within the core's existing memory budget?
+
+**Answer.** A host explicitly opts into miniature support and acknowledges a matching
+request revision after clearing/checking output setup. Submission is pending; failure
+reports unknown and requires dark output until retry. Other hosts/canvases are
+unsupported. One192-byte optional startup block holds state and a180-byte physical
+image; averaging uses three local sums per10x10cell. Preview consumers reorder that
+same image, without a second projection or buffer in the core. The measured host
+allocation with a drive is131041bytes, below131072. Normal leg data is unchanged.
+The physical index x*6+y follows the manufacturer's schematic/PCB for the approved
+landscape orientation; it remains subject to a later powered corner/axis check.
+
+**Resolution.** `core/src/mini.cpp`, `core/include/odrig_core.h`, `docs/core.md`
+and the seed57 design. This records software design, not electrical acceptance.
+
+## Seed 57: status reply space
+
+**Question.** How does the additional mode state fit within the fixed1024-byte
+reply when the host description contains control characters?
+
+**Answer.** Keep the95-byte input bound and cap the encoded description at256bytes,
+truncating on a character boundary. Normal printable host descriptions are unchanged.
+The longest-status conservative check first measured1099bytes; the regression for
+95control bytes first retained all95 instead of the bounded42. The escaped limit
+leaves room for mode state without changing the public line/reply limits.
+
+**Resolution.** `core/src/commands.cpp`, `docs/commands.md` and the miniature tests.
+
+## Seed 57: unknown state during a failed-setup retry
+
+**Question.** Does submitting a retry establish a known output mode?
+
+**Answer.** No. Keep the previous failure and `on:null` while retry is pending;
+only successful host acknowledgement establishes a known mode. The regression first
+observed `on:false` before acknowledgement. Repeated setup failure remains unknown.
+
+**Resolution.** `core/src/commands.cpp` and the miniature control tests/design.
+
+## Seed 57: output setup and paired preview delivery
+
+**Question.** How are physical setup and preview delivery kept consistent without
+holding command replies or implementing the planned current-budget controls?
+
+**Answer.** The main loop clears and drains the old output, checks readiness again
+before setup, checks every new output, then clears and drains it before acknowledging.
+Failure keeps decoded frames from the outputs and allows an explicit retry. The
+refresh producer publishes under the common lock, after probe measurements; hardware
+operations and transfer waits remain outside it. Host regressions first found setup
+attempted during a resumed transfer and a stale20-output summary after selecting one.
+The existing WLED limiter stays enabled and counts the selected60LED bus. Seed45
+remains planned; its separate core/app budget controls are not supplied by this work.
+
+The emulator acknowledges virtual setup and publishes the core's physical RGB beside
+the corresponding normal frame in one coalesced slot. The browser only reorders those
+60pixels. Slow clients cannot accumulate a separate preview queue; normal canvas and
+ODRR geometry are unchanged. WLED's pinned transfer/limiter interface was checked at
+[29b389df1c1aaec6ff53aea742d17063b985906c](https://github.com/wled/WLED/blob/29b389df1c1aaec6ff53aea742d17063b985906c/wled00/bus_manager.cpp).
+Host tests are not a firmware build or physical transfer/power proof.
+
+**Resolution.** `firmware/usermod/odrig_mini_output.h`, `odrig_usermod.cpp`,
+`odrig_leds.cpp`, `emulator/binding.py`, `emulator/hub.py` and `docs/emulator.md`.
+
+## Seed 57: the app's confirmed miniature state
+
+**Question.** What does the checkbox show while a request is accepted but output
+setup has not completed, or a reply is lost?
+
+**Answer.** It keeps the last status value while the serialized request and its
+first subsequent status are outstanding, then follows the host's pending state.
+Only a fresh status establishes the mode; a successful command reply does not
+check the box. A connection failure invalidates the snapshot until a newer status
+arrives, including when another kind of reply reestablishes contact first.
+Missing or unsupported capability is explicitly unavailable, never treated as off.
+An output failure shows unknown, permits an explicit retry and offers Restore
+normal outputs. Target changes clear all local request state. Reopening the app
+reads status and never enables or retries the mode automatically. An indication
+outside Settings names active miniature output and its brightness cap.
+
+The first browser pass exposed a null-member crash with legacy firmware, then
+passed after the missing capability was handled throughout the drawing path.
+The app message-table check first counted20 command error codes against19;
+the approved `unsupported` refusal now has its own explanation and coverage.
+The tests also distinguish command acceptance from physical acknowledgement and
+exercise the same controls against the running emulator.
+
+**Resolution.** `app/www/commands.js`, `app/www/client.js`,
+`app/www/screens/mini.js` and `tests/app/test_mini.py`.
+
+## Seed 57: operator orientation and power boundaries
+
+**Question.** What does source evidence establish before a powered matrix check?
+
+**Answer.** The manufacturer's schematic and PCB establish a derived chain:
+DIN to LED116,60 parts through LED39, rotated into landscape front view with IN
+at left. Indices rise up each column, `x*6+y`; the rear view reverses left/right.
+The manufacturer's linked LED datasheet gives2.8V input-high minimum at5V, which
+supports the already approved direct3.3V data plan for the documented part.
+Neither fact proves that the received assembly matches or that the actual board's
+5V path, protection, concurrent USB paths or current budget are ready. Those
+checks include boot and failed/restored normal output, where the miniature-only
+brightness cap cannot protect the assembly. Keep the full wall disconnected and
+power off before changing wires. No new circuit or supply is introduced.
+
+**Resolution.** The root README pin table, operator sequence and source links;
+`docs/mapping.md`, `docs/firmware.md` and the retained human acceptance task.
+
+The integrated documentation audit first found the vocabulary's approved-command
+list missing `debug`; both its entry and coverage now include the miniature form.
+The mapping browser's unsupported wait also first read a null mapping error:
+its whole-page text search matched the new miniature explanation before mapping
+had answered. Waiting on the mapping error itself preserves the independent
+mapping assertion rather than depending on another panel's timing.
+
+The catalog-serving test met WinError10055 twice while opening a connection for
+each of538 files. Its verification loop now reuses existing HTTP/1.1 support,
+with every file, byte, content type, cache header and rejected path still checked.
+The serving class then passed all7 cases. This changes a test fixture only;
+production server behavior and Windows settings are unchanged.
+
+## Seed 58: preference storage and compatibility
+
+**Question.** How are durable brightness overrides bounded without changing the
+existing default-brightness contract or evicting missing files?
+
+**Answer.** Use internal `brightness.txt`/`brightness.part`, path namespaces like
+saved repeats, at most512 retained records and32 external records. New entries
+beyond either limit are `no-space`; existing entries can be updated/removed and
+missing media never makes room automatically. Zero is a present value. Cache
+listed internal/external values with fixed startup memory, compacting private
+metadata without narrowing existing position/count domains or raising memory
+bounds. Publish only verified durable settings; report damaged settings and use
+defaults safely, retaining usable state on failed updates.
+
+`status.brightness` remains the runtime default. Add `dimming` selected/saved/error
+readback, before blackout/mini cap; the renderer and miniature share selection.
+The app captures target/animation identity at input start and reads back before
+claiming a saved state. The existing WLED limiter remains; seed45's planned new
+budgets are not implemented here. Owner-approved save/default command forms need
+no additional command decision. Firmware compilation stays deferred to seed60.
+
+**Resolution.** Seed58 requirements/design/tasks; all product questions were
+already answered in its seed. Physical acceptance remains a separate task.
+
+## Seed 58: refreshing preferences after file identity changes
+
+**Question.** Does an item's cached preference survive a change to a different
+file name merely because its numeric id stays the same?
+
+**Answer.** No. Preferences belong to paths. The upload/restore regression first
+observed `[19,19]` instead of `[19,null]`: restoring the original path correctly
+used19, but assigning a different path kept that cached value. Refresh preferences
+after durable renamed-file publication, and alongside repeat-cache refreshes after
+indexed-file publication, movement and removal. The retained settings file itself
+is unchanged by an animation rename/removal; restoring its old path still uses it.
+
+**Resolution.** `core/src/storage.cpp`, `core/src/catalog.cpp` and the brightness
+identity regression. Fixed startup allocations remain below the existing bounds:
+Core3944 bytes and the100-item drive case131069 bytes, with full position/count
+domains preserved. Independent128-byte settings reads keep compiler stack frames
+within the existing512-byte limit.
+
+## 2026-10-30 — bounded saved brightness and app confirmation
+
+Saved brightness uses internal namespace/path records retained even for absent files,
+with 512 total and 32 external records and no eviction. A 128-byte independent reader
+preserves decoder ownership and the 512-byte stack-frame bound. Existing item padding,
+full-domain 6-byte repeat records,5-byte brightness records and private-field alignment
+keep the 100-item drive allocation 131069 bytes and Core 3944 without raising limits.
+One selector supplies player and miniature output; `status.brightness` stays the
+runtime default and additive `dimming` aligns with the status file identity.
+
+The app captures target epoch, animation ID/file and mode. Dirty or already-entered
+numeric edits require later status before capture; every override release commits
+its final value, with unchanged writes elided in the core. Only valid status restores
+status freshness after communication failure. Other command replies cannot make old
+override data editable. Firmware tools preserve/replace/read back brightness.txt.
+These technical resolutions do not close electrical, board or phone acceptance;
+firmware compilation remains deferred to the separately planned seed 60.
+
+Integrated verification also showed that a held brightness draft must be discarded
+when status freshness is lost, even if the same file returns after recovery. The
+controller's edit binding includes freshness, so releasing an interrupted drag
+cannot resend the discarded value. The failing70-versus20 regression then passed.
+
+
+## Seed 59: external exclusions and explicit turns
+
+**Question.** The player represents an explicit animation jump as a playlist turn.
+Does an external Ignore change cut that explicit turn, and may a newly checked
+excluded file start automatically while nothing plays?
+
+**Answer.** Own and ancestor exclusions apply to every automatic selection and
+revalidation, including the first file that finishes checking. Explicit manual
+turns remain available and finish normally; a paused explicit turn retains that
+provenance. This does not permit a later automatic selection of the excluded file.
+
+**Resolution.** The shared eligibility helper and turn provenance in
+`core/src/ignored.cpp` and `core/src/player.cpp`, the inclusion contract in
+`docs/commands.md`, and `tests/core/test_external_inclusion.py` carry the answer.
+
+
+## Seed 59: exclusive playback and preserved normal selection
+
+**Question.** How do explicit folder play, playlist windows, durable migration and
+bounded status replies work while Clocks only owns playback?
+
+**Answer.** Keep the normal playlist path and hold its elapsed window independently
+of the exclusive scheduler. Global restart and Play on Clocks restart its clock bag;
+Play on an inside subfolder explicitly plays its first physically available file,
+then returns to the clock/message program. Inside manual files remain available
+when ignored or messages are disabled. Outside play and output-taking mapping tests
+are refused. Leaving Only resolves the saved normal path again, falling back to
+root when needed, without restoring a transient diagnostic or paused break.
+
+Read version-1 Off/Between settings without rewriting them; the next changed
+setting writes and verifies the complete version-2 file before publication.
+Independent message permutations complete one whole message loop in either enabled
+mode. Reserve the new mode metadata inside the existing 1,024-byte reply by limiting
+escaped host description output to 160 bytes. Ordinary 95-byte ASCII descriptions
+and the complete supported file and folder paths are retained.
+
+**Resolution.** `core/src/breaks.cpp`, `core/src/player.cpp`,
+`core/src/commands.cpp`, `docs/commands.md`, `docs/show.md` and
+`docs/specs/59-p2-message-clock-widgets-and-clocks-only-mode/verification.md`.
+
+
+## Seed 59: temporary media changes retain the normal playlist
+
+**Question.** Should a temporary card without the normal playlist erase its saved
+path while Clocks only is active?
+
+**Answer.** No. Only holds the normal path and elapsed window until exit. Tree
+publication may resolve a transient root current-folder record, but must not clear
+that saved path or reset its window. On exit, the normal resolver either finds the
+folder on the current medium or deliberately chooses root with a fresh window.
+A regression observed `night` becoming root after an intermediate card lacked it;
+the central resolver now applies that fallback only outside Only. Restoration
+after changed IDs and the still-missing exit case both pass.
+
+**Resolution.** `core/src/order.cpp`, `tests/core/test_clock_modes.py` and
+`docs/specs/59-p2-message-clock-widgets-and-clocks-only-mode/verification.md`.
+
+
+## Seed 59: explicit restart and confirmed app state
+
+**Question.** Which request should the app's global restart send in Only, and when
+may a mode change be shown as saved or trigger initial folder navigation?
+
+**Answer.** Seed59's rule16 explicitly refuses raw `play all`; its global restart
+instead sends `play` with the folder ID freshly resolved in `clock_only`. The
+initial runtime implementation had accepted raw `play all`, and a UI integration
+regression observed success rather than `in-use`. The command guard and transport
+checks now enforce the seed's exact boundary; the app never substitutes a remembered
+numeric ID. The earlier commands-page sentence permitting raw `play all` is superseded.
+
+Command acknowledgement alone does not publish the selected mode as confirmed:
+wait for a newer fresh status. Contradictory status shows the reported choice.
+A lost reply stays explicitly unconfirmed, but authoritative later status may
+recover the mode and its initial navigation without claiming the command reply
+was received. Pending replies from a previous target cannot update the new target.
+Open Clocks once per target/mode entry, waiting for a resolved folder if necessary;
+later browsing and reconnect in the same mode do not force it open again.
+Old targets map booleans to Off/Between and cannot select Only. External inclusion
+uses the same existing setting and command, independently of card write capability;
+its own and inherited exclusions are shown distinctly for files and folders.
+
+**Resolution.** `app/www/commands.js`, `client.js`, `screens/clocks.js`,
+`screens/show.js`, `core/src/commands.cpp`, `docs/android-app.md`, `docs/commands.md`,
+and the shared app/core/emulator mode regressions.
+
+## Seed 59: reproducible message masks and source comparison
+
+**Question.** How can the retained browser animation become bounded widgets without
+system fonts or losing full sequences, and how is its presentation checked?
+
+**Answer.** Pin the reference and existing authored font hashes, parse the seven
+data-only sequences, and area-sample reusable alpha4 caption/digit masks. Retain
+every Hebrew character and source role. Use the approved deterministic virtual
+time/random model and analytic slowdown. Instrument the retained page only at its
+clock/random/final decorative canvas boundaries and compare 58 fixed-time pairs.
+Existing font metrics and quantization change letter shapes and some wrap points;
+physical pixels omit the decorative unlit grid. An oversized first digit atlas was
+observed and reduced to the reference's 12-pixel size inside its 16-row wheel window.
+
+**Resolution.** The generator, manifest, review, representative comparison and
+21-file share-readback hashes are beside the retained reference under the seed's
+`source/`. Converter/core/browser tests independently verify source captions,
+flags, bytes, actual runtime pixels and complete loops. The old message and its
+companions are unchanged. Physical card installation, LED and phone checks remain
+open; final APK/FW delivery follows seed60, as the owner subsequently requested.
+
+## Seed 60: host caches and owned setup processes
+
+**Question.** How can Windows install the pinned firmware tools without overwriting
+macOS caches, relying on Unix launchers, losing output or leaking compiler children?
+
+**Answer.** Preserve macOS toolchain paths and namespace other hosts' executable
+environments/PlatformIO caches under the shared firmware root. Keep common setup
+locking and pinned requirements; successful stamps include the host. Use native
+executables and explicit UTF-8/CRT streams. Own a suspended Windows child before
+resuming it, close its job at parent exit, and close every pipe on interruption;
+Unix uses owned process groups. Clone/copy into uniquely created sibling folders
+and publish only completed copies, never delete a preexisting contributor partial.
+
+**Resolution.** `fwtool/host.py`, `process.py`, paths/environment/setup/launcher and
+WLED staging implement this boundary. Seventeen discovered host tests pass after
+seven observed failures. Real Windows base/newer pinned setup and two concurrent
+idempotent repeats pass. Firmware compilation and other-host proof remain later
+tasks; no hardware, firmware runtime, global installation or signing key changed.
+
+## Seed 60: portable local dependencies and build identity
+
+**Question.** Must Windows copy the core instead of linking it, and how are spaced
+paths and cross-host build identity preserved without changing firmware behavior?
+
+**Answer.** The pinned PlatformIO uses portable `.pio-link` JSON references for
+`symlink://`, requiring no OS link privilege and always reading current sources.
+Keep it. Normalize configuration paths and quote individual compiler arguments;
+retain complete dependency/INI values. Serialize checkout build mutations, bound
+compiler jobs and use the owned process helper. Retain every kind/flag/output and
+the partition-size guard. Publish UTF-8/LF checksums and source/host/toolchain/input/
+image provenance, excluding generated builds and operator secrets. Compare source
+and meaningful image properties; host-specific metadata can change binary bytes.
+
+**Resolution.** Build/host/project generation and `fwtool/provenance.py` carry the
+implementation. All28 discovered host checks pass, including actual unprivileged
+spaced-path package linking, immediate current-source visibility, all eight variant
+mappings and checkout serialization. Actual image/cross-host proof remains later
+tasks. No runtime firmware source, command, GPIO or hardware change was made.
+
+## Seed 60: portable host verification and unavailable APK archives
+
+**Question.** How should firmware verification retain runtime checks on Windows,
+where Unix compiler names and sanitizer libraries are unavailable, and how should
+the combined runner handle a Mac-only APK archive manifest?
+
+**Answer.** Reuse the core's proven compiler/check selection, including available
+sanitizers or its existing trap/stack/assertion fallback, and retain every native
+runtime and storage/flash protection case. Skip only the filesystem-link guard
+when Windows explicitly denies link privileges. Select the host-specific firmware
+Python cache; report an unsupported APK build honestly while continuing firmware.
+No board checks are substituted and final APK delivery remains separately required.
+
+**Resolution.** `tests/firmware/compiler.py`, native firmware fixtures, `tests/run.py`
+and the runner suite carry this behavior. The verification record gives observed
+failures, native discovery results and the one privilege skip.
+
+## Seed 60: actual host proof, spaced roots and image identity
+
+**Question.** Does a successful default build prove all variants/architectures, and
+must images from normal and spaced checkouts have the same bytes?
+
+**Answer.** No. Record actual OS/architecture and variant coverage separately. Match
+current runtime/configuration inputs, ESP32-S3 image validation and linked player
+symbols; absolute compiler paths and ELF/application metadata can change bytes.
+An intentional current-source failure, restoration, retry and warm reuse show that
+the spaced checkout compiles its own current code and recovers after interruption.
+
+**Resolution.** `firmware/verify_build.py`, the read-only host matrix and the build
+verification record carry these checks and exact observed hashes/timings. Native
+host instructions replace the former Mac-only setup claim, preserving legacy Mac
+cache paths and every board rule. Remote host results and final delivery follow.
+
+## Seed 60: canonical path fixtures and the committed CI bridge
+
+**Question.** The default builds succeed on all hosts, but the first Windows/Mac
+matrix fails tests comparing short/alias TEMP paths to canonical product paths.
+How can this be repaired before final delivery without bundling tasks or rewriting
+published commits?
+
+**Answer.** Normalize expected path identity in the three existing fixtures. Treat
+the failed checks as this PR's regression. Use TACTIC's minimal integrity bridge to
+commit that test repair before resuming the existing delivery task and remote gate;
+do not add a runtime feature or call the failed matrix successful.
+
+**Resolution.** Task6 is the source-backed bridge, with observed CI failures and
+normal/actual Windows8.3 discovery proof. Task5 remains the final artifact/CI handoff
+boundary. Requirements and all board/phone limits remain unchanged.
+
+## Seed 60: checked Clang scheduling frame
+
+**Question.** The default firmware builds on all hosts, but the Mac newcomer checked
+host fails its512-byte frame bound at528 bytes in playlist_turn. What repair preserves
+both the safety rule and the existing clock/playlist behavior?
+
+**Answer.** Isolate the existing bounded clocks-only scheduler in a non-inlined helper,
+preserving its body and caller condition. Keep the limit, sanitizers and all state/
+arena budgets. Verify the full core/emulator regressions and add an early Mac checked
+host build; retain the remote target check before final handoff.
+
+**Resolution.** Task7 is the minimal committed integrity bridge between the host
+matrix and final delivery. player.cpp contains the extraction; the workflow checks
+the bound early, and the verification record retains observed failure and proof.
+Requirements, hardware choices, command list and playback semantics are unchanged.
+
+## Seed 60: final native APK packaging and persistent signer
+
+**Question.** The automatic APK archive manifest has only Mac-arm64 archives, and
+the owner expressly waived the former Mac signer. How is the authorized Windows
+delivery completed reproducibly without expanding firmware-host work into an app
+pipeline feature or replacing the global debug key?
+
+**Answer.** Use the existing local JDK21/SDK, authoritative shared web staging,
+Capacitor and pinned Gradle wrapper with build-local homes/caches. Sign the output
+with a dedicated persistent key and verify the original APK assertions, signature
+and alignment. Back up its exact key/credential/reuse files beside the existing Drive
+APK, update existing artifacts in place and verify identity/bytes. Keep the general
+APK archive limitation and physical acceptance explicit.
+
+**Resolution.** The delivery proof records source, actual host gates, artifact/key
+hashes, preserved file identities and the unchanged global key. Reuse instructions
+are beside the APK; no signing secret enters git. The original final task remains
+one proof boundary after the separate committed CI fixture bridge.
+
+## Seed 60: owner-directed optional Mac verification
+
+**Question.** The final Windows/Linux jobs pass, but the Mac newcomer walkthrough
+is still running. Must delivery wait for Mac after the owner explicitly asks to
+skip Mac verification and use Windows alternatives?
+
+**Answer.** No. Stop the remaining Mac run and require the successful native
+Windows/Linux evidence. Existing Windows firmware setup/spaced-path builds,
+checked core/emulator regressions and native APK packaging cover the work here.
+Keep Mac verification available through the manual workflow's include_macos input;
+the PR does not schedule it. No compiler protection or runtime test is weakened.
+
+**Resolution.** The host workflow and firmware documentation carry this policy.
+The verification record distinguishes observed Mac default/inspection/host success
+from the uncompleted newcomer walkthrough, and never calls the canceled overall
+run green. Final PR Windows/Linux checks remain owned before handoff.
+
+## Seed 60: verify the Android signing-key transition on an actual emulator
+
+**Question.** Package/signature checks pass, but the owner sees `App not installed`
+after the authorized move from the Mac signing key to a persistent Windows key.
+Which installation path must the delivery verify?
+
+**Answer.** Exercise both clean installation and updates on Android. The old Mac
+APK followed by the new signer reproduces `INSTALL_FAILED_UPDATE_INCOMPATIBLE`;
+one-time removal of the old installation permits the new APK, and later same-key
+updates succeed. Preserve package identity and the persistent key. Explain that
+the migration resets phone-local app data and leaves board storage unchanged.
+Do not describe rebuilding with a different key as a transparent upgrade.
+
+**Resolution.** The Android installation guide carries the migration instructions,
+and the verification record binds emulator install/launch/update results to the
+rebuilt APK's delivered bytes. The old-to-new path is a required publication check;
+physical phone acceptance remains open. No new application feature was added.
+
+## Seed 63: folder destinations and creation guards in existing upload forms
+
+**Question.** How can a ready-made upload preserve the browsed folder, prevent a
+silent replacement and survive card changes without a new command spelling or
+larger fixed arena?
+
+**Answer.** Extend the existing external begin's file argument to a validated
+catalog path, URI-encoding spaces and percent signs and decoding exactly once.
+Keep the basename and stable folder id, reconstructing the path on the stack.
+Reuse the existing expectation command with zero for absent external destinations,
+checked before data and before publication. Nonzero external expectations remain
+unsupported; explicit existing replacement clients without this guard retain
+their behavior. Internal CRC expectations are unchanged. Drop an external
+transaction when its mounted generation changes, without deleting a part on a
+new medium. Retain the old part for the existing recovery on its original card.
+The short inactivity timeout uses modular32-bit timestamp subtraction, freeing
+room for the full32-bit folder id without increasing the Upload/Core allocation.
+
+**Resolution.** commands.md and the shared core define these semantics on every
+transport. Nested publication updates both the folder and its parent's count row,
+the global file positions and id map in the existing atomic catalog transaction.
+The app will require the absent-destination guard for all new external uploads.
+No new command-list spelling, animation format or internal-folder model is added.
+
+## Seed 63: internal creation confirmation before any data
+
+**Question.** A fresh root list finds an unused internal id, but another controller
+can claim it before begin. How does a new upload avoid silently replacing it?
+
+**Answer.** Use the existing CRC-bearing internal begin form and include a
+`replacing` boolean in its chunk reply. The app requires explicit false for new
+files and otherwise cancels before sending data; absent confirmation explains
+that older firmware needs updating. The ordinary five-argument begin and
+explicit CRC-guarded text/clock edits keep their existing behavior. The boolean
+describes the transaction the core opened and is stable while that transaction
+blocks other content changes. No command spelling or user choice is added.
+
+**Resolution.** commands.md, the shared core and app implement the confirmation.
+Fail-first browser proof saw the unguarded app report Uploaded despite a begin
+that said replacing:true; the guarded flow sends no data in that case.
+
+An unused id is insufficient when an unreferenced physical file has the chosen
+basename. CRC-bearing new internal uploads also refuse that collision before
+opening a part. A fail-first host regression confirmed the missing refusal; no
+file outside the show's listing is implicitly replaced by new-file creation.
+
+## Folder browsing after a refused folder lookup
+
+**Question.** Does one `unknown-id` while populating a folder prove the folder was
+removed, so the app should immediately clear its browsing trail and show Root?
+
+**Answer.** No. Re-resolve the captured path through fresh parent listings first.
+An existing path remains selected and adopts its current folder id. Restart the
+folder's paginated listing from zero after a retry delay; never mix partial pages.
+A failed verification, or a missing path while the catalog is loading or damaged,
+keeps the previous complete view and retries. A complete listing that confirms
+the path is absent with an available catalog (or a legacy unsupported catalog)
+still returns to Root. Target and navigation identity are checked after each
+awaited reply so recovery cannot override the operator's later navigation.
+
+**Resolution.** The owner explicitly added this correction to seed 63's existing
+PR after reporting Clocks jumping to Root. Five browser regressions showed Root
+before the app fix; eight focused recovery tests and the actual native-emulator
+Clocks collection now pass. This fixes UI recovery, without claiming that a
+physical SD/flash I/O fault was reproduced or repaired.

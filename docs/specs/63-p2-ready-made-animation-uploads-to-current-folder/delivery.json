@@ -1,0 +1,47 @@
+{
+  "seed": 63,
+  "deliveredUtc": "2026-10-31T09:21:42.838299+00:00",
+  "softwareCommit": "9c5b996ee8505d086bfa81b18e56f3513d873a68",
+  "pullRequest": "https://github.com/korenmic/Odrig/pull/37",
+  "certificateSha256": "5a489ec294e53cdec085d71092cf4e7285ae08d4d43c19929d84130f3649f0f1",
+  "files": {
+    "odrig-debug.apk": {
+      "bytes": 19083943,
+      "sha256": "9ec6da6e45d1422f4bce04357364a89725ca310af0df184660ad99193ea8d988",
+      "device": 428019990,
+      "inode": 11084,
+      "overwrittenInPlace": true,
+      "mountedReadbackVerified": true
+    },
+    "odrig-firmware.bin": {
+      "bytes": 1880416,
+      "sha256": "288d6989dc5d298beaf5a5d5f41d8ef5826e6a3c0f1bf8bca3205c3f77f2c440",
+      "device": 428019990,
+      "inode": 11087,
+      "overwrittenInPlace": true,
+      "mountedReadbackVerified": true
+    }
+  },
+  "firmware": {
+    "chip": "ESP32-S3",
+    "environment": "odrig_microsd",
+    "applicationOffset": "0x10000",
+    "buildHost": {
+      "system": "win32",
+      "architecture": "x86_64",
+      "os": "Windows-11-10.0.26200-SP0"
+    }
+  },
+  "android": {
+    "tests": 8,
+    "cleanInstall": true,
+    "sameSignerUpdate": true,
+    "launch": true,
+    "androidVersion": "16",
+    "avd": "Medium_Phone_API_36.1"
+  },
+  "signingBackupsVerifiedUnchanged": true,
+  "identityEvidence": "In-place writes and SHA256/length readback through the existing Google Drive mount; no independent Drive API verification.",
+  "physicalBoardAcceptance": false,
+  "physicalPhoneAcceptance": false
+}

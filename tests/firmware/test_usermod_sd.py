@@ -3,10 +3,13 @@
 import functools
 import pathlib
 import subprocess
+import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from . import FIRMWARE, ROOT
+from core import build as core_build
 
 
 WLED = r"""
@@ -19,6 +22,10 @@ WLED = r"""
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#ifdef _WIN32
+#include <io.h>
+#define fsync _commit
+#endif
 using BaseType_t = int;
 using UBaseType_t = unsigned;
 using TickType_t = unsigned;
@@ -34,8 +41,10 @@ static const unsigned MALLOC_CAP_8BIT = 2;
 static const unsigned MALLOC_CAP_DMA = 4;
 struct TaskYield {};
 inline SemaphoreHandle_t xSemaphoreCreateMutex() { return &fakeMutex; }
-inline BaseType_t xSemaphoreTake(SemaphoreHandle_t mutex, unsigned) {
-  assert(mutex && !mutex->held); mutex->held = true; return pdTRUE;
+inline BaseType_t xSemaphoreTake(SemaphoreHandle_t mutex, unsigned wait) {
+  assert(mutex);
+  if (mutex->held && wait == 0) return 0;
+  assert(!mutex->held); mutex->held = true; return pdTRUE;
 }
 inline void xSemaphoreGive(SemaphoreHandle_t mutex) { assert(mutex->held); mutex->held = false; }
 inline unsigned pdMS_TO_TICKS(unsigned ms) { return ms; }
@@ -87,6 +96,17 @@ struct FakeSD {
   int select = -1;
   bool formatting = true;
   uint64_t total = 0, used = 0;
+  uint64_t elapsedMs = 0, capacityDelayMs = 0;
+  bool fat32 = false, badBoot = false, rawFailure = false;
+  unsigned partition = 0, activeFat = 0, allocated = 17;
+  unsigned clusters = 5000, clusterSectors = 1;
+  unsigned tableSectors() { return ((clusters + 2) * (fat32 ? 4 : 2) + 511) / 512; }
+  unsigned reserved() { return fat32 ? 32 : 1; }
+  unsigned volumeSectors() { return reserved() + 2 * tableSectors() + (fat32 ? 0 : 32) + clusters * clusterSectors; }
+  size_t numSectors() { return partition + volumeSectors(); }
+  size_t sectorSize() { return 512; }
+  static void put16(uint8_t *p, unsigned v) { p[0] = v & 255; p[1] = (v >> 8) & 255; }
+  static void put32(uint8_t *p, unsigned v) { put16(p, v & 65535); put16(p + 2, v >> 16); }
   SPIClass *bus = nullptr;
   bool begin(int cs, SPIClass &spi, unsigned hz, const char *path, unsigned count, bool format) {
     ++mounts; select = cs; bus = &spi; frequency = hz; maxFiles = count; formatting = format;
@@ -96,13 +116,80 @@ struct FakeSD {
   }
   void end() { fakeBeforeUnmount(); ++unmounts; mounted = false; }
   bool readRAW(uint8_t *buffer, unsigned sector) {
-    ++probes; assert(sector == 0); memset(buffer, 0, 512); return present && readable;
+    ++probes;
+    assert(sector < numSectors());
+    memset(buffer, 0, 512);
+    if (!present || !readable || rawFailure) return false;
+    if (sector == 0 && partition != 0) {
+      put16(buffer + 510, 0xaa55);
+      buffer[450] = fat32 ? 0x0c : 0x06;
+      put32(buffer + 454, partition); put32(buffer + 458, volumeSectors());
+    } else if (sector == partition) {
+      buffer[0] = 0xeb;
+      put16(buffer + 11, badBoot ? 1024 : 512);
+      buffer[13] = clusterSectors;
+      put16(buffer + 14, reserved()); buffer[16] = 2;
+      put16(buffer + 17, fat32 ? 0 : 512);
+      put32(buffer + 32, volumeSectors());
+      if (fat32) {
+        put32(buffer + 36, tableSectors());
+        put16(buffer + 40, activeFat ? 0x80 | activeFat : 0);
+        put32(buffer + 44, 2);
+      } else put16(buffer + 22, tableSectors());
+      put16(buffer + 510, 0xaa55);
+    } else {
+      const unsigned start = partition + reserved() + activeFat * tableSectors();
+      if (sector >= start && sector < start + tableSectors()) {
+        const unsigned width = fat32 ? 4 : 2;
+        for (unsigned at = 0; at < 512 / width; ++at) {
+          const unsigned cluster = (sector - start) * (512 / width) + at;
+          const unsigned entry = cluster < 2 + allocated ? (fat32 ? 0x0fffffff : 0xffff) : 0;
+          if (fat32) put32(buffer + at * width, entry | 0xa0000000);
+          else put16(buffer + at * width, entry);
+        }
+      }
+    }
+    return true;
   }
   int cardType() { return mounted ? 3 : 0; }
-  uint64_t totalBytes() { return mounted && present ? total : 0; }
-  uint64_t usedBytes() { return mounted && present ? used : 0; }
+  uint64_t totalBytes() { elapsedMs += capacityDelayMs; return mounted && present ? total : 0; }
+  uint64_t usedBytes() { elapsedMs += capacityDelayMs; return mounted && present ? used : 0; }
 };
 static FakeSD SD;
+"""
+
+WINDOWS_DIRENT = r"""
+#pragma once
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <string>
+#include <string.h>
+static const unsigned DT_REG = 8, DT_DIR = 4;
+struct dirent { char d_name[MAX_PATH + 1]; unsigned d_type; };
+struct DIR { HANDLE handle; WIN32_FIND_DATAA found; bool first; dirent entry; };
+inline DIR *opendir(const char *path) {
+  const DWORD attributes = GetFileAttributesA(path);
+  if (attributes == INVALID_FILE_ATTRIBUTES || !(attributes & FILE_ATTRIBUTE_DIRECTORY)) return nullptr;
+  DIR *dir = new DIR;
+  dir->handle = FindFirstFileA((std::string(path) + "\\*").c_str(), &dir->found);
+  if (dir->handle == INVALID_HANDLE_VALUE) { delete dir; return nullptr; }
+  dir->first = true;
+  return dir;
+}
+inline dirent *readdir(DIR *dir) {
+  if (!dir->first && !FindNextFileA(dir->handle, &dir->found)) return nullptr;
+  dir->first = false;
+  strcpy(dir->entry.d_name, dir->found.cFileName);
+  dir->entry.d_type = dir->found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ? DT_DIR : DT_REG;
+  return &dir->entry;
+}
+inline int closedir(DIR *dir) {
+  const bool closed = FindClose(dir->handle);
+  delete dir;
+  return closed ? 0 : -1;
+}
 """
 
 PROGRAM = r"""
@@ -239,7 +326,7 @@ const uint8_t *bytesOf(const char *text) { return reinterpret_cast<const uint8_t
 void cleanup(const odrig_host &host) {
   host.close(nullptr);
   closeSecond();
-  free(names); free(playedBuffer); free(secondBuffer);
+  free(names); free(pending); free(playedBuffer); free(secondBuffer);
   assert(openFiles.empty()); assert(!fakeMutex.held);
 }
 
@@ -287,7 +374,7 @@ int main(int argc, char **argv) {
   assert(SD.bus->clock == ODRIG_SD_SCK && SD.bus->input == ODRIG_SD_MISO);
   assert(SD.bus->output == ODRIG_SD_MOSI && SD.select == ODRIG_SD_CS);
   assert(SD.frequency == ODRIG_SD_FREQUENCY && SD.maxFiles >= 3 && !SD.formatting);
-  assert(fakeDelay >= 100);
+  assert(fakeDelay > 0 && fakeDelay <= 1000);
   if (mode == "absent" || mode == "filesystem") {
     assert(host.drive(nullptr) == 0);
     assert(host.drive_writable(nullptr, 0) == 0 && host.drive_list(nullptr, 0) == -1);
@@ -302,6 +389,140 @@ int main(int argc, char **argv) {
   }
   const uint32_t generation = host.drive(nullptr);
   assert(generation != 0);
+  if (mode == "cold-capacity") {
+    SD.total = 31914983424ull; SD.used = 16475328ull; SD.capacityDelayMs = 5000;
+    uint64_t available = 0, total = 0;
+    const uint64_t before = SD.elapsedMs;
+    host.drive_space(nullptr, generation, &available, &total);
+    const uint64_t nextRefreshAndStatus = SD.elapsedMs - before;
+    printf("cold capacity delayed next refresh/status by %llu ms\n", (unsigned long long)nextRefreshAndStatus);
+    fflush(stdout);
+    assert(nextRefreshAndStatus <= 50);
+    cleanup(host); puts("ok"); return 0;
+  }
+  if (mode.compare(0, 9, "capacity-") == 0) {
+    if (mode == "capacity-fat32") {
+      SD.fat32 = true; SD.clusters = 262144; SD.clusterSectors = 64;
+      SD.partition = 2048; SD.activeFat = 1;
+    } else if (mode == "capacity-partition") SD.partition = 2048;
+    invalidateCapacity();
+    uint64_t available = 7, total = 9;
+    unsigned slices = 0;
+    auto finish = [&]() {
+      while (cardCapacity.pending()) {
+        const unsigned before = SD.probes;
+        capacityStep();
+        assert(SD.probes == before + 1 && !fakeMutex.held);
+        ++slices;
+        uint8_t byte;
+        assert(host.read_at(nullptr, "drive/b.odrg", 0, &byte, 1) == 1);
+        assert(host.drive(nullptr) == generation);
+      }
+      assert(host.drive_space(nullptr, generation, &available, &total) == 1);
+      assert(total == uint64_t(SD.clusters) * SD.clusterSectors * 512);
+      assert(available == uint64_t(SD.clusters - SD.allocated) * SD.clusterSectors * 512);
+    };
+    finish();
+    assert(slices == SD.tableSectors() + (SD.partition ? 2 : 1));
+    const unsigned warm = SD.probes;
+    for (unsigned at = 0; at < 10; ++at) assert(host.drive_space(nullptr, generation, &available, &total) == 1);
+    assert(SD.probes == warm && SD.elapsedMs == 0);
+    if (mode == "capacity-fat32") assert(total > UINT64_C(0xffffffff));
+    if (mode == "capacity-errors") {
+      invalidateCapacity(); SD.rawFailure = true;
+      capacityStep();
+      assert(!cardCapacity.pending() && !cardCapacity.known());
+      assert(host.drive_space(nullptr, generation, &available, &total) == -1);
+      assert(host.drive(nullptr) == generation && host.drive_writable(nullptr, generation) == 1);
+      SD.rawFailure = false;
+      invalidateCapacity(); finish();
+      fakeMutex.held = true;
+      available = 7; total = 9;
+      assert(host.drive_space(nullptr, generation, &available, &total) == -1);
+      assert(available == 7 && total == 9);
+      fakeMutex.held = false;
+      assert(SD.probes > warm);
+    } else if (mode == "capacity-mutations") {
+      assert(host.write_open(nullptr, "drive/new.odrg") == 1);
+      const unsigned before = SD.probes;
+      capacityStep();
+      assert(SD.probes == before && host.drive_space(nullptr, generation, &available, &total) == -1);
+      assert(host.write(nullptr, bytesOf("new"), 3) == 1 && host.write_close(nullptr) == 1);
+      ++SD.allocated;
+      finish();
+      assert(host.rename(nullptr, "drive/new.odrg", "drive/newer.odrg") == 1);
+      assert(host.drive_space(nullptr, generation, &available, &total) == -1);
+      finish();
+      assert(host.remove(nullptr, "drive/newer.odrg") == 1);
+      assert(host.drive_space(nullptr, generation, &available, &total) == -1);
+      --SD.allocated; finish();
+    } else if (mode == "capacity-failed-create" || mode == "capacity-failed-write") {
+      if (mode == "capacity-failed-create") {
+        failCreate = true;
+        assert(host.write_open(nullptr, "drive/fail.odrg") == -1);
+        failCreate = false;
+      } else {
+        assert(host.write_open(nullptr, "drive/partial.odrg") == 1);
+        failWrite = true;
+        assert(host.write(nullptr, bytesOf("partial"), 7) == -1);
+        failWrite = false;
+        assert(host.write_close(nullptr) == -1);
+      }
+      assert(host.drive_space(nullptr, generation, &available, &total) == -1);
+      const unsigned before = SD.probes;
+      for (unsigned at = 0; at < 5; ++at) capacityStep();
+      assert(SD.probes == before && host.drive(nullptr) == generation);
+      assert(host.drive_writable(nullptr, generation) == 1);
+      SD.present = false; sdStep(); SD.present = true; sdStep();
+      const uint32_t after = host.drive(nullptr);
+      assert(after != generation && after != 0);
+      while (cardCapacity.pending()) capacityStep();
+      assert(host.drive_space(nullptr, after, &available, &total) == 1);
+    } else if (mode == "capacity-geometry") {
+      uint8_t boot[512];
+      assert(SD.readRAW(boot, 0));
+      for (unsigned bad = 0; bad < 10; ++bad) {
+        uint8_t changed[512]; memcpy(changed, boot, sizeof changed);
+        if (bad == 0) changed[510] = 0;
+        if (bad == 1) changed[13] = 3;
+        if (bad == 2) changed[13] = 0;
+        if (bad == 3) SD.put16(changed + 14, 0);
+        if (bad == 4) changed[16] = 0;
+        if (bad == 5) SD.put16(changed + 22, 1);
+        if (bad == 6) SD.put32(changed + 32, 0xffffffff);
+        if (bad == 7) SD.put16(changed + 17, 0);
+        if (bad == 8) SD.put32(changed + 32, 100);
+        if (bad == 9) SD.put16(changed + 11, 1024);
+        OdrigSdCapacity scan; scan.reset(SD.numSectors()); scan.consume(changed);
+        assert(!scan.pending() && !scan.known());
+      }
+      OdrigSdCapacity scan;
+      scan.reset(0); assert(!scan.pending());
+      scan.reset(UINT64_C(0x100000001)); assert(!scan.pending());
+      SD.fat32 = true; SD.clusters = 65525;
+      assert(SD.readRAW(boot, 0));
+      SD.put16(boot + 40, 0x82);
+      scan.reset(SD.numSectors()); scan.consume(boot);
+      assert(!scan.pending() && !scan.known());
+      SD.partition = 2048;
+      assert(SD.readRAW(boot, 0));
+      memcpy(boot + 462, boot + 446, 16);
+      scan.reset(SD.numSectors()); scan.consume(boot);
+      assert(!scan.pending() && !scan.known());
+    } else if (mode == "capacity-generation") {
+      SD.present = false; sdStep();
+      assert(host.drive_space(nullptr, generation, &available, &total) == -1);
+      SD.present = true; SD.allocated += 11; sdStep();
+      const uint32_t nextGeneration = host.drive(nullptr);
+      assert(nextGeneration != 0 && nextGeneration != generation);
+      assert(host.drive_space(nullptr, nextGeneration, &available, &total) == -1);
+      while (cardCapacity.pending()) capacityStep();
+      assert(host.drive_space(nullptr, generation, &available, &total) == -1);
+      assert(host.drive_space(nullptr, nextGeneration, &available, &total) == 1);
+      assert(available == uint64_t(SD.clusters - SD.allocated) * 512);
+    }
+    cleanup(host); puts("ok"); return 0;
+  }
   // Nothing of the folder is listed before the core asks.
   assert(named(host, generation, 0).empty());
   if (mode == "names") {
@@ -327,7 +548,12 @@ int main(int argc, char **argv) {
     host.close(nullptr);
     assert(host.read_at(nullptr, "drive/night/deep/x.odrg", 0, &byte, 1) == 1 && byte == 'x');
     assert(host.read_at(nullptr, "drive/night/../b.odrg", 0, &byte, 1) == -1);
+#ifdef _WIN32
+    assert(logged("sd: card opened: 8 animation files in 7 folders of odrig; 0 files and 3 folders passed over"));
+    assert(!isFolderName("bad."));
+#else
     assert(logged("sd: card opened: 8 animation files in 7 folders of odrig; 0 files and 4 folders passed over"));
+#endif
   } else if (mode == "many-folders") {
     assert(host.drive_list(nullptr, generation) == 37);
     for (unsigned at = 0; at < 5; ++at) {
@@ -367,16 +593,20 @@ int main(int argc, char **argv) {
     }
   } else if (mode == "space") {
     uint64_t freeBytes = 1, totalBytes = 1;
-    SD.total = 31914983424ull; SD.used = 16475328ull;
+    assert(host.drive_space(nullptr, generation, &freeBytes, &totalBytes) == -1);
+    while (cardCapacity.pending()) capacityStep();
     assert(host.drive_space(nullptr, generation, &freeBytes, &totalBytes) == 1);
-    assert(totalBytes == 31914983424ull && freeBytes == 31914983424ull - 16475328ull);
+    assert(totalBytes == 5000ull * 512 && freeBytes == (5000ull - 17) * 512);
     assert(host.drive_space(nullptr, generation + 1, &freeBytes, &totalBytes) == -1);
     assert(host.drive_space(nullptr, 0, &freeBytes, &totalBytes) == -1);
-    SD.total = 0;
+    fakeMutex.held = true;
     assert(host.drive_space(nullptr, generation, &freeBytes, &totalBytes) == -1);
-    SD.total = 31914983424ull; SD.used = SD.total + 1;
+    fakeMutex.held = false;
+    invalidateCapacity(); SD.badBoot = true;
+    capacityStep();
     assert(host.drive_space(nullptr, generation, &freeBytes, &totalBytes) == -1);
-    SD.used = 16475328ull; SD.present = false; sdStep();
+    assert(host.drive(nullptr) == generation);
+    SD.badBoot = false; SD.present = false; sdStep();
     assert(host.drive(nullptr) == 0 && SD.unmounts == 1);
     assert(host.drive_space(nullptr, generation, &freeBytes, &totalBytes) == -1);
     assert(SD.mounts == 1);
@@ -618,21 +848,28 @@ class SpiCard(unittest.TestCase):
         cls.addClassCleanup(cls.folder.cleanup)
         cls.work = pathlib.Path(cls.folder.name)
         for name, content in (("wled.h", WLED), ("SPI.h", SPI), ("SD.h", SD)):
-            (cls.work / name).write_text(content, encoding="utf-8")
+            (cls.work / name).write_text(content, encoding="utf-8", newline="\n")
+        if sys.platform == "win32":
+            (cls.work / "dirent.h").write_text(WINDOWS_DIRENT, encoding="utf-8", newline="\n")
         drive = FIRMWARE / "usermod" / "odrig_drive.cpp"
-        (cls.work / "main.cpp").write_text(PROGRAM.replace("@DRIVE@", str(drive)), encoding="utf-8")
+        (cls.work / "main.cpp").write_text(PROGRAM.replace("@DRIVE@", str(drive)), encoding="utf-8", newline="\n")
 
     @classmethod
     @functools.lru_cache(maxsize=None)
     def built(cls, pins=(39, 40, 41, 42), frequency=4000000):
-        binary = cls.work / f"card-{'-'.join(map(str, pins))}-{frequency}"
+        binary = cls.work / f"card-{'-'.join(map(str, pins))}-{frequency}{'.exe' if sys.platform == 'win32' else ''}"
         flags = ["-DODRIG_DRIVE_SD_SPI", '-DODRIG_SD_MOUNT_PATH="."']
         for name, value in zip(("SCK", "MISO", "MOSI", "CS"), pins):
             flags.append(f"-DODRIG_SD_{name}={value}")
         flags.append(f"-DODRIG_SD_FREQUENCY={frequency}")
+        compiler = core_build.find()
+        if compiler.kind != "gnu":
+            raise unittest.SkipTest("the POSIX SD stand-in requires a GNU-style host compiler")
+        with mock.patch.object(core_build, "CORE", cls.work), mock.patch.object(core_build, "BUILD", cls.work / "build"):
+            _, checks = core_build.checks(compiler)
         done = subprocess.run(
-            ["c++", "-std=c++11", "-Wall", "-Wextra", "-Werror", "-fsanitize=address,undefined",
-             "-fno-sanitize-recover=all", *flags, f"-I{cls.work}", f"-I{ROOT / 'core' / 'include'}",
+            [compiler.cxx, "-std=c++11", "-Wall", "-Wextra", "-Werror", *checks,
+             *flags, f"-I{cls.work}", f"-I{ROOT / 'core' / 'include'}",
              str(cls.work / "main.cpp"), "-o", str(binary)], capture_output=True, text=True,
         )
         if done.returncode:
@@ -653,8 +890,30 @@ class SpiCard(unittest.TestCase):
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(content)
             done = subprocess.run([str(self.built(pins, frequency)), name], cwd=trial, capture_output=True, text=True)
-            self.assertEqual(done.returncode, 0, done.stderr)
-            self.assertEqual(done.stdout.strip(), "ok")
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertEqual(done.stdout.strip().splitlines()[-1], "ok")
+
+    def test_cold_capacity_does_not_delay_the_next_refresh_or_status(self):
+        self.case("cold-capacity")
+
+    def test_capacity_slices_allow_reads_and_queries_and_count_active_fat_above_four_gib(self):
+        for mode in ("capacity-partition", "capacity-fat32"):
+            with self.subTest(mode=mode):
+                self.case(mode)
+
+    def test_capacity_io_failure_and_busy_cache_do_not_change_mounted_presence(self):
+        self.case("capacity-errors")
+
+    def test_all_external_mutations_and_failed_writes_invalidate_capacity(self):
+        for mode in ("capacity-mutations", "capacity-failed-create", "capacity-failed-write"):
+            with self.subTest(mode=mode):
+                self.case(mode)
+
+    def test_capacity_rejects_malformed_or_ambiguous_geometry_without_guessing(self):
+        self.case("capacity-geometry")
+
+    def test_remount_cannot_publish_the_previous_cards_capacity(self):
+        self.case("capacity-generation")
 
     def test_unconfigured_or_unsafe_pins_never_start_a_task_or_touch_spi(self):
         for pins in ((-1, -1, -1, -1), (1, 40, 41, 42), (39, 39, 41, 42)):
@@ -684,6 +943,8 @@ class SpiCard(unittest.TestCase):
         files = {"b.odrg": b"b", "A.ODRG": b"a", "night/comet.odrg": b"c", "night/deep/x.odrg": b"x", "night/deep/deeper/y.odrg": b"y",
                  "night/deep/deeper/more/z.odrg": b"z", "a b/q.odrg": b"q", "a-b/r.odrg": b"r", ".h/s.odrg": b"s", "System Volume Information/t.odrg": b"t",
                  "bad./u.odrg": b"u", "night/.hidden.odrg": b"h", "only/sub/k.odrg": b"k", "empty": None}
+        if sys.platform == "win32":
+            del files["bad./u.odrg"]
         self.case("folders", files)
         many = {f"r{at:03}.odrg": b"x" for at in range(5)}
         many.update({f"f{at:02}/x.odrg": b"x" for at in range(40)})

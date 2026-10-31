@@ -4,6 +4,7 @@
 
 #include "catalog.h"
 #include "crc32.h"
+#include "drive.h"
 #include "json_reader.h"
 #include "storage.h"
 
@@ -72,7 +73,7 @@ uint32_t base64_size(const char *text, uint32_t length) {
 }
 
 void upload_touch(Core &core, uint64_t now) {
-    if (core.upload.state != kUploadNone && now - core.upload.progress >= kUploadQuietMs) {
+    if (core.upload.state != kUploadNone && static_cast<uint32_t>(now) - core.upload.progress >= kUploadQuietMs) {
         upload_discard(core);
     }
 }
@@ -92,7 +93,7 @@ void upload_step(Core &core, uint64_t now) {
         return;
     }
     Checker &checker = *core.checker;
-    upload.progress = now;
+    upload.progress = static_cast<uint32_t>(now);
     Reason reason;
     uint32_t record = 0;
     if (!upload.header_read) {
@@ -150,7 +151,7 @@ void upload_step(Core &core, uint64_t now) {
     check_ended(core, reason == kReadError ? kCheckStorageFailed : kCheckBadFile, reason);
 }
 
-uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, uint32_t bytes, Reply &reply) {
+uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, uint32_t bytes, Reply &reply, bool report_creation) {
     Upload &upload = core.upload;
     if (upload.state != kUploadNone) {
         return refuse(reply, "busy");
@@ -178,6 +179,10 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
         return refuse(reply, "no-space");
     }
     const odrig_host &host = core.host;
+    if (report_creation && is_new && host.read_at != nullptr) {
+        uint8_t probe = 0;
+        if (host.read_at(host.ctx, name, 0, &probe, 1) >= 0) return refuse(reply, "in-use");
+    }
     uint32_t free_bytes = 0;
     uint32_t total_bytes = 0;
     const bool told = host.space != nullptr && host.space(host.ctx, &free_bytes, &total_bytes) == 1;
@@ -200,10 +205,16 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
     upload.received = 0;
     upload.crc = kCrcStart;
     upload.header_read = 0;
+    upload.absent = 0;
+    upload.folder = 0;
     upload.installed = 0;
-    upload.progress = now;
+    upload.progress = static_cast<uint32_t>(now);
     reply.text("{\"ok\":true,\"chunk\":");
     reply.number(kChunkSize);
+    if (report_creation) {
+        reply.text(",\"replacing\":");
+        reply.text(is_new ? "false" : "true");
+    }
     reply.text("}\n");
     return reply.length;
 }
@@ -215,6 +226,19 @@ uint32_t upload_begin_external(Core &core, uint64_t now, const char *name, uint3
     }
     if (!catalog_drive_writable(core)) {
         return refuse(reply, "read-only");
+    }
+    char parent[kDrivePathRoom];
+    const char *base = name;
+    for (const char *at = name; *at != '\0'; ++at) {
+        if (*at == '/') base = at + 1;
+    }
+    const uint32_t parent_length = base == name ? 0 : static_cast<uint32_t>(base - name - 1);
+    memcpy(parent, name, parent_length);
+    parent[parent_length] = '\0';
+    const uint32_t ordinal = drive_folder_with_path(core, parent);
+    IndexFolder destination;
+    if (ordinal == kNoFolder || !drive_folder(core, ordinal, destination)) {
+        return refuse(reply, "unknown-id");
     }
     const odrig_host &host = core.host;
     uint64_t free_bytes = 0;
@@ -230,16 +254,18 @@ uint32_t upload_begin_external(Core &core, uint64_t now, const char *name, uint3
     drive_check_yields(core);
     upload.state = kUploadReceiving;
     uint32_t length = 0;
-    for (; name[length] != '\0'; ++length) {
-        upload.name[length] = name[length];
+    for (; base[length] != '\0'; ++length) {
+        upload.name[length] = base[length];
     }
     upload.name[length] = '\0';
     upload.size = bytes;
     upload.received = 0;
     upload.crc = kCrcStart;
     upload.header_read = 0;
+    upload.absent = 0;
+    upload.folder = destination.id;
     upload.installed = 0;
-    upload.progress = now;
+    upload.progress = static_cast<uint32_t>(now);
     reply.text("{\"ok\":true,\"chunk\":");
     reply.number(kChunkSize);
     reply.text("}\n");
@@ -262,13 +288,22 @@ uint32_t upload_begin_known(Core &core, uint64_t now, uint32_t id, const char *n
             return reply.length;
         }
     }
-    return upload_begin(core, now, id, name, bytes, reply);
+    return upload_begin(core, now, id, name, bytes, reply, true);
 }
 
 uint32_t upload_expect(Core &core, uint32_t crc, Reply &reply) {
     Upload &upload = core.upload;
     if (upload.state == kUploadNone) {
         return refuse(reply, "no-upload");
+    }
+    if (upload.id == 0) {
+        if (upload.received != 0 || crc != 0) return refuse(reply, "bad-argument");
+        if (!upload_external_absent(core)) {
+            upload_discard(core);
+            return refuse(reply, "stale");
+        }
+        upload.absent = 1;
+        return succeed(reply);
     }
     uint32_t position = 0;
     while (position < core.item_count && core.items[position].id != upload.id) {
@@ -330,7 +365,7 @@ uint32_t upload_data(Core &core, uint64_t now, uint32_t offset, const char *text
         upload.crc = crc_add(upload.crc, core.chunk[at]);
     }
     upload.received += count;
-    upload.progress = now;
+    upload.progress = static_cast<uint32_t>(now);
     if (upload.received == upload.size) {
         // The last byte: the file is closed, and its check begins with the next refresh.
         if (host.write_close(host.ctx) != 1) {
@@ -369,6 +404,10 @@ uint32_t upload_end(Core &core, uint32_t crc, Reply &reply) {
         return reply.length;
     }
     if (upload.id == 0) {
+        if (upload.absent && !upload_external_absent(core)) {
+            upload_discard(core);
+            return refuse(reply, "stale");
+        }
         uint32_t id = 0;
         if (upload.outcome != kCheckPassed || !catalog_install_external(core, &id)) {
             upload_discard(core);
@@ -395,6 +434,28 @@ uint32_t upload_cancel(Core &core, Reply &reply) {
     }
     upload_discard(core);
     return succeed(reply);
+}
+
+bool upload_external_name(const Core &core, char *into) {
+    uint32_t length = 0;
+    if (core.upload.folder != 0) {
+        uint32_t ordinal = 0;
+        if (drive_find(core, core.upload.folder, &ordinal) != 'd') return false;
+        length = drive_folder_path(core, ordinal, into, kDrivePathRoom);
+        if (length == 0 || length >= kDrivePathRoom - 1) return false;
+        into[length++] = '/';
+    }
+    const uint32_t base = static_cast<uint32_t>(strlen(core.upload.name));
+    if (base + length >= kDrivePathRoom) return false;
+    memcpy(into + length, core.upload.name, base + 1);
+    return true;
+}
+
+bool upload_external_absent(const Core &core) {
+    char path[kDriveOpenRoom] = "drive/";
+    if (!upload_external_name(core, path + 6) || drive_position_named(core, path + 6, static_cast<uint32_t>(strlen(path + 6))) != kNothing) return false;
+    uint8_t probe = 0;
+    return core.host.read_at != nullptr && core.host.read_at(core.host.ctx, path, 0, &probe, 1) < 0;
 }
 
 }  // namespace odrig

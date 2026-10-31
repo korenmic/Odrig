@@ -91,6 +91,39 @@ class OnTheShowScreen(Counts):
 
 
 class WhatIsNotKnown(Counts):
+    def test_disconnect_drops_stale_absence_or_capacity_and_recovers_unknown_mounted_storage(self):
+        listed = (200, json.dumps({"ok": True, "items": [
+            {"id": 1, "file": "one.odrg", "bytes": 1138, "ignored": False, "external": False},
+            {"id": 60001, "file": "card.odrg", "bytes": 52340, "ignored": False, "external": True},
+        ], "next": None}))
+        for mounted in (False, True):
+            with self.subTest(mounted=mounted):
+                mode = {"offline": False, "recovered": False}
+
+                def reply(line):
+                    if mode["offline"]:
+                        return 503, ""
+                    if line == b"space":
+                        if mode["recovered"]:
+                            return space(1, True)
+                        return space(1, mounted, 77000000 if mounted else None, 99000000 if mounted else None)
+                    return support.PLAYING if line == b"status" else listed
+
+                def offline():
+                    mode["offline"] = True
+
+                def recover():
+                    mode.update(offline=False, recovered=True)
+
+                initial = r"free 77\.0 MB of 99\.0 MB" if mounted else r"External storage: absent \(read-only\)\.$"
+                with support.StandIn({name: reply for name in ("status", "list", "space")}) as target:
+                    seen = self.lines(target.address, 2, [initial, r"External storage: information unavailable\.$",
+                                      r"External storage: 1 animation, capacity unavailable \(read-only\)\.$"],
+                                      steps=[offline, recover], ms=12000)
+                    self.assertEqual(target.together, 1)
+                self.assertEqual(seen[1]["external"], "External storage: information unavailable.")
+                self.assertEqual(seen[2]["external"], "External storage: 1 animation, capacity unavailable (read-only).")
+
     def test_while_the_list_is_busy_the_drive_s_number_is_not_known_yet_and_the_board_s_is(self):
         replies = {"status": support.PLAYING, "list": BUSY, "space": space(2, True, 3100000000, 31900000000)}
         with support.StandIn(replies) as target:

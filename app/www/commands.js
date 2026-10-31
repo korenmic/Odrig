@@ -89,7 +89,26 @@ function progressOf(reply) {
 // null from a target that does not report them.
 export async function status() {
   const reply = await carriedOut("status");
+  const dimming = reply.dimming;
+  const dimmingSound = dimming === undefined || dimming === null ||
+    (typeof dimming === "object" && whole(dimming.value, 0, 255) &&
+      (dimming.saved === null || whole(dimming.saved, 0, 255)) &&
+      (dimming.error === null || typeof dimming.error === "string"));
+  const mini = reply.mini;
+  const miniSound = mini === undefined || (mini !== null && typeof mini === "object" &&
+    typeof mini.supported === "boolean" && (mini.on === null || typeof mini.on === "boolean") &&
+    typeof mini.pending === "boolean" && typeof mini.requested === "boolean" &&
+    (mini.error === null || typeof mini.error === "string") && whole(mini.brightness, 0, 255));
   const named = (value) => value === undefined || value === null || typeof value === "string";
+  const hasClockMode = reply.clock_mode !== undefined;
+  const clockMode = hasClockMode ? reply.clock_mode : typeof reply.clocks === "boolean" ? (reply.clocks ? "between" : "off") : null;
+  const only = reply.clock_only;
+  const modeSound = !hasClockMode ? only === undefined :
+    ["off", "between", "only"].includes(clockMode) && typeof reply.clocks === "boolean" && reply.clocks === (clockMode !== "off") &&
+    (clockMode === "only" ? only !== null && typeof only === "object" &&
+      (only.folder === null || whole(only.folder, 1, MOST_ID)) &&
+      ["playing", "no-card", "missing-folder", "no-clocks"].includes(only.state) &&
+      (only.state !== "playing" || only.folder !== null) : only === null);
   const sound =
     typeof reply.on === "boolean" &&
     whole(reply.brightness, 0, 255) &&
@@ -108,12 +127,13 @@ export async function status() {
     countOrNull(reply.saved, MOST_SAVED) &&
     (reply.clocks === undefined || typeof reply.clocks === "boolean") &&
     (reply.clock_message === undefined || typeof reply.clock_message === "boolean");
-  if (!sound) {
+  if (!sound || !miniSound || !dimmingSound || !modeSound) {
     throw new Failure("bad-reply", address());
   }
   return {
     on: reply.on,
     brightness: reply.brightness,
+    dimming: dimming == null ? null : {...dimming},
     playing: reply.playing,
     animation: reply.animation,
     fps: reply.fps,
@@ -132,6 +152,10 @@ export async function status() {
     saved: reply.saved ?? null,
     clocks: reply.clocks ?? null,
     clockMessage: reply.clock_message ?? null,
+    hasClockMode,
+    clockMode,
+    clockOnly: hasClockMode && only !== null ? {...only} : null,
+    mini: mini === undefined ? null : {...mini},
   };
 }
 
@@ -174,22 +198,26 @@ export async function list(from = 0, folder = null) {
         whole(item.id, 1, MOST_ID) &&
         (item.files === undefined || (typeof item.playlist === "string" && whole(item.files, 0, MOST_ID))) &&
         (item.ignored === undefined || typeof item.ignored === "boolean") &&
+        (item.inherited_ignored === undefined || typeof item.inherited_ignored === "boolean") &&
         (item.external === undefined || typeof item.external === "boolean") &&
         (item.type === undefined || typeof item.type === "string") &&
         (item.fault === undefined || typeof item.fault === "string") &&
         ((typeof item.file === "string" && item.playlist === undefined && (item.bytes === null || whole(item.bytes, 0, MOST_BYTES))) ||
           (typeof item.playlist === "string" && item.playlist.length > 0 && item.external === true && item.file === undefined && item.cycle === undefined &&
-            item.bytes === undefined && item.ignored === undefined && item.type === undefined && item.fault === undefined) ||
+            item.bytes === undefined && item.type === undefined && item.fault === undefined) ||
           (Array.isArray(item.cycle) && item.file === undefined && item.playlist === undefined && item.ignored === undefined && item.external === undefined &&
-            item.type === undefined && item.fault === undefined)),
+            item.inherited_ignored === undefined && item.type === undefined && item.fault === undefined)),
     );
   if (!sound) {
     throw new Failure("bad-reply", address());
   }
   return {
     items: reply.items.map((item) => (typeof item.file === "string" ? {id: item.id, file: item.file, bytes: item.bytes, ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
+      ...(item.inherited_ignored === undefined ? {} : {inheritedIgnored: item.inherited_ignored}),
       ...(item.external === undefined ? {} : {external: item.external}), ...(item.type === undefined ? {} : {type: item.type}),
-      ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist, ...(item.files === undefined ? {} : {files: item.files})} :
+      ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist, ...(item.files === undefined ? {} : {files: item.files}),
+      ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
+      ...(item.inherited_ignored === undefined ? {} : {inheritedIgnored: item.inherited_ignored})} :
       {id: item.id, cycle: true})),
     next: reply.next,
   };
@@ -221,8 +249,15 @@ export async function remove(id) {
 
 // Opens the upload of a file of some bytes as the item with this id. Gives the most bytes
 // one `upload data` may carry.
-export async function uploadBegin(id, file, bytes) {
-  const reply = await carriedOut(`upload begin ${id} ${file} ${bytes}`);
+export async function uploadBegin(id, file, bytes, createCrc = null) {
+  const line = `upload begin ${id} ${file} ${bytes}${createCrc === null ? "" : " " + createCrc}`;
+  const reply = createCrc === null
+    ? await carriedOut(`upload begin ${id} ${file} ${bytes}`)
+    : await carriedOut(`upload begin ${id} ${file} ${bytes} ${createCrc}`);
+  if (createCrc !== null && reply.replacing !== false) {
+    try { await uploadCancel(); } catch (_) { /* An unchanged upload opens no transaction. */ }
+    throw new Refusal(reply.replacing === true || reply.unchanged === true ? "stale" : "unsupported", line);
+  }
   if (!whole(reply.chunk, 1, MOST_BYTES)) {
     throw new Failure("bad-reply", address());
   }
@@ -232,7 +267,8 @@ export async function uploadBegin(id, file, bytes) {
 // Opens the upload of a file of some bytes to the external storage, which gives the
 // animation its id when the upload ends. Gives the most bytes one `upload data` may carry.
 export async function uploadBeginExternal(file, bytes) {
-  const reply = await carriedOut(`upload begin external ${file} ${bytes}`);
+  const encoded = file.split("/").map(encodeURIComponent).join("/");
+  const reply = await carriedOut(`upload begin external ${encoded} ${bytes}`);
   if (!whole(reply.chunk, 1, MOST_BYTES)) {
     throw new Failure("bad-reply", address());
   }
@@ -309,6 +345,14 @@ export async function brightness(value) {
   await carriedOut(`brightness ${value}`);
 }
 
+export async function brightnessSave(id, value) {
+  await carriedOut(`brightness ${id} ${value} save`);
+}
+
+export async function brightnessDefault(id) {
+  await carriedOut(`brightness ${id} default`);
+}
+
 // Gives the playlist's turn in progress of an animation so many loops, for that turn alone.
 export async function repeat(id, loops) {
   await carriedOut(`repeat ${id} ${loops}`);
@@ -323,6 +367,17 @@ export async function repeatSave(id, loops) {
 // Switches the clocks between the animations on or off.
 export async function clocks(on) {
   await carriedOut(`clocks ${on ? "on" : "off"}`);
+}
+
+// Selects one of the installation's clock playback modes.
+export async function clockMode(mode) {
+  if (!["off", "between", "only"].includes(mode)) throw new RangeError("unknown clock mode");
+  await carriedOut(`clocks ${mode === "between" ? "on" : mode}`);
+}
+
+// Requests a temporary output change; status confirms its physical completion.
+export async function debugMini(on) {
+  await carriedOut(`debug mini ${on ? "on" : "off"}`);
 }
 
 // Switches the message after each clock on or off.

@@ -80,6 +80,6 @@ Existing APK, firmware, signing backups and their receipts were untouched.
 
 Physical SD installation/catalog refresh and LED/phone acceptance remain
 unperformed. Seed63's ready-made upload feature is planned separately and is
-not implemented here; its mixed-root destination question remains open.
+not implemented here; its destination behavior follows the separately maintained seed.
 The new PR's remote-check availability is reported in the handoff; the base
 has no workflow files and reported zero check runs and zero statuses.

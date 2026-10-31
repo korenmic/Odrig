@@ -37,11 +37,12 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 // null while none is known; `keysVersion` grows when they change. `catalogNone` says that
 // the target keeps no catalogs, and `pagesRefused` that it reads no page of one: a target
 // from before either. `statusCount` counts the replies to `status`, so that a screen can wait
-// for the first one after a command.
+// for the first one after a command. `statusFresh` requires a valid status after the
+// latest communication failure; replies to other commands cannot restore it.
 export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, level: {path: "", id: null}, rootNames: null,
   animations: null, cycles: [], folders: [], space: null,
   listVersion: 0, listBusy: false, order: null, orderVersion: 0, orderKnown: true, catalog: null, keys: {internal: null, external: null}, keysVersion: 0,
-  catalogNone: false, pagesRefused: false, statusCount: 0};
+  catalogNone: false, pagesRefused: false, statusCount: 0, statusFresh: false};
 
 const watchers = new Set();
 // What the operator asked for and was not sent yet, in its order: each a kind and the
@@ -59,6 +60,7 @@ let listTimer = null;
 let listing = null;
 // The folders entered from the root down to the level shown, each `{path, id}`.
 const trail = [];
+let onlyOpened = false;
 // Whether the root's names are due while another level is shown, and the root's list that
 // is being asked for in parts for them: the ids and the files so far and the position to
 // ask for next.
@@ -142,6 +144,8 @@ function failed(error) {
   }
   state.link = "no-answer";
   state.failure = error;
+  state.space = null;
+  state.statusFresh = false;
 }
 
 async function askStatus() {
@@ -158,7 +162,15 @@ async function askStatus() {
     }
     heard();
     state.status = reply;
+    state.statusFresh = true;
     state.statusCount += 1;
+    if (reply.clockMode !== "only") onlyOpened = false;
+    else if (!onlyOpened && reply.clockOnly?.folder != null) {
+      onlyOpened = true;
+      trail.length = 0;
+      trail.push({path: "clocks", id: reply.clockOnly.folder});
+      toLevel();
+    }
     const named = reply.animation;
     const here = typeof reply.file === "string" && parentOf(reply.file) === state.level.path && (state.level.id === null || reply.file.includes("/"));
     if (named !== null && state.animations !== null && named !== askedFor && here && !state.animations.some((animation) => animation.id === named)) {
@@ -242,6 +254,61 @@ function namesOf(items) {
   return {ids: named.map((item) => item.id), files: named.filter((item) => typeof item.file === "string").map((item) => item.file)};
 }
 
+// Resolve the captured path without changing the visible level. A failed lookup
+// or an unavailable catalog does not establish that the folder was removed.
+async function recoverLevel(asked, level) {
+  const current = () => asked === target && level === state.level;
+  const found = [];
+  let path = "";
+  let parent = null;
+  try {
+    for (const name of level.path.split("/")) {
+      path += (path ? "/" : "") + name;
+      let from = 0;
+      let folder = null;
+      do {
+        const reply = await commands.list(from, parent);
+        if (!current()) return;
+        folder = reply.items.find(item => item.playlist === path) ?? null;
+        from = reply.next;
+      } while (folder === null && from !== null);
+      if (folder === null) {
+        let catalog = null;
+        try { catalog = await commands.catalog(); } catch (error) {
+          if (!(error instanceof commands.Refusal && ["unknown-command", "bad-argument"].includes(error.code))) throw error;
+        }
+        if (!current()) return;
+        if (catalog === null || ["ok", "absent", "none"].includes(catalog.external.state)) {
+          heard();
+          trail.length = 0;
+          toLevel();
+          return;
+        }
+        break;
+      }
+      found.push({path, id: folder.id});
+      parent = folder.id;
+    }
+    if (found.length === level.path.split("/").length) {
+      trail.splice(0, trail.length, ...found);
+      if (parent !== level.id) {
+        heard();
+        toLevel();
+        return;
+      }
+    }
+    heard();
+  } catch (error) {
+    if (!current()) return;
+    if (error instanceof commands.Refusal) heard();
+    else failed(error);
+  }
+  listing = null;
+  state.listBusy = true;
+  listAgainLater(LIST_WHEN_BUSY_MS);
+  changed();
+}
+
 // Asks for one part of the list of the level shown. The new list takes the place of the
 // old one only when its last part has come; when a part fails, the old list stays. A
 // folder that is no more brings the list to the root.
@@ -279,10 +346,7 @@ async function askListPart() {
       return;
     }
     if (error instanceof commands.Refusal && error.code === "unknown-id" && level.id !== null) {
-      // The folder is no more, with its card or after a removal: the root is shown.
-      heard();
-      trail.length = 0;
-      toLevel();
+      await recoverLevel(asked, level);
       return;
     } else if (error instanceof commands.Refusal && error.code === "busy") {
       // The target has just started and still reads what it has installed. What is
@@ -568,14 +632,17 @@ async function give(request) {
     const reply = await request.carry();
     if (asked !== target) {
       request.reject?.(new Error("the address changed"));
+      request.settle?.(false);
       return;
     }
     heard();
     request.confirm?.(reply);
     request.resolve?.(reply);
+    request.settle?.(true);
   } catch (error) {
     if (asked !== target) {
       request.reject?.(new Error("the address changed"));
+      request.settle?.(false);
       return;
     }
     if (error instanceof commands.Refusal) {
@@ -591,6 +658,7 @@ async function give(request) {
       failed(error);
     }
     request.reject?.(error);
+    request.settle?.(false);
   }
   if (request.kind === "remove" || request.kind === "ignore" || request.kind === "order") {
     listing = null;
@@ -720,10 +788,12 @@ export function begin() {
   state.link = "checking";
   state.failure = null;
   state.status = null;
+  state.statusFresh = false;
   state.heardAt = null;
   state.since = Date.now();
   state.answered = false;
   trail.length = 0;
+  onlyOpened = false;
   state.level = {path: "", id: null};
   state.rootNames = null;
   rootDue = false;
@@ -840,12 +910,13 @@ async function askRootPart() {
 
 // Takes something the operator asked for. A brightness that still waits is replaced by a
 // newer one, at its place.
-function want(kind, carry, confirm) {
+function want(kind, carry, confirm, settle) {
   const waiting = kind === "brightness" ? wanted.findIndex((request) => request.kind === kind) : -1;
   if (waiting === -1) {
-    wanted.push({kind, carry, confirm});
+    wanted.push({kind, carry, confirm, settle});
   } else {
-    wanted[waiting] = {kind, carry, confirm};
+    wanted[waiting].settle?.(false);
+    wanted[waiting] = {kind, carry, confirm, settle};
   }
   next();
 }
@@ -868,12 +939,32 @@ export function remove(animation, done) {
   want("remove", () => commands.remove(animation.id), () => done(animation));
 }
 
+export function inClockFolder(item) {
+  const path = typeof item.playlist === "string" ? item.playlist : item.external === true ? item.file : null;
+  return path === "clocks" || typeof path === "string" && path.startsWith("clocks/");
+}
+
+export function canPlay(item) {
+  return state.status?.clockMode !== "only" || inClockFolder(item);
+}
+
 export function play(id) {
-  want("play", () => commands.play(id));
+  want("play", () => {
+    if (state.status?.clockMode === "only" && id !== state.status.clockOnly?.folder) {
+      const item = [...(state.animations || []), ...state.folders].find((candidate) => candidate.id === id);
+      if (item === undefined || !inClockFolder(item)) throw new commands.Refusal("in-use", `play ${id}`);
+    }
+    return commands.play(id);
+  });
 }
 
 export function playAll() {
-  want("play", () => commands.playAll());
+  want("play", () => {
+    if (state.status?.clockMode !== "only") return commands.playAll();
+    const folder = state.status.clockOnly?.folder;
+    if (folder == null) throw new commands.Refusal("in-use", "play all");
+    return commands.play(folder);
+  });
 }
 
 export function switchOn() {
@@ -884,8 +975,31 @@ export function switchOff() {
   want("off", () => commands.off());
 }
 
-export function setBrightness(value) {
-  want("brightness", () => commands.brightness(value));
+function capturedBrightness(snapshot, carry) {
+  if (snapshot !== null && (snapshot.version !== target || state.link !== "answers" || !state.statusFresh ||
+      state.status?.animation !== snapshot.animation || state.status?.file !== snapshot.file ||
+      (state.status?.dimming?.saved != null) !== snapshot.override)) {
+    throw new commands.Refusal("stale", "brightness");
+  }
+  return carry();
+}
+
+export function setBrightness(value, snapshot = null) {
+  return new Promise((settle) => {
+    want("brightness", () => capturedBrightness(snapshot, () => commands.brightness(value)), undefined, settle);
+  });
+}
+
+export function brightnessValue(value, snapshot) {
+  return requestOperation("brightness-edit", () => capturedBrightness(snapshot, () => commands.brightness(value)));
+}
+
+export function brightnessSave(id, value, snapshot) {
+  return requestOperation("brightness-edit", () => capturedBrightness(snapshot, () => commands.brightnessSave(id, value)));
+}
+
+export function brightnessDefault(id, snapshot) {
+  return requestOperation("brightness-edit", () => capturedBrightness(snapshot, () => commands.brightnessDefault(id)));
 }
 
 // The loops of an animation's turn in progress, for that turn alone; the loops kept for
@@ -907,8 +1021,16 @@ export function clocks(on) {
   return requestOperation("clocks", () => commands.clocks(on));
 }
 
+export function clockMode(mode) {
+  return requestOperation("clocks", () => commands.clockMode(mode));
+}
+
 export function clockMessage(on) {
   return requestOperation("clocks", () => commands.clockMessage(on));
+}
+
+export function debugMini(on) {
+  return requestOperation("mini", () => commands.debugMini(on));
 }
 
 // Names the function that is told of every refusal of what the operator asked for.
@@ -932,6 +1054,52 @@ export function targetVersion() {
   return target;
 }
 
+// Fresh upload observations share the serialized command stream with all controls.
+export function uploadSnapshot(level) {
+  return requestOperation("upload-preflight", async () => {
+    const asked = target;
+    const unchanged = () => { if (asked !== target) throw new Error("the target changed"); };
+    const space = await commands.space();
+    unchanged();
+    state.space = space;
+    let catalog = null;
+    try { catalog = await commands.catalog(); } catch (error) {
+      if (!(error instanceof commands.Refusal && ["unknown-command", "bad-argument"].includes(error.code))) throw error;
+    }
+    unchanged();
+    async function all(folder) {
+      const items = [];
+      let from = 0;
+      do {
+        const reply = await commands.list(from, folder);
+        unchanged();
+        items.push(...reply.items);
+        from = reply.next;
+      } while (from !== null);
+      return items;
+    }
+    const root = await all(null);
+    let items = root;
+    let folderValid = level.id === null;
+    if (level.id !== null && space.external?.present === true) {
+      let path = "";
+      for (const part of level.path.split("/")) {
+        path += (path ? "/" : "") + part;
+        const folder = items.find(row => row.playlist === path);
+        if (!folder) break;
+        if (path === level.path) folderValid = folder.id === level.id;
+        items = await all(folder.id);
+      }
+    }
+    if (catalog !== null) {
+      const after = await commands.catalog();
+      unchanged();
+      if (["internal", "external"].some(storage => after[storage].generation !== catalog[storage].generation)) throw new commands.Refusal("stale", "upload preflight");
+    }
+    return {space, catalog, root, items, folderValid};
+  });
+}
+
 function requestOperation(kind, carry, confirm) {
   return new Promise((resolve, reject) => {
     wanted.push({kind, carry, confirm, resolve, reject});
@@ -942,6 +1110,7 @@ function requestOperation(kind, carry, confirm) {
 function cancelWaiting() {
   for (const request of wanted) {
     request.reject?.(new Error("the request was cancelled"));
+    request.settle?.(false);
   }
   wanted.length = 0;
 }
@@ -999,7 +1168,7 @@ export function refreshContent() {
 
 export function ignore(id, ignored) {
   return requestOperation("ignore", () => commands.ignore(id, ignored), () => {
-    const animation = state.animations?.find(item => item.id === id);
+    const animation = [...(state.animations || []), ...state.folders].find(item => item.id === id);
     if (animation) animation.ignored = ignored;
   });
 }

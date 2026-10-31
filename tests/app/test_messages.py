@@ -38,7 +38,7 @@ class TheTable(unittest.TestCase):
         return self.found["refusals"][f"{code} | {line} | {'null' if reason is None else reason}"]
 
     def test_every_error_code_of_the_command_list_has_a_text_or_is_one_the_app_cannot_get(self):
-        self.assertEqual(len(self.codes), 19)
+        self.assertEqual(len(self.codes), 20)
         cannot_get = self.found["notForTheApp"]
         self.assertLessEqual(set(cannot_get), set(self.codes))
         self.assertEqual(len(cannot_get), len(set(cannot_get)))
@@ -62,6 +62,7 @@ class TheTable(unittest.TestCase):
         self.assertEqual(self.text("busy", "remove 7", None), "The installation is busy. Try again in a moment. (busy)")
         self.assertEqual(self.text("in-use", "remove 7", None), "Animation 7 cannot be removed: a cycle plays it, or it is on a USB stick. (in-use)")
         self.assertEqual(self.text("mapping-conflict"), "Mapping changed on the target. Reload before saving. (mapping-conflict)")
+        self.assertEqual(self.text("unsupported"), "This target cannot use miniature display mode with its current output setup. (unsupported)")
         self.assertEqual(self.text("storage-error", "space", None), "The installation could not use its storage. (storage-error)")
         # A code the app does not know, also one that is a word of the language.
         self.assertEqual(self.text("weird", "on", None), REFUSED.format("weird"))

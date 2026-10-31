@@ -14,6 +14,8 @@ T0 = 1000
 OK = 'reply {"ok":true}'
 UNCHANGED = 'reply {"ok":true,"unchanged":true}'
 CHUNK = 'reply {"ok":true,"chunk":1500}'
+NEW_CHUNK = 'reply {"ok":true,"chunk":1500,"replacing":false}'
+REPLACE_CHUNK = 'reply {"ok":true,"chunk":1500,"replacing":true}'
 STORAGE_ERROR = 'reply {"ok":false,"error":"storage-error"}'
 
 
@@ -123,9 +125,9 @@ class Unchanged(unittest.TestCase):
     def test_it_is_answered_only_for_the_last_uploads_id_file_size_and_crc32(self):
         new = self.NEW
         for line, reply in ((begin(1, "one.odrg", new), UNCHANGED),
-                            (begin(1, "one.odrg", new, zlib.crc32(new) ^ 1), CHUNK),
-                            (begin(1, "one.odrg", new + b"x"), CHUNK),
-                            (begin(1, "other.odrg", new), CHUNK),
+                            (begin(1, "one.odrg", new, zlib.crc32(new) ^ 1), REPLACE_CHUNK),
+                            (begin(1, "one.odrg", new + b"x"), REPLACE_CHUNK),
+                            (begin(1, "other.odrg", new), REPLACE_CHUNK),
                             (begin(1, "two.odrg", new), 'reply {"ok":false,"error":"in-use"}'),
                             (begin(9, "one.odrg", new), 'reply {"ok":false,"error":"in-use"}'),
                             (begin(3, "one.odrg", new), 'reply {"ok":false,"error":"in-use"}'),
@@ -135,15 +137,15 @@ class Unchanged(unittest.TestCase):
                 self.assertEqual(self.after_the_upload(line), [reply])
 
     def test_an_upload_begun_since_makes_it_unknown(self):
-        self.assertEqual(self.after_the_upload("upload begin 9 new.odrg 100", "upload cancel", begin(1, "one.odrg", self.NEW)), [CHUNK, OK, CHUNK])
+        self.assertEqual(self.after_the_upload("upload begin 9 new.odrg 100", "upload cancel", begin(1, "one.odrg", self.NEW)), [CHUNK, OK, REPLACE_CHUNK])
 
     def test_a_removed_item_is_uploaded_anew(self):
         replies = self.replies(upload(9, "nine.odrg", self.NEW) + [support.line(T0 + 300, "remove 9"), support.line(T0 + 300, begin(9, "nine.odrg", self.NEW))])
-        self.assertEqual(replies[-3:], [OK, OK, CHUNK])
+        self.assertEqual(replies[-3:], [OK, OK, NEW_CHUNK])
 
     def test_a_file_the_check_read_and_no_upload_installed_is_uploaded(self):
         one = as_bytes(self.FILES)["one.odrg"]
-        self.assertEqual(self.replies([support.line(T0, begin(1, "one.odrg", one))]), [CHUNK])
+        self.assertEqual(self.replies([support.line(T0, begin(1, "one.odrg", one))]), [REPLACE_CHUNK])
 
     def test_the_form_without_the_crc32_is_as_before(self):
         one = as_bytes(self.FILES)["one.odrg"]

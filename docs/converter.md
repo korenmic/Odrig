@@ -497,6 +497,7 @@ a web page load the same files.
 | `bidi.js` | The Unicode Bidirectional Algorithm for the characters of a text: `paragraphLevel`, `levels` and `visualOrder`. |
 | `textlayout.js` | The layout of a text: `checkCharacters`, `visualLines` and `layout`, with the fonts by name. |
 | `draw.js` | What the player draws: the pass of a text and the place of its block at a time, `passMs` and `placeAt`, and its picture, `drawText`; a clock's seed, `mix`, `stir` and `seedOf`, what the seed chooses, `clockOf`, its virtual time, `virtualTime`, and its picture, `drawClock`; a picture clock's time with its direction, `pictureTime`, the text of a field's pattern, `patternText`, and the layer of its hands or its digits, `overlayOf`. |
+| `messageclock.js` | Generated message clocks: strict compiled-mask JSON `load` and `source`, bounded subtype-6 `encode` and `decode`, and deterministic elapsed-time `draw` shared by the app preview. |
 | `mapping.js` | Mapping files: `loads`. |
 | `show.js` | Show files: `loads`. |
 | `pack.js` | The installed file set of a show from the bytes of its files: `pack`. |

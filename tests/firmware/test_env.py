@@ -2,7 +2,7 @@ import os
 import pathlib
 import unittest
 
-from fwtool import env, paths
+from fwtool import env, host, paths
 
 FOLDER_VARIABLES = ("PLATFORMIO_CORE_DIR", "PLATFORMIO_BUILD_CACHE_DIR", "npm_config_cache", "PIP_CACHE_DIR")
 SWITCHES = {"PLATFORMIO_SETTING_ENABLE_TELEMETRY": "No", "npm_config_update_notifier": "false"}
@@ -27,9 +27,9 @@ class ChildEnvironment(unittest.TestCase):
             self.assertEqual(made.get(name), value, name)
 
     def test_the_programs_of_the_work_folder_come_first_on_the_path(self):
-        made = env.child({"PATH": "/usr/bin:/bin", "HOME": "/Users/somebody"})
-        self.assertEqual(made["PATH"].split(os.pathsep), [str(paths.VENV / "bin"), "/usr/bin", "/bin"])
-        self.assertEqual(env.child({"HOME": "/Users/somebody"})["PATH"], str(paths.VENV / "bin"))
+        made = env.child({"PATH": os.pathsep.join(("/usr/bin", "/bin")), "HOME": "/Users/somebody"})
+        self.assertEqual(made["PATH"].split(os.pathsep), [str(host.scripts(paths.VENV)), "/usr/bin", "/bin"])
+        self.assertEqual(env.child({"HOME": "/Users/somebody"})["PATH"], str(host.scripts(paths.VENV)))
 
     def test_the_path_does_not_grow_from_one_process_to_the_next(self):
         once = env.child({"PATH": "/usr/bin:/bin"})
@@ -42,10 +42,10 @@ class ChildEnvironment(unittest.TestCase):
         self.assertEqual(made["LANG"], "en_US.UTF-8")
         self.assertNotEqual(made["PIP_CACHE_DIR"], caller["PIP_CACHE_DIR"])
         self.assertEqual(caller["PATH"], "/usr/bin")
-        self.assertEqual(env.child()["HOME"], os.environ["HOME"])
+        self.assertEqual(env.child().get("HOME"), os.environ.get("HOME"))
 
     def test_no_variable_names_a_folder_in_the_home_folder(self):
-        home = pathlib.Path(os.environ["HOME"]).resolve()
+        home = pathlib.Path.home().resolve()
         made = env.child({"PATH": "/usr/bin", "HOME": str(home)})
         for name in set(FOLDER_VARIABLES) | set(SWITCHES):
             value = pathlib.Path(made[name])

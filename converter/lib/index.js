@@ -12,6 +12,7 @@ export * as inflate from "./inflate.js";
 export * as inventory from "./inventory.js";
 export * as jsonframes from "./jsonframes.js";
 export * as mapping from "./mapping.js";
+export * as messageclock from "./messageclock.js";
 export * as motion from "./motion.js";
 export * as odrg from "./odrg.js";
 export * as odrgx from "./odrgx.js";

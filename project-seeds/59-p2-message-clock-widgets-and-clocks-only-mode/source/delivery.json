@@ -1,0 +1,111 @@
+{
+  "destination": "ODRIG_ANIMATIONS from env",
+  "verifiedReadback": true,
+  "files": [
+    {
+      "path": "card/clocks/message/v7-consciousness.odrgx",
+      "bytes": 9588,
+      "sha256": "592977056b2b7473d7c7b860f9a4f1e786d9abfe4cbd16962e9954cf461fed3d"
+    },
+    {
+      "path": "card/clocks/message/v7-consciousness.gif",
+      "bytes": 11948,
+      "sha256": "fcc7f6580ef21e04584fd0141d7a5bc58f7fa9fcb8466b6bd2083a98b49a12e2"
+    },
+    {
+      "path": "card/clocks/message/v7-consciousness.md",
+      "bytes": 1722,
+      "sha256": "b6aaa4fe55a475b2e15ca514a15d0b3f908abe7034417dbfdb855a7d8cbeaf7c"
+    },
+    {
+      "path": "card/clocks/message/v7-symmetry.odrgx",
+      "bytes": 7737,
+      "sha256": "911f857d47a3d972d549566d54a57d794307b5e33f9be41d6becc4ebd6bb1347"
+    },
+    {
+      "path": "card/clocks/message/v7-symmetry.gif",
+      "bytes": 13942,
+      "sha256": "f6589f259e89f500da9e8a3041570e05911cb11e1776454133c4a7ae430b68ef"
+    },
+    {
+      "path": "card/clocks/message/v7-symmetry.md",
+      "bytes": 1721,
+      "sha256": "66540279be9ac4d93df92e862e5ad50081f22a27cad21abdeb2fd2bf7c29d2e8"
+    },
+    {
+      "path": "card/clocks/message/v7-temperature.odrgx",
+      "bytes": 9574,
+      "sha256": "a34aada473c03d6146fcb46da9a35001e0ecadd23d77d60cc98d2844f6285487"
+    },
+    {
+      "path": "card/clocks/message/v7-temperature.gif",
+      "bytes": 11729,
+      "sha256": "e8781ae6fac150b79e2ac8a5da4ba6aa0624b2742679ac76f468ec38ea4fa3b2"
+    },
+    {
+      "path": "card/clocks/message/v7-temperature.md",
+      "bytes": 1728,
+      "sha256": "843a290129fa7d2bf10c86416cd1c8d27f602c3468bb660ea94b15e3b1b21d7a"
+    },
+    {
+      "path": "card/clocks/message/v7-the-time.odrgx",
+      "bytes": 9594,
+      "sha256": "108fa62aabf425ca39f29dec7b6b8c9fed7457f6c16dfdc9536a49a2daa6fc0c"
+    },
+    {
+      "path": "card/clocks/message/v7-the-time.gif",
+      "bytes": 12229,
+      "sha256": "7e34423a57a72eca4f2b15f390276f5625d96d3eaa5910109c9b9eff2aaa4535"
+    },
+    {
+      "path": "card/clocks/message/v7-the-time.md",
+      "bytes": 1709,
+      "sha256": "9437ee8a9619fa21b71ca3d26537f5eb330db42b85049db3ffe2aa307775081c"
+    },
+    {
+      "path": "card/clocks/message/v7-countdown.odrgx",
+      "bytes": 22515,
+      "sha256": "8cb82ff0b2fcd2cc35fb6f3507889b633d02bacc5673bd10a1b39e2352786d6c"
+    },
+    {
+      "path": "card/clocks/message/v7-countdown.gif",
+      "bytes": 14480,
+      "sha256": "1f7d6c852e57b22ad870c0d85ac55b6fb7ae7feaf68460bfbfff8ce86d51644e"
+    },
+    {
+      "path": "card/clocks/message/v7-countdown.md",
+      "bytes": 1738,
+      "sha256": "c37be12cce4304f9abdd5f1e18275582d696e5784d7fcced48b6db5621d654e5"
+    },
+    {
+      "path": "card/clocks/message/v7-the-clock.odrgx",
+      "bytes": 7747,
+      "sha256": "4963cc42d63ecec1dfca9f407e48dab39c6db61c08e435e405f238687d6a1256"
+    },
+    {
+      "path": "card/clocks/message/v7-the-clock.gif",
+      "bytes": 14390,
+      "sha256": "d94ca35bba0758a271bafa0019f3edbda1ccca5a46751afd97caa8b81751986e"
+    },
+    {
+      "path": "card/clocks/message/v7-the-clock.md",
+      "bytes": 1714,
+      "sha256": "5908e9e3b253a62691c32efcb567dddd9be735cb5ba9298e1651b58443198bb0"
+    },
+    {
+      "path": "card/clocks/message/v7-mistakes.odrgx",
+      "bytes": 12480,
+      "sha256": "4aa1bfa59dcb8ce53f136cfc9229961cac11dbd454aa6e33c26f689a665bcf1f"
+    },
+    {
+      "path": "card/clocks/message/v7-mistakes.gif",
+      "bytes": 15127,
+      "sha256": "ad9fce2fc91f5b73d5bffcbbf10d44373a0c9a1e4c7d09735d51422bd9121e10"
+    },
+    {
+      "path": "card/clocks/message/v7-mistakes.md",
+      "bytes": 1722,
+      "sha256": "985a6a87b9193aeab66dcbee884d9be6612252a7be7bee717cc40dd1faca5227"
+    }
+  ]
+}

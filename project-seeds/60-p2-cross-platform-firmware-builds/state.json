@@ -1,0 +1,10 @@
+{
+  "number": 60,
+  "slug": "60-p2-cross-platform-firmware-builds",
+  "state": "completed",
+  "title": "Cross-platform firmware builds",
+  "priority": "P2",
+  "addedAt": "2026-10-29",
+  "addedCommit": "84a38388e0b8bc907614da43a9d85c940c6ae686",
+  "summary": "Host-aware pinned firmware setup/build, canonical paths, owned process cleanup and provenance implemented; Windows/Linux default build and test gates verified. Mac default build/inspection passed but full newcomer verification was skipped at owner request and remains optional. Final APK, firmware and persistent signer backup delivered; physical acceptance from seeds56-59 remains open."
+}

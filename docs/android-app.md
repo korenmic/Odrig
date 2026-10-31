@@ -18,9 +18,10 @@ a top bar with the app's name and whether the installation answers.
   row and expands it again. Under them the panel says what plays, the animation on the
   LEDs with its id and its file name, before them the square of its preview as a row has
   it, hidden while nothing plays, while a test shows and while the list does not hold the
-  animation yet, `ON` or `OFF`, the brightness and the refreshes a second, the line `Set
-  the brightness to` with a field that holds the brightness as a number, and the big
-  slider for it under them: the field and the slider follow each other both ways. The
+  animation yet, `ON` or `OFF`, the selected brightness and the refreshes a second,
+  `Default brightness` or `This animation's brightness` beside its numeric field,
+  and the shortened slider with `Override for this animation` beside it. The field
+  and slider follow each other both ways, and the current file is named. The
   panel shows no line of what plays, such as `Playlist` or `Cycle 3`, and no words `On`
   and `Off`. Under the name of the animation on the LEDs stands its bar while a
   playlist turn plays it, the root's or a folder's, and the level shown holds it: its row menu's
@@ -48,7 +49,13 @@ a top bar with the app's name and whether the installation answers.
   number; a card whose catalog is not `ok` has no count, and its line says only what is
   free, as `External storage: free 3.1 GB of 31.9 GB`. While the
   card's catalog is still read, the external number is `animations not known yet`, and
-  while the show is invalid the internal one is `animations not known`. Below them, when
+  while the show is invalid the internal one is `animations not known`.
+  A mounted card with unknown byte counts keeps its catalog count and says
+  `capacity unavailable`; its write capability remains independent of capacity.
+  After a connection failure, refused space query or target change, the old storage
+  report is no longer current: the external line says `External storage: information
+  unavailable.` until a fresh reply arrives. A fresh absent reply alone says `absent`.
+  Below them, when
   Settings says so, stands the pinned Tests group; then two filters and the one list of
   animations, one level of the card's folders at a time, as a file explorer shows them.
   Above the list stands the level's heading, `Root` or the folder's whole path, as
@@ -66,7 +73,11 @@ a top bar with the app's name and whether the installation answers.
   folder row that leads to the current playlist at every level above it, from the path
   that `status` names as `playlist`; the line of what plays names the file from `status`
   as well. The list comes back to the root when the target changes, when the card goes
-  out and when the folder shown is gone from the card. An upload chooses its id and its
+  out and when the folder shown is confirmed gone from the card. A refused folder lookup
+  first rechecks its path through fresh parent listings. An existing path keeps its
+  location, including when its id changed; an unavailable verification keeps the last
+  complete rows and retries. A later reply cannot undo Back or a target change.
+  An upload chooses its id and its
   name against the root's level, which the app reads for it when another level is
   shown. Each row
   begins its Play button with a square of 44 by 44 pixels: the preview of its animation, a
@@ -90,20 +101,20 @@ a top bar with the app's name and whether the installation answers.
   menu works as any other's. The
   other animations and every other control work as ever, also when every animation is
   unavailable.
-- **Upload** makes an animation from a video or a GIF of the phone, or makes a text or a
-  clock, and uploads it, with the free internal storage above it. While the installation
-  can write its card, an animation of a video or a GIF goes to the card unless
-  `This board` is chosen, and the card's free storage is there too.
-- **Settings** has the checkbox `Show test animations`, the panel `Clocks` with its two
-  checkboxes, the catalogs of the board's own
+- **Upload** accepts a ready-made ODRG/ODRGX animation without conversion, converts
+  video/GIF media, or makes a text/clock. New file uploads show a Storage dropdown,
+  filename and full destination before sending. External defaults when detected;
+  absent External is grayed out and Internal is selected. Both capacity lines remain visible.
+- **Settings** has the checkbox `Show test animations`, the panel `Clocks` with its mode
+  dropdown and independent message checkbox, the catalogs of the board's own
   storage and of the card with a rebuild of each, and the mapping editor: the twenty
   saved snake-to-pin assignments. It has no copy of the power or brightness controls.
 - **Target** has the address of the installation, says whether it answers, names the
   installation and the last fault it met in a file, and says how the phone's requests
   travel.
 
-The app is one more client of the commands of [commands.md](commands.md). It sends
-forty-two command lines and no other, each as `POST /odrig` to the address that is set:
+The app is one more client of the commands of [commands.md](commands.md). The table
+maps its actions to command lines, each sent as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -112,13 +123,15 @@ forty-two command lines and no other, each as `POST /odrig` to the address that 
 | Taps a row of the list, or presses `Play this folder` inside a folder | `play <id>` |
 | Presses `Play this folder` at the root | `play all` |
 | Presses the power icon while the LEDs are off, or while they are on | `on`, `off` |
-| Moves the slider, or enters a brightness in its field | `brightness <n>` |
+| Moves the slider, or enters a brightness with the override unchecked | `brightness <n>` |
+| Checks the brightness override, or commits an edit while checked | `brightness <id> <n> save` |
+| Unchecks the brightness override | `brightness <id> default` |
 | Nothing: at boot, reconnect, return to the app, entering Animations or Upload, every ten seconds while either is visible, and after upload or deletion | `space` |
 | Chooses Delete in a row's menu and then `Remove it` | `remove <id>` |
 | Chooses Ignore in playlist or Restore to playlist in a row's menu | `ignore <id> <0-or-1>` |
 | Confirms Delete selected | `remove many <ids>` |
-| Presses `Upload to the installation` | `upload begin <id> <file> <bytes>`, then `upload data <offset> <base64>` for each piece, then `upload end <crc32>`, sent again while the installation still checks the file |
-| Presses `Upload to the installation` with `The card` chosen | `upload begin external <file> <bytes>`, then the pieces and the end as for an upload |
+| Presses `Upload to the installation` for a new internal file | `upload begin <id> <file> <bytes> <crc32>`, confirm replacing is false, then `upload data <offset> <base64>` for each piece and `upload end <crc32>`, sent again while the installation checks it |
+| Presses `Upload to the installation` with `External storage` chosen | `upload begin external <file> <bytes>`, `upload expect 00000000`, then the pieces and the end as for an upload |
 | Presses `Cancel` while it uploads | `upload cancel` |
 | Chooses Edit in the menu of a text's or a clock's row | `read <id> <offset>`, from offset 0 until the whole file is read |
 | Presses `Save` for a text or a clock it edits | `upload begin <id> <file> <bytes>`, then `upload expect <crc32>` with the CRC-32 of the file it read, then the pieces and the end as for an upload |
@@ -132,7 +145,7 @@ forty-two command lines and no other, each as `POST /odrig` to the address that 
 | Presses `Repeat this` on the bar of the animation playing now, or Done or Enter in its field | `repeat <id> <n>` |
 | Presses `Save` on that bar | `repeat <id> <n> save` |
 | Presses `Restore default` on that bar | `repeat <id> default` |
-| Ticks or clears `Clocks between animations`, or `The message after each clock` | `clocks on`, `clocks off`, `clocks message on`, `clocks message off` |
+| Chooses `Off`, `Between animations` or `Clocks only`, or changes `The message after each clock` | `clocks off`, `clocks on`, `clocks only`, `clocks message on`, `clocks message off` |
 | Opens the target screen while the installation answers | `fault` |
 | Opens Settings, or waits two seconds while Settings is visible, and after it sent a rebuild or a cancel; nothing: when the target first answers, when it answers again after a silence, and after every complete list | `catalog` |
 | Nothing: after `catalog` showed a storage's catalog of another generation or number of entries than the one the app read, every page of it from offset 0 to its end, one request after the other | `catalog page <storage> <page> <offset>` |
@@ -145,7 +158,8 @@ unsupported message.
 
 Inclusion changes wait for acknowledgement before showing saved state. The list refreshes
 periodically so changes from serial or another app become visible. Older targets whose
-list lacks the inclusion flag keep playback controls but have no mutation controls.
+list lacks the inclusion flag keep playback controls but have no inclusion control.
+External deletion independently requires a writable medium.
 Deletion sends at most 32 distinct ids per batch on the existing serialized command stream.
 A refused batch preserves the remaining selection; a missing reply reports only the
 confirmed count and refreshes the list before another attempt. It never retries a lost
@@ -292,16 +306,90 @@ Either connect the phone by USB and run `python3 app/app.py install`, or copy
 `build/app/odrig-debug.apk` to the phone and open it there; the phone then asks whether
 apps from this source may be installed. The app is called `odrig`.
 
-The APK is a debug build, signed with a key that the first build made in
-`build/app/android-user/`. An app signed with another key does not replace it: after the
-work folder was removed, or on another computer, remove the app from the phone before
-installing a new build.
+Every APK is signed. Android will not replace an installed app with the same package
+name and a different signing certificate, even when installing from an allowed source.
+The installer may say only `App not installed`; USB installation reports
+`INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
+
+The Windows delivery uses the dedicated persistent key backed up beside the APK in
+Google Drive `Artifacts/odrig/`, with its credentials and reuse instructions. When
+moving from the former Mac-signed APK to this key, uninstall `odrig` from the phone's
+Settings, then install the downloaded APK. This is a one-time migration: uninstalling
+resets the app's phone-local settings and cached previews. The board's settings and
+animations are stored on the board and are not removed by uninstalling the phone app.
+Future builds must reuse the backed-up key and can update this installation normally.
+Retaining the original signing key instead is required to update a Mac-signed
+installation without uninstalling it; re-signing or rebuilding with a different key
+cannot bypass Android's certificate check.
+
+Before publishing an APK, verify its clean installation, launch and update on Android,
+as well as its package contents and signature. An emulator check covers those paths;
+the physical phone and board acceptance checks remain separate.
 
 The app needs Android 7 or later, and a web view of version 80 or later. On a phone with
 an older web view it says so, and says to update "Android System WebView" in the Play
 Store. It asks for no permission that the phone shows a question for.
 
 ## Using it
+
+### Miniature display control
+
+Settings has **Miniature display debug mode**, with the 10x6 explanation and the
+[root README wiring](../README.md#miniature-display-debug-mode). Use it only for
+the approved matrix assembly, with the full wall disconnected and its electrical
+checks complete. It does not change the installed 60x60 canvas or saved mapping.
+
+The checkbox shows `status.mini.on`, not a locally saved preference. It retains
+the last confirmed value while submitting a request, disables while a request or
+physical setup is pending, and waits for fresh status after acceptance. Active
+mode is also named outside Settings, with its brightness cap of 40. Other clients'
+changes appear through status polling. An absent or unsupported capability is
+explicitly unavailable, rather than off.
+
+Refusal leaves the confirmed setting visible. A lost reply or disconnection makes
+the state unknown until a newer status arrives; contact through another command
+alone does not validate an old status. Reconnect, changing targets and restarting
+the app only read the mode, and never enable or retry it automatically. Output
+setup failure is unknown and dark; a deliberate checkbox tap retries on, or
+**Restore normal outputs** requests off. Follow the README's power and restored
+brightness precautions before a physical transition. Reboot is always normal mode.
+
+Automated Chrome tests exercise these controls against stand-ins and the real
+emulator. The phone check remains open: actual tapping/readback, another client's
+change, disconnect/reconnect, restart with mode off, failure recovery, readability
+outside Settings, and the matrix/board observations. No phone acceptance or new
+firmware build is implied by the web tests.
+
+### Saved animation brightness controls
+
+Animations places **Override for this animation** beside the shortened slider and
+names the current file. Unchecked, its slider/number field edits **Default brightness**
+with ordinary throttled commands. Checked, it edits **This animation's brightness**;
+a drag commits one durable save when released. Zero is a valid saved value, and
+power off does not replace the editable value with a cap or blackout value.
+
+Checking captures the target-confirmed selected value. Unchecking removes the
+override and immediately uses the latest default. Valid dirty numeric text is
+committed and read back first; invalid text blocks the switch. An Enter/Done edit
+already in flight is also confirmed before capture. A reply acknowledges a command;
+only subsequent status confirms its setting. The checkbox is never stored on the
+phone. Reload, reconnect and changes from another client follow target status.
+
+Input captures target epoch, animation ID, full file and mode. Identity changes
+cancel unsent edits; queued commands validate the capture, sent commands retain it,
+and late replies cannot repaint another identity. Missing/null capability retains
+default controls but disables overrides. Unknown or malformed status, no known file,
+and damaged settings explain why saving is unavailable. A non-status reply cannot
+restore status freshness after a failure. Uncertain saves are not automatically
+repeated; readback determines what the target kept.
+
+Storage identity, limits, corruption recovery and default/zero precedence are in
+[commands.md](commands.md#saved-animation-brightness). Browser/emulator proof is in
+the seed 58 verification document. Board/phone acceptance remains open, including
+restart retention and removing an override at brightness 40 or less. Firmware
+compilation is deferred to seed 60; the final APK follows all 56–59 software.
+
+### Playback and storage
 
 1. Join the phone to the installation's Wi-Fi network, `odrig`, in the phone's Wi-Fi
    settings; [wifi.md](wifi.md) has the network. The app joins no network itself.
@@ -396,13 +484,20 @@ an invalid show, `The installed show is invalid: <reason>.`; a folder the list d
 hold yet, right after a card is put in, is named by its id until the list has come. Why a
 show is invalid is said on the target screen, and in the message of a refused play.
 
-A tap on a row plays its animation. Its `...` button opens the row's menu and plays
-nothing. The menu of an internal animation has `Ignore in playlist`, or `Restore to
-playlist` when it is ignored, `Move up`, `Move down`, `Select` and `Delete`; the menu of an
-animation of the external storage has `Move up` and `Move down`, and `Delete` while the
-installation can write its card; otherwise it says that external storage is read-only. An ignored row says `Ignored` with a sign and its name is muted; it
-keeps its place in the order and the playlist passes over it. A change of inclusion shows
-`Saving...` on the row until the installation has confirmed it.
+A tap on an available row plays its animation within the active mode's boundary.
+Its `...` button opens its menu and plays nothing. Files whose target reports inclusion
+have `Ignore in playlist` or `Restore to playlist`, including external files on read-only
+media: their preference is saved on the target, not on the card. Internal animations
+also have `Select` and `Delete`; external deletion requires a writable card. Moves keep
+their existing rules. Older targets without the inclusion flag expose no inclusion action.
+
+A folder whose inclusion is reported has its own `...` menu with `Ignore folder` or
+`Include folder`. Ignored files and folders stay browsable, with muted names and an
+`Ignored` note. An inherited exclusion says `Excluded by a parent folder`; when both
+apply it says so. The menu explains that changing the child's own choice does not
+override an ignored ancestor. A change says `Saving…` until acknowledgement, refreshes
+the list, and preserves the confirmed choice on refusal. Ignore affects automatic
+selection; explicit inside playback remains available. It never changes the card bytes.
 
 `Delete` asks `Remove animation <id> <file> from the installation?`, or for an animation
 of the card `Remove animation <id> <file>? Its file is deleted from the card.`; `Remove it`
@@ -494,18 +589,45 @@ colours do. A video is drawn at most 1,280 pixels wide or high before it is fitt
   the list of Animations and in the playlist until it is moved, and plays when it is
   tapped.
 
-While the installation can write its card, `space` says so with `"read_only":false`, and
-Upload has `Store on` above `Upload to the installation`, with `The card`, chosen at
-first, and `This board`, and the card's free storage under the board's: the card holds the
-animations, and the board's own storage keeps one or two to fall back on. An animation for
-the card goes as `upload begin external <file> <bytes>` with the same file name, then its
-pieces and its end as above; the card gives it its id, from 60001 up, and its place in the
-playlist by its name, and the app says `Uploaded to the card as animation <id> <file>. It
-plays in the playlist.` The app does not compare its size with the card's free storage
-first: the installation refuses one that does not fit before anything is sent, and the app
-says so. While the card cannot be written, or is out, Upload has no choice and stores on
-the board, as before. Texts and clocks are stored on the board, though the card may hold
-them too.
+### Ready-made files and upload destinations
+
+`Choose a ready-made animation` accepts `.odrg` and `.odrgx`. Actual headers identify
+the format. Wrong/unsupported headers, damaged bounded containers and another canvas
+are refused in words. The exact encoded bytes are uploaded, without conversion,
+resizing or timing changes. Compressed frame bodies never inflate on the phone for
+a preview. The app reuses its content-key preview catalog/cache; otherwise it says
+that no preview is available and the target will check the complete animation.
+
+Every new ready-made or converted-media selection starts with `External storage`
+when detected, even if Internal was chosen for the previous form. Choose `Internal
+storage` for this form if desired. Absent/not-detected External stays visible,
+disabled and gray, with automatic Internal fallback. Redetection restores automatic
+External unless Internal was explicitly chosen. A detected read-only card remains
+External and refuses the upload; it never silently falls back. Empty lists and filters
+do not determine whether storage is present.
+
+The form captures the folder browsed when selecting the file, independent of playback.
+External in `night/deep` shows `External /night/deep/file.odrg`. Combined root uses
+the chosen storage root. Internal always shows its flat root, `Internal /file.odrg`,
+and explains that a browsed SD folder was not retained. Navigation cannot move the
+prepared destination. The editable basename must obey the32-byte naming rule; the
+external full path obeys the100-byte/three-level catalog rule. Folders must exist.
+
+Before sending, fresh target, storage, catalog and folder observations detect stale
+destinations and collisions. A preflight absence fallback discovered by the click
+is shown and requires another Upload click. Collisions require a different basename;
+they never silently overwrite. New external files use `upload expect 00000000` and
+internal files use CRC-bearing begin with explicit `replacing:false` confirmation
+before data. Unsupported older firmware stops with an explanation and a cancelled
+transaction. Explicit text/clock edits keep their original file and CRC stale guard.
+
+Known capacity is checked first, including the upload reserve; the target remains
+authoritative when capacity is unavailable. After begin the storage/path are frozen.
+A disconnected card stops that attempt; it does not continue in Internal. A new
+manual attempt can use the visibly updated fallback. Cancellation, failed checks
+and uncertain completion are distinct from an acknowledged installed file. After
+success the destination catalog/list/preview refresh normally. Authored texts and
+clocks remain in Internal; ready-made containers can use either selected storage.
 
 To make a text, press `Make a text` on Upload. A form opens under it: the text, written
 with English letters, digits, signs and Hebrew letters, and line feeds; its font,
@@ -546,6 +668,11 @@ A picture clock, a picture dial or a picture display that the converter makes of
 shows its preview and plays it. The app does not make one, and does not change one: its
 `Edit` reads the file and, in place of the form, says `This clock is made from a picture:
 it cannot be edited here.`
+
+A generated message clock also previews, plays and uploads as a widget. Its `Edit`
+opens no form and says `Generated message clocks can be previewed and uploaded, but
+cannot be edited in this form.` Its caption masks and timeline belong to its generated
+source, rather than the ordinary clock fields.
 
 The animations of a microSD card or a USB drive plugged into the installation are rows
 too, with the badge `ex`, each with its id from 60001 up and its file's name on the
@@ -727,23 +854,33 @@ leaves that snake with the position that shows it whole, gives position 10 no sn
 then the snake no other position shows, its own, and says `Position 10 shows no snake`;
 apply the reading, then tick the box.
 
-**Clocks.** After the first panel of Settings, the panel `Clocks` has two checkboxes in the
-form of `Snake 10 is cross-wired`. `Clocks between animations`: after every 5 animations,
-and at least every 5 minutes, a clock of the card's folder `clocks` plays, and an animation
-cut for it goes on where it was. `The message after each clock`: the animation of
-`clocks/message` flashes once after every clock, while the first is on. Each box shows what
-the installation reports, `clocks` and `clock_message` of `status`, and a tap sends at once
-`clocks on` or `clocks off`, `clocks message on` or `clocks message off`. Both boxes cannot be
-used while a line of the panel is out and while the installation does not answer. The line
-under them says `Saved: a clock plays between the animations.`, `Saved: no clock plays
-between the animations.`, `Saved: the message flashes after each clock.` or `Saved: no
-message after the clocks.`; a refusal is said there instead: `The target is busy checking or
-uploading files. Try again after it finishes.`, `The target has an invalid show. Fix its
-show before changing the clocks.` or `The target could not save the setting. The setting in
-force is shown.`, and the box shows the setting in force again. After each reply both boxes
-follow `status`, also when another controller changed them. The panel is hidden while the
-installation's `status` has no `clocks`: its software has no clocks between the animations.
-The emulator's Controller view shows the same panel.
+**Clocks.** The Settings panel has one `Clocks` dropdown: `Off`, `Between animations`,
+`Clocks only`. Between inserts a clock after five animations or five minutes and resumes
+the interrupted animation. Only plays the external `clocks` program exclusively. The
+independent `The message after each clock` checkbox inserts one complete animation from
+`clocks/message` in either enabled mode. Messages and clock faces each use their own
+shuffled bag; every eligible direct child has a turn before that bag reshuffles.
+
+The controls follow fresh target status. While a change is pending, both controls are
+disabled. A successful command acknowledgement is followed by status confirmation before
+the panel says `Saved:`. A refusal restores the reported setting and explains busy,
+invalid-show or storage failure. A lost reply is explicitly unconfirmed; a later fresh
+status shows the actual setting without claiming the reply was acknowledged. A different
+reported choice is shown as such. Reconnect and other controllers update the controls;
+changing targets clears pending state and ignores replies belonging to the old target.
+
+Selecting Only initially opens the resolved Clocks folder on Animations once. Later
+browsing may go to root or any other folder without changing playback or being forced
+back on each poll. Outside Play buttons are disabled with an explanation. `Restart clocks`
+targets the currently resolved Clocks folder ID even while another level is browsed;
+the raw `play all` command remains refused by the core. Inside files and folders remain
+manually playable when ignored or when automatic messages are off. Display tests require
+leaving Only first. Missing storage, missing Clocks or no eligible face keeps Only
+selected, with an explanation and dark output; a missing resolved folder disables restart.
+
+Older clock-capable firmware without explicit mode metadata maps its existing booleans
+to Off and Between; the Only option is unavailable, with an update explanation. A target
+without clock settings hides the panel. Browser Controller and APK use the same controls.
 
 **The test animations.** `Show test animations` in Settings, off at first and
 remembered on the phone, shows the pinned Tests group above the list of Animations: `Tests
@@ -785,8 +922,11 @@ it is dismissed with `OK` or another takes its place.
 | `unavailable` | A play of an animation whose file had a fault in this boot, or of a cycle of only such. | Animation `<id>` cannot be played until it is replaced: its file has a fault. The list says which. |
 | `busy` | A removal while the installation still reads what it has installed after a start, or while an upload is open; a rebuild while another runs or an upload is open; an upload to the card while its catalog is read. | The installation is busy. Try again in a moment. |
 | `in-use` | A removal of an animation that a cycle plays or that a USB stick holds. | Animation `<id>` cannot be removed: a cycle plays it, or it is on a USB stick. |
+| `in-use` | Play outside Clocks only, or raw `play all` in that mode. | Clocks only allows playback inside the Clocks folder. Leave Clocks only in Settings to play elsewhere. |
+| `in-use` | A display-taking mapping test while Only owns playback. | Leave Clocks only in Settings before starting a display test. |
+| `in-use` | Inclusion of an unsupported item or on older firmware. | This target does not support playlist inclusion for that item. |
 | `read-only` | A removal of an animation of the card while the installation cannot write it. | Animation `<id>` cannot be removed: the card cannot be written now. |
-| `read-only` | An upload to the card while the installation cannot write it. | The card cannot be written now. Choose This board to store the animation on the board. |
+| `read-only` | An upload to the card while the installation cannot write it. | The card cannot be written now. Choose Internal storage to store the animation on the board. |
 | `read-only` | A rebuild of the catalog of a storage the installation cannot write. | That storage cannot be written now, so its catalog cannot be rebuilt. |
 | `storage-error` | The installation could not read or write its storage. | The installation could not use its storage. |
 | `in-use` | An upload whose id or file name another item took meanwhile. | That name or id is in use on the installation. The list is asked for again; upload again. |
@@ -968,7 +1108,7 @@ installed; the phone with mobile data on.
     clock's hands or digits move on the LEDs, the melting watch's hands bend with its
     face, and after the save the row is where it was.
 21. **The card and the catalogs.** With firmware that writes the card, and the card in.
-    On Upload, make an animation: `Store on` has `The card` chosen; upload it. *Seen:*
+    On Upload, make an animation: `Storage` has `External storage` chosen; upload it. *Seen:*
     `Uploaded to the card as animation ...`, its row with `ex`, and it plays on the LEDs
     when tapped. Choose `Delete` in its menu and `Remove it`. *Seen:* the row goes, and the
     card's free storage grows. In Settings, `Rebuild the card's catalog` and `Rebuild`.
@@ -983,12 +1123,15 @@ installed; the phone with mobile data on.
     too, also after a restart of the board; `Restore default` brings its own count back;
     `Ignore` moves on at once; the panel stays at the top while the list scrolls under it,
     and with the phone held sideways the whole screen scrolls.
-23. **The clocks.** With firmware that has the command `clocks`, and the card's folder
-    `clocks` filled, in Settings. *Seen:* the panel `Clocks` with its two boxes off; tick
-    `Clocks between animations`: the line says `Saved: a clock plays between the
-    animations.`, and after five animations a clock plays on the LEDs before the next;
-    tick `The message after each clock`: the message flashes after the next clock; after a
-    restart of the board both boxes are still ticked; clear both, and no clock plays.
+23. **The clocks.** With current firmware and populated `clocks` and `clocks/message`,
+    *Seen:* choose Between in Settings and enable messages. Check the clock break, complete
+    message turns and persistence after restart. Choose Only: Clocks opens once, outside
+    playback stops, and browsing elsewhere leaves outside Play disabled. Restart clocks
+    still targets Clocks. Play an inside message with automatic messages off; try Ignore
+    on a face, a message and their folders, including an inherited child choice, then
+    Include. Check dark recovery when all faces are excluded, mode restoration, reconnect
+    and another controller's changes. Repeat upright and sideways. These physical and
+    phone observations remain open until actually performed.
 24. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
@@ -1131,7 +1274,7 @@ By programs, on a Mac:
   `This board` chosen instead, each refusal in words, and no choice for a card it cannot
   write; `Delete` of a card's animation, one with a fault among them, and none on a card
   that cannot be written; the storage lines and the badges of both kinds of card.
-- That the web code sends the forty-two lines above and no other, and names no address
+- That the web code uses the documented protocol and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted
@@ -1141,6 +1284,11 @@ By programs, on a Mac:
   and the rule that allows plain HTTP.
 
 ## What is open
+
+- **Message clock modes and external inclusion on a phone and on the board.** The
+  shared browser/emulator proofs do not replace physical acceptance of all seven
+  sequences, Only boundaries, inherited exclusions, restarts and complete turns.
+  Seed59's human deployment task remains unchecked.
 
 - **Mapping and the diagonal on the real installation.** No firmware was flashed for
   this run. Seed 30 task 5 requires the owner to inspect all twenty snakes, correct an

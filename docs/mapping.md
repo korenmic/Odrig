@@ -370,3 +370,19 @@ app draft, and preserves power, brightness and current limiting. Its JSON source
 `core/assets/mapping-diagonal.json`; `python3 core/diagonal.py --check` checks the
 embedded ODRG bytes against the converter. Explicit physical verification is an
 owner's check; software cannot detect whether a wire actually reaches a snake.
+
+## Miniature mapping
+
+Temporary miniature mode is a host-output exception, not another installed mapping.
+The 60x60 logical canvas and its files stay unchanged. The miniature reads logical
+RGB before the normal twenty-snake pin permutation and snake 10 cross-wiring,
+then places its 6x6 average in columns 2..7 of a 10x6 display. Columns 0,1,8,9 are
+black. With zero-based coordinates from bottom left, physical index is `x*6+y`:
+straight columns upward, left to right. The [root README](../README.md#approved-connection-and-orientation)
+defines the front/rear orientation and approved pads from manufacturer source.
+This derived chain order still needs a powered corner/axis check.
+
+Mini output is one 60-LED GPIO1 bus. Disabling or rebooting restores the normal
+routing without writing `mapping.json` or changing any saved pin assignment.
+The ordinary diagonal and snake diagnostic remain normal-canvas content; seeing
+their miniature projection cannot prove the full wall's physical mapping.

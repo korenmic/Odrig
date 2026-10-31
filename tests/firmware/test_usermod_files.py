@@ -107,9 +107,9 @@ class Includes(unittest.TestCase):
             self.assertIn(expected, own)
         self.assertNotIn("wled", own.lower())
         override = (FIRMWARE / "platformio_override.ini.in").read_text(encoding="utf-8")
-        self.assertIn("-I@REPO@/firmware/usermod/wled", override)
+        self.assertIn('-I"@REPO@/firmware/usermod/wled"', override)
         project = (STANDALONE / "platformio.ini.in").read_text(encoding="utf-8")
-        self.assertLess(project.index("-I@REPO@/firmware/standalone/platform"), project.index("-I@REPO@/firmware/usermod"))
+        self.assertLess(project.index('-I"@REPO@/firmware/standalone/platform"'), project.index('-I"@REPO@/firmware/usermod"'))
         self.assertNotIn("firmware/usermod/wled", project)
 
     def test_the_standalone_firmware_compiles_the_shared_sources_through_files_of_one_line(self):
@@ -251,9 +251,12 @@ class TheTask(unittest.TestCase):
         self.assertRegex(setup, r"if \(core != nullptr\) \{\n\s+xTaskCreatePinnedToCore\(")
 
     def test_the_task_asks_again_only_when_the_loop_has_taken_the_last_refresh(self):
-        steps = [self.task.index(step) for step in ("if (refreshReady || updating) {", "ulTaskNotifyTake(", "continue;", "const bool due = refreshDue();", "refreshReady = true;", "vTaskDelay(1);")]
+        steps = [self.task.index(step) for step in ("if (refreshReady || updating || outputChanging) {", "ulTaskNotifyTake(", "continue;", "const bool due = refreshDue();", "vTaskDelay(1);")]
         self.assertEqual(steps, sorted(steps))
-        self.assertEqual(self.usermod.count("refreshDue()"), 3)
+        polling = self.usermod[self.usermod.index("bool refreshDue() {"):self.usermod.index("const char TASK_NAME[]")]
+        steps = [polling.index(step) for step in ("Locked held;", "if (outputChanging) return false;", "odrig_core_poll(", "if (due) refreshReady = true;", "return due;")]
+        self.assertEqual(steps, sorted(steps))
+        self.assertEqual(self.usermod.count("refreshDue()"), 2)
         self.assertNotIn("refreshDue()", self.usermod[self.usermod.index("class OdrigUsermod"):])
 
     def test_physical_pins_are_read_once_and_routing_is_refreshed_under_the_core_lock(self):
@@ -341,7 +344,7 @@ class TheCore(unittest.TestCase):
     def test_the_build_names_the_core_as_a_library_where_it_is(self):
         template = text_of(FIRMWARE / "platformio_override.ini.in")
         self.assertRegex(template, r"(?m)^lib_deps = \$\{esp32s3\.lib_deps\}\n  odrig_core = symlink://@REPO@/core$")
-        self.assertRegex(template, r"(?m)^  -I@REPO@/core/include$")
+        self.assertRegex(template, r'(?m)^  -I"@REPO@/core/include"$')
 
     def test_the_usermod_has_no_decoder_mapping_show_or_command_code_of_its_own(self):
         for path in SOURCES:
@@ -510,10 +513,13 @@ class Host(unittest.TestCase):
 
     def test_wled_is_held_in_its_live_mode_at_every_pass(self):
         hold = self.leds[self.leds.index("void OdrigLeds::hold()"):self.leds.index("void OdrigLeds::fill()")]
-        for expected in ("realtimeOverride = REALTIME_OVERRIDE_NONE;", "useMainSegmentOnly = false;", "realtimeLock(65000, REALTIME_MODE_GENERIC);", "if (doInitBusses)", "else if (!matches())"):
+        live = self.leds[self.leds.index("void OdrigLeds::keepLive()"):self.leds.index("void OdrigLeds::hold()")]
+        for expected in ("realtimeOverride = REALTIME_OVERRIDE_NONE;", "useMainSegmentOnly = false;", "realtimeLock(65000, REALTIME_MODE_GENERIC);"):
+            self.assertIn(expected, live)
+        for expected in ("keepLive();", "if (doInitBusses)", "else if (!matches())"):
             self.assertIn(expected, hold)
         usermod = text_of(USERMOD / "odrig_usermod.cpp")
-        self.assertEqual(usermod.count("OdrigLeds::hold();"), 2)
+        self.assertEqual(usermod.count("OdrigLeds::hold();"), 3)
 
     def test_the_probe_build_counts_a_dimmed_send_only_while_the_limiter_is_on(self):
         probe = text_of(USERMOD / "odrig_probe.cpp")

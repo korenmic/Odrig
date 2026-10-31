@@ -53,7 +53,7 @@ export function cardWritable(space) {
 
 export function external(space, count) {
   const drive = space?.external;
-  if (!drive) return "External storage: capacity unavailable (read-only).";
+  if (!drive) return "External storage: information unavailable.";
   if (!drive.present) return "External storage: absent (read-only).";
   const locked = cardWritable(space) ? "" : " (read-only)";
   const number = count === undefined ? "" : `${count === null ? "animations not known yet" : animations(count)}, `;

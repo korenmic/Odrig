@@ -67,7 +67,7 @@ function base64(bytes) {
 // bytes a second, `end` how the upload ended: `{done: true, id}`, with the id the target
 // gave or null, `{cancelled: true}`, or `{error}` with the Refusal or the Failure that
 // ended it. `wake` asks the client to look for the next line again.
-export function uploading({id, file, bytes, expect = null, external = false}, {report, end, wake}) {
+export function uploading({id, file, bytes, expect = null, external = false, create = false}, {report, end, wake}) {
   const crc = crc32(bytes);
   let stage = "begin";
   let chunk = 0;
@@ -132,7 +132,7 @@ export function uploading({id, file, bytes, expect = null, external = false}, {r
       }
       if (stage === "begin") {
         return async () => {
-          chunk = external ? await commands.uploadBeginExternal(file, bytes.length) : await commands.uploadBegin(id, file, bytes.length);
+          chunk = external ? await commands.uploadBeginExternal(file, bytes.length) : await commands.uploadBegin(id, file, bytes.length, create ? crc : null);
           stage = expect === null ? "data" : "expect";
           samples.push({at: performance.now(), received: 0});
           report(0, 0);
@@ -140,7 +140,14 @@ export function uploading({id, file, bytes, expect = null, external = false}, {r
       }
       if (stage === "expect") {
         return async () => {
-          await commands.uploadExpect(expect);
+          try {
+            await commands.uploadExpect(expect);
+          } catch (error) {
+            if (error instanceof commands.Refusal) {
+              try { await commands.uploadCancel(); } catch (_) { /* The target may already have discarded it. */ }
+            }
+            throw error;
+          }
           stage = "data";
         };
       }

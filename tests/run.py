@@ -35,6 +35,8 @@ import sys
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "firmware"))
+from fwtool import host as firmware_host
 WINDOWS = sys.platform == "win32"
 REPORT = pathlib.Path("build") / "tests" / "report.json"
 LOGS = pathlib.Path("build") / "tests"
@@ -58,7 +60,8 @@ SUITES = (
     Suite("onboarding", "tests/onboarding"),
     Suite("runner", "tests/runner"),
     Suite("mapping", "tests/mapping", needs=("core",)),
-    Suite("firmware", "tests/firmware", split=True, needs=("firmware-python",)),
+    Suite("firmware-host", "tests/firmware_host"),
+    Suite("firmware", "tests/firmware", split=True, cap=1, needs=("firmware-python",)),
     Suite("core", "tests/core", split=True, needs=("core",)),
     Suite("emulator", "tests/emulator", split=True, needs=("core",)),
     Suite("app", "tests/app", split=True, cap=4, needs=("core",)),
@@ -297,10 +300,8 @@ class Runner:
         return None
 
     def firmware_python(self):
-        name = "python.exe" if WINDOWS else "python"
-        folder = "Scripts" if WINDOWS else "bin"
         tools = pathlib.Path(os.environ["ODRIG_TOOLS"]).expanduser().resolve() if os.environ.get("ODRIG_TOOLS") else self.root / "build"
-        path = tools / "firmware" / "venv" / folder / name
+        path = firmware_host.program(firmware_host.tool_root(tools / "firmware") / "venv", "python")
         return path if path.exists() else None
 
     def python_of(self, suite):
@@ -469,8 +470,24 @@ class Runner:
 
     # The builds, beside the suites.
 
+    def missing_build(self, build):
+        if build.name != 'apk' or build.command != ['app/app.py', 'build']:
+            return None
+        manifest = self.root / 'app' / 'toolchain.json'
+        if not manifest.is_file(): return None
+        data = json.loads(manifest.read_text(encoding='utf-8'))
+        system = '-'.join(firmware_host.identity())
+        if any(system not in data.get(name,{}) for name in ('jdk','command-line-tools')):
+            return f'the APK toolchain has no archives for {system}'
+        return None
+
     def start_builds(self):
         for build in self.builds:
+            why = self.missing_build(build)
+            if why:
+                self.built[build.name] = dict(build=build,outcome=f'SKIPPED: {why}',seconds=0)
+                self.say(f'{build.name}: not run: {why}')
+                continue
             self.logs.mkdir(parents=True, exist_ok=True)
             log = self.logs / f"build-{build.name}.log"
             handle = open(log, "w", encoding="utf-8")

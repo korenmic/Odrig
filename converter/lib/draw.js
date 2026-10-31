@@ -3,6 +3,7 @@
 
 import {FONT_TABLES, SINE} from "./fonttables.js";
 import {glyphIndex} from "./textlayout.js";
+import * as messageclock from "./messageclock.js";
 
 export const EFFECTS = ["static", "marquee", "slide", "pan"];
 export const MOTIONS = ["left", "right", "up", "down"];
@@ -561,6 +562,7 @@ function drawPictureWidget(settings, seed, t, canvas, picture) {
 // Draws a clock of these settings with this seed `t` milliseconds into its turn into
 // `picture`, three bytes for each pixel in the pixel order of docs/format.md.
 export function drawClock(settings, seed, t, canvas, picture) {
+  if (settings.widget === "message-clock") return messageclock.draw(settings, seed, t, picture);
   if (PICTURE_WIDGETS.includes(settings.widget)) {
     drawPictureWidget(settings, seed, t, canvas, picture);
     return picture;

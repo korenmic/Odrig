@@ -104,6 +104,38 @@ class AgainstTheEmulator(unittest.TestCase):
                     self.assertEqual((result.status, result.out, result.err), (status, out, ""))
         self.assertEqual((self.folder / "repeats.txt").read_bytes(), b"odrig-repeats 1\n")
 
+    def test_miniature_command_uses_each_existing_transport(self):
+        for target in self.targets.values():
+            for mode in ("on", "off"):
+                result = support.run_tool(*target, "debug", "mini", mode)
+                self.assertEqual((result.status, result.out, result.err),
+                                 (1, '{"ok":false,"error":"unsupported"}\n', ""))
+
+    def test_saved_brightness_uses_each_transport_without_changing_content_or_default(self):
+        before = support.files_of(self.folder)
+        for target in self.targets.values():
+            for words, status, out in (
+                (("brightness", "1", "0", "save"), 0, OK),
+                (("play", "1"), 0, OK),
+                (("brightness", "83"), 0, OK),
+                (("brightness", "3", "default"), 1, '{"ok":false,"error":"in-use"}\n'),
+                (("brightness", "99", "7", "save"), 1, '{"ok":false,"error":"unknown-id"}\n'),
+                (("brightness", "1", "256", "save"), 1, '{"ok":false,"error":"bad-argument"}\n'),
+            ):
+                result = support.run_tool(*target, *words)
+                self.assertEqual((result.status, result.out, result.err), (status, out, ""))
+            reply = json.loads(support.run_tool(*target, "status").out)
+            self.assertEqual(reply["brightness"], 83)
+            self.assertEqual(reply["dimming"], {"value": 0, "saved": 0, "error": None})
+            self.assertEqual((self.folder / "brightness.txt").read_bytes(), b"odrig-brightness 1\n0 f hello.odrg\n")
+            result = support.run_tool(*target, "brightness", "1", "default")
+            self.assertEqual((result.status, result.out, result.err), (0, OK, ""))
+            reply = json.loads(support.run_tool(*target, "status").out)
+            self.assertEqual(reply["dimming"], {"value": 83, "saved": None, "error": None})
+        after = support.files_of(self.folder)
+        self.assertEqual({name: after[name] for name in before}, before)
+        self.assertEqual(set(after) - set(before), {"brightness.txt"})
+
     def test_a_refused_command_prints_the_reply_and_exits_with_1(self):
         for transport, target in self.targets.items():
             for words, code in ((("play", "99"), "unknown-id"), (("play", "abc"), "bad-argument"), (("brightness", "256"), "bad-argument"), (("brightness", "-5"), "bad-argument"),
@@ -194,7 +226,8 @@ class Session(unittest.TestCase):
         self.assertEqual(replies[support.LINES], replies["http"])
         codes = [json.loads(reply).get("error") for reply in replies["http"]]
         self.assertEqual(codes[-10:-1], ["unknown-id", "bad-argument", "bad-argument", "line-too-long", None, None, "unknown-id", "unknown-id", "unknown-id"])
-        self.assertEqual({words[0] for words in SESSION}, set(cli.COMMANDS) - {"upload"})
+        # Uploads and miniature output have their own transport scenarios.
+        self.assertEqual({words[0] for words in SESSION}, set(cli.COMMANDS) - {"upload", "debug"})
 
 
 class Unreachable(unittest.TestCase):
@@ -273,6 +306,11 @@ class Usage(unittest.TestCase):
             ["--port", "a", "dance"],
             ["--port", "a", "play"],
             ["--port", "a", "brightness"],
+            ["--port", "a", "brightness", "1", "2"],
+            ["--port", "a", "brightness", "1", "2", "keep"],
+            ["--port", "a", "brightness", "1", "2", "save", "extra"],
+            ["--port", "a", "brightness", "1\r", "default"],
+            ["--port", "a", "brightness", "1", "2\n", "save"],
             ["--port", "a", "status", "1"],
             ["--port", "a", "on", "now"],
             ["--port", "a", "play", "1", "2"],
@@ -302,6 +340,11 @@ class Usage(unittest.TestCase):
             ["--port", "a", "clocks", "yes"],
             ["--port", "a", "clocks", "on", "now"],
             ["--port", "a", "clocks", "message", "on\n"],
+            ["--port", "a", "debug"],
+            ["--port", "a", "debug", "mini"],
+            ["--port", "a", "debug", "mini", "yes"],
+            ["--port", "a", "debug", "mini", "on\n"],
+            ["--port", "a", "debug", "mini", "on", "extra"],
         ):
             result = support.run_tool(*argv)
             self.assertEqual(result.status, 2, argv)
@@ -312,17 +355,17 @@ class Usage(unittest.TestCase):
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
         table = text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save",
-                                      "repeat <id> default", "clocks on", "clocks off", "clocks message on", "clocks message off", "upload begin <id> <file> <bytes>", "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel"])
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "brightness <id> <n> save", "brightness <id> default", "status", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save",
+                                      "repeat <id> default", "clocks on", "clocks off", "clocks only", "clocks message on", "clocks message off", "upload begin <id> <file> <bytes>", "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel", "debug mini on", "debug mini off"])
         # `play all` is `play` with the word in the place of the id.
-        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog", "repeat ", "clocks ")) and command not in ("play all", "remove many <ids>", "list in <folder-id>")]
-        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog", "repeat", "clocks")],
+        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog", "repeat ", "clocks ", "debug ", "brightness <id> ")) and command not in ("play all", "remove many <ids>", "list in <folder-id>")]
+        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog", "repeat", "clocks", "debug")],
                          [command.replace("<id>", "<x>").replace("<n>", "<x>").replace("<value>", "<x>").replace("<offset>", "<x>") for command in one_line])
         self.assertEqual(list(cli.COMMANDS)[-1], "upload")
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
                          {"play": ("ID",), "brightness": ("N",), "read": ("ID", "OFFSET"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "repeat": ("ID", "N", "[save]"),
-                          "clocks": ("OPERATION",), "upload": ("ID", "FILE")})
+                          "clocks": ("OPERATION",), "debug": ("mini", "on|off"), "upload": ("ID", "FILE")})
 
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),
@@ -332,7 +375,7 @@ class Usage(unittest.TestCase):
                            (["catalog", "check"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
                            (["repeat", "1"], "repeat takes ID N, ID N save, or ID default"), (["repeat", "1", "8", "keep"], "repeat takes ID N, ID N save, or ID default"),
                            (["repeat", "1", "8", "save", "x"], "repeat takes ID N, ID N save, or ID default"), (["repeat", "1", "8\n"], "a command is one line"),
-                           (["clocks"], "clocks takes on, off, message on, or message off"), (["clocks", "message", "yes"], "clocks takes on, off, message on, or message off"),
+                           (["clocks"], "clocks takes on, off, only, message on, or message off"), (["clocks", "message", "yes"], "clocks takes on, off, only, message on, or message off"),
                            (["status", "--external"], "--external goes with upload"), (["--log", "--external"], "--external goes with upload"),
                            (["upload", "--external"], "upload --external takes one argument: FILE"),
                            (["upload", "--external", "9", "a.odrg"], "upload --external takes one argument: FILE")):
@@ -346,9 +389,14 @@ class Usage(unittest.TestCase):
             (["status"], b"status\n"),
             (["on"], b"on\n"),
             (["off"], b"off\n"),
+            (["debug", "mini", "on"], b"debug mini on\n"),
+            (["debug", "mini", "off"], b"debug mini off\n"),
             (["play", "12"], b"play 12\n"),
             (["play", "all"], b"play all\n"),
             (["brightness", "300"], b"brightness 300\n"),
+            (["brightness", "60001", "0", "save"], b"brightness 60001 0 save\n"),
+            (["brightness", "abc", "300", "save"], b"brightness abc 300 save\n"),
+            (["brightness", "1", "default"], b"brightness 1 default\n"),
             (["play", "abc"], b"play abc\n"),
             (["brightness", " 7"], b"brightness  7\n"),
             (["play", "1" * 70], b"play " + b"1" * 70 + b"\n"),
@@ -369,6 +417,7 @@ class Usage(unittest.TestCase):
             (["repeat", "60001", "default"], b"repeat 60001 default\n"),
             (["clocks", "on"], b"clocks on\n"),
             (["clocks", "off"], b"clocks off\n"),
+            (["clocks", "only"], b"clocks only\n"),
             (["clocks", "message", "on"], b"clocks message on\n"),
             (["clocks", "message", "off"], b"clocks message off\n"),
         ):
@@ -378,6 +427,10 @@ class Usage(unittest.TestCase):
         said = " ".join(cli.parser().format_help().split())
         self.assertIn("Commands: play ID, play all, on, off,", said)
         self.assertIn("the word all of play", said)
+
+    def test_help_names_each_brightness_form(self):
+        said = " ".join(cli.parser().format_help().split())
+        self.assertIn("brightness N, brightness ID N save, brightness ID default", said)
 
     def test_no_option_tells_the_emulator_from_the_board(self):
         options = {option for action in cli.parser()._actions for option in action.option_strings}

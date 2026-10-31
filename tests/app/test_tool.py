@@ -45,14 +45,17 @@ def stand_in(path, code):
     return path
 
 
-def get(port, path, method="GET"):
-    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+def get(port, path, method="GET", connection=None):
+    own_connection = connection is None
+    if own_connection:
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
     try:
         connection.request(method, path)
         answer = connection.getresponse()
         return answer.status, dict(answer.getheaders()), answer.read()
     finally:
-        connection.close()
+        if own_connection:
+            connection.close()
 
 
 class Serve(unittest.TestCase):
@@ -86,15 +89,17 @@ class Serve(unittest.TestCase):
     def test_the_default_preview_catalog_is_given_beside_the_web_code_and_nothing_below_it(self):
         kept = sorted(path for path in support.THUMBNAILS.iterdir() if path.is_file())
         self.assertIn(support.THUMBNAILS / "catalog.js", kept)
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.port, timeout=10)
+        self.addCleanup(connection.close)
         for path in kept:
             with self.subTest(path=path.name):
-                status, headers, body = get(self.server.port, "/thumbnails/" + path.name)
+                status, headers, body = get(self.server.port, "/thumbnails/" + path.name, connection=connection)
                 self.assertEqual((status, body), (200, path.read_bytes()))
                 wanted = "image/gif" if path.suffix == ".gif" else "text/javascript; charset=utf-8"
                 self.assertEqual((headers["Content-Type"], headers["Cache-Control"]), (wanted, "no-store"))
         for path in ("/thumbnails", "/thumbnails/", "/thumbnails/none.gif", "/thumbnails/../index.html", "/thumbnails/x/catalog.js", "/catalog.js", "/thumbnails/index.html"):
             with self.subTest(path=path):
-                self.assertEqual(get(self.server.port, path)[0], 404)
+                self.assertEqual(get(self.server.port, path, connection=connection)[0], 404)
 
     def test_the_address_alone_gives_the_page(self):
         status, headers, body = get(self.server.port, "/")

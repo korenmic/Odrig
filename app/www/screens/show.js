@@ -3,6 +3,7 @@
 // a file explorer shows them, each row with its preview, its storage badge and its menu.
 
 import * as client from "../client.js";
+import * as brightness from "./brightness.js";
 import * as capacity from "../capacity.js";
 import * as filters from "./filters.js";
 import {Refusal} from "../commands.js";
@@ -13,23 +14,6 @@ import * as reorder from "./reorder.js";
 import * as selection from "./selection.js";
 import * as tests from "./tests.js";
 
-// The shortest time between two brightness commands while the slider is moved.
-const BRIGHTNESS_EVERY_MS = 200;
-// How long after a brightness command a status does not move the slider.
-const SLIDER_RESTS_MS = 1000;
-// The brightness the field takes, and what it says of another value.
-const MOST_BRIGHTNESS = 255;
-const BRIGHTNESS_RANGE = "The brightness is 0 to 255.";
-
-// Whether the operator holds the slider, the value and the time of the newest brightness
-// command, and the timer of one that waits for its time.
-let held = false;
-let sentValue = null;
-let sentAt = -Infinity;
-let waiting = null;
-// The value in force: the brightness this phone last wrote into the field, by the slider,
-// by a value sent from the field, or by following a status; null before the first.
-let inForce = null;
 // The inclusion changes under way, by id, each with the target it was sent to.
 const pending = new Map();
 // The bar of the animation playing now: the animation it shows and what the installation
@@ -77,6 +61,15 @@ export function isExternal(animation) {
 // of a target that reports its inclusion.
 export function isEditable(animation) {
   return !isExternal(animation) && typeof animation.ignored === "boolean";
+}
+
+function canIgnore(item) {
+  return typeof item.ignored === "boolean";
+}
+
+function inclusionNote(item) {
+  if (item.inheritedIgnored) return item.ignored ? "\u2298 Ignored \xb7 also excluded by a parent folder" : "\u2298 Excluded by a parent folder";
+  return item.ignored ? "\u2298 Ignored" : "";
 }
 
 // Whether an animation is on a card the target may write, so that the app may delete it.
@@ -154,7 +147,7 @@ function nameOf(path) {
 // in the shown order and those of them the filters show; and its sub-folders in the order
 // of the list, each with the count of the files directly in it.
 function levelOf(state, all) {
-  const folders = state.folders.map((item) => ({path: item.playlist, id: item.id, name: nameOf(item.playlist), count: item.files ?? 0}));
+  const folders = state.folders.map((item) => ({...item, path: item.playlist, name: nameOf(item.playlist), count: item.files ?? 0}));
   return {path: state.level.path, rows: all, shown: all.filter(filters.matches), folders};
 }
 
@@ -170,15 +163,36 @@ function countWords(count) {
   return count === 1 ? "1 animation" : `${count} animations`;
 }
 
+function moreButton(id, label) {
+  const more = document.createElement("button");
+  more.type = "button";
+  more.className = "more";
+  more.textContent = "\u22ef";
+  more.setAttribute("aria-haspopup", "menu");
+  more.setAttribute("aria-expanded", "false");
+  more.setAttribute("aria-label", label);
+  more.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (menuFor === id) closeMenu();
+    else openMenu(id, more);
+  });
+  return more;
+}
+
 // The row of a sub-folder of the level: its name, the count of its own files, and a way
 // in. It is no row of an animation: the filters, the moves and the selection pass it by.
 function folderRow(entry) {
-  const made = document.createElement("button");
-  made.type = "button";
+  const managed = canIgnore(entry);
+  const made = document.createElement(managed ? "div" : "button");
+  if (managed) made.setAttribute("role", "listitem");
+  else made.type = "button";
   made.className = "folder-row";
   made.dataset.path = entry.path;
   made.dataset.id = String(entry.id);
-  made.setAttribute("aria-label", `Open folder ${entry.path}`);
+  made.dataset.managed = String(managed);
+  const open = managed ? document.createElement("button") : made;
+  if (managed) { open.type = "button"; open.className = "folder-open"; }
+  open.setAttribute("aria-label", `Open folder ${entry.path}`);
   const text = document.createElement("span");
   text.className = "folder-text";
   const name = document.createElement("span");
@@ -187,12 +201,16 @@ function folderRow(entry) {
   const meta = document.createElement("span");
   meta.className = "meta";
   meta.textContent = countWords(entry.count);
-  text.append(name, meta);
+  const note = document.createElement("span");
+  note.className = "row-state";
+  note.hidden = true;
+  text.append(name, meta, note);
   const chevron = document.createElement("span");
   chevron.className = "chevron";
   chevron.setAttribute("aria-hidden", "true");
   chevron.textContent = "\u203a";
-  made.append(text, chevron);
+  open.append(text, chevron);
+  if (managed) made.append(open, moreButton(entry.id, `Actions for folder ${entry.path}`));
   made.addEventListener("click", () => enter(entry));
   return made;
 }
@@ -527,21 +545,7 @@ function row(animation) {
   badge.setAttribute("role", "img");
   badge.setAttribute("aria-label", where);
   badge.title = where;
-  const more = document.createElement("button");
-  more.type = "button";
-  more.className = "more";
-  more.textContent = "\u22ef";
-  more.setAttribute("aria-haspopup", "menu");
-  more.setAttribute("aria-expanded", "false");
-  more.setAttribute("aria-label", `Actions for ${animation.id} ${animation.file}`);
-  more.addEventListener("click", (event) => {
-    event.stopPropagation();
-    if (menuFor === animation.id) {
-      closeMenu();
-    } else {
-      openMenu(animation.id, more);
-    }
-  });
+  const more = moreButton(animation.id, `Actions for ${animation.id} ${animation.file}`);
   made.append(play, badge, more);
   if (typeof animation.fault === "string") {
     // An animation whose file had a fault: grayed, its reason in words, and no Play.
@@ -571,7 +575,7 @@ function rowKey(animation) {
 
 function keyOfChild(child) {
   if (child.classList.contains("folder-row")) {
-    return `#${child.dataset.path}|${child.dataset.id}`;
+    return `#${child.dataset.path}|${child.dataset.id}|${child.dataset.managed}`;
   }
   if (!child.classList.contains("row")) {
     return "?";
@@ -585,7 +589,7 @@ function keyOfChild(child) {
 // sub-folders.
 function drawRows(here) {
   const place = byId("animations-list");
-  const wanted = [...here.shown.map(rowKey), ...here.folders.map((entry) => `#${entry.path}|${entry.id}`)];
+  const wanted = [...here.shown.map(rowKey), ...here.folders.map((entry) => `#${entry.path}|${entry.id}|${canIgnore(entry)}`)];
   const shown = [...place.children].map(keyOfChild);
   if (shown.length === wanted.length && shown.every((key, at) => key === wanted[at])) {
     return;
@@ -617,6 +621,14 @@ function rowsState(state, animations, here) {
       continue;
     }
     made.querySelector(".meta").textContent = countWords(entry.count);
+    made.classList.toggle("ignored", entry.ignored === true || entry.inheritedIgnored === true);
+    const saving = pending.get(entry.id) === version;
+    made.dataset.saving = String(saving);
+    const note = made.querySelector(".row-state");
+    note.textContent = saving ? "Saving\u2026" : inclusionNote(entry);
+    note.hidden = note.textContent === "";
+    const more = made.querySelector(".more");
+    if (more) more.disabled = !answers() || saving;
     made.setAttribute("aria-current", String(marked !== null && (marked === entry.path || marked.startsWith(`${entry.path}/`))));
   }
   for (const made of byId("animations-list").querySelectorAll(":scope > .row")) {
@@ -628,10 +640,10 @@ function rowsState(state, animations, here) {
     made.setAttribute("aria-current", String(current));
     made.querySelector(".play").setAttribute("aria-current", String(current));
     const saving = pending.get(animation.id) === version;
-    made.classList.toggle("ignored", animation.ignored === true);
+    made.classList.toggle("ignored", animation.ignored === true || animation.inheritedIgnored === true);
     made.dataset.saving = String(saving);
     const note = made.querySelector(".row-state");
-    note.textContent = saving ? "Saving\u2026" : animation.ignored === true ? "\u2298 Ignored" : "";
+    note.textContent = saving ? "Saving\u2026" : inclusionNote(animation);
     note.hidden = note.textContent === "";
     previews.show(made.querySelector(".thumb"), previewOf(animation));
     const check = made.querySelector(".pick input");
@@ -640,7 +652,17 @@ function rowsState(state, animations, here) {
       check.disabled = selection.locked();
     }
     made.querySelector(".more").disabled = !answers();
+    const play = made.querySelector(".play");
+    const allowed = client.canPlay(animation);
+    play.disabled = typeof animation.fault === "string" || !allowed;
+    play.title = allowed ? "" : "Leave Clocks only to play an animation outside the Clocks folder.";
+    if (!allowed) play.setAttribute("aria-describedby", "only-boundary");
+    else play.removeAttribute("aria-describedby");
   }
+  const only = state.status?.clockMode === "only";
+  byId("play-all").textContent = only ? "Restart clocks" : "Play this folder";
+  byId("play-all").disabled = only && (state.status.clockOnly?.folder == null || !state.statusFresh);
+  say("only-boundary", only ? "Clocks only: browsing is unrestricted. Play outside the Clocks folder is disabled; leave Clocks only in Settings to play it." : null);
 }
 
 function draw(state) {
@@ -659,20 +681,16 @@ function draw(state) {
     byId("power-toggle").setAttribute("aria-pressed", "false");
   } else {
     byId("power").textContent = status.on ? "ON" : "OFF";
-    byId("brightness").textContent = `Brightness ${status.brightness}`;
+    byId("brightness").textContent = `Brightness ${status.dimming?.value ?? status.brightness}`;
     byId("playing").textContent = playing(status, state);
     drawNow(status, state);
     byId("fps").textContent = `${status.fps} refreshes a second`;
     byId("on").setAttribute("aria-pressed", String(status.on));
     byId("off").setAttribute("aria-pressed", String(!status.on));
     byId("power-toggle").setAttribute("aria-pressed", String(status.on));
-    // A status moves neither the slider nor the field while the slider is held, right
-    // after a command, while the field holds text not sent, or while it is typed into.
-    if (!held && performance.now() - sentAt >= SLIDER_RESTS_MS && !unsent() && !typingIn()) {
-      byId("level").value = String(status.brightness);
-      writeLevel(status.brightness);
-    }
+
   }
+  brightness.draw(state);
   const all = shownOrder(state);
   const here = levelOf(state, all);
   const animations = here.shown;
@@ -685,7 +703,7 @@ function draw(state) {
   byId("none").hidden = state.animations === null || all.length > 0;
   byId("filter-empty").hidden = here.rows.length === 0 || animations.length > 0;
   selection.draw(state);
-  if (menuFor !== null && !animations.some((animation) => animation.id === menuFor)) {
+  if (menuFor !== null && !animations.some((animation) => animation.id === menuFor) && !here.folders.some((folder) => folder.id === menuFor)) {
     closeMenu();
   } else if (menuFor !== null) {
     fillMenu();
@@ -728,10 +746,11 @@ async function include(animation, included) {
 function actions(animation) {
   const items = [];
   const free = answers() && !selection.locked();
-  if (isEditable(animation)) {
+  if (canIgnore(animation)) {
     const saving = pending.get(animation.id) === client.targetVersion();
     items.push(animation.ignored ? {label: "Restore to playlist", act: () => include(animation, true), disabled: !free || saving}
       : {label: "Ignore in playlist", act: () => include(animation, false), disabled: !free || saving});
+    if (animation.inheritedIgnored) items.push({note: "Excluded by a parent folder. This choice changes only this file's own setting."});
   }
   for (const extra of extensions.menu) {
     items.push(...extra(animation));
@@ -742,7 +761,8 @@ function actions(animation) {
   } else if (onWritableCard(animation)) {
     items.push({label: "Delete", act: () => selection.askOne(animation), disabled: !free, danger: true});
   } else if (isExternal(animation)) {
-    items.push({note: "External storage is read-only: this animation cannot be ignored or deleted from the app."});
+    items.push({note: canIgnore(animation) ? "External storage is read-only: this animation cannot be deleted. Inclusion is saved on the target." :
+      "External storage is read-only: this animation cannot be ignored or deleted from the app."});
   } else {
     items.push({note: "This installation's software does not let the app change this animation."});
   }
@@ -750,13 +770,19 @@ function actions(animation) {
 }
 
 function fillMenu() {
-  const animation = (client.state.animations || []).find((item) => item.id === menuFor);
+  const animation = [...(client.state.animations || []), ...client.state.folders].find((item) => item.id === menuFor);
   const menu = byId("row-menu");
   if (animation === undefined) {
     closeMenu();
     return;
   }
-  const items = actions(animation);
+  const folder = typeof animation.playlist === "string";
+  const saving = pending.get(animation.id) === client.targetVersion();
+  const items = folder ? [
+    {label: animation.ignored ? "Include folder" : "Ignore folder", act: () => include(animation, animation.ignored === true),
+      disabled: !answers() || selection.locked() || saving},
+    ...(animation.inheritedIgnored ? [{note: "Excluded by a parent folder. Including this folder does not override that ancestor."}] : []),
+  ] : actions(animation);
   const key = JSON.stringify(items.map((item) => [item.label, item.note, item.disabled]));
   if (menu.dataset.key === key) {
     return;
@@ -824,75 +850,6 @@ export function closeMenu() {
   byId("row-menu").hidden = true;
 }
 
-// Sends the slider's value as a brightness command, now or as soon as the shortest time
-// since the one before has passed. A value that was the last one sent is not sent again.
-function sendLevel() {
-  clearTimeout(waiting);
-  waiting = null;
-  const left = sentAt + BRIGHTNESS_EVERY_MS - performance.now();
-  if (left > 0) {
-    waiting = setTimeout(sendLevel, left);
-    return;
-  }
-  const value = Number(byId("level").value);
-  if (value !== sentValue) {
-    sentValue = value;
-    sentAt = performance.now();
-    client.setBrightness(value);
-  }
-}
-
-// Writes a brightness into the field, and makes it the value in force.
-function writeLevel(value) {
-  inForce = value;
-  byId("level-number").value = value === null ? "" : String(value);
-}
-
-// Whether the field holds text that differs from the value in force.
-function unsent() {
-  return byId("level-number").value !== (inForce === null ? "" : String(inForce));
-}
-
-// Whether the field is typed into: it has the focus while the phone's keyboard is open.
-function typingIn() {
-  return document.activeElement === byId("level-number") && document.body.classList.contains("typing");
-}
-
-// Shows the value in force in the field and on the slider, 0 on the slider while there is
-// none.
-function showInForce() {
-  writeLevel(inForce);
-  byId("level").value = String(inForce === null ? 0 : inForce);
-}
-
-// The field was entered or left with text not sent: a whole value from 0 to 255 that is
-// not the value in force is sent as letting go of the slider sends; anything else, and
-// anything while the app is hidden, sends nothing and shows the value in force.
-function commitLevel() {
-  const field = byId("level-number");
-  if (!unsent()) {
-    return;
-  }
-  const digits = field.value.replace(/[^0-9]/g, "");
-  const value = Number(digits);
-  if (document.hidden || digits === "" || value > MOST_BRIGHTNESS) {
-    say("level-range", !document.hidden && digits !== "" ? BRIGHTNESS_RANGE : null);
-    showInForce();
-    return;
-  }
-  say("level-range", null);
-  if (value === inForce) {
-    showInForce();
-    return;
-  }
-  byId("level").value = String(value);
-  writeLevel(value);
-  if (performance.now() - sentAt >= SLIDER_RESTS_MS) {
-    sentValue = null;
-  }
-  sendLevel();
-}
-
 // Lets another part of the screen add actions to a row's menu, draw with the screen, or
 // give the order of the rows.
 export function extend({menu, draw: drawing, order}) {
@@ -950,53 +907,11 @@ export function start(options) {
   // The level's button: the root's playlist at the root, the folder's inside one.
   byId("play-all").addEventListener("click", () => {
     const level = client.state.level;
-    if (level.id === null) client.playAll();
+    if (client.state.status?.clockMode === "only" || level.id === null) client.playAll();
     else client.play(level.id);
   });
   byId("level-back").addEventListener("click", () => enter(null));
-  const level = byId("level");
-  const field = byId("level-number");
-  level.addEventListener("input", () => {
-    held = true;
-    // The slider wins over text not sent: the text is dropped, and the field gives up the
-    // focus only after it holds the slider's value, so that leaving it sends nothing.
-    const dropped = unsent();
-    writeLevel(Number(level.value));
-    if (dropped && document.activeElement === field) {
-      field.blur();
-    }
-    say("level-range", null);
-    sendLevel();
-  });
-  level.addEventListener("change", () => {
-    held = false;
-    writeLevel(Number(level.value));
-    say("level-range", null);
-    // The value at which the slider is let go is always sent: once more when it was
-    // sent a while ago, because somebody else may have set another since.
-    if (performance.now() - sentAt >= SLIDER_RESTS_MS) {
-      sentValue = null;
-    }
-    sendLevel();
-  });
-  // The field takes digits only, and moves the slider to each whole value up to 255 as it
-  // is typed; it sends when it is entered or left.
-  field.addEventListener("input", () => {
-    const digits = field.value.replace(/[^0-9]/g, "");
-    if (digits !== field.value) {
-      field.value = digits;
-    }
-    say("level-range", null);
-    if (digits !== "" && Number(digits) <= MOST_BRIGHTNESS) {
-      level.value = String(Number(digits));
-    }
-  });
-  field.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      commitLevel();
-    }
-  });
-  field.addEventListener("change", commitLevel);
+  brightness.start({redraw});
   // A press anywhere else closes the menu of a row, and so does Escape.
   document.addEventListener("click", (event) => {
     if (menuFor !== null && !byId("row-menu").contains(event.target)) {

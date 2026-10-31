@@ -1,10 +1,10 @@
 {
   "number": 57,
   "slug": "57-p2-miniature-matrix-debug-mode",
-  "state": "remaining",
+  "state": "in_progress",
   "title": "Miniature matrix debug mode",
   "priority": "P2",
   "addedAt": "2026-10-29",
   "addedCommit": "pending-local",
-  "summary": "A shared app checkbox controls temporary firmware projection of original 60x60 animations onto the purchased 10x6 matrix. The owner approved the command, GPIO1 mini-only data, shared ground and ESP 5V power, and supplied matrix/pinout references. Ready for S2S with zero open product questions; current budget, USB power paths and powered hardware acceptance remain execution checks, not verified measurements."
+  "summary": "Software implemented: acknowledged shared app controls, logical 60x60-to-10x6 projection, safe GPIO1-only host transitions, emulator preview and exact approved wiring documentation. Host/browser verification is recorded in the spec. Firmware compilation is deferred to future seed60. Electrical commissioning, actual power/USB paths, powered board behavior and phone acceptance remain open; state stays in_progress until observed."
 }

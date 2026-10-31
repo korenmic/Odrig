@@ -94,6 +94,13 @@ main {
   color: var(--teal);
 }
 
+#mini-indicator {
+  max-width: 696px;
+  margin: 8px auto;
+  width: fit-content;
+  color: var(--text);
+}
+
 main {
   padding: 8px calc(12px + var(--bar-right)) calc(104px + var(--bar-bottom)) calc(12px + var(--bar-left));
 }
@@ -407,6 +414,29 @@ button[aria-pressed="true"] {
   min-width: 44px;
   margin: 0;
   font-variant-numeric: tabular-nums;
+}
+
+#level-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#level-controls > input {
+  flex: 1 1 100px;
+  min-width: 80px;
+  width: auto;
+}
+
+#level-controls .check {
+  flex: 0 1 180px;
+  min-width: 0;
+  min-height: 48px;
+  margin: 0;
+}
+
+#level-file {
+  overflow-wrap: anywhere;
 }
 
 input[type="range"] {
@@ -890,6 +920,7 @@ label.button {
 }
 
 #preview,
+#ready-preview,
 #author-preview {
   display: block;
   width: 100%;
@@ -898,6 +929,16 @@ label.button {
   background: var(--back);
   border: 1px solid var(--edge);
   border-radius: 12px;
+}
+
+#ready-preview {
+  max-width: 280px;
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+
+#upload-storage option:disabled {
+  color: #8b93a7;
 }
 
 /* Settings. */
@@ -1074,6 +1115,18 @@ input[type="checkbox"] {
   color: var(--teal);
 }
 
+.clock-mode-label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+#clocks {
+  width: 100%;
+  min-height: 48px;
+  margin-bottom: 12px;
+}
+
 .folder-row {
   display: flex;
   align-items: center;
@@ -1092,6 +1145,36 @@ input[type="checkbox"] {
 .folder-row .folder-text {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.folder-open {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 48px;
+  width: auto;
+  margin: 0;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text);
+  text-align: left;
+}
+
+.folder-row button.more {
+  flex: 0 0 48px;
+  width: 48px;
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  font-size: 22px;
+}
+
+.folder-row.ignored .name {
+  color: var(--lesser);
 }
 
 .folder-row .name {

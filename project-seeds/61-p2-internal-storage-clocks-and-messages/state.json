@@ -1,0 +1,10 @@
+{
+  "number": 61,
+  "slug": "61-p2-internal-storage-clocks-and-messages",
+  "state": "remaining",
+  "title": "Internal-storage clocks and messages",
+  "priority": "P2",
+  "addedAt": "2026-10-31",
+  "addedCommit": "5bf322dcd2d4c58cbabfc19a358a8692a102ce92",
+  "summary": "Recognize clocks/message relative paths across internal storage and SD in both clock modes, with compatible internal catalogs and a managed internal deployment attempt of the seven approved messages. For matching paths and file types, a persistent Clocks dropdown offers SD card (default) and Internal storage, preserving physical source identity and eligibility. No open product questions remain before S2S. Creation does not implement the feature or upload to the board."
+}

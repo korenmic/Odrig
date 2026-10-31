@@ -10,6 +10,7 @@ namespace odrig {
 
 // The most bytes the core asks the host for in one read.
 const uint32_t kFileBufferSize = 512;
+const uint32_t kFileCacheSize = 256;
 
 // One file of the host, read from its first byte to its last without going back. The core
 // has one of these for the file that `open`, `read` and `close` hold, so one such file is
@@ -51,7 +52,7 @@ struct FileSource {
     uint16_t length;
     uint8_t is_open;
     int8_t stopped;
-    uint8_t buffer[kFileBufferSize];
+    uint8_t buffer[kFileCacheSize];
 };
 
 }  // namespace odrig

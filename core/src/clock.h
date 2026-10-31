@@ -21,7 +21,9 @@ const uint32_t kLayerAt = 128;
 // Reads and checks a widget payload from the source, where the header left it, as far as
 // its end, which must be the file's: its canvas, its widget, its length and settings, a
 // picture clock's parts and picture, and its loop. With `into`, the 20 bytes of a clock,
-// or a picture clock's head and parts, are kept there too. A picture clock's picture is
+// or a picture clock's head and parts, are kept there too. A message-clock's complete
+// payload is retained; `into` must have kLargestWidget bytes when nonnull. Its static
+// masks are drawn procedurally by elapsed time. A picture clock's picture is
 // decoded into the pixel buffer of `picture`, and its decoder holds its palette.
 Reason clock_read(FileSource *file, const ContentHeader &header, uint8_t *into, const Picture &picture);
 
