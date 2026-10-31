@@ -6,7 +6,8 @@ Make one animation from the owner's supplied deep-space pixel-art picture. Keep
 the view at 10x zoom and slowly scan it in alternating horizontal rows: begin
 at the top-left corner, move to the top-right, descend by one tenth of the
 picture's height, move back to the left, descend again, and continue to the bottom.
-The owner requests a final view of the bottom-right corner.
+After the tenth row, make the owner-approved extra left-to-right pass along
+the bottom row, ending at the bottom-right corner.
 
 The original picture is tracked unchanged in this seed's `references/` folder.
 This seed plans animation content; it does not implement a new renderer, change
@@ -35,10 +36,10 @@ tenth of its height, enlarged to fill the target's 60 x 60 canvas. This is
 linear magnification: a 108 x 108 source window, or one hundredth of the image
 area. Begin already zoomed in; no opening zoom transition was requested.
 
-Ten non-overlapping rows with alternating directions end at the bottom-left,
-not the bottom-right. The owner's endpoint is retained as a requirement, with
-the smallest proposed reconciliation and its approval question below. Do not
-silently implement a different endpoint or claim that the parity issue is settled.
+Ten non-overlapping rows with alternating directions end at the bottom-left.
+On 2026-10-31 the owner approved the proposed extra left-to-right pass along
+that same bottom row to finish at bottom-right. Preserve the ten row positions,
+the descent size and this additional final pass.
 
 ## Reference
 
@@ -77,13 +78,12 @@ silently implement a different endpoint or claim that the parity issue is settle
    source's pixel-art character and legibility at 60 x 60; avoid conspicuous
    shimmer, flicker, smeared stars or newly invented details.
 
-6. The requested final viewport is the bottom-right crop at `(972, 972)`.
-   Resolve Q1 before S2S finalizes the route. The recommended reconciliation
-   is to finish the ordinary tenth row at `(0, 972)`, then make one additional
-   slow left-to-right pass along that same bottom row, ending at `(972, 972)`.
-   This repeats the bottom row once without changing the ten row positions,
-   the 10x zoom, the first direction or the requested descent size. It is a
-   proposal, not an approved extra movement.
+6. Finish the ordinary tenth row at `(0, 972)`, then make one additional slow
+   left-to-right pass along that same bottom row, ending at `(972, 972)`.
+   This owner-approved final pass repeats the bottom row once without changing
+   the ten row positions, the 10x zoom, the first direction or the requested
+   descent size. The complete route has eleven horizontal passes and nine
+   descents; the final viewport is the bottom-right crop.
 
 7. Treat the complete agreed scan as one animation loop. Use the existing
    playback behavior when the file repeats from its final frame to its initial
@@ -130,25 +130,15 @@ silently implement a different endpoint or claim that the parity issue is settle
 
 ## Open Questions Requiring The Owner
 
-### Q1. Which final path should reconcile the tenth row with the requested corner?
-
-Ten rows beginning left-to-right alternate to a last right-to-left row and end
-at bottom-left. The requested bottom-right endpoint needs an additional movement
-or a change to one of the stated path rules.
-
-- **A. Recommended:** approve one extra left-to-right pass along the bottom row,
-  ending at bottom-right. Preserve all ten row positions and 10% descents.
-- **B. Alternative:** finish at bottom-left after the ten alternating rows,
-  explicitly changing the requested final corner.
-
-Await the owner's answer before generating the final requirements/design/tasks.
-The linear meaning of 10x zoom is stated above; exact slow timing and sampling
-are technical specification choices, not additional owner questions.
+None. On 2026-10-31 the owner answered "Yes to that proposal", approving Q1's
+option A: one extra left-to-right pass along the bottom row, ending at bottom-right.
+The ten row positions and 10% descents are unchanged. Exact slow timing and
+sampling are technical specification choices. No owner questions remain before S2S.
 
 ## Definition Of Done
 
-1. Q1 is answered and the seed/spec route agrees with that answer; no contradictory
-   row count, direction or endpoint remains.
+1. The spec follows the approved route: ten alternating rows, then an extra
+   left-to-right bottom-row pass, ending at bottom-right with no extra descent.
 2. The unchanged reference, checksum, reproducible source/generator and chosen
    crop/timing/sampling parameters are available to a fresh supported checkout.
 3. An animation of the whole agreed scan plays upright at fixed 10x zoom on the
