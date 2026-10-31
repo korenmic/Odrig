@@ -58,7 +58,7 @@ previously delivered seeds56–60; seed61 is not a dependency or part of this ru
     Exercise the shared app against the native emulator with Clocks content.
     Record the actual reproduction and remaining physical acceptance limits.
 
-- [ ] 6. Deliver the folder-navigation correction
+- [x] 6. Deliver the folder-navigation correction
   - Build the APK from the clean task-5 source with the same persistent key,
     verify packaging and Android AVD installation/update/launch, and overwrite
     the existing Drive APK in place with hash/length/identity readback.
