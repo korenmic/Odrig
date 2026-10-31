@@ -5,5 +5,5 @@
   "title": "Upload ready-made animations into the folder being browsed",
   "priority": "P2",
   "addedAt": "2026-10-31",
-  "summary": "Upload existing ODRG/ODRGX bytes directly without conversion into the currently explored folder through managed catalog-safe uploads. One owner question remains: SD root, internal root, or an explicit storage choice when browsing the combined top-level list. Planning only."
+  "summary": "Upload existing ODRG/ODRGX bytes without conversion into the displayed destination, preserving the explored External folder. Storage is selectable; every new upload defaults to External when detected, otherwise automatically selects Internal and grays out External. Preserve visible destination changes, capacity checks and active transaction identity. No open product questions remain before S2S. Planning only."
 }
