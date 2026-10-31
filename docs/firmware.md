@@ -135,9 +135,10 @@ metadata may change bytes across hosts; compare source/configuration identity an
 image properties rather than requiring identical binary hashes.
 
 The read-only [firmware host workflow](../.github/workflows/firmware-hosts.yml)
-builds one PR head on Windows, macOS and Linux from a spaced checkout path, then
+builds one PR head on Windows and Linux from a spaced checkout path, then
 retains images, provenance, inspection and discovered test results. It uses no board
-or deployment secrets. Its Mac job also runs the newcomer walkthrough. The
+or deployment secrets. A manual run can opt into macOS with `include_macos`; that
+job also runs the newcomer walkthrough. The
 [verification record](specs/60-p2-cross-platform-firmware-builds/verification.md)
 distinguishes actual OS/architecture results, reuse/interruption and optional variant
 coverage. A configured job alone is not successful build evidence; Intel/arm64 and

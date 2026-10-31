@@ -220,3 +220,78 @@ The actual updated Mac Clang/ASan bound and complete newcomer walkthrough remain
 the post-commit remote gate owned by task5. The final firmware and APK are rebuilt
 again after this committed safety repair, with its new current-input identity and
 the same persistent signer; no stale52b artifact is delivered. No board is used.
+
+## Task 5 — final host gate and artifact delivery
+
+The corrected software revision is `7e51b988de85603da1e396ca3a0ad53dd3c2f785`. Its
+[host run](https://github.com/korenmic/Odrig/actions/runs/41147438908) has successful Windows x86_64 and Linux x86_64 jobs,
+including each default build, offline image/source/symbol inspection and all discovered
+firmware/host/runner checks. The owner explicitly requested skipping Mac verification
+and using Windows alternatives. The Mac default build, offline inspection, host tests
+and checked core build had already passed; cancellation of its full newcomer walkthrough
+was requested, and its result is excluded from the delivery gate. The retained run
+status is `completed`/`cancelled`, not an all-host green claim. Windows native firmware setup,
+spaced-path builds, checked core/emulator suites and APK packaging supply the local
+alternative. The PR matrix now requires Windows/Linux; Mac remains opt-in via the
+manual workflow's include_macos input, including its full newcomer walkthrough.
+After the workflow/documentation policy update, all88 discovered onboarding checks
+pass locally (run20261031-022600-134704). No Windows verification depends on Mac access.
+All downloaded compiled input
+maps equal `224a133c05622531faf2d60c35a6d30d4b660bea7f2ff9520924d0107d113774`. Exact downloaded image and ELF hashes are checked
+against the retained provenance/inspection records.
+
+| Actual host | Image bytes | Image SHA256 |
+|---|---:|---|
+| win32/x86_64 | 1879264 | `b9071e7bb2be5db80130f20ac64d9ddba40955627dd34459d681d99f6b839297` |
+| linux/x86_64 | 1879280 | `5288575a95e48bf812c3857294dc16d81e23f836d55d6911a3d887ffa9e7894c` |
+
+Only the default was actually compiled. Mac Intel, Linux arm64 and optional variants
+remain unperformed; eight variant selections are covered by their existing tests.
+No physical board, SD installation, wiring, power or phone check is claimed.
+
+Final Windows firmware and shared-code APK were rebuilt from the clean software
+revision above after the CI fixture repair. The final CI host-selection change does
+not change compiled firmware or shared app inputs. Firmware uses the existing fw.py default
+pipeline and passes offline image validation/current-player inspection. APK uses
+authoritative shared staging, Capacitor8.5.3, existing JDK21/SDK36/build-tools35 and
+the pinned Gradle8.14.3 wrapper with isolated caches/home. The same eight APK tests
+pass with native Windows SDK tool resolution only: application/permissions/HTTP,
+native activity/plugin and every web/converter/thumbnail asset byte-for-byte. Test
+proof is bound to the final APK hash; its bundled source note is clean/current.
+The generic automatic APK archive manifest remains Mac-arm64-only; no general APK
+host pipeline was added. The validated native Windows packaging recipe is recorded
+in the delivered signing notes.
+
+The dedicated persistent PKCS12/RSA2048 key is reused across final rebuilds. Its
+certificate SHA256 is `5a489ec294e53cdec085d71092cf4e7285ae08d4d43c19929d84130f3649f0f1`. The owner's global Android debug
+keystore remains byte-identical. Key, credential JSON, public certificate and reuse
+instructions were uploaded beside the APK in Google Drive `Artifacts/odrig/`; no
+private credential or key was committed. The old Mac signer was explicitly waived.
+The reuse notes explain that an old-key installation can require uninstalling before
+installing the new signer, and that future builds must reuse this backed-up key.
+
+| Delivered file | Bytes | SHA256 |
+|---|---:|---|
+| `odrig-debug.p12` | 2674 | `b49e3f8b499571af7ae7281cfeb09eaa7fdb15cebc9a59397eced9e978318324` |
+| `odrig-firmware.bin` | 1879296 | `94d1bd97605f10adb795da6ea31e3f0d5336ccc49eb823323b82d11669bfe2b3` |
+| `odrig-debug.apk` | 19046838 | `51db8ac28ba1654375c95c6f47af4df3eed6fc37ab0a48fddf71874b14bb0a3c` |
+
+The existing `odrig-debug.apk` and `odrig-firmware.bin` were opened in place with
+r+b, overwritten/truncated, flushed, and read back. Their mounted Drive file
+identities were preserved: APK inode11084,
+firmware inode11087, on the same
+device before/after. Prior bytes are backed up under build/. Every delivered byte
+hash is verified, including private-key/credential backups and firmware checksum,
+provenance and inspection companions. `odrig-delivery.json` is the Drive receipt;
+local proof is `build/seed60-task5-drive-proof.json`. The unrelated recording is
+untouched. This verifies the mounted Drive filesystem update/readback, without
+claiming an independent remote API response.
+
+[PR35](https://github.com/korenmic/Odrig/pull/35) is the only final PR, targeting
+master from the stacked tip branch. The delivery/CI-policy commit does not change
+compiled/app inputs; its post-push Windows/Linux checks are owned before the ready handoff and
+reported in the PR/checkpoint. Four physical acceptance tasks from56–59 stay open.
+The final commit audit extends the22 earlier proof commits with this task5 boundary.
+Every task has a separate checkbox/proof commit. Six earlier subjects omit the
+required Seed/task prefix: `541e702`, `907d812`, `f24aa9f`, `c59aa8d`, `b677d19`, `8ae2e35`. These naming deviations are disclosed;
+pushed history is preserved. They do not bundle implementation tasks.

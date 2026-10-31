@@ -30,7 +30,7 @@
   append resolutions and record local verification honestly. Commit software before
   the final delivery task; no unobserved host/variant is reported successful.
 
-- [ ] 5. Validate cross-host builds and deliver final APK and firmware.
+- [x] 5. Validate cross-host builds and deliver final APK and firmware.
   Push this tip branch, create/attach the ONE PR targeting master, and own its CI
   handoff, correcting attributable regressions. Confirm actual Windows/macOS build
   evidence and report Linux/variant/architecture coverage. After all software,

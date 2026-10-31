@@ -12524,3 +12524,39 @@ host build; retain the remote target check before final handoff.
 matrix and final delivery. player.cpp contains the extraction; the workflow checks
 the bound early, and the verification record retains observed failure and proof.
 Requirements, hardware choices, command list and playback semantics are unchanged.
+
+## Seed 60: final native APK packaging and persistent signer
+
+**Question.** The automatic APK archive manifest has only Mac-arm64 archives, and
+the owner expressly waived the former Mac signer. How is the authorized Windows
+delivery completed reproducibly without expanding firmware-host work into an app
+pipeline feature or replacing the global debug key?
+
+**Answer.** Use the existing local JDK21/SDK, authoritative shared web staging,
+Capacitor and pinned Gradle wrapper with build-local homes/caches. Sign the output
+with a dedicated persistent key and verify the original APK assertions, signature
+and alignment. Back up its exact key/credential/reuse files beside the existing Drive
+APK, update existing artifacts in place and verify identity/bytes. Keep the general
+APK archive limitation and physical acceptance explicit.
+
+**Resolution.** The delivery proof records source, actual host gates, artifact/key
+hashes, preserved file identities and the unchanged global key. Reuse instructions
+are beside the APK; no signing secret enters git. The original final task remains
+one proof boundary after the separate committed CI fixture bridge.
+
+## Seed 60: owner-directed optional Mac verification
+
+**Question.** The final Windows/Linux jobs pass, but the Mac newcomer walkthrough
+is still running. Must delivery wait for Mac after the owner explicitly asks to
+skip Mac verification and use Windows alternatives?
+
+**Answer.** No. Stop the remaining Mac run and require the successful native
+Windows/Linux evidence. Existing Windows firmware setup/spaced-path builds,
+checked core/emulator regressions and native APK packaging cover the work here.
+Keep Mac verification available through the manual workflow's include_macos input;
+the PR does not schedule it. No compiler protection or runtime test is weakened.
+
+**Resolution.** The host workflow and firmware documentation carry this policy.
+The verification record distinguishes observed Mac default/inspection/host success
+from the uncompleted newcomer walkthrough, and never calls the canceled overall
+run green. Final PR Windows/Linux checks remain owned before handoff.
