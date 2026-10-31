@@ -12753,3 +12753,19 @@ repairing it with defaults; unsaved manual mode is explained as temporary.
 
 **Resolution.** `screens/time.js`, `timing.js`, the guarded command validators and
 native/stand-in browser scenarios implement and verify these choices.
+
+## Seed64: initial inventory before authoring
+
+**Question.** Can the added connection-time reads expose authoring before the
+initial root-name inventory has arrived, causing an existing id to be chosen?
+
+**Answer.** Integration testing observed a new text uploaded as id1 instead of the
+free id3. Unknown names must keep new-authoring Upload disabled with a readable
+waiting explanation. A new text/clock also uses the existing internal creation-only
+begin guard, so a later id claim is refused atomically. Existing-file editing keeps
+its read CRC. This restores the intended free-id/no-replacement behavior under
+the shared queue's delayed initial inventory.
+
+**Resolution.** `screens/author.js` and native preview/authoring regression cases
+verify both missing inventory and an id claimed since the inventory. Both failed
+before the fix; no new command or file format is introduced.

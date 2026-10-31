@@ -656,6 +656,12 @@ turn of it on the installation chooses them; `New random time` shows another. A 
 `One loop takes 30.00 seconds.`, or names a number that is out of its range. It is
 uploaded as a text is, as `clock-<kind>.odrgx`, `clock-analog.odrgx` for one with hands.
 
+New texts and clocks wait for the installed animation names before choosing the
+lowest free id and a filename. The form explains that wait and disables Upload.
+New uploads use the existing creation-only begin form, so a place taken by another
+controller is refused without replacing an installed animation. Editing retains
+its separate existing-file CRC guard.
+
 A text or a clock of the board's own storage has `Edit` in its row's menu. The app reads its
 file back from the installation, opens its form on Upload, titled with its id and its
 file, as `Animation 5 hello.odrgx`, and fills it with what the file holds. `Save` sends
@@ -1072,7 +1078,7 @@ installed; the phone with mobile data on.
 1. **Install.** `python3 app/app.py install` with the phone on USB, or copy
    `build/app/odrig-debug.apk` to the phone and open it. *Seen:* the app `odrig` is on the
    phone and starts on the target screen with the address `4.3.2.1`.
-2. **The emulator.** On the Mac: `python -m emulator build/demo-20/show --lan`; allow
+2. **The emulator.** On the computer: `python -m emulator build/demo-20/show --lan`; allow
    incoming connections if macOS asks. Phone and Mac on the same Wi-Fi network. Give the
    app the address of the emulator's `lan:` line. *Seen:* `Answers`, `Sent over Wi-Fi.`,
    and then the show screen.
@@ -1188,7 +1194,16 @@ installed; the phone with mobile data on.
     Include. Check dark recovery when all faces are excluded, mode restoration, reconnect
     and another controller's changes. Repeat upright and sideways. These physical and
     phone observations remain open until actually performed.
-24. **Note** the phone's model, its Android version, the web view's version from the
+24. **Time and scheduled hours.** Keep board brightness at40 or less. In Settings,
+    *Seen:* the confirmed time/zone matches the phone, automatic sync starts on, and
+    disabling it survives reopening. Set a short daily interval excluding now, save,
+    and see the LEDs off while playback progresses. Manual On wins through a restart;
+    Resume schedule returns to the saved hours. With automatic sync off, reset and
+    see that invalid time ignores the schedule; Sync now restores it. Check a changed
+    phone zone/DST, a due reconnection after15 minutes, and no periodic time writes
+    while connected. Restore the original hours, auto-sync choice and manual mode.
+    These physical phone/LED observations remain unperformed.
+25. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1199,8 +1214,9 @@ python3 -m unittest discover -s tests/apk -t .
 ```
 
 The first runs the web code in Chrome without a window against an emulator and against
-stand-in targets of its own, and takes about two minutes. It needs the core's library,
-`make -C core shared`, and Chrome: the one in `/Applications`, or the program the
+stand-in targets of its own. Duration depends on the host; the parallel runner bounds
+the app to four workers. It needs the core's library (`python core/build.py shared`
+on Windows, `make -C core shared` on macOS) and installed Chrome, or the program the
 variable `ODRIG_CHROME` names. Nothing it does reaches another computer: what the app
 would send to the installation's address ends at the suite's own server.
 
@@ -1213,7 +1229,12 @@ Neither needs a phone.
 
 ## What is verified
 
-By programs, on a Mac:
+By programs, on macOS and Windows:
+
+Board-time and Settings tests cover real native scheduling blackout, sticky manual
+On/Off and Resume, clock loss, named-zone DST, guarded target changes, confirmation,
+lost replies, preserved edits and phone-size controls. Release evidence and remaining
+physical acceptance are in [verification.md](specs/64-p2-board-time-and-daily-on-off-schedule/verification.md).
 
 - The four tabs and every action of the web code, in Chrome against the emulator:
   the address, the status, the list for shows of up to 40 animations, `play`,
@@ -1341,6 +1362,10 @@ By programs, on a Mac:
 
 ## What is open
 
+- **Board time and scheduled hours on the owner's phone and board.** Step24 above
+  remains unperformed. Browser/native and Android virtual-device evidence cannot
+  observe real LEDs, real power loss or the phone's network behavior.
+
 - **Message clock modes and external inclusion on a phone and on the board.** The
   shared browser/emulator proofs do not replace physical acceptance of all seven
   sequences, Only boundaries, inherited exclusions, restarts and complete turns.
@@ -1394,7 +1419,9 @@ By programs, on a Mac:
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.
-- The build is verified on one system, macOS on Apple Silicon. `app/toolchain.json` has
-  no entry for another.
+- Automatic toolchain setup remains pinned to macOS on Apple Silicon in
+  `app/toolchain.json`. Windows packaging has also been verified with the existing
+  Android Studio JDK/SDK and the persistent dedicated signing key. That does not
+  claim automatic setup support for another entry in the toolchain file.
 - `npm audit` names three advisories of moderate severity in a package that Capacitor's
   command line uses at build time. Nothing of it is in the APK.

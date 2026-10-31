@@ -92,7 +92,7 @@ Only seed64 is in scope; do not implement seeds45 or61 or resume cancelled seed1
     Missing controls failed first; unsaved edits, a hidden lost-reply error and a
     hidden sync acknowledgement were observed red before their UI-state fixes.
 
-- [ ] 6. Verify the integrated feature and document release acceptance
+- [x] 6. Verify the integrated feature and document release acceptance
   - Run every board-free suite that works on this Windows host, using discovery.
     Verify native HTTP/TCP and app behavior against deterministic clocks, power loss
     and persisted manual mode; retain memory/source/stack evidence.
@@ -100,6 +100,16 @@ Only seed64 is in scope; do not implement seeds45 or61 or resume cancelled seed1
     an explicit unperformed physical phone/board checklist. Fix in-scope failures
     with fail-first regression evidence, never fake physical acceptance.
   - Audit task/proof boundaries and prepare a clean runtime build source.
+  - Verified:5239 cases across all ten available Windows suites have passing last
+    results, with21 platform skips; the portable walkthrough Plan adds4 passes.
+    Final app493/onboarding88 pass after the integration fix. Three outdated
+    cache/manual-persistence expectations were corrected after observed failures;
+    two resource-pressure browser cases pass isolated and in their full reruns.
+    Delayed initial inventory exposed new authoring choosing an occupied id;
+    deterministic regressions failed first. New authoring waits for names and uses
+    the existing internal creation-only guard; previews/editing pass all22 cases.
+    Arena131029/Core3776 and original bounds are retained. verification.md records
+    exact run identities and the unperformed physical acceptance checklist.
 
 - [ ] 7. Build, deploy and verify the APK and firmware artifacts
   - Build firmware only through fw.py on Windows and inspect its ESP32-S3 image and
