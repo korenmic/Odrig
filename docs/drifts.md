@@ -12646,3 +12646,23 @@ An unused id is insufficient when an unreferenced physical file has the chosen
 basename. CRC-bearing new internal uploads also refuse that collision before
 opening a part. A fail-first host regression confirmed the missing refusal; no
 file outside the show's listing is implicitly replaced by new-file creation.
+
+## Folder browsing after a refused folder lookup
+
+**Question.** Does one `unknown-id` while populating a folder prove the folder was
+removed, so the app should immediately clear its browsing trail and show Root?
+
+**Answer.** No. Re-resolve the captured path through fresh parent listings first.
+An existing path remains selected and adopts its current folder id. Restart the
+folder's paginated listing from zero after a retry delay; never mix partial pages.
+A failed verification, or a missing path while the catalog is loading or damaged,
+keeps the previous complete view and retries. A complete listing that confirms
+the path is absent with an available catalog (or a legacy unsupported catalog)
+still returns to Root. Target and navigation identity are checked after each
+awaited reply so recovery cannot override the operator's later navigation.
+
+**Resolution.** The owner explicitly added this correction to seed 63's existing
+PR after reporting Clocks jumping to Root. Five browser regressions showed Root
+before the app fix; eight focused recovery tests and the actual native-emulator
+Clocks collection now pass. This fixes UI recovery, without claiming that a
+physical SD/flash I/O fault was reproduced or repaired.

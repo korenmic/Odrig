@@ -73,7 +73,11 @@ a top bar with the app's name and whether the installation answers.
   folder row that leads to the current playlist at every level above it, from the path
   that `status` names as `playlist`; the line of what plays names the file from `status`
   as well. The list comes back to the root when the target changes, when the card goes
-  out and when the folder shown is gone from the card. An upload chooses its id and its
+  out and when the folder shown is confirmed gone from the card. A refused folder lookup
+  first rechecks its path through fresh parent listings. An existing path keeps its
+  location, including when its id changed; an unavailable verification keeps the last
+  complete rows and retries. A later reply cannot undo Back or a target change.
+  An upload chooses its id and its
   name against the root's level, which the app reads for it when another level is
   shown. Each row
   begins its Play button with a square of 44 by 44 pixels: the preview of its animation, a

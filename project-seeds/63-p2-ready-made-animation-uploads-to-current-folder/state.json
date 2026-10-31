@@ -1,9 +1,9 @@
 {
   "number": 63,
   "slug": "63-p2-ready-made-animation-uploads-to-current-folder",
-  "state": "completed",
+  "state": "in_progress",
   "title": "Upload ready-made animations into the folder being browsed",
   "priority": "P2",
   "addedAt": "2026-10-31",
-  "summary": "Upload existing ODRG/ODRGX bytes without conversion into the displayed destination, preserving the explored External folder. Storage is selectable; every new upload defaults to External when detected, otherwise automatically selects Internal and grays out External. Preserve visible destination changes, capacity checks and active transaction identity. Software implemented and verified through native emulator/browser and Android AVD checks. APK and required firmware uploaded; physical board/phone acceptance remains open."
+  "summary": "Upload existing ODRG/ODRGX bytes without conversion into the displayed destination, preserving the explored External folder. Storage is selectable; every new upload defaults to External when detected, otherwise automatically selects Internal and grays out External. Original software and artifacts delivered. Owner-authorized follow-up fixes Clocks unexpectedly returning to Root after transient lookup failures; refreshed APK delivery is pending. Physical board/phone acceptance remains open."
 }

@@ -97,3 +97,41 @@ hash and length, and retained the existing mounted file identities. This is moun
 Drive evidence, not an independent Drive API check. The dedicated signing key and
 all four existing signing backup files remained byte-identical. The global Android
 debug key was also unchanged.
+
+## Folder-navigation follow-up
+
+The owner authorized tasks 5 and 6 after reporting that Clocks unexpectedly
+returns to Root while entries load. `askListPart` treated one `unknown-id` as proof
+that the browsed folder was gone, cleared its navigation trail and immediately
+selected Root. A transient lookup failure or stale folder ID therefore discarded
+the operator's location without verifying the path.
+
+Five browser assertions were observed failing against the delivered app before
+the correction: the resulting path was empty and Root had been visited instead of
+retaining `clocks` or `clocks/message`. The corrected client re-resolves the captured
+path through fresh parent listings, recovers an updated folder ID, and restarts
+pagination from zero after a bounded retry delay. Failed verification and an
+incomplete/damaged catalog keep the path and previously complete rows. A confirmed
+missing path still returns to Root. Every awaited reply retains target and level
+identity guards, so a late recovery cannot undo the operator's Back/navigation.
+
+The full discovered app suite passed 445 tests and onboarding passed 88 in
+`build/folder-followup-suites.log` (run `20261031-120038-104212`). A subsequent focused
+recovery run passed 8 tests, adding catalog-loading/damaged states; no production source
+changed after the broad run. Its final result is retained in
+`build/folder-recovery-final.log`. The original fail-first evidence is
+`build/folder-recovery-red.log`.
+
+The native emulator/shared-browser proof used all 120 actual Clocks files: 112
+direct entries and 8 message entries. It retained 112 unique visible rows through
+three complete multi-page refreshes, with no Root visit. This is the project's
+native Core/host emulator, not an ESP32-S3 instruction-set/hardware simulation.
+Controlled protocol refusals reproduce the faulty UI recovery; spontaneous SD I/O
+failure on the physical board is not claimed reproduced or repaired by this change.
+The owner's earlier storage-error report still needs its physical storage readings.
+
+The correction changes only app code. The delivered firmware's input digest remains
+`3d8b6dd472e4f9c30827a1f4c706496fd2ad7faf9afe2ce0a47677fe66f961cd`;
+its image, checksum and provenance remain unchanged for this correction.
+Task 6 records the new APK and retains that firmware. Phone folder-browsing
+acceptance remains open until the owner tries the updated APK.

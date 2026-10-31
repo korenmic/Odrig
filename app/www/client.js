@@ -254,6 +254,61 @@ function namesOf(items) {
   return {ids: named.map((item) => item.id), files: named.filter((item) => typeof item.file === "string").map((item) => item.file)};
 }
 
+// Resolve the captured path without changing the visible level. A failed lookup
+// or an unavailable catalog does not establish that the folder was removed.
+async function recoverLevel(asked, level) {
+  const current = () => asked === target && level === state.level;
+  const found = [];
+  let path = "";
+  let parent = null;
+  try {
+    for (const name of level.path.split("/")) {
+      path += (path ? "/" : "") + name;
+      let from = 0;
+      let folder = null;
+      do {
+        const reply = await commands.list(from, parent);
+        if (!current()) return;
+        folder = reply.items.find(item => item.playlist === path) ?? null;
+        from = reply.next;
+      } while (folder === null && from !== null);
+      if (folder === null) {
+        let catalog = null;
+        try { catalog = await commands.catalog(); } catch (error) {
+          if (!(error instanceof commands.Refusal && ["unknown-command", "bad-argument"].includes(error.code))) throw error;
+        }
+        if (!current()) return;
+        if (catalog === null || ["ok", "absent", "none"].includes(catalog.external.state)) {
+          heard();
+          trail.length = 0;
+          toLevel();
+          return;
+        }
+        break;
+      }
+      found.push({path, id: folder.id});
+      parent = folder.id;
+    }
+    if (found.length === level.path.split("/").length) {
+      trail.splice(0, trail.length, ...found);
+      if (parent !== level.id) {
+        heard();
+        toLevel();
+        return;
+      }
+    }
+    heard();
+  } catch (error) {
+    if (!current()) return;
+    if (error instanceof commands.Refusal) heard();
+    else failed(error);
+  }
+  listing = null;
+  state.listBusy = true;
+  listAgainLater(LIST_WHEN_BUSY_MS);
+  changed();
+}
+
 // Asks for one part of the list of the level shown. The new list takes the place of the
 // old one only when its last part has come; when a part fails, the old list stays. A
 // folder that is no more brings the list to the root.
@@ -291,10 +346,7 @@ async function askListPart() {
       return;
     }
     if (error instanceof commands.Refusal && error.code === "unknown-id" && level.id !== null) {
-      // The folder is no more, with its card or after a removal: the root is shown.
-      heard();
-      trail.length = 0;
-      toLevel();
+      await recoverLevel(asked, level);
       return;
     } else if (error instanceof commands.Refusal && error.code === "busy") {
       // The target has just started and still reads what it has installed. What is
