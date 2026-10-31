@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "brightness": 40,
+  "items": [{"id": 1, "file": "space-scan.odrg", "repeat": 1}],
+  "start": 1
+}

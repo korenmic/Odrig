@@ -12,7 +12,7 @@ This seed's owner questions are resolved. Seed63 remains planning only.
   - Set the seed state to in_progress. Run discovered converter-npm and
     onboarding suites; tick only this item and commit with the observed failure.
 
-- [ ] 2. Generate and publish the complete animation with previews and provenance
+- [x] 2. Generate and publish the complete animation with previews and provenance
   - Generate all18,004frames, encode/check with the existing converter, create
     the normal thumbnail and reproducible repeat1 demonstration show.
   - Publish collection binary/GIF/readme under the existing size policy; include

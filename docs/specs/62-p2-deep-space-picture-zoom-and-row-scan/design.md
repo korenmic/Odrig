@@ -59,8 +59,9 @@ speed as the installation's speed. A small static review page shows both with
 the original reference and route/timing details. Converter `thumbnail` creates
 the ordinary app/catalog preview from the final ODRG.
 
-Encode with `node converter/odrig.js encode`; inspect with `check` and verify
-the binary through both the existing reader and the actual emulator. Store
+Encode with the existing converter's `pack` command, which calls its encoder
+and assembles the repeat1 show together; `encode` is the equivalent file-only
+route. Inspect with `check` and verify through its reader and actual emulator. Store
 `space-scan.odrg`, its normal GIF and provenance in collection/card/space/ if
 the binary is <=50,000,000bytes, otherwise follow collection/long/ and the
 configured share rules. The provenance includes image/binary checksums,
