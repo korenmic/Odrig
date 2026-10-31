@@ -136,9 +136,9 @@ Rules: [format.md](format.md), "The widget payload" and "Picture clocks".
 | Reason | Condition |
 |---|---|
 | `canvas-too-large` | The clock is for a canvas whose picture, 3 * W * H bytes, is above 65,534. |
-| `truncated` | The file ends before the payload's first byte, the 20 bytes of a clock, or the head, a hand, a cap or a field of a picture clock. |
-| `unknown-widget` | The widget is not one the reader has: 1 `analog`, 2 `digital`, 3 `melting`, 4 `picture-dial` or 5 `picture-display`. |
-| `payload-size` | The payload's length in the header is not 20 bytes for a widget 1 to 3; for a picture clock, the payload's length is not the number of bytes after the header. |
+| `truncated` | The file ends before the payload's first byte, the 20 bytes of a clock, the head, a hand, a cap or a field of a picture clock, or any declared part of a message clock. |
+| `unknown-widget` | The widget is not one the reader has: 1 `analog`, 2 `digital`, 3 `melting`, 4 `picture-dial`, 5 `picture-display` or 6 `message-clock`. |
+| `payload-size` | The payload's length in the header is not 20 bytes for a widget 1 to 3; for a picture clock, the payload's length is not the number of bytes after the header; for a message clock it disagrees with the exact mask/atlas layout or exceeds the widget window. |
 | `bad-settings` | The reserved byte is not 0, the seconds are not 1 to 3,600, the least speed is not 1 to 3,600, or the greatest is below the least or above 3,600. Of a picture clock also: a direction above 2; turns above 100, or not 0 without `random`; a dial without hands, with more than 8 or with more than 4 caps; a display without fields, with more than 4 or with a cap; a hand of a unit above 2, a pivot or a cap outside the canvas, a length or a radius of 0, a half width that is not 1 to 15, an offset that is not -12 to 12; a field's box empty or outside the canvas, a blink that is not 0 or 1, a reserved byte that is not 0, a pattern with no character, with a byte that is none of `HIhMmSs:` and the space, or with one after a zero byte; and, once the picture's palette is read, a colour of a hand, a cap or a field that is not below its size. |
 | `unknown-font` | A field of a picture display names a font that is not 1 to 4. |
 | `bad-picture` | The picture of a picture clock has not exactly one frame, or its palette has no colour or more than 8. |

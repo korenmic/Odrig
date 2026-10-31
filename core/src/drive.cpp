@@ -33,7 +33,7 @@ const char *index_line(const Core &core, const char *name, uint32_t width, uint3
     if (!held) {
         // As many whole lines as the room holds, from this one on, in one read or more.
         cursor.room_name[0] = '\0';
-        const uint32_t want = kFileBufferSize / width * width;
+        const uint32_t want = static_cast<uint32_t>(sizeof cursor.room) / width * width;
         uint32_t got = 0;
         while (got < want) {
             const int32_t count = core.host.read_at(core.host.ctx, name, offset + got, cursor.room + got, want - got);

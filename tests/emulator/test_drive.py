@@ -130,9 +130,9 @@ class AnEmulatorWithADrive(unittest.TestCase):
         self.assertEqual(self.listed_when(emulator, lambda items: len(items) == 2, "list in 60004"), [(60005, None), (60002, "night/comet.odrg")])
         self.assertEqual(self.listed_when(emulator, lambda items: len(items) == 1, "list in 60005"), [(60003, "night/deep/x.odrg")])
         reply = json.loads(emulator.command("list"))
-        self.assertEqual([item for item in reply["items"] if "playlist" in item], [{"id": 60004, "playlist": "night", "external": True, "files": 1}])
+        self.assertEqual([item for item in reply["items"] if "playlist" in item], [{"id": 60004, "playlist": "night", "external": True, "files": 1, "ignored": False, "inherited_ignored": False}])
         night = json.loads(emulator.command("list in 60004"))
-        self.assertEqual(night["items"][0], {"id": 60005, "playlist": "night/deep", "external": True, "files": 1})
+        self.assertEqual(night["items"][0], {"id": 60005, "playlist": "night/deep", "external": True, "files": 1, "ignored": False, "inherited_ignored": False})
         with support.Lines(emulator.tcp) as port:
             self.assertEqual(json.loads(port.ask("list")), reply)
             self.assertEqual(json.loads(port.ask("list in 60004")), night)
@@ -142,6 +142,24 @@ class AnEmulatorWithADrive(unittest.TestCase):
         self.assertEqual((status["playing"], status["animation"]), (60004, 60002))
         self.assertEqual(json.loads(emulator.command("play all")), {"ok": True})
         self.assertEqual(emulator.status()["playing"], "all")
+
+    def test_external_ignore_is_durable_over_http_and_tcp_without_writing_the_card(self):
+        folder = support.installed(self.top / 'odrig', {'b.odrg': self.animation})
+        support.installed(folder / 'night', {'comet.odrg': self.animation})
+        before = {p.relative_to(folder).as_posix(): p.read_bytes() for p in folder.rglob('*') if p.is_file()}
+        emulator = support.entered(self, support.Emulator(self.folder, '--drive', self.top, tcp_port=0))
+        self.listed_when(emulator, lambda items: len(self.drives(items)) == 2)
+        self.listed_when(emulator, lambda items: len(items) == 1, 'list in 60003')
+        self.assertEqual(json.loads(emulator.command('ignore 60003 1')), {'ok': True})
+        child = json.loads(emulator.command('list in 60003'))['items'][0]
+        self.assertFalse(child['ignored'])
+        self.assertTrue(child['inherited_ignored'])
+        with support.Lines(emulator.tcp) as port:
+            self.assertEqual(json.loads(port.ask('play 60002')), {'ok': True})
+            self.assertEqual(json.loads(port.ask('ignore 60002 1')), {'ok': True})
+            self.assertEqual(json.loads(port.ask('status'))['animation'], 60002)
+        self.assertEqual((self.folder / 'ignored.txt').read_bytes(), b'odrig-ignored 1\nd night\nf night/comet.odrg\n')
+        self.assertEqual({p.relative_to(folder).as_posix(): p.read_bytes() for p in folder.rglob('*') if p.is_file()}, before)
 
     def test_a_damaged_file_and_one_of_another_canvas_are_left_out_and_logged(self):
         wide = core_support.clip(4, 3, 3, (100,))

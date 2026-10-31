@@ -29,14 +29,14 @@ class CoreDocument(unittest.TestCase):
 
     def test_it_names_every_function_of_the_header(self):
         functions = set(re.findall(r"\b(odrig_core_[a-z_]+)\(", self.header))
-        self.assertEqual(len(functions), 7)
+        self.assertEqual(len(functions), 10)
         for function in sorted(functions):
             self.assertTrue(function in self.named, function)
             self.assertTrue(f"{function}(" in self.text, function)
 
-    def test_it_names_every_member_of_the_two_structs(self):
+    def test_it_names_every_member_of_the_public_structs(self):
         structs = dict(re.findall(r"typedef struct (odrig_[a-z]+) \{(.*?)\}", self.header, flags=re.S))
-        self.assertEqual(sorted(structs), ["odrig_host", "odrig_leg"])
+        self.assertEqual(sorted(structs), ["odrig_host", "odrig_leg", "odrig_mini"])
         members = {}
         for struct, body in structs.items():
             members[struct] = re.findall(r"(?:\(\*|[ *])([a-z_]+)\)?(?:\([^;]*\))?;", body)
@@ -56,7 +56,7 @@ class CoreDocument(unittest.TestCase):
 
     def test_it_names_the_types_and_the_limits_of_the_header(self):
         types = set(re.findall(r"\b(odrig_[a-z_]+)\b", self.header)) - set(re.findall(r"\b(odrig_core_[a-z_]+)\(", self.header))
-        self.assertEqual(types, {"odrig_core", "odrig_host", "odrig_leg", "odrig_reply_fn"})
+        self.assertEqual(types, {"odrig_core", "odrig_host", "odrig_leg", "odrig_mini", "odrig_reply_fn"})
         limits = dict(re.findall(r"#define (ODRIG_[A-Z_]+)\s+([0-9]+)", self.header))
         self.assertEqual(limits, {"ODRIG_LINE_MAX": "2048", "ODRIG_REPLY_MAX": "1024"})
         for name in sorted(types | set(limits)):
@@ -90,13 +90,13 @@ class CoreDocument(unittest.TestCase):
     def test_its_memory_table_adds_up_to_what_the_suite_measures(self):
         table = self.text.split("\n## Memory\n")[1].split("\n## ")[0]
         rows = re.findall(r"(?m)^\| ([^|*]+) \| [^|]+ \| ([0-9,]+) \|$", table)
-        self.assertEqual(len(rows), 17)
+        self.assertEqual(len(rows), 18)
         total = int(re.search(r"\*\*Total\*\* \| \| \*\*([0-9,]+)\*\*", table).group(1).replace(",", ""))
         self.assertEqual(sum(int(number.replace(",", "")) for _, number in rows), total)
         from .test_memory import hundred_items
 
         asked, blocks = support.start(hundred_items()).memory
-        self.assertEqual((asked, blocks), (total, 17))
+        self.assertEqual((asked, blocks), (total, 18))
         example, _ = support.start(support.example_show()).memory
         self.assertIn(f"{example:,} bytes", table)
 
@@ -120,7 +120,7 @@ class CoreDocument(unittest.TestCase):
 class CommandsDocument(unittest.TestCase):
     """docs/commands.md against the core's command front-end."""
 
-    ORDER = ["line-too-long", "unknown-command", "bad-argument", "show-invalid", "no-upload", "incomplete", "bad-checksum", "busy", "unknown-id", "unavailable", "in-use", "read-only", "mapping-conflict", "stale", "order-conflict", "no-space", "bad-offset",
+    ORDER = ["line-too-long", "unknown-command", "bad-argument", "show-invalid", "unsupported", "no-upload", "incomplete", "bad-checksum", "busy", "unknown-id", "unavailable", "in-use", "read-only", "mapping-conflict", "stale", "order-conflict", "no-space", "bad-offset",
              "bad-file", "storage-error"]
 
     @classmethod
@@ -142,10 +142,10 @@ class CommandsDocument(unittest.TestCase):
     def test_its_commands_are_the_ones_the_front_end_reads(self):
         table = self.text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save", "repeat <id> default", "clocks on", "clocks off", "clocks message on", "clocks message off", "upload begin <id> <file> <bytes>",
-                                      "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel"])
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "brightness <id> <n> save", "brightness <id> default", "status", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save", "repeat <id> default", "clocks on", "clocks off", "clocks only", "clocks message on", "clocks message off", "upload begin <id> <file> <bytes>",
+                                      "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel", "debug mini on", "debug mini off"])
         self.assertEqual(set(re.findall(r'words\.is\(0, "([a-z]+)"\)', self.sources)), {command.split(" ")[0] for command in documented})
-        self.assertEqual(set(re.findall(r'words\.is\(1, "([a-z]+)"\)', self.sources)), {"all", "begin", "data", "end", "cancel", "get", "set", "cross", "test", "many", "move", "expect", "rebuild", "page", "message"})
+        self.assertEqual(set(re.findall(r'words\.is\(1, "([a-z]+)"\)', self.sources)), {"all", "begin", "data", "end", "cancel", "get", "set", "cross", "test", "many", "move", "expect", "rebuild", "page", "message", "mini"})
 
     def test_its_limits_are_the_cores(self):
         limits = dict(re.findall(r"#define (ODRIG_[A-Z_]+)\s+([0-9]+)", self.header))

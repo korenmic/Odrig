@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from fwtool import build, env, paths, toolchain, wled
+from fwtool import build, env, host, paths, toolchain, wled
 
 from . import ROOT, support
 from .test_docs import section
@@ -25,11 +25,11 @@ def environments():
 
 class TheFolder(unittest.TestCase):
     def test_the_newer_software_has_a_folder_of_its_own_inside_the_work_folder(self):
-        self.assertEqual(paths.NEWER, paths.SHARED / "newer")
+        self.assertEqual(paths.NEWER, paths.HOST_ROOT / "newer")
         for folder in (paths.NEWER_VENV, paths.NEWER_PYTHON, paths.NEWER_PIO_CORE, paths.NEWER_PIO_CACHE):
             self.assertTrue(folder.is_absolute(), folder)
             self.assertIn(paths.NEWER, folder.parents, folder)
-        self.assertEqual(paths.NEWER_PYTHON, paths.NEWER_VENV / "bin" / "python")
+        self.assertEqual(paths.NEWER_PYTHON, host.program(paths.NEWER_VENV, "python"))
         self.assertEqual(paths.NEWER_REQUIREMENTS, paths.FIRMWARE / "requirements-newer.txt")
 
     def test_no_folder_of_the_build_known_good_lies_in_it(self):
@@ -52,10 +52,10 @@ class TheEnvironment(unittest.TestCase):
             self.assertEqual(newer[name], value, name)
 
     def test_the_programs_of_the_newer_software_come_first_and_those_of_the_build_known_good_are_left_out(self):
-        newer = env.child({"PATH": f"{paths.VENV / 'bin'}{os.pathsep}/usr/bin"}, newer=True)
-        self.assertEqual(newer["PATH"].split(os.pathsep), [str(paths.NEWER_VENV / "bin"), "/usr/bin"])
+        newer = env.child({"PATH": f"{host.scripts(paths.VENV)}{os.pathsep}/usr/bin"}, newer=True)
+        self.assertEqual(newer["PATH"].split(os.pathsep), [str(host.scripts(paths.NEWER_VENV)), "/usr/bin"])
         known = env.child(newer)
-        self.assertEqual(known["PATH"].split(os.pathsep), [str(paths.VENV / "bin"), "/usr/bin"])
+        self.assertEqual(known["PATH"].split(os.pathsep), [str(host.scripts(paths.VENV)), "/usr/bin"])
         self.assertEqual(known["PLATFORMIO_CORE_DIR"], str(paths.PIO_CORE))
         self.assertEqual(env.child(newer, newer=True)["PATH"], newer["PATH"])
 
@@ -136,7 +136,7 @@ class Building(unittest.TestCase):
             return mock.Mock(returncode=status)
         with mock.patch.object(build.toolchain, "python_environment"), mock.patch.object(build.toolchain, "newer_environment") as newer, \
                 mock.patch.object(build.wled, "restore_and_patch") as patched, mock.patch.object(build.wled, "write_override") as overridden, \
-                mock.patch.object(build.subprocess, "run", run), mock.patch.object(build, "keep", return_value=1500000) as kept, \
+                mock.patch.object(build.process, "run", run), mock.patch.object(build.provenance, "write"), mock.patch.object(build, "keep", return_value=1500000) as kept, \
                 mock.patch.object(build, "sha256", return_value="48e51d84"):
             result = support.run_main("build", *arguments)
         return result, ran, newer, patched, overridden, kept
@@ -146,9 +146,9 @@ class Building(unittest.TestCase):
             with self.subTest(arguments=arguments):
                 result, ran, newer, patched, overridden, kept = self.build(*arguments)
                 self.assertEqual(result.status, 0, result.err)
-                self.assertEqual(ran[0][0], [str(paths.NEWER_PYTHON), "-m", "platformio", "run", "-d", str(paths.WLED), "-e", environment])
+                self.assertEqual(ran[0][0], [str(paths.NEWER_PYTHON), "-m", "platformio", "run", "-d", str(paths.WLED), "-e", environment, "-j", "2"])
                 self.assertEqual(ran[0][1]["env"]["PLATFORMIO_CORE_DIR"], str(paths.NEWER_PIO_CORE))
-                self.assertEqual(ran[0][1]["env"]["PATH"].split(os.pathsep)[0], str(paths.NEWER_VENV / "bin"))
+                self.assertEqual(ran[0][1]["env"]["PATH"].split(os.pathsep)[0], str(host.scripts(paths.NEWER_VENV)))
                 newer.assert_called_once_with()
                 self.assertEqual(patched.call_args.kwargs, {"patches": paths.PATCHES})
                 overridden.assert_called_once_with()
@@ -161,7 +161,7 @@ class Building(unittest.TestCase):
             with self.subTest(arguments=arguments):
                 result, ran, newer, _, _, kept = self.build(*arguments)
                 self.assertEqual(result.status, 0, result.err)
-                self.assertEqual(ran[0][0], [str(paths.PYTHON), "-m", "platformio", "run", "-d", str(paths.WLED), "-e", environment])
+                self.assertEqual(ran[0][0], [str(paths.PYTHON), "-m", "platformio", "run", "-d", str(paths.WLED), "-e", environment, "-j", "2"])
                 self.assertEqual(ran[0][1]["env"]["PLATFORMIO_CORE_DIR"], str(paths.PIO_CORE))
                 newer.assert_not_called()
                 self.assertEqual(kept.call_args.args[1], paths.OUT / image)
@@ -236,7 +236,7 @@ class WhatTheNewerSoftwareLeavesOut(unittest.TestCase):
         self.assertEqual(card["build_unflags"].split("\n"), ["${env:odrig.build_unflags}", "-D WLED_ENABLE_DMX_INPUT"])
         flags = card["build_flags"].split("\n")
         self.assertEqual(flags[:4], ["${env:odrig.build_flags}", "-D WLED_DISABLE_INFRARED", "-D WLED_USE_SHARED_RMT", "-D ESP32_ARDUINO_NO_RGB_BUILTIN"])
-        self.assertEqual(flags[4], f"-include {ROOT}/firmware/newer/odrig_newer.h")
+        self.assertEqual(flags[4], f'-include "{ROOT.as_posix()}/firmware/newer/odrig_newer.h"')
 
     def test_the_sticks_build_leaves_nothing_out(self):
         found = environments()

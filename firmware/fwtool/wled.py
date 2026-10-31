@@ -2,11 +2,13 @@
 checkout's work folder, checked, and patched there."""
 
 import pathlib
+import contextlib
 import shutil
 import subprocess
 import sys
+import tempfile
 
-from . import Failure, env, paths
+from . import Failure, env, host, paths, process
 
 TEMPLATE = paths.FIRMWARE / "platformio_override.ini.in"
 OVERRIDE_NAME = "platformio_override.ini"
@@ -18,7 +20,23 @@ COMMIT = "29b389df1c1aaec6ff53aea742d17063b985906c"
 
 
 def _git(folder, *arguments):
-    return subprocess.run(["git", "-C", str(folder), *arguments], capture_output=True, text=True, env=env.child())
+    return process.run(["git", "-C", str(folder), *arguments], capture_output=True, text=True, env=env.child())
+
+
+@contextlib.contextmanager
+def staging(folder):
+    """A uniquely owned sibling, never a preexisting contributor's partial copy."""
+    parent = pathlib.Path(folder).resolve().parent
+    parent.mkdir(parents=True, exist_ok=True)
+    partial = pathlib.Path(tempfile.mkdtemp(prefix='.odrig-wled-', dir=parent))
+    partial.rmdir()
+    try:
+        yield partial
+    finally:
+        if partial.exists():
+            if partial.resolve().parent != parent or not partial.name.startswith('.odrig-wled-'):
+                raise Failure('setup-failed', 'refusing cleanup outside the owned source staging folder')
+            shutil.rmtree(partial)
 
 
 def fetch(folder=paths.WLED_SOURCE, url=URL, tag=TAG):
@@ -26,10 +44,11 @@ def fetch(folder=paths.WLED_SOURCE, url=URL, tag=TAG):
     folder = paths.output(folder)
     if folder.exists():
         return False
-    folder.parent.mkdir(parents=True, exist_ok=True)
-    done = subprocess.run(["git", "clone", "--depth", "1", "--branch", tag, url, str(folder)], capture_output=True, text=True, env=env.child())
-    if done.returncode != 0:
-        raise Failure("setup-failed", f"git clone of {url} at {tag} failed: {done.stderr.strip()[-300:]}")
+    with staging(folder) as partial:
+        done = process.run(["git", "clone", "--config", "core.autocrlf=false", "--depth", "1", "--branch", tag, url, str(partial)], capture_output=True, text=True, env=env.child())
+        if done.returncode != 0:
+            raise Failure("setup-failed", f"git clone of {url} at {tag} failed: {done.stderr.strip()[-300:]}")
+        partial.rename(folder)
     return True
 
 
@@ -49,17 +68,15 @@ def copy(source=paths.WLED_SOURCE, folder=paths.WLED):
     folder = paths.output(folder)
     if folder.exists() or pathlib.Path(source).resolve() == folder.resolve():
         return False
-    folder.parent.mkdir(parents=True, exist_ok=True)
-    partial = folder.with_name(folder.name + ".partial")
-    shutil.rmtree(partial, ignore_errors=True)
-    command = copy_command(source, partial)
-    if command is None:
-        shutil.copytree(source, partial, symlinks=True)
-    else:
-        done = subprocess.run(command, capture_output=True, text=True)
-        if done.returncode != 0:
-            raise Failure("setup-failed", f"copying {source} into {partial} failed: {done.stderr.strip()[-300:]}")
-    partial.rename(folder)
+    with staging(folder) as partial:
+        command = copy_command(source, partial)
+        if command is None:
+            shutil.copytree(source, partial, symlinks=True)
+        else:
+            done = process.run(command, capture_output=True, text=True)
+            if done.returncode != 0:
+                raise Failure("setup-failed", f"copying {source} into {partial} failed: {done.stderr.strip()[-300:]}")
+        partial.rename(folder)
     return True
 
 
@@ -97,16 +114,13 @@ def restore_and_patch(folder=paths.WLED, patches=paths.PATCHES, commit=COMMIT):
 
 def override_text(root=paths.ROOT, template=TEMPLATE):
     """The override file: the template with the repository's path in place of @REPO@."""
-    root = str(pathlib.Path(root).resolve())
-    if any(character.isspace() for character in root):
-        raise Failure("build-failed", f"the repository's path, {root!r}, has a space in it, which the library entries of the build cannot carry")
-    return pathlib.Path(template).read_text().replace(PLACEHOLDER, root)
+    return pathlib.Path(template).read_text(encoding='utf-8').replace(PLACEHOLDER, host.config_path(root))
 
 
 def write_override(folder=paths.WLED, root=paths.ROOT, template=TEMPLATE):
     """Writes the override file into WLED's folder, unless it is there with this content."""
     path = paths.output(pathlib.Path(folder) / OVERRIDE_NAME)
     text = override_text(root, template)
-    if not path.is_file() or path.read_text() != text:
-        path.write_text(text)
+    if not path.is_file() or path.read_text(encoding='utf-8') != text:
+        path.write_text(text, encoding='utf-8', newline='\n')
     return path

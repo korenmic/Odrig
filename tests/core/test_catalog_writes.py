@@ -66,7 +66,7 @@ class Uploads(unittest.TestCase):
         self.assertEqual(found.entry("new.odrg"), catalog.entry_of("new.odrg", data, canvas=CANVAS))
         self.assertEqual(found.marker.generation, 2)
         items = {item["file"]: item for item in replies(run)[-2]["items"] if item.get("external")}
-        self.assertEqual(items["new.odrg"], {"id": 60003, "file": "new.odrg", "bytes": len(data), "external": True, "type": "frames"})
+        self.assertEqual(items["new.odrg"], {"id": 60003, "file": "new.odrg", "bytes": len(data), "external": True, "type": "frames", "ignored": False, "inherited_ignored": False})
         self.assertNotIn("upload.part", left)
 
     def test_a_replacement_keeps_its_id_and_a_removal_frees_its_place(self):

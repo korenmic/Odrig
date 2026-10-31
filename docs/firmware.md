@@ -17,11 +17,14 @@ the [measurements](#measurements-on-the-board) made on the board,
 
 ## What the tool needs
 
-On the Mac before the tool runs:
+Before the tool runs:
 
-- macOS with Apple's command-line developer tools,
+- Windows10/11 x64, or macOS on Intel/Apple processors; Linux-compatible host
+  selection also covers x64/arm64, with actual coverage recorded below,
 - git,
-- Python 3.10 or later, as `python3`.
+- Python 3.10 or later, as `python3` on Unix or `python` on Windows,
+- a supported native C/C++ compiler for host verification (Apple's command-line developer tools,
+  GCC/Clang, or the core's Windows compiler selection).
 
 Everything else the tool installs itself, into the work folder, the first time a command is
 run. That first time needs a network connection; later runs do not fetch again.
@@ -60,7 +63,8 @@ at the tag name. The tool chooses none of it:
 55.03.312-1 and PlatformIO 6.2.0. The firmware reads its external animations from a
 microSD card on that software; the USB stick's build, `build --stick`, stays on the
 software known good, which WLED's files name. The newer software lives in
-`build/firmware/newer/`, so the build known good and its tools stay as they are. The first
+`build/firmware/newer/` on macOS, or the selected host namespace described below,
+so the build known good and its tools stay as they are. The first
 `build` fetches it; nothing of it is on a computer before. The sizes are those the sources state, about 700 MB in all; a line *named by its
 manifest* is a small manifest that names the real download, which is given as its release
 offers it for a Mac with Apple's processor.
@@ -90,9 +94,65 @@ of the build known good. The platform takes the other compiler, `toolchain-riscv
 only for a project with a folder `ulp`, and CMake, Ninja and ESP-IDF itself only to compile
 ESP-IDF's libraries again, which the firmware's build does not do.
 
+## Host builds and verification
+
+From the repository root on Windows, including a path containing spaces:
+
+```text
+python firmware/fw.py setup
+python firmware/fw.py build
+python firmware/verify_build.py
+python tests/run.py --suites firmware,firmware-host,runner --workers 2
+```
+
+Use `python3` on macOS/Linux. No board is needed or reached by these commands.
+The build retains the default `odrig_microsd`, vendor pins, hardware definitions
+and size limit. The platform selects native vendor archives and checks integrity;
+an unavailable archive fails, with no implicit upgrade or foreign executable reuse.
+
+macOS retains the legacy folders shown below. Windows uses
+`build/firmware/hosts/win32-x86_64/` for `venv/`, `pio/`, `pio-cache/` and `newer/`;
+Linux uses `hosts/linux-x86_64/` or `hosts/linux-arm64/`. Windows programs are under
+`venv/Scripts/`, with `.exe` suffixes; Unix uses `venv/bin/`. Setup prints the host,
+tool folder and versions. With `ODRIG_TOOLS`, host folders move under its `firmware/`;
+fetched WLED and pip/npm caches can be shared. Patched WLED, builds and outputs
+remain checkout-local. Shared setup and checkout build locks serialize mutation.
+
+Include/forced-include arguments are quoted and complete INI dependency/path values
+retain spaces. PlatformIO's `symlink://` writes `.pio-link` JSON references on
+Windows, requiring no privileged filesystem link or copied library. Current source
+edits remain visible. Compilation uses two jobs. Windows jobs or Unix process groups
+own setup/build descendants through completion, failure and interruption. No global
+compiler, persistent PATH change or unrelated-process termination is required.
+
+Each image retains its `.sha256` and adds `.bin.build.json`: committed/dirty tracked
+source, host/environment/tools, vendor manifest identities, input hashes and image
+bytes/hash. `verify_build.py` inspects the default output offline, checking the
+ESP32-S3 header, checksum/current-source provenance and linked player entry points.
+It writes `image-info.txt` and `verification.json` beside the image. It does not
+flash or claim physical acceptance. Compiler paths, timestamps and ELF/application
+metadata may change bytes across hosts; compare source/configuration identity and
+image properties rather than requiring identical binary hashes.
+
+The read-only [firmware host workflow](../.github/workflows/firmware-hosts.yml)
+builds one PR head on Windows and Linux from a spaced checkout path, then
+retains images, provenance, inspection and discovered test results. It uses no board
+or deployment secrets. A manual run can opt into macOS with `include_macos`; that
+job also runs the newcomer walkthrough. The
+[verification record](specs/60-p2-cross-platform-firmware-builds/verification.md)
+distinguishes actual OS/architecture results, reuse/interruption and optional variant
+coverage. A configured job alone is not successful build evidence; Intel/arm64 and
+optional variants are not inferred from another host.
+
+All eight kinds retain their selection: default, microSD alias, probe, stock, stick,
+stick-probe, standalone and standalone-probe. Selection tests and actual compilation
+coverage are separate. Standalone remains an incomplete fallback player. Board and
+phone acceptance of runtime features remains open under the unchanged board rules.
+
 ## The work folder
 
-The work folder is `build/firmware/` under the repository root. Git ignores it, and removing
+The work folder is `build/firmware/` under the repository root. This is the retained
+macOS tool layout; Windows/Linux use the host namespaces above. Git ignores it, and removing
 it removes everything the tool installed, fetched or built.
 
 ```
@@ -496,10 +556,12 @@ whether it is sound is not known yet.
    `order.txt` of [show.md](show.md#the-saved-playlist-order), the saved playlist,
    `playlist.txt` of [core.md](core.md#the-saved-playlist), the saved repeats,
    `repeats.txt` of [show.md](show.md#the-saved-repeats), and the clocks' two settings,
-   `clocks.txt` of `clocks on|off` and `clocks message on|off` in
+   `clocks.txt` of `clocks on|off` and `clocks message on|off`, and saved animation
+   brightness in `brightness.txt` and external inclusion in `ignored.txt`, described in
    [commands.md](commands.md), may be files of the folder; a folder without them keeps the
    board's, as installing animations does not change the order, the playlist, the repeats
-   or the clocks' settings the operator chose.
+   or the clocks' settings, animation brightness and external inclusion the operator chose. An explicitly
+   supplied settings file replaces that file; one omitted from the folder is kept.
 5. In that image it changes only what differs. A file of the folder that `/odrig` holds
    with the same bytes stays where it is, neither read nor written. A new file is written
    under its name, and a changed one under a spare name, `~0`, `~1` and so on, which then
@@ -671,7 +733,7 @@ python3 firmware/fw.py read-show build/show-from-board
 ```
 
 Copies the files of `/odrig` on the board into a folder that is new or empty, among them
-`order.txt`, `playlist.txt`, `repeats.txt` and `clocks.txt` when the board has them, prints each name with
+`order.txt`, `playlist.txt`, `repeats.txt`, `clocks.txt`, `brightness.txt` and `ignored.txt` when the board has them, prints each name with
 its size, and restarts the board. The folder can then be compared with the one
 the emulator ran:
 
@@ -1429,7 +1491,10 @@ committed by one rename. Moving an animation in the saved order writes `order.pa
 renames it onto `order.txt` the same way, saving or restoring a repeat writes
 `repeats.part` and renames it onto `repeats.txt`, switching the clocks or their message on
 or off writes `clocks.part` and renames it onto `clocks.txt`, and the choice of a playlist
-writes `playlist.part` and renames it onto `playlist.txt`. What one change writes:
+writes `playlist.part` and renames it onto `playlist.txt`. Saved animation brightness
+writes `brightness.part`, closes it durably and verifies it before renaming it onto
+`brightness.txt`; external inclusion writes and verifies `ignored.part` before renaming
+it onto `ignored.txt`. Neither changes an animation, show or catalog file. What one change writes:
 
 | Change | What is written | Bytes |
 |---|---|---|
@@ -2291,4 +2356,44 @@ cannot split a frame between two assignments. The standalone output adapter foll
 the same pin lookup contract. Its current main program remains a seed-12 trial,
 not a complete standalone player or evidence that app control works on that trial.
 
-The shared core handles `ignore ID 0|1` and atomic `remove many IDS` over serial and HTTP. The WLED drive adapter supplies optional external free/total bytes from FAT free clusters under its mutex. It never formats removable media, never writes a USB stick, and changes only files of a card's folder `odrig`, as the core asks ([microsd.md](microsd.md#plugging-in-and-pulling-out)). Unsupported hosts report unavailable capacity; the standalone image remains its existing trial, not a complete player.
+The shared core handles `ignore ID 0|1` and atomic `remove many IDS` over serial and HTTP.
+The microSD adapter supplies external free/total bytes from a generation-safe cache.
+Its query never waits for a FAT scan: a worker counts one raw FAT sector per slice,
+releasing the storage guard between slices. Mounted presence does not wait for
+capacity. Mutations invalidate it, and failed writes keep it unavailable until
+remount rather than trusting potentially unsynchronized allocation state. See
+[the capacity contract](microsd.md#capacity-without-stopping-playback) for supported
+geometry, freshness and unperformed board measurements. The USB-stick compatibility
+backend retains its separate VFS capacity implementation. Neither backend formats
+removable media; a stick is never written, and only files in the card's `odrig`
+folder change as the core asks. Unsupported hosts report unavailable capacity;
+the standalone image remains its existing trial, not a complete player.
+
+## Temporary miniature output
+
+The default WLED host opts into the shared core's miniature mode on a 60x60 canvas.
+Its alternate source is one 60-LED GRB bus on GPIO1; the normal source metadata is
+kept for restoration. Only this selected source is refreshed while mini is active.
+Neither the normal mapping nor persistent WLED/current settings change.
+
+A staged main-loop controller pauses new refresh requests and discards queued
+frame copies, clears the outgoing buses, waits for their transfer, configures and
+checks the selected source, then clears/drains the new buses before acknowledging
+the core's matching request revision. Readiness is checked again before setup.
+No transfer wait or WLED setup occurs under the core lock. Commands and background
+work continue between stages. Failed setup suppresses normal frames, keeps the
+available outputs dark and reports unknown mode until an explicit successful retry.
+
+The existing WLED current limiter remains enabled and counts the selected source's
+60 active LEDs. The planned separate wall/per-snake core/app budgets of seed 45 are
+not implemented here. Brightness is capped at 40 in the core only while miniature
+output is used; boot and restored normal output can use a higher normal brightness.
+The cap cannot establish power readiness at startup or after a failed transition.
+
+Use only the [approved connection and acceptance boundaries](../README.md#miniature-display-debug-mode).
+Hardware operation remains through the normal firmware tool and command routes.
+The host controller and actual output adapter were exercised with stand-ins, not
+with physical buses. No firmware compilation, flash, transfer timing measurement,
+electrical check or 20–50 FPS board observation was performed for this feature.
+Compilation in this run is deferred by the owner to the future cross-platform
+firmware seed 60; that work is not a prerequisite for the remaining software seeds.

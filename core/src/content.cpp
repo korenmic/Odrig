@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "drive.h"
+#include "ignored.h"
 #include "order.h"
 #include "player.h"
 #include "storage.h"
@@ -43,6 +44,9 @@ const char kListType[] = ",\"type\":\"";
 const char kListHead[] = "{\"ok\":true,\"items\":[";
 const char kListInternal[] = ",\"external\":false";
 const char kListExternal[] = ",\"external\":true";
+
+const char *ignored_text(bool value) { return value ? ",\"ignored\":true" : ",\"ignored\":false"; }
+const char *inherited_text(bool value) { return value ? ",\"inherited_ignored\":true" : ",\"inherited_ignored\":false"; }
 
 // The member that ends an animation of `list` whose file is quarantined, before its reason
 // and the closing quotation mark.
@@ -276,8 +280,16 @@ uint32_t content_list(const Core &core, uint32_t level, uint32_t from, Reply &re
                 // The drive went while the list was written, or cannot be read: it is no more.
                 continue;
             }
+            uint32_t ordinal = 0;
+            const uint32_t id = row->id;
+            if (drive_find(core, id, &ordinal) != 'd') continue;
+            const bool own = ignored_own(core, 'd', ordinal);
+            const bool inherited = ignored_inherited(core, 'd', ordinal);
+            row = drive_subfolder(core, folder, position - items);
+            if (row == nullptr) continue;
             const uint32_t size = (first ? 0 : 1) + text_length(kListId) + digits(row->id) + text_length(kListPlaylist) +
-                                  json_escaped(row->name, nullptr) + 1 + text_length(kListExternal) + text_length(kListFiles) + digits(row->files) + 1;
+                                  json_escaped(row->name, nullptr) + 1 + text_length(kListExternal) + text_length(kListFiles) + digits(row->files) +
+                                  text_length(ignored_text(own)) + text_length(inherited_text(inherited)) + 1;
             if (!reply.fits(size + tail)) {
                 break;
             }
@@ -293,11 +305,15 @@ uint32_t content_list(const Core &core, uint32_t level, uint32_t from, Reply &re
             reply.text(kListExternal);
             reply.text(kListFiles);
             reply.number(row->files);
+            reply.text(ignored_text(own));
+            reply.text(inherited_text(inherited));
             reply.text("}");
             continue;
         }
         if (position >= items) {
             const uint32_t at = level_listed_position(core, folder, position - items - folders);
+            const bool own = at != kNothing && ignored_own(core, 'f', at);
+            const bool inherited = at != kNothing && ignored_inherited(core, 'f', at);
             const DriveRow *row = at == kNothing ? nullptr : drive_row(core, at);
             if (row == nullptr) {
                 // The drive went while the list was written, or cannot be read: it is no more.
@@ -307,7 +323,8 @@ uint32_t content_list(const Core &core, uint32_t level, uint32_t from, Reply &re
             const char *fault = reason_name(static_cast<Reason>(row->fault));
             const uint32_t size = (first ? 0 : 1) + text_length(kListId) + digits(row->id) + text_length(kListFile) + json_escaped(row->name, nullptr) +
                                   text_length(kListBytes) + (left_out ? 4 + text_length(kListFault) + text_length(fault) + 1 : digits(row->bytes)) +
-                                  text_length(kListExternal) + text_length(kListType) + text_length(type_name(row->type)) + 1 + 1;
+                                  text_length(kListExternal) + text_length(kListType) + text_length(type_name(row->type)) +
+                                  text_length(ignored_text(own)) + text_length(inherited_text(inherited)) + 1 + 1;
             if (!reply.fits(size + tail)) {
                 break;
             }
@@ -329,6 +346,8 @@ uint32_t content_list(const Core &core, uint32_t level, uint32_t from, Reply &re
             reply.text(kListType);
             reply.text(type_name(row->type));
             reply.text("\"");
+            reply.text(ignored_text(own));
+            reply.text(inherited_text(inherited));
             if (left_out) {
                 reply.text(kListFault);
                 reply.text(fault);
@@ -441,7 +460,7 @@ uint32_t content_ignore(Core &core, uint32_t id, bool ignored, Reply &reply) {
     uint32_t position = 0;
     while (position < core.item_count && core.items[position].id != id) ++position;
     if (position == core.item_count) {
-        return refuse(reply, drive_id_taken(core, id) ? "in-use" : "unknown-id");
+        return ignored_change(core, id, ignored, reply);
     }
     ItemInfo &item = core.items[position];
     if (item.is_cycle) return refuse(reply, "in-use");

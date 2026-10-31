@@ -559,6 +559,9 @@ def entry_of(name, data, canvas=CANVAS):
             header, _ = odrgx.decode_frames(data)
         elif len(data) - odrgx.HEADER.size != header.payload_size:
             raise errors.Rejection(errors.PAYLOAD_SIZE, f"the header gives the payload {header.payload_size} bytes and it has {len(data) - odrgx.HEADER.size}")
+        elif header.type == 3 and header.payload_size and data[odrgx.HEADER.size] == 6:
+            from . import messageclock
+            messageclock.decode(data)
         width, height, total_ms, kind = header.width, header.height, header.loop_ms, odrgx.TYPE_NAMES[header.type]
     else:
         decoded = odrg.decode(data)

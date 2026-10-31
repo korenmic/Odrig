@@ -22,16 +22,24 @@ const uint8_t kBreakMessage = 2;
 // counted.
 const uint8_t kBreakTurns = 5;
 const uint64_t kBreakMs = 300000;
+const uint8_t kClocksOff = 0;
+const uint8_t kClocksBetween = 1;
+const uint8_t kClocksOnly = 2;
 
 // The start, before the show is read: removes a `clocks.part` a cut left, and reads
 // `clocks.txt` whole and strictly. A missing file is both settings off; a file out of its
 // form is both off, and the log says `clocks unreadable`.
 void breaks_start(Core &core);
 
-// The reply to `clocks on`, `clocks off`, `clocks message on` and `clocks message off`,
-// the words after `clocks` given. The file is written whole and renamed before the
+// The reply to the clock mode or message setting. The file is written, verified and renamed before the
 // setting takes effect; a setting already in force writes nothing.
-uint32_t breaks_command(Core &core, bool message, bool on, Reply &reply);
+uint32_t breaks_command(Core &core, bool message, uint8_t value, Reply &reply);
+
+const char *breaks_mode(const Core &core);
+const char *breaks_only_state(const Core &core);
+bool breaks_position_allowed(const Core &core, uint32_t position);
+bool breaks_folder_allowed(const Core &core, uint32_t ordinal);
+bool breaks_has_face(const Core &core);
 
 // The drive's tree was built, found again or cleared, or the positions of its walk moved:
 // the clocks' folders are found again by their paths, and a new order of the clocks is
@@ -46,8 +54,8 @@ bool breaks_passes_over(const Core &core, uint32_t at);
 // position of the playlist, a new order drawn when it is used up; kNothing when none plays.
 uint32_t breaks_pick(Core &core, uint64_t at);
 
-// The message: the first file of `clocks/message` that plays, or kNothing.
-uint32_t breaks_message(const Core &core);
+// The next eligible message in its independent shuffled bag, or kNothing.
+uint32_t breaks_message(Core &core, uint64_t at);
 
 }  // namespace odrig
 

@@ -11,6 +11,7 @@
 <p id="app-name">odrig</p>
 <p id="top-link" class="pill" role="status">Checking</p>
 </header>
+<p id="mini-indicator" class="pill" role="status" hidden></p>
 <main>
 <section id="animations" hidden>
 <div id="now-panel" class="panel">
@@ -37,10 +38,15 @@
 </div>
 <p id="readiness" class="small" role="status" aria-live="polite" hidden></p>
 <div id="level-line">
-<label for="level-number" class="slider-label">Set the brightness to</label>
+<label id="level-label" for="level-number" class="slider-label">Default brightness</label>
 <input id="level-number" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" placeholder="-">
 </div>
+<div id="level-controls">
 <input id="level" type="range" min="0" max="255" step="1" value="0" aria-label="Brightness">
+<label class="check" for="level-override"><input id="level-override" type="checkbox" disabled><span>Override for this animation</span></label>
+</div>
+<p id="level-file" class="small" hidden></p>
+<p id="level-said" class="small" role="status" aria-live="polite" hidden></p>
 <p id="level-range" class="small" role="status" aria-live="polite" hidden></p>
 <div id="test-now" hidden>
 <p id="test-now-text" role="status"></p>
@@ -83,6 +89,7 @@
 </div>
 <p id="order-note" class="small" role="status" aria-live="polite"></p>
 <div id="level-head" class="folder-head"><button id="level-back" type="button" hidden>Back</button><h2 id="level-title">Root</h2><button id="play-all" type="button">Play this folder</button></div>
+<p class="small" id="only-boundary" hidden></p>
 <div id="animations-list" role="list" aria-labelledby="list-title"></div>
 <p id="none" hidden>No animation is installed.</p>
 <div id="filter-empty" hidden>
@@ -196,9 +203,18 @@
 </div>
 <div id="clocks-panel" class="panel" hidden>
 <h2>Clocks</h2>
-<label class="check" for="clocks"><input id="clocks" type="checkbox"><span><span class="title">Clocks between animations</span><span class="small">After every 5 animations, and at least every 5 minutes, a clock of the card's folder clocks plays; an animation cut for it goes on where it was.</span></span></label>
-<label class="check" for="clock-message"><input id="clock-message" type="checkbox"><span><span class="title">The message after each clock</span><span class="small">The animation of clocks/message flashes once after every clock, while clocks between animations is on.</span></span></label>
+<label class="clock-mode-label" for="clocks"><span class="title">Clocks</span><span class="small" id="clocks-description">Between animations inserts a clock after every 5 animations or 5 minutes. Clocks only restricts playback to the external clocks folder.</span></label>
+<select id="clocks" aria-describedby="clocks-description clocks-support"><option value="off">Off</option><option value="between">Between animations</option><option value="only">Clocks only</option></select>
+<p class="small" id="clocks-support" hidden></p>
+<label class="check" for="clock-message"><input id="clock-message" type="checkbox"><span><span class="title">The message after each clock</span><span class="small">One complete animation from clocks/message plays after each clock in either enabled mode.</span></span></label>
+<p id="clocks-state" role="status" hidden></p>
 <p id="clocks-said" role="status" aria-live="polite" hidden></p>
+</div>
+<div id="mini-panel" class="panel">
+<h2>Miniature display</h2>
+<label class="check" for="debug-mini"><input id="debug-mini" type="checkbox" disabled><span><span class="title">Miniature display debug mode</span><span class="small">The full canvas fits on the central 6 &times; 6 pixels of the 10 &times; 6 matrix, at brightness 40 or less. Power off before rewiring: disconnect the full wall; matrix 5V to board 5V, GND to GND, IN to GPIO1. Follow the README wiring and power checks. This mode resets off on reboot.</span></span></label>
+<p id="mini-said" role="status" aria-live="polite">Reading the miniature mode&hellip;</p>
+<button id="mini-restore" type="button" hidden>Restore normal outputs</button>
 </div>
 <div id="catalogs" class="panel">
 <h2>Catalogs</h2>

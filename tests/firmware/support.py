@@ -4,6 +4,7 @@ import collections
 import contextlib
 import hashlib
 import io
+from pathlib import Path
 import struct
 import subprocess
 import sys
@@ -139,7 +140,7 @@ class RecordedEsptool:
 
     def written(self):
         """`(address, file name)` for everything the one write call writes."""
-        return [(address, name.rsplit("/", 1)[-1]) for address, name in self.pairs(self.call("write-flash"))]
+        return [(address, Path(name).name) for address, name in self.pairs(self.call("write-flash"))]
 
     def words(self):
         return [word for call in self.calls for word in call]

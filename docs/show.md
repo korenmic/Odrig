@@ -396,8 +396,8 @@ never writes two.
 While the clocks are on, `clocks on` of [commands.md](commands.md#clocks-between-the-animations),
 the playlist has a break now and then: a turn of a clock, and, while the message is on and
 there is one, one loop of the message after it. The clocks are the animation files directly
-in the folder `clocks` of a card's folder `odrig`, at its first level, and the message is the
-first animation file directly in `clocks/message` that can play; the show's own animations
+in the folder `clocks` of a card's folder `odrig`, at its first level, and each message is
+the next eligible direct file in an independent shuffled bag of `clocks/message`; the show's own animations
 are never clocks, nor is a file of another sub-folder of `clocks`. While both settings are
 off, the player plays as the rest of this page says.
 
@@ -431,6 +431,11 @@ off, the player plays as the rest of this page says.
   its place comes is passed over. When the order is used up a new one is drawn, and the
   last clock of one may be the first of the next. A new order is drawn at the start, when a
   card is taken up or dropped, and when its tree changes.
+- **The order of messages.** Messages have their own shuffled bag in both enabled modes.
+  Every eligible direct message is taken before that bag reshuffles; ignored files and
+  descendants of ignored folders are passed over. A message turn is one complete loop,
+  including procedural loops longer than 30 seconds. Choosing a message does not consume
+  a place in the clock-face bag.
 - **What cuts a break.** Whatever cuts a turn of the playlist cuts a break, its paused turn
   not resumed: a `play` of any kind, `play all`, `ignore`, `remove`, an upload, the
   quarantine of its file, the card pulled out; and a test of the mapping, after which the
@@ -442,3 +447,18 @@ off, the player plays as the rest of this page says.
 - **The window.** A playlist's window that passes during a break is taken at the break's
   end: the paused turn is not resumed, and the next playlist plays from its first
   animation. A restart forgets a break.
+
+### Clocks only
+
+`clocks only` uses the same two bags in a separate scheduler: a clock, optionally a
+complete message, then the next clock. It does not run normal breaks or folder-window
+rotation. The normal playlist path and its window stay saved, and leaving Only resumes
+that valid playlist, else root, without restoring a paused break. A global restart
+uses `play <resolved-clocks-folder-id>`; raw `play all` is refused. An explicit inside
+file or subfolder is a manual turn before the
+exclusive program continues. Outside play and output-taking diagnostics are refused.
+
+Only remains selected when media is absent, Clocks is missing or no face is eligible.
+Output stays dark and responsive with the reason in `clock_only`; a relevant media or
+inclusion change retries selection. Browsing is unrestricted, and Ignore remains an
+automatic exclusion rather than a manual-play ban inside the exclusive boundary.

@@ -181,7 +181,8 @@ class EmulatorDocument(unittest.TestCase):
     def test_its_events_are_the_ones_the_emulator_sends(self):
         text = section(self.text, "The event stream")
         events = dict(re.findall(r"event: ([a-z]+)\ndata: (.+)", text))
-        self.assertEqual(sorted(events), ["frame", "hello", "log", "position", "status"])
+        self.assertEqual(sorted(events), ["frame", "hello", "log", "mini", "position", "status"])
+        self.assertEqual(json.loads(events["mini"]), {"active": False})
         self.assertEqual(sorted(json.loads(events["hello"])), ["drive", "error", "legs", "page", "serial", "show", "t0", "tcp"])
         entry = hub.Hub().log(5, "serial", b"play 2", False, b'{"ok":true}\n')
         self.assertEqual(sorted(json.loads(events["log"])), sorted(entry))

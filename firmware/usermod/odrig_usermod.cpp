@@ -14,6 +14,7 @@
 #include "odrig_files.h"
 #include "odrig_http.h"
 #include "odrig_leds.h"
+#include "odrig_mini_output.h"
 #include "odrig_routing.h"
 #include "odrig_log.h"
 #include "odrig_sd_config.h"
@@ -103,6 +104,15 @@ size_t commandLine(const char *line, size_t length, char *reply, size_t capacity
 // logical leg currently assigned to each pin, under the core lock.
 OdrigLeg *legs = nullptr;
 uint32_t legsRead = 0;
+const uint8_t *miniPixels = nullptr;
+bool miniature = false;
+bool outputsDark = false;
+uint64_t lastDarkMs = 0;
+OdrigMiniOutput miniOutput;
+volatile bool refreshReady = false;
+volatile bool outputChanging = false;
+// While WLED writes a new firmware, no file is read and nothing is sent to LEDs.
+volatile bool updating = false;
 
 void readLegs() {
   if (core == nullptr) return;
@@ -122,9 +132,22 @@ void readLegs() {
   legsRead = count;
 }
 
-uint32_t legCount() { return legsRead; }
+void enableMiniSupport() {
+  if (core == nullptr || legsRead == 0) return;
+  Locked held;
+  odrig_core_mini_support(core);
+  odrig_mini mini = {};
+  if (odrig_core_mini(core, &mini)) miniPixels = mini.rgb;
+}
+
+uint32_t legCount() { return miniature ? 1 : legsRead; }
 
 bool legAt(uint32_t index, OdrigLeg *out) {
+  if (miniature) {
+    if (index != 0 || miniPixels == nullptr) return false;
+    *out = OdrigLeg{1, 1, 60, miniPixels};
+    return true;
+  }
   if (index >= legsRead) return false;
   *out = legs[index];
   return true;
@@ -142,8 +165,18 @@ void syncLegs() {
 
 // Asks the core for a refresh. The timestamp is read after the lock is taken.
 bool refreshDue() {
+#ifdef ODRIG_PROBE
+  const uint32_t readsBefore = OdrigFiles::secondReads();
+  const int64_t pollStart = esp_timer_get_time();
+#endif
   Locked held;
-  return odrig_core_poll(core, OdrigFiles::nowMs()) == 1;
+  if (outputChanging) return false;
+  const bool due = odrig_core_poll(core, OdrigFiles::nowMs()) == 1;
+#ifdef ODRIG_PROBE
+  OdrigProbe::polled((uint32_t)(esp_timer_get_time() - pollStart), OdrigFiles::secondReads() != readsBefore);
+#endif
+  if (due) refreshReady = true;
+  return due;
 }
 
 // The request for a refresh has a task of its own on the chip's other processor core, so
@@ -155,31 +188,76 @@ const uint32_t TASK_STACK = 8192;
 const UBaseType_t TASK_PRIORITY = 1;
 const BaseType_t TASK_PROCESSOR = 0;
 TaskHandle_t requester = nullptr;
-volatile bool refreshReady = false;
-// While WLED writes a new firmware, no file is read and nothing is sent to the LEDs.
-volatile bool updating = false;
 
 void requestRefreshes(void *) {
   for (;;) {
-    if (refreshReady || updating) {
+    if (refreshReady || updating || outputChanging) {
       // The loop wakes the task when it has taken the refresh.
       ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(50));
       continue;
     }
-#ifdef ODRIG_PROBE
-    const uint32_t readsBefore = OdrigFiles::secondReads();
-    const int64_t pollStart = esp_timer_get_time();
     const bool due = refreshDue();
-    OdrigProbe::polled((uint32_t)(esp_timer_get_time() - pollStart), OdrigFiles::secondReads() != readsBefore);
-#else
-    const bool due = refreshDue();
-#endif
-    if (due) {
-      refreshReady = true;
-    } else {
+    if (!due) {
       vTaskDelay(1);
     }
   }
+}
+
+struct MiniDriver {
+  bool ready() const { return BusManager::canAllShow(); }
+  void dark() const { OdrigLeds::dark(); }
+  void select(bool enabled) const { miniature = enabled; }
+  bool apply() const {
+    OdrigLeds::apply();
+    return OdrigLeds::matches() && OdrigLeds::legs() != 0 && OdrigLeds::working() == OdrigLeds::legs();
+  }
+};
+
+// Capturing a request pauses the producer under the same lock that publishes a
+// completed refresh. No output operation or transfer wait owns that lock.
+bool serviceMini(bool &refreshFilled) {
+  if (core == nullptr) return false;
+  if (!miniOutput.busy()) {
+    Locked held;
+    odrig_mini mini = {};
+    if (odrig_core_mini(core, &mini) && mini.pending) {
+      outputChanging = true;
+      refreshReady = false;
+      refreshFilled = false;
+      miniOutput.begin(mini.revision, mini.requested != 0);
+    }
+  }
+  if (miniOutput.busy()) {
+    MiniDriver driver;
+    if (miniOutput.step(driver)) {
+      {
+        Locked held;
+        const bool acknowledged = odrig_core_mini_complete(core, miniOutput.revision(), miniOutput.success()) == 1;
+        outputsDark = !miniOutput.success() || !acknowledged;
+        refreshReady = false;
+        outputChanging = false;
+      }
+      lastDarkMs = OdrigFiles::nowMs();
+      miniOutput.finish();
+      if (requester != nullptr) xTaskNotifyGive(requester);
+    }
+    return true;
+  }
+  if (!outputsDark) return false;
+  const uint64_t now = OdrigFiles::nowMs();
+  if (BusManager::canAllShow()) {
+    OdrigLeds::hold();
+    if (now - lastDarkMs >= 20 && BusManager::canAllShow()) {
+      OdrigLeds::dark();
+      lastDarkMs = now;
+    }
+  }
+  {
+    Locked held;
+    refreshReady = false;
+  }
+  if (requester != nullptr) xTaskNotifyGive(requester);
+  return true;
 }
 
 #ifdef ODRIG_PROBE
@@ -231,6 +309,7 @@ class OdrigUsermod : public Usermod {
     OdrigProbe::started(startMs, errorNow);
 #endif
     readLegs();
+    enableMiniSupport();
     const OdrigLegSource source = {legCount, legAt};
     OdrigLeds::source(source);
     OdrigLeds::hold();
@@ -247,11 +326,13 @@ class OdrigUsermod : public Usermod {
 #ifdef ODRIG_PROBE
     OdrigProbe::pass(OdrigFiles::nowMs());
 #endif
-    OdrigLeds::hold();
+    OdrigLeds::keepLive();
     // WLED answers the lookups of its captive portal only outside its live mode.
     if (apActive) dnsServer.processNextRequest();
     OdrigSerial::poll(feedBytes);
     OdrigUart::poll(commandLine);
+    if (serviceMini(refreshFilled)) return;
+    OdrigLeds::hold();
 #ifdef ODRIG_PROBE
     // A step of the store trial is made as a command's storage calls are: when the pacing
     // holds no line back, and with the lock held.

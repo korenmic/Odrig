@@ -83,7 +83,7 @@ class TheTree(unittest.TestCase):
         self.assertEqual([item["id"] for item in reply["items"]], [1, 60007, 60008, 60001, 60002])
         self.assertEqual(folders(reply), [(60007, "a b"), (60008, "night")])
         self.assertEqual(files(reply), [(1, "four.odrg"), (60001, "A.ODRG"), (60002, "b.odrg")])
-        self.assertEqual(reply["items"][1], {"id": 60007, "playlist": "a b", "external": True, "files": 1})
+        self.assertEqual(reply["items"][1], {"id": 60007, "playlist": "a b", "external": True, "files": 1, "ignored": False, "inherited_ignored": False})
 
     def test_list_in_gives_a_folders_level_its_sub_folders_then_its_own_files(self):
         answers = replies(with_drive(SHOW, NESTED, asked(0, *LEVELS[1:])))
@@ -157,7 +157,7 @@ class WhatPlaysAndTheOrderOfALevel(unittest.TestCase):
                                  ("all", 1, "four.odrg", None)])
         nothing = replies(support.start(show_of([], {}), asked(0, "status")))[0]
         self.assertEqual((nothing["file"], nothing["playlist"]), (None, None))
-        self.assertEqual(list(nothing)[-5:], ["file", "playlist", "clocks", "clock_message", "left"])
+        self.assertEqual(list(nothing)[-7:], ["file", "playlist", "clocks", "clock_message", "clock_mode", "clock_only", "left"])
 
     def test_order_get_gives_the_root_level_and_order_get_in_a_folders(self):
         lines = ("order get", "order get in 60007", "order get in 60008", "order get in 60010", "order get in 60008 1", "order get in 1", "order get in 60001",
@@ -253,13 +253,13 @@ class PlayOfAFolder(unittest.TestCase):
         self.assertEqual(replies(run)[1], refusal("unknown-id"))
         self.assertEqual(folders(replies(run)[2]), [])
 
-    def test_a_folders_id_is_in_use_for_the_commands_of_an_animation(self):
+    def test_a_folder_supports_ignore_and_refuses_animation_content_commands(self):
         with a_drive(NESTED) as top:
             revision = replies(support.start(SHOW, asked(0, "order get"), ["--drive", top]))[0]["revision"]
-            commands = ("remove many 60008", "ignore 60008 1", "read 60008 0", "upload begin 60008 x.odrg 10", f"order move {revision} 60008 60001",
+            commands = ("remove many 60008", "read 60008 0", "upload begin 60008 x.odrg 10", f"order move {revision} 60008 60001",
                         f"order move {revision} 60001 60008", "remove 60008")
-            run = support.start(SHOW, asked(0, *commands), ["--drive", top])
-        self.assertEqual(replies(run), [refusal("in-use")] * len(commands))
+            run = support.start(SHOW, asked(0, "ignore 60008 1", *commands), ["--drive", top])
+        self.assertEqual(replies(run), [DONE] + [refusal("in-use")] * len(commands))
         on_card = on_cataloged_card(card(NESTED), asked(8100, "remove 60008", "list"))
         self.assertEqual(replies(on_card)[0], refusal("in-use"))
         self.assertEqual(folders(replies(on_card)[1]), [(60007, "a b"), (60008, "night")])

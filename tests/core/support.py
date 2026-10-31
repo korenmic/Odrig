@@ -458,7 +458,7 @@ def demo_show():
 # in the current playlist's window, which runs with the time, the counts of the turn in
 # progress, and the names of the file and the folder that play, which the tests of what
 # plays look at.
-READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "clocks", "clock_message", "left")
+READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "clocks", "clock_message", "clock_mode", "clock_only", "left", "mini", "dimming")
 
 
 def without_readiness(state):
@@ -717,6 +717,17 @@ class _Clip:
         return self.pictures[bisect.bisect_right(self.ends, elapsed if self.broken else elapsed % self.total)]
 
 
+def status_lines_without_dimming(lines):
+    result = []
+    for line in lines:
+        if line.startswith('reply {"ok":true,"on"'):
+            state = json.loads(line[6:])
+            state.pop("dimming", None)
+            line = "reply " + json.dumps(state, separators=(",", ":"))
+        result.append(line)
+    return result
+
+
 class ReferencePlayer:
     """What the core does with an installed file set, stated a second time.
 
@@ -829,10 +840,12 @@ class ReferencePlayer:
     CLOCKS = "clocks.txt"
     CLOCKS_FORMS = {b"odrig-clocks 1\nclocks %s\nmessage %s\n" % (clocks, message): (clocks == b"on", message == b"on")
                     for clocks in (b"on", b"off") for message in (b"on", b"off")}
+    CLOCKS_FORMS.update({b"odrig-clocks 2\nmode %s\nmessage %s\n" % (clocks, message): (clocks == b"between", message == b"on")
+                         for clocks in (b"between", b"off") for message in (b"on", b"off")})
 
     def _read_clocks(self):
         """Reads `clocks.txt` whole and strictly: a missing file is both settings off, a file
-        out of its one form both off, and the log says so."""
+        out of its supported forms both off, and the log says so."""
         data = self.files.get(self.CLOCKS)
         if data is None:
             return
@@ -856,7 +869,7 @@ class ReferencePlayer:
         on = arguments[-1] == b"on"
         settings = (self.clocks, on) if message else (on, self.clock_message)
         if settings != (self.clocks, self.clock_message):
-            self.files[self.CLOCKS] = next(text for text, form in self.CLOCKS_FORMS.items() if form == settings)
+            self.files[self.CLOCKS] = next(text for text, form in self.CLOCKS_FORMS.items() if form == settings and text.startswith(b"odrig-clocks 2\n"))
             self.clocks, self.clock_message = settings
         return None
 
@@ -1700,6 +1713,9 @@ class ReferencePlayer:
             "ok": True,
             "on": self.on,
             "brightness": self.brightness,
+            "dimming": {"value": self.brightness, "saved": None, "error": None} if self.changeable and self.error is None else None,
+            "mini": {"supported": False, "on": False, "pending": False, "requested": False,
+                     "error": None, "brightness": min(self.brightness, 40) if self.on else 0},
             "playing": self.playing,
             "animation": self.shown if self.playing is not None else None,
             "fps": self.refreshes_in[second - 1] if second >= 1 else 0,
@@ -1726,6 +1742,8 @@ class ReferencePlayer:
         state["file"] = self.items[self.shown].file if self.playing is not None and self.shown in self.items else None
         state["playlist"] = None
         state["clocks"], state["clock_message"] = self.clocks, self.clock_message
+        state["clock_mode"] = "between" if self.clocks else "off"
+        state["clock_only"] = None
         state["left"] = max(0, self.WINDOW - (now - self.window_started)) // 1000
         return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
 

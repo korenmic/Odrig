@@ -592,7 +592,9 @@ class HostWithoutStorage(Content):
         with_storage = support.start(files, script)
         for option in ("--no-storage", "--only-space"):
             without = support.start(files, script, [option, "--trace-store", "--trace-files"])
-            self.assertEqual([line for line in without.lines if not line.startswith("open ")], with_storage.lines, option)
+            self.assertEqual(support.status_lines_without_dimming([line for line in without.lines if not line.startswith("open ")]),
+                             support.status_lines_without_dimming(with_storage.lines), option)
+            self.assertTrue(all(json.loads(line[6:])["dimming"] is None for line in without.lines if line.startswith('reply {"ok":true,"on"')))
             # It is not asked for the five blocks that only a host with storage needs: the
             # chunk buffer, the decoders, the pixel buffer and the window of the check, and
             # the keys of the saved order. It is asked to remove nothing, and not for the

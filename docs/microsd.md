@@ -182,7 +182,7 @@ recorded then.
 ## Plugging in and pulling out
 
 The reader's card-detect line is not wired, so the firmware finds a card by reading. A
-task of the firmware, `odrig-drive`, makes one step a second:
+task of the firmware, `odrig-drive`, checks presence about once a second:
 
 - **No card mounted.** It tries to mount one. That fails for an empty reader and for a
   file system the chip does not read alike, which the firmware cannot tell apart. When a
@@ -212,6 +212,37 @@ ids afresh. A card that goes while one of its files is read can hold that read u
 chip's SD driver gives up, which may pause the LEDs for a moment. A board without a card
 plays its installed show as it always did.
 
+## Capacity without stopping playback
+
+The mounted card is published before its capacity is known. `space` can therefore
+report `present:true`, `free:null` and `total:null`; its catalog, listing and playback
+remain available. Write capability is reported independently, not inferred from
+unknown free bytes. The capacity callback attempts the storage guard without
+waiting and returns only a complete cached pair; it performs no card IO or FAT scan.
+
+Between presence checks, the worker counts allocation entries one 512-byte sector
+per slice and yields for at least one scheduler tick. It uses raw sector reads,
+without calling `SD.totalBytes()`, `SD.usedBytes()` or the monolithic `f_getfree`
+calculation. The scan has fixed memory, validates FAT16/FAT32 geometry and uses
+64-bit cluster counts. It supports an unpartitioned volume or one unambiguous
+primary FAT partition, honoring FAT32's active table. Unsupported or ambiguous
+partitioning, malformed geometry and a failed capacity read leave capacity
+unavailable and log why; they do not by themselves declare the mounted card absent.
+
+Every possible allocation-changing operation invalidates the cache. Discovery
+pauses while a file is written and restarts after a successfully synchronized close
+or other successful change. Removal and remount discard the previous card's result.
+A failed mutation keeps capacity unavailable until remount: FatFs may retain dirty
+allocation state newer than the raw sectors, so counting those sectors could be
+optimistic. This does not make an otherwise writable mounted card read-only.
+Unknown preflight capacity still relies on the existing safe upload transaction;
+it never invents available bytes or publishes a partial animation/catalog.
+
+The scan's convergence time depends on FAT size, card speed and intervening writes;
+each slice releases the storage guard. Raw transfer latency still follows the SD
+driver's timeout. The board's command timings and 20–50 FPS acceptance must be
+measured on real hardware; emulator results do not establish those measurements.
+
 ## The log and WLED's information
 
 The card's lines in [the log](firmware.md#the-log) on the socket marked COM are of the
@@ -234,6 +265,9 @@ kind `sd`:
 - `card not mounted; no card or unreadable file system`, once for each spell without a
   card.
 - `card unavailable; files closed, waiting for a card`, when a card went.
+- `capacity unavailable: sector read failed`, `capacity unavailable: unsupported
+  volume geometry`, or `capacity unavailable after failed storage mutation;
+  waiting for remount`, when capacity cannot be published safely.
 - `SPI did not start on the configured pins; reader disabled`, and
   `SD pins or SPI frequency not configured safely; reader disabled`, for a reader that
   is not started.

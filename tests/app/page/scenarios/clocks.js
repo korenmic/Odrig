@@ -11,11 +11,14 @@ function look(app) {
   const label = (id) => app.doc.querySelector(`label[for="${id}"]`);
   return {
     hidden: app.byId("clocks-panel").getClientRects().length === 0,
+    kind: app.byId("clocks").tagName,
+    mode: app.byId("clocks").value,
+    options: [...app.byId("clocks").querySelectorAll("option")].map((option) => ({value: option.value, text: option.textContent, disabled: option.disabled})),
     title: app.doc.querySelector("#clocks-panel h2").textContent,
     after: app.byId("clocks-panel").previousElementSibling.querySelector("input").id,
     labels: BOXES.map((id) => label(id).querySelector(".title").textContent),
     smalls: BOXES.map((id) => label(id).querySelector(".small").textContent),
-    checked: BOXES.map((id) => app.byId(id).checked),
+    checked: BOXES.map((id) => id === "clocks" && app.byId(id).tagName === "SELECT" ? app.byId(id).value !== "off" : app.byId(id).checked),
     disabled: BOXES.map((id) => app.byId(id).disabled),
     said: app.text("clocks-said"),
     role: app.byId("clocks-said").getAttribute("role"),
@@ -32,7 +35,11 @@ export default async function (app) {
   for (const act of app.settings.acts) {
     if (act.tap !== undefined) {
       // A tap clears the line of the panel at once, and its answer says something.
-      app.byId(act.tap).click();
+      if (act.tap === "clocks" && app.byId(act.tap).tagName === "SELECT") {
+        const field = app.byId(act.tap);
+        field.value = field.value === "off" ? "between" : "off";
+        field.dispatchEvent(new Event("change", {bubbles: true}));
+      } else app.byId(act.tap).click();
       seen[act.look] = look(app);
       await app.until(() => app.text("clocks-said") !== null && BOXES.every((id) => !app.byId(id).disabled), `the tap on ${act.tap} answered`, 15000);
       seen[act.answered] = look(app);

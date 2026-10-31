@@ -202,6 +202,7 @@
   }
 
   function onHello(event) {
+    onMini({data: '{"active":false}'});
     hello = JSON.parse(event.data);
     mapping = null;
     newest = null;
@@ -317,6 +318,28 @@
     }
   }
 
+  function onMini(event) {
+    var value = JSON.parse(event.data);
+    var panel = byId("mini-preview");
+    var canvas = byId("mini-canvas");
+    var context = canvas.getContext("2d");
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    panel.hidden = value.active !== true;
+    if (panel.hidden) return;
+    var rgb = bytesOf(value.rgb || "");
+    if (rgb.length !== 180) {
+      panel.hidden = true;
+      return;
+    }
+    for (var x = 0; x < 10; x += 1) {
+      for (var y = 0; y < 6; y += 1) {
+        var at = 3 * (x * 6 + y);
+        context.fillStyle = "rgb(" + rgb[at] + "," + rgb[at + 1] + "," + rgb[at + 2] + ")";
+        context.fillRect(x * 20, (5 - y) * 20, 20, 20);
+      }
+    }
+  }
+
   /* Pointing: at a part of a leg, which highlights the leg, or at an LED, which also
      names it. */
   /* What the readout says while the pointer is on nothing. */
@@ -404,6 +427,7 @@
   source.addEventListener("status", onStatus);
   source.addEventListener("log", onLog);
   source.addEventListener("frame", onFrame);
+  source.addEventListener("mini", onMini);
   source.addEventListener("position", onPosition);
   seekBar.addEventListener("pointerdown", onSeekDown);
   seekBar.addEventListener("pointermove", onSeekMove);

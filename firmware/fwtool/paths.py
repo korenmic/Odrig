@@ -4,7 +4,7 @@ no tool may write."""
 import os
 import pathlib
 
-from . import Failure
+from . import Failure, host
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FIRMWARE = ROOT / "firmware"
@@ -25,10 +25,11 @@ TOOLS = tools_folder()
 SHARED = TOOLS / "firmware"
 SETUP_LOCK = TOOLS / "setup.lock"
 
-VENV = SHARED / "venv"
-PYTHON = VENV / "bin" / "python"
-PIO_CORE = SHARED / "pio"
-PIO_CACHE = SHARED / "pio-cache"
+HOST_ROOT = host.tool_root(SHARED)
+VENV = HOST_ROOT / "venv"
+PYTHON = host.program(VENV, "python")
+PIO_CORE = HOST_ROOT / "pio"
+PIO_CACHE = HOST_ROOT / "pio-cache"
 NPM_CACHE = SHARED / "npm-cache"
 PIP_CACHE = SHARED / "pip-cache"
 # WLED's source as fetched, and the checkout's copy of it, which is patched and built.
@@ -37,12 +38,13 @@ WLED = WORK / "WLED"
 STANDALONE = WORK / "standalone"
 OUT = WORK / "out"
 STORAGE = WORK / "storage"
+BUILD_LOCK = WORK / "build.lock"
 
 # The newer USB software, beside the build known good: its Python environment, PlatformIO's
 # folder with the platform, the framework and the compilers, and the build cache.
-NEWER = SHARED / "newer"
+NEWER = HOST_ROOT / "newer"
 NEWER_VENV = NEWER / "venv"
-NEWER_PYTHON = NEWER_VENV / "bin" / "python"
+NEWER_PYTHON = host.program(NEWER_VENV, "python")
 NEWER_PIO_CORE = NEWER / "pio"
 NEWER_PIO_CACHE = NEWER / "pio-cache"
 

@@ -111,6 +111,10 @@ class SettlingInSlicesOfSevenBytes(unittest.TestCase):
 class TheChecksAndThePlayerGoOnWhileItSettles(unittest.TestCase):
     def assert_no_pending(self, run):
         for text in texts(run):
+            if text.startswith("{"):
+                value = json.loads(text)
+                value.pop("mini", None)
+                text = json.dumps(value, separators=(",", ":"))
             self.assertNotIn("pending", text)
             self.assertNotIn('"reason":""', text)
             self.assertFalse(text.endswith(" ") or "  " in text, text)

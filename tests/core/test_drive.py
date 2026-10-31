@@ -138,7 +138,10 @@ class TheDrivesList(unittest.TestCase):
             fixed = support.start(SHOW, script, ["--drive", top, "--only-space"])
         self.assertEqual(replies(without)[0], {"ok": True, "items": [{"id": 1, "file": "four.odrg", "bytes": len(SHOW["four.odrg"]), "ignored": False, "external": False, "type": "frames"}], "next": None})
         self.assertEqual(replies(without)[2], refusal("unknown-id"))
-        self.assertEqual(replies(fixed), replies(without))
+        self.assertIsNone(replies(fixed)[1]["dimming"])
+        self.assertEqual(replies(without)[1]["dimming"], dict(value=255, saved=None, error=None))
+        self.assertEqual([{key: value for key, value in reply.items() if key != "dimming"} for reply in replies(fixed)],
+                         [{key: value for key, value in reply.items() if key != "dimming"} for reply in replies(without)])
 
 
 class TheCheckOfTheDrive(unittest.TestCase):
@@ -182,8 +185,9 @@ class TheCheckOfTheDrive(unittest.TestCase):
         # The table of 256 places of a drive without a catalog, the boot's memory of 16
         # files left out, the cursor over a drive's index, and in the block of the saved
         # order the tree's table of 33 folders of 8 bytes, the room for the current
-        # playlist's path and the saved repeats of 32 of its files.
-        self.assertEqual((drive - without, drive_blocks - blocks), (3072 + 640 + 972 + 33 * 8 + 104 + 32 * 8, 3))
+        # playlist's path, saved repeats and brightness preferences of32 files each,
+        # and128 external file/folder exclusions.
+        self.assertEqual((drive - without, drive_blocks - blocks), (3072 + 640 + 716 + 33 * 8 + 104 + 32 * 6 + 32 * 5 + 128 * 5, 3))
         self.assertLess(drive, 131072)
         self.assertIn(f"the target file takes {drive:,} bytes", (support.ROOT / "docs" / "core.md").read_text(encoding="utf-8"))
 

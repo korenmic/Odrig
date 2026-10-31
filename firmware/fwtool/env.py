@@ -7,7 +7,7 @@ and npm. `HOME` is left as the caller has it.
 
 import os
 
-from . import paths
+from . import host, paths
 
 FOLDERS = {
     "PLATFORMIO_CORE_DIR": paths.PIO_CORE,
@@ -19,6 +19,8 @@ NEWER_FOLDERS = dict(FOLDERS, PLATFORMIO_CORE_DIR=paths.NEWER_PIO_CORE, PLATFORM
 SWITCHES = {
     "PLATFORMIO_SETTING_ENABLE_TELEMETRY": "No",
     "npm_config_update_notifier": "false",
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8",
 }
 
 
@@ -29,8 +31,8 @@ def child(caller=None, newer=False):
     for name, folder in (NEWER_FOLDERS if newer else FOLDERS).items():
         made[name] = str(folder)
     made.update(SWITCHES)
-    programs = str((paths.NEWER_VENV if newer else paths.VENV) / "bin")
-    tools = {str(paths.VENV / "bin"), str(paths.NEWER_VENV / "bin")}
+    programs = str(host.scripts(paths.NEWER_VENV if newer else paths.VENV))
+    tools = {str(host.scripts(paths.VENV)), str(host.scripts(paths.NEWER_VENV))}
     earlier = [folder for folder in made.get("PATH", "").split(os.pathsep) if folder and folder not in tools]
     made["PATH"] = os.pathsep.join([programs] + earlier)
     return made

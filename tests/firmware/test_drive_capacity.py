@@ -3,6 +3,7 @@ import subprocess
 import tempfile
 import unittest
 from . import FIRMWARE
+from .compiler import compiled
 
 
 class DriveCapacity(unittest.TestCase):
@@ -38,7 +39,8 @@ int main(void) {
 }
 '''
         with tempfile.TemporaryDirectory() as work:
-            path = pathlib.Path(work, 'capacity')
-            subprocess.run(['cc','-x','c','-std=c99','-Wall','-Wextra','-Werror','-o',str(path),'-'],input=program,text=True,capture_output=True,check=True)
-            output = subprocess.check_output([str(path)],text=True)
+            source = pathlib.Path(work, 'capacity.c')
+            source.write_text(program, encoding='utf-8', newline='\n')
+            path = compiled([source], pathlib.Path(work, 'capacity'), language='c')
+            output = subprocess.check_output([str(path)], encoding='utf-8')
         self.assertEqual(output, '0 34359738368 68719476736\n-1\n')

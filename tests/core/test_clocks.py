@@ -143,7 +143,7 @@ class ClocksInAShow(Playback):
     def test_a_clock_of_another_canvas_or_with_a_fault_is_quarantined_at_the_start(self):
         cases = {
             "size-mismatch": clock_of(canvas=(21, 10)),
-            "unknown-widget": clock_of(widget=6),
+            "unknown-widget": clock_of(widget=7),
             "bad-settings": clock_of(least=601),
             "loop-mismatch": bytes(clock_of()[:12]) + struct.pack("<I", 1999) + bytes(clock_of()[16:]),
         }
@@ -186,6 +186,11 @@ def clocks_file(clocks, message):
     return f"odrig-clocks 1\nclocks {clocks}\nmessage {message}\n".encode("ascii")
 
 
+def saved_clocks_file(clocks, message):
+    mode = "between" if clocks == "on" else "off"
+    return f"odrig-clocks 2\nmode {mode}\nmessage {message}\n".encode("ascii")
+
+
 def settings_of(run):
     """The two settings each `status` of a session reports."""
     return [(state["clocks"], state["clock_message"]) for state in replies(run) if "on" in state]
@@ -223,7 +228,7 @@ class TheSettings(Playback):
         run, kept = support.start_and_keep(three(), script)
         self.assertEqual(answers_of(run), [DONE] * 3)
         self.assertEqual(settings_of(run), [(False, False), (True, False), (True, True), (False, True)])
-        self.assertEqual(kept["clocks.txt"], clocks_file("off", "on"))
+        self.assertEqual(kept["clocks.txt"], saved_clocks_file("off", "on"))
         restarted = support.start({**three(), "clocks.txt": kept["clocks.txt"]}, asked(0, "status"))
         self.assertEqual(settings_of(restarted), [(False, True)])
 
@@ -251,7 +256,7 @@ class TheSettings(Playback):
                 self.assertEqual(logged(run).count("clocks unreadable"), 1)
                 self.assertEqual(list(run.logs), support.ReferencePlayer(files).start_logs)
                 self.assertEqual(settings_of(run), [(False, False), (False, True)])
-                self.assertEqual(kept["clocks.txt"], clocks_file("off", "on"))
+                self.assertEqual(kept["clocks.txt"], saved_clocks_file("off", "on"))
 
     def test_a_part_left_by_a_cut_is_removed_at_the_start(self):
         run, kept = support.start_and_keep({**three(), "clocks.part": clocks_file("on", "on")}, asked(0, "status"))
@@ -296,7 +301,7 @@ class TheSettings(Playback):
 
     def test_the_members_stand_before_left_which_stays_last(self):
         run = support.start(three(), asked(0, "status"))
-        self.assertEqual(list(replies(run)[0])[-3:], ["clocks", "clock_message", "left"])
+        self.assertEqual(list(replies(run)[0])[-5:], ["clocks", "clock_message", "clock_mode", "clock_only", "left"])
 
 
 # A card with two animations of 4 seconds at its root, three clocks of 6 seconds, two loops

@@ -325,7 +325,7 @@ class HostInterface(unittest.TestCase):
         text = self.HEADER.read_text(encoding="utf-8")
         self.assertEqual(sorted(INCLUDE_LINE.findall(text)), [("<", "stddef.h"), ("<", "stdint.h")])
 
-    def test_it_declares_the_seven_functions_of_the_core(self):
+    def test_it_declares_the_public_functions_of_the_core(self):
         text = self.HEADER.read_text(encoding="utf-8")
         declared = re.findall(r"\b(odrig_core_[a-z_]+)\(", without_comments_and_strings(text))
         self.assertEqual(
@@ -337,6 +337,9 @@ class HostInterface(unittest.TestCase):
                 "odrig_core_feed",
                 "odrig_core_leg",
                 "odrig_core_leg_count",
+                "odrig_core_mini",
+                "odrig_core_mini_complete",
+                "odrig_core_mini_support",
                 "odrig_core_poll",
             ],
         )

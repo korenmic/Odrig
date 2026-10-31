@@ -24,7 +24,7 @@ class TheAnimationsOfADrive(Controls):
         presses = [{"row": 60001, "until": "Now 60001 Sunrise\\.odrg"}]
         seen, lines = self.sent(emulator, "presses", lambda line: line == "play 60001", rows=3, presses=presses)
         self.assertEqual([line for line, _ in lines], ["play 60001"])
-        self.assertEqual(seen[0]["buttons"], ["LEDs on or off", "Collapse the panel", "Repeat 60001 Sunrise.odrg this turn", "Save the repeat of 60001 Sunrise.odrg for every turn",
+        self.assertEqual(seen[0]["buttons"], ["LEDs on or off", "Collapse the panel", "Ignore 60001 Sunrise.odrg in playlist", "Repeat 60001 Sunrise.odrg this turn", "Save the repeat of 60001 Sunrise.odrg for every turn",
                                               "Restore the default repeat of 60001 Sunrise.odrg", "All, 3", "Internal, 2", "External, 1", "All, 3", "Normal, 3", "Text, 0",
                                               "Widget, 0", "Play this folder", "Play 1 hello.odrg", "Actions for 1 hello.odrg", "Play 2 dvd.odrg",
                                               "Actions for 2 dvd.odrg", "Play 60001 Sunrise.odrg", "Actions for 60001 Sunrise.odrg"])

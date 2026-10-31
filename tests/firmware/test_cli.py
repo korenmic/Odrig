@@ -122,14 +122,14 @@ class Building(unittest.TestCase):
         def run(command, **named):
             ran.append((command, named))
             return mock.Mock(returncode=status)
-        with mock.patch.object(build.toolchain, "python_environment"), mock.patch.object(build.toolchain, "newer_environment"), mock.patch.object(build.wled, "restore_and_patch") as patched, mock.patch.object(build.wled, "write_override"), mock.patch.object(build.subprocess, "run", run), mock.patch.object(build, "keep", return_value=1232912), mock.patch.object(build, "sha256", return_value="48e51d84"):
+        with mock.patch.object(build.toolchain, "python_environment"), mock.patch.object(build.toolchain, "newer_environment"), mock.patch.object(build.wled, "restore_and_patch") as patched, mock.patch.object(build.wled, "write_override"), mock.patch.object(build.process, "run", run), mock.patch.object(build.provenance, "write"), mock.patch.object(build, "keep", return_value=1232912), mock.patch.object(build, "sha256", return_value="48e51d84"):
             result = support.run_main("build", *arguments)
         return result, ran, patched
 
     def test_stock_builds_wleds_own_environment_with_no_patch(self):
         result, ran, patched = self.build("--stock")
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(ran[0][0][1:], ["-m", "platformio", "run", "-d", str(build.paths.WLED), "-e", "esp32s3dev_16MB_opi"])
+        self.assertEqual(ran[0][0][1:], ["-m", "platformio", "run", "-d", str(build.paths.WLED), "-e", "esp32s3dev_16MB_opi", "-j", "2"])
         self.assertEqual(patched.call_args.kwargs, {"patches": None})
         self.assertIn("stock-built.bin: 1232912 bytes", result.out)
 
@@ -143,7 +143,7 @@ class Building(unittest.TestCase):
                                               (["--stick"], "odrig", "odrig-stick.bin"), (["--stick", "--probe"], "odrig_probe", "odrig-stick-probe.bin")):
             result, ran, patched = self.build(*arguments)
             self.assertEqual(result.status, 0, result.err)
-            self.assertEqual(ran[0][0][-2:], ["-e", environment])
+            self.assertEqual(ran[0][0][-4:], ["-e", environment, "-j", "2"])
             self.assertEqual(patched.call_args.kwargs, {"patches": build.paths.PATCHES})
             self.assertIn(f"{image}: ", result.out)
 

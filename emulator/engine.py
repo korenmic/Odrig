@@ -130,11 +130,21 @@ class Engine:
                 self.t0 = now
             self._opened = None
             if self.core.poll(now):
-                self.hub.refresh(now, self.core.frame())
+                self.hub.refresh(*self._output(now))
             if self._opened is not None:
                 self._take_open(now)
             self._take_lengths()
             self._publish()
+
+    def _output(self, now):
+        """Normal record geometry plus an optional shared miniature picture."""
+        output = (now, self.core.frame())
+        miniature = getattr(self.core, "miniature", None)
+        if miniature is not None:
+            picture = miniature()
+            if picture is not None:
+                output += (picture,)
+        return output
 
     def routing(self):
         """What the page must read the mapping again for: the legs and their pins, and the
@@ -243,7 +253,7 @@ class Engine:
             now = self.now_ms()
             self._opened = None
             if self.core.poll(now):
-                frame = (now, self.core.frame())
+                frame = self._output(now)
             if self._opened is not None:
                 self._take_open(now)
         if frame is not None:
