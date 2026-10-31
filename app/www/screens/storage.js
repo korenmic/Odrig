@@ -359,12 +359,18 @@ export function start(options) {
   byId("media").addEventListener("change", () => {
     const files = byId("media").files;
     if (files.length === 1) {
-      choose(files[0]);
+      const file = files[0];
+      byId("media").value = "";
+      choose(file);
     }
   });
   byId("ready-file").addEventListener("change", () => {
     const files = byId("ready-file").files;
-    if (files.length === 1) chooseReady(files[0], message);
+    if (files.length === 1) {
+      const file = files[0];
+      byId("ready-file").value = "";
+      chooseReady(file, message);
+    }
   });
   for (const name of Object.keys(FITS)) {
     byId(`fit-${name}`).addEventListener("click", () => chooseFit(name));
