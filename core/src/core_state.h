@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "container.h"
+#include "civil_time.h"
 #include "file_source.h"
 #include "inflate.h"
 #include "odrg_decoder.h"
@@ -403,6 +404,8 @@ struct Mini;
 struct Core {
     // Fields are grouped by alignment; comments name related state across these groups.
     odrig_host host;
+
+    CivilTime civil;
 
     Mini *mini;
 

@@ -4,7 +4,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
 Execute one task, verify it, tick its checkbox and proof-commit before the next.
 Only seed64 is in scope; do not implement seeds45 or61 or resume cancelled seed12.
 
-- [ ] 1. Implement the boot-local civil clock and bounded phone-zone snapshot
+- [x] 1. Implement the boot-local civil clock and bounded phone-zone snapshot
   - Add civil_time state/parser, read/set/zone command dispatch and additive capability.
     Load verified persisted zone rules without restoring epoch validity. Keep memory,
     allocation, reply and compiler stack bounds; compact existing state only if needed.
@@ -14,6 +14,10 @@ Only seed64 is in scope; do not implement seeds45 or61 or resume cancelled seed1
     behavior before adding it; capture the red assertion in the proof commit.
   - Document the time contract and memory figures; append resolved design choices to
     drifts/decisions. Set the seed in_progress. Discover core and onboarding suites.
+  - Verified:1067 discovered core tests pass(1 skip), including17 new civil-time
+    scenarios;88 onboarding tests pass. Initial missing-command test failed at
+    `assertTrue(state['ok'])` before implementation. Target memory131013 bytes,
+    Core3760 bytes; existing limits and status prefix/suffix contracts retained.
 
 - [ ] 2. Implement persistent daily scheduling and sticky manual overrides
   - Add schedule settings validation/readback/atomic publication and wire operations.

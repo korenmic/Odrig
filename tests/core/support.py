@@ -458,7 +458,7 @@ def demo_show():
 # in the current playlist's window, which runs with the time, the counts of the turn in
 # progress, and the names of the file and the folder that play, which the tests of what
 # plays look at.
-READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "clocks", "clock_message", "clock_mode", "clock_only", "left", "mini", "dimming")
+READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "clocks", "clock_message", "clock_mode", "clock_only", "left", "mini", "dimming", "timing")
 
 
 def without_readiness(state):
@@ -1730,7 +1730,7 @@ class ReferencePlayer:
         checked = 0 if self.error is not None else len(names) - to_check
         unavailable = 0 if self.error is not None else len([item for item in self.items.values() if item.cycle is None and item.file in self.faults])
         readiness = "recovery" if self.error is not None else "checking" if to_check else "degraded" if unavailable else "ready"
-        state.update(readiness=readiness, checked=checked, to_check=to_check, unavailable=unavailable,
+        state.update(timing=True, readiness=readiness, checked=checked, to_check=to_check, unavailable=unavailable,
                      checking=self.checks[0][0] if self.error is None and self.checks else None, host=None)
         # The seed of the clock on the LEDs, then the seconds left in the window of the
         # current playlist, the root, the last member.

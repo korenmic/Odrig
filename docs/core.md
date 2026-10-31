@@ -295,7 +295,7 @@ normal brightness rounding at `min(selected brightness,40)`, then their 100 samp
 summed and divided with floor rounding. All side columns stay black. Physical
 order is `x*6+y`, bottom left, in the [README orientation](../README.md#approved-connection-and-orientation).
 The core uses three local channel sums per cell, with no per-frame allocation or
-second decoder. The measured host allocation with a drive is 131069 bytes, below
+second decoder. The measured host allocation with a drive is 131013 bytes, below
 131072. Off, invalid or blank output clears the image.
 
 `debug mini on|off` requests a RAM-only transition. Only the host acknowledgement
@@ -331,7 +331,7 @@ and `odrig_core_command` works as ever.
 A line that is no valid command is answered with the first code that applies, in the
 order of the table of [commands.md](commands.md): `line-too-long`, `unknown-command`,
 `bad-argument`, `show-invalid`, `unsupported`, `no-upload`, `incomplete`, `bad-checksum`, `busy`,
-`unknown-id`, `unavailable`, `in-use`, `read-only`, `mapping-conflict`, `stale`, `order-conflict`, `no-space`, `bad-offset`, `bad-file` and
+`unknown-id`, `unavailable`, `in-use`, `read-only`, `mapping-conflict`, `zone-unset`, `stale`, `order-conflict`, `no-space`, `bad-offset`, `bad-file` and
 `storage-error`. It
 changes nothing, except that `bad-checksum`, `stale`, `bad-file` and `storage-error` discard the
 upload they are about.
@@ -954,7 +954,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,712 |
+| The core object | fixed | 3,760 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -972,13 +972,13 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
 | Miniature state and physical RGB, only for a 60x60 canvas | fixed | 188 |
-| **Total** | | **125,177** |
+| **Total** | | **125,225** |
 
 That is about 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-45,776 of them. The example show on the two-leg mapping asks for 88,466 bytes. A host
+45,776 of them. The example show on the two-leg mapping asks for 88,514 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,637 bytes for the target file. A host with a drive
+of the check and the saved order: 77,685 bytes for the target file. A host with a drive
 is asked for three blocks more, after the three of the check: the table of a drive
 without a catalog, 12 bytes for each of 256 places, 3,072 bytes; the boot's memory of 16
 files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive's index,
@@ -989,7 +989,7 @@ a table of 33 records of 8 bytes and 104 bytes of room for the current playlist'
 368, the saved repeats of32 drive files at6 bytes each (192), and32 brightness
 preferences at5 bytes each (160), followed by128 external exclusion records at5 bytes
 each (640). Positions retain all32 bits. With it
-the target file takes 130,965 bytes, below 131,072. The clocks between the animations add
+the target file takes 131,013 bytes, below 131,072. The clocks between the animations add
 no block: their settings, their counts, the paused turn and the key and the place of their
 order are fields of the core object, and the order is a permutation computed from its key. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
@@ -1290,8 +1290,8 @@ values/presence use existing item padding/flags.32 external values use 5-byte
 records beside compact 6-byte repeat records with full 32-bit positions/16-bit counts.
 The independent 128-byte reader preserves the 512-byte stack-frame compiler bound.
 
-The measured 100-item Windows host requests 130965 bytes with a drive,21 allocation
-blocks, and the Core object is 3712 bytes. Existing 128 KiB/4096 limits remain unchanged;
+The measured 100-item Windows host requests 131013 bytes with a drive,21 allocation
+blocks, and the Core object is 3760 bytes. Existing 128 KiB/4096 limits remain unchanged;
 no allocation is added per frame. The store streams and verifies a part before
 publishing it, keeps prior usable cache after failed updates, and discards partial
 startup application if the settings file is damaged. `dimming` is additive status;
@@ -1317,3 +1317,19 @@ selection only after relevant changes. No per-frame allocation or additional blo
 is introduced. `status` adds explicit mode/reason metadata within its unchanged
 1,024-byte bound; escaped host descriptions use at most160 bytes, while ordinary
 95-byte ASCII descriptions and supported full file/folder paths remain intact.
+
+## Civil time
+
+`civil_time.cpp` owns a boot-local UTC anchor independent of the player clock.
+The accepted epoch advances using clamped monotonic elapsed milliseconds; reset
+never restores it. The supported range is 2000 through 2099. The persisted phone
+zone snapshot supplies its IANA name, offsets and exact UTC transition instants;
+only crossing a cached transition reads its rules during normal playback.
+
+The zone grammar and commands are in [commands.md](commands.md#board-time). A
+complete snapshot fits the existing 1500-byte chunk and 2048-byte command line.
+Publication verifies the complete staged bytes before atomic rename. Missing or
+damaged rules never supply invented time. Routine clock sets write no storage.
+The added state uses48 Core bytes; the target with a drive takes131,013 bytes in
+21 blocks, below the unchanged128 KiB bound. No allocation occurs after startup,
+and the512-byte compiler frame bound remains enabled.

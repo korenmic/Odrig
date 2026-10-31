@@ -863,3 +863,8 @@ are in [format.md](format.md), "Measured sizes".
   specs and verification records, but do not keep a merged seed in progress.
   The owner cancelled the standalone fallback firmware seed; its unfinished work
   is retained as history and is not scheduled for completion.
+
+- 2026-10-31: Seed64's owner authorized autonomous protocol choices and delivery.
+  Add shared `time`, `time zone DATA` and `time set UTC REVISION` operations with
+  verified phone-zone rules, boot-local epoch validity and no per-sync flash writes;
+  the exact format and refusals are in commands.md.

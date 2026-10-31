@@ -25,6 +25,9 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `brightness <id> <n> save` | Saves brightness for the listed animation's file, including zero, without changing the default. |
 | `brightness <id> default` | Removes that file's saved brightness, using the latest default immediately if it is playing. |
 | `status` | Reports the current state. |
+| `time` | Reads the boot-local civil clock and accepted phone zone. |
+| `time zone <base64>` | Atomically installs a complete phone-zone snapshot. |
+| `time set <utc-seconds> <zone-crc32>` | Sets the clock against the accepted zone revision. |
 | `fault` | Reports the latest fault of a file since the start. |
 | `space` | Reports the free and the total storage and the number of animations. |
 | `list`, `list <from>` | Lists the items of the show and the root's level of a USB drive or a card: the playlists of its folders and its own animations. |
@@ -80,6 +83,36 @@ selected value at 40; WLED's existing current limiter remains in force.
 
 A number in a command is written in decimal digits.
 
+## Board time
+
+`time` reports `ok`, `valid`, nullable UTC seconds `utc`, nullable IANA `zone`,
+nullable offset seconds `offset`, nullable eight-digit lowercase CRC-32 `revision`,
+zone coverage `from`/`until`, and nullable `error`. Time is invalid after every core
+restart until a successful set, even when rules survive. Missing rules have null
+metadata; damaged rules report `zone-unreadable`. Reads work during show recovery.
+
+`time zone DATA` takes URL-safe unpadded base64 of the complete bounded snapshot
+format in [the design](specs/64-p2-board-time-and-daily-on-off-schedule/design.md#a-compact-complete-zone-snapshot).
+It is at most1500 decoded bytes: a120-byte header and up to276 five-byte UTC/offset
+index transitions. Rules cover a range inside[946684800,4102444800), carry up to8
+distinct signed offsets in seconds and a63-character IANA name, and must be exact,
+strictly ordered and canonical. They live in `timezone.bin`. Publication writes
+`timezone.part`, closes it durably, verifies its exact bytes and atomically renames
+it. An unchanged revision writes nothing. A failed update keeps prior accepted
+rules. Abandoned parts never supply rules on startup.
+
+`time set UTC REVISION` takes decimal UTC seconds from946684800 through4102444799
+and the zone's confirmed lowercase CRC. It writes no flash and affects neither
+playback time nor animation clocks. The rules must cover the given UTC. Time then
+advances offline from monotonic elapsed milliseconds, including zone transitions;
+no Internet, phone or NTP is needed. Range expiry is invalid time, never a wrap.
+
+Success replies are `{"ok":true}`; read `time` afterwards to confirm. Invalid forms,
+ranges, schema or encoding are `bad-argument`; a wrong revision is `stale`; no usable
+zone is `zone-unset`; unavailable write callbacks are `unsupported`; an active
+upload/rebuild is `busy`; failed storage or verification is `storage-error`. These
+operations share the same dispatch for existing serial, HTTP and native hosts.
+
 ## Saved animation brightness
 
 `brightness ID VALUE save` durably saves 0..255 for the listed animation's file;
@@ -130,11 +163,12 @@ file's override or latest default without restarting its timing. Missing/null
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"dimming":{"value":128,"saved":null,"error":null},"mini":{"supported":false,"on":false,"pending":false,"requested":false,"error":null,"brightness":40},"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"clock_mode":"off","clock_only":null,"left":86399}
+{"ok":true,"on":true,"brightness":128,"dimming":{"value":128,"saved":null,"error":null},"mini":{"supported":false,"on":false,"pending":false,"requested":false,"error":null,"brightness":40},"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"timing":true,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"clock_mode":"off","clock_only":null,"left":86399}
 ```
 
 | Member | Meaning |
 |---|---|
+| `timing` | True when board-time commands are supported; absent on older firmware. |
 | `on` | Whether the LEDs are switched on. |
 | `brightness` | Runtime default brightness, 0 to 255, initialized from the show. An animation override does not change this value. |
 | `dimming` | Selected animation brightness before blackout/mini cap as `value`, nullable saved override as `saved` (zero is valid), and nullable settings `error`. `null` when persistence is unsupported; absent in older firmware. A damaged settings file reports `settings-unreadable`. |
@@ -458,6 +492,7 @@ character boundary, so expanded status remains within the fixed reply limit.
 | `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file. |
 | `read-only` | `upload begin external`, `catalog rebuild`, or `order move` of a file of the drive, while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
+| `zone-unset` | No usable phone-zone rules have been installed for a time set. |
 | `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. `repeat <id> <n>`: no turn of that animation is reported. |
 | `order-conflict` | `order move`: the saved order or the listed animations changed since the client read the order's revision; read it again before moving. |
 | `no-space` | `repeat <id> <n> save`: no room is left for another saved repeat; `upload begin`: the file would not fit, or the show has no room for another item; `upload begin external`: the file would not fit on the drive. |

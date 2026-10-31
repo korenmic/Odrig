@@ -12666,3 +12666,18 @@ PR after reporting Clocks jumping to Root. Five browser regressions showed Root
 before the app fix; eight focused recovery tests and the actual native-emulator
 Clocks collection now pass. This fixes UI recovery, without claiming that a
 physical SD/flash I/O fault was reproduced or repaired.
+
+## Seed 64: civil-time wire forms and offline phone zones
+
+**Question.** How can the board follow phone time-zone rules offline without a
+platform time API, a new host callback or a second unbounded memory buffer?
+
+**Answer.** Use a boot-local UTC anchor and a validated compact phone-zone snapshot
+in the existing chunk. The supported civil range is2000..2099; the snapshot holds
+up to8 offsets and276 exact transitions, each five bytes. The phone supplies rules
+from its own Intl data. `time`, `time zone DATA` and `time set UTC REVISION` use
+shared dispatch. The owner's autonomous implementation instruction authorizes
+these protocol choices without another permission question.
+
+**Resolution.** The spec design, commands.md and core.md define the format, strict
+validation, revision guard, atomic publication, reset invalidation and memory bound.

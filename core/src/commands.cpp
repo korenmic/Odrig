@@ -213,7 +213,7 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     }
     // How far the check is, and what is unavailable.
     const Readiness counts = readiness_of(core);
-    reply.text(",\"readiness\":\"");
+    reply.text(",\"timing\":true,\"readiness\":\"");
     reply.text(core.invalid ? "recovery" : counts.to_check != 0 ? "checking" : counts.unavailable != 0 ? "degraded" : "ready");
     reply.text("\",\"checked\":");
     reply.number(counts.checked);
@@ -310,7 +310,7 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
         reply.text(breaks_only_state(core));
         reply.text("\"}");
     } else reply.text("null");
-    // The seconds left in the current playlist's window, the last member.
+    // The seconds left in the current playlist's window.
     reply.text(",\"left\":");
     reply.number(player_window_left(core));
     reply.text("}\n");
@@ -576,6 +576,16 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
 
     Words words;
     words.split(line, length);
+
+    if (words.is(0, "time")) {
+        if (words.count == 1) return civil_reply(core, now, reply);
+        if (words.count == 3 && words.is(1, "zone")) return civil_zone(core, now, words.text[2], words.size[2], reply);
+        uint32_t utc = 0, revision = 0;
+        if (words.count == 4 && words.is(1, "set") && number_word(words, 2, 946684800u, 4102444799u, &utc) && crc_word(words, 3, &revision)) {
+            return civil_set(core, now, utc, revision, reply);
+        }
+        return refuse(reply, "bad-argument");
+    }
 
     if (words.is(0, "mapping")) {
         if (words.count == 2 && words.is(1, "get")) return mapping_get(core, reply);
