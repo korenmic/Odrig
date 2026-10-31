@@ -4,8 +4,10 @@
 
 Let the operator select an existing ODRG animation file and upload its original
 bytes directly, without converting or re-encoding it. The upload belongs in the
-folder the operator is currently exploring. Preserve the existing media import
-workflow and the managed upload/catalog protections.
+folder the operator is currently exploring. Storage is selectable, defaulting
+to External whenever detected. If External is disconnected or not detected,
+select Internal automatically and gray out External. Preserve the existing
+media import workflow and the managed upload/catalog protections.
 
 ## Priority
 
@@ -24,8 +26,11 @@ currently installs loose files at the SD root. Supporting ready-made files and
 subfolder destinations therefore requires both an app entry point and compatible
 managed destination handling. A changed file picker alone is insufficient.
 
-The root browsing list combines internal animations and loose SD files. That
-mixed view does not identify a unique storage destination; Q1 resolves it.
+The root browsing list combines internal animations and loose SD files. On
+2026-10-31 the owner resolved its destination choice: storage is selectable,
+External is always the default when detected, and absence/disconnection selects
+Internal while graying out External. This is an upload destination choice,
+separate from what is playing and from list filters.
 
 ## Required Behavior
 
@@ -41,18 +46,26 @@ mixed view does not identify a unique storage destination; Q1 resolves it.
    Large encoded files must not require expansion of every frame on the phone
    merely to create a preview. Keep preflight and preview work bounded and use
    the target's authoritative managed validation, with an honest preview fallback.
-3. Capture the destination storage and full relative folder path from the
-   browsing context when the upload is prepared. Show the destination clearly
-   before sending. An upload prepared in SD folder `a/b` must install
-   `a/b/<filename>`, not the SD root, internal root or the current playback folder.
-   Browsing context is separate from what happens to be playing.
+3. Capture the chosen destination storage and full relative folder path when
+   the upload is prepared. Show both clearly before sending. With External
+   selected, an upload prepared in SD folder `a/b` installs `a/b/<filename>`;
+   browsing and playback are separate. At the combined top level, use the root
+   of the selected storage. Current Internal storage has a flat root: selecting
+   or falling back to Internal from an SD subfolder must show `Internal /` and
+   explain the destination change before sending. Do not invent matching internal
+   folders or claim the SD path was retained. This adds no general internal-folder
+   model; existing valid internal path support may be reused where available.
    Apply the explored-folder destination consistently to new ready-made uploads
    and new converted-media uploads prepared from that context. Explicit edits or
    replacements remain anchored to their original stored file and its stale guard.
-4. Preserve that destination while the operator navigates elsewhere or reconnects.
-   Resolve it against the current storage/catalog before sending; removed media,
-   missing/changed folders, stale IDs and read-only storage must cause an honest
-   refusal or renewed confirmation, never silent redirection to another folder.
+4. Navigation must not silently change a prepared destination. Revalidate storage,
+   folder and catalog identity before sending. The approved absence fallback
+   applies before an upload starts and must update the visible destination.
+   A missing/changed folder, stale ID, read-only card, full storage or other write
+   refusal is not absence and must not silently redirect the upload. Once bytes
+   have started, freeze the transaction's storage/path. A disconnection stops
+   that attempt safely; a new attempt may use the visibly selected Internal
+   fallback, never continue or replay the active transaction into another storage.
 5. Use existing managed upload validation, capacity accounting, incremental checks,
    CRC/readback, transaction recovery and atomic catalog/index publication. Keep
    existing files and metadata intact on cancellation, interruption or failure.
@@ -68,6 +81,18 @@ mixed view does not identify a unique storage destination; Q1 resolves it.
 8. Reuse the same shared app and core in the emulator and APK. Handle old firmware,
    refused paths, disconnects and uncertain completion honestly. Keep supported
    media conversion available for inputs that actually require it.
+9. Provide a Storage selector with the named choices `External storage` and
+   `Internal storage`. Every new upload form defaults to External when detected;
+   the operator may choose Internal for that form. Do not persist an earlier
+   Internal choice as the next form's default. When External is disconnected or
+   not detected, select Internal automatically, disable/gray the External choice
+   and explain why. Re-detection re-enables External and restores the automatic
+   default if the operator has not explicitly chosen Internal for the current
+   form; revalidate the destination first and never retarget an active upload.
+   Derive presence from the target's storage detection/capability, not an empty,
+   filtered or still-loading file list. Report detected-but-read-only separately.
+   Internal fallback still obeys capacity and naming rules: an oversized file is
+   refused with an explanation, without conversion, truncation or overwrite.
 
 ## Technical Constraints
 
@@ -84,29 +109,32 @@ mixed view does not identify a unique storage destination; Q1 resolves it.
   internal nested-clock paths or a general internal-folder redesign. If those are
   available when implemented, use their validated path model consistently.
 - Test actual byte uploads against the emulator, including nested SD destinations,
-  unchanged bytes, failures and storage/catalog changes. Native phone acceptance
-  remains an owner check.
+  unchanged bytes, selectable storage/defaults, absent/not-detected External,
+  disabled choices, re-detection, explicit Internal selection, preflight versus
+  in-flight removal, insufficient internal capacity and storage/catalog changes.
+  Native phone acceptance remains an owner check.
 - The owner requested creating this seed only. Do not enqueue or implement it as
   part of seed62's animation work.
 
 ## Open Questions Requiring The Owner
 
-### Q1. Which destination should the combined top-level list use?
-
-- **A. Recommended:** upload to the SD root and refuse if it is unavailable or read-only.
-- **B. Alternative:** upload to the internal root, under its existing naming/capacity rules.
-- **C. Alternative:** ask the operator to choose SD root or internal root at that level.
-
-An actual SD subfolder already determines its destination and needs no extra choice.
-Exact wire forms and safe implementation details are specification work; no new
-command spelling is approved merely by creating this seed.
+None. The owner resolved the storage choice on 2026-10-31: selectable storage,
+External as the default whenever detected, and automatic Internal fallback with
+External grayed out when disconnected or not detected. Folder display, safe
+transaction boundaries, capacity checks and re-detection behavior are specified
+above. The seed is ready for S2S with zero open product questions. Exact wire
+forms remain specification work; any actual new command spelling still needs
+explicit owner approval before implementation, as the repository requires.
 
 ## Definition Of Done
 
-1. Q1 is resolved; requirements/design/tasks specify destination capture, validation,
-   root behavior, compatibility, collision handling and interrupted uploads.
-2. A valid ready-made animation is installed byte-for-byte in the explored folder,
-   with an acknowledged catalog/list entry and usable preview; no conversion runs.
+1. Requirements/design/tasks preserve the owner's resolved choice and specify
+   the selector, External default, disabled absent External, visible Internal
+   fallback, re-detection and safe behavior before/during an upload.
+2. A valid ready-made animation is installed byte-for-byte in the displayed
+   destination folder, preserving the explored SD path when External is selected
+   and explicitly showing the Internal root when storage is switched or falls back.
+   It has an acknowledged catalog/list entry and usable preview; no conversion runs.
 3. Discovered app/core/emulator/content suites cover nested folders, byte identity,
    malformed files, canvas mismatch, collisions, stale destinations, cancellation,
    disconnects, read-only/missing media and old-firmware behavior.
