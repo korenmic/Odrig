@@ -12600,3 +12600,27 @@ Do not describe rebuilding with a different key as a transparent upgrade.
 and the verification record binds emulator install/launch/update results to the
 rebuilt APK's delivered bytes. The old-to-new path is a required publication check;
 physical phone acceptance remains open. No new application feature was added.
+
+## Seed 63: folder destinations and creation guards in existing upload forms
+
+**Question.** How can a ready-made upload preserve the browsed folder, prevent a
+silent replacement and survive card changes without a new command spelling or
+larger fixed arena?
+
+**Answer.** Extend the existing external begin's file argument to a validated
+catalog path, URI-encoding spaces and percent signs and decoding exactly once.
+Keep the basename and stable folder id, reconstructing the path on the stack.
+Reuse the existing expectation command with zero for absent external destinations,
+checked before data and before publication. Nonzero external expectations remain
+unsupported; explicit existing replacement clients without this guard retain
+their behavior. Internal CRC expectations are unchanged. Drop an external
+transaction when its mounted generation changes, without deleting a part on a
+new medium. Retain the old part for the existing recovery on its original card.
+The short inactivity timeout uses modular32-bit timestamp subtraction, freeing
+room for the full32-bit folder id without increasing the Upload/Core allocation.
+
+**Resolution.** commands.md and the shared core define these semantics on every
+transport. Nested publication updates both the folder and its parent's count row,
+the global file positions and id map in the existing atomic catalog transaction.
+The app will require the absent-destination guard for all new external uploads.
+No new command-list spelling, animation format or internal-folder model is added.

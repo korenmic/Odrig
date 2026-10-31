@@ -449,21 +449,40 @@ bool level_words(const Core &core, const Words &words, uint32_t first, uint32_t 
     return words.count == at + 1 && number_word(words, at, 0, 0xFFFFFFFFu, from);
 }
 
-// The four `upload` commands. The words are read first, then the show is asked for.
+// Decodes a URI path argument; spaces and percent signs cannot be raw command words.
+bool external_path(const char *word, uint32_t size, char *name) {
+    uint32_t length = 0;
+    for (uint32_t at = 0; at < size; ++at) {
+        uint32_t value = static_cast<uint8_t>(word[at]);
+        if (value == '%') {
+            if (at + 2 >= size) return false;
+            value = 0;
+            for (uint32_t digit = 0; digit < 2; ++digit) {
+                const char c = word[++at];
+                const uint32_t half = c >= '0' && c <= '9' ? static_cast<uint32_t>(c - '0') :
+                    c >= 'a' && c <= 'f' ? static_cast<uint32_t>(c - 'a' + 10) :
+                    c >= 'A' && c <= 'F' ? static_cast<uint32_t>(c - 'A' + 10) : 16;
+                if (half == 16) return false;
+                value = value * 16 + half;
+            }
+        }
+        if (value < 32 || value > 126 || length >= kDrivePathRoom - 1) return false;
+        name[length++] = static_cast<char>(value);
+    }
+    name[length] = '\0';
+    const char *base = name;
+    for (uint32_t at = 0; at < length; ++at) if (name[at] == '/') base = name + at + 1;
+    return catalog_name_allowed(name, length) && is_file_name(base);
+}
+
+// Upload's words are read first, then the show is asked for.
 uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
     if (words.count >= 3 && words.is(1, "begin") && words.is(2, "external")) {
         uint32_t bytes;
         uint32_t crc = 0;
-        char name[33];
-        if ((words.count != 5 && words.count != 6) || words.size[3] < 1 || words.size[3] > 32 || !number_word(words, 4, 1, 0xFFFFFFFFu, &bytes) ||
+        char name[kDrivePathRoom];
+        if ((words.count != 5 && words.count != 6) || !external_path(words.text[3], words.size[3], name) || !number_word(words, 4, 1, 0xFFFFFFFFu, &bytes) ||
             (words.count == 6 && !crc_word(words, 5, &crc))) {
-            return refuse(reply, "bad-argument");
-        }
-        for (uint32_t at = 0; at < words.size[3]; ++at) {
-            name[at] = words.text[3][at];
-        }
-        name[words.size[3]] = '\0';
-        if (!is_file_name(name)) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {

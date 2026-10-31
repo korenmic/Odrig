@@ -205,9 +205,10 @@ class ThePathsInTheSavedOrderAndTheCatalog(unittest.TestCase):
         found = catalog.read(catalog.MemoryStorage(left, drive=True))
         self.assertEqual(sorted(entry.name for entry in found.entries), ["A.ODRG", "b.odrg", "night/deep/deeper/y.odrg", "night/deep/x.odrg"])
 
-    def test_upload_begin_external_takes_a_bare_file_name(self):
+    def test_upload_begin_external_takes_existing_folder_paths_and_bare_names(self):
         run = on_cataloged_card(card(NESTED), asked(8100, "upload begin external night/new.odrg 100", "upload begin external new.odrg 100", "upload cancel"))
-        self.assertEqual((replies(run)[0], replies(run)[1]["ok"]), (refusal("bad-argument"), True))
+        self.assertEqual((replies(run)[0], replies(run)[1]), ({"ok": True, "chunk": 1500}, refusal("busy")))
+        self.assertTrue(replies(run)[2]["ok"])
 
 
 def every(ms, until, *commands):

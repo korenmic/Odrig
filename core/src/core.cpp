@@ -507,6 +507,11 @@ void drive_touch(Core &core) {
     if (number == core.drive_number) {
         return;
     }
+    if (core.upload.state != kUploadNone && core.upload.id == 0) {
+        // The host has observed a different medium. Never remove or write a part on it.
+        core.checker->file.close();
+        core.upload.state = kUploadNone;
+    }
     if (check_complete(core) && core.upload.state == kUploadNone) {
         // The check may be in a file of the drive that went.
         core.checker->file.close();
