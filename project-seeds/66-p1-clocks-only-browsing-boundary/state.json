@@ -1,0 +1,9 @@
+{
+  "number": 66,
+  "slug": "66-p1-clocks-only-browsing-boundary",
+  "state": "remaining",
+  "title": "Browsing stays inside Clocks in Only mode",
+  "priority": "P1",
+  "addedAt": "2026-11-01",
+  "summary": "Restrict all user-visible app navigation and destinations to the resolved Clocks subtree during Only; fail closed when unavailable. Zero open owner questions."
+}
