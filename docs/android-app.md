@@ -152,6 +152,8 @@ maps its actions to command lines, each sent as `POST /odrig` to the address tha
 | Presses `Rebuild the board's catalog` or `Rebuild the card's catalog`, and then `Rebuild` | `catalog rebuild internal`, `catalog rebuild external` |
 | Presses `Cancel the rebuild` | `catalog cancel` |
 | Connects with timing-capable firmware; reads time, then follows the phone's zone and sets UTC when due | `time`, `guard <board-id> time`, `guard <board-id> time zone <base64>`, `guard <board-id> time set <utc-seconds> <zone-crc32>`, `guard <board-id> schedule` |
+| Saves the daily hours and whether to use them | `guard <board-id> schedule set <revision> <on-HH:MM> <off-HH:MM> <on-or-off>` |
+| Ends manual On/Off and returns to the saved hours | `guard <board-id> schedule resume <revision>` |
 
 It uses the shared command protocol and shows only what a reply said. Mapping saves
 require firmware that supports the mapping commands; an older target gives a readable
@@ -930,6 +932,31 @@ Browser fixtures explicitly turn auto-sync off when testing unrelated behavior,
 so the real time of day cannot change their expected LED visibility. Timing tests
 also run the real app with the preference absent and prove the product default-on
 behavior against the native core. Phone/board acceptance remains separate.
+
+### Time and schedule controls
+
+Settings has a Time and schedule card after Clocks. Board time shows the confirmed
+local date, time and phone-supplied zone at the last refresh. An unset clock explains
+that the schedule is ignored. Sync now follows the phone even with automatic sync
+off. The automatic-sync choice is kept on the phone; a storage failure explains
+that the choice applies only for this session. Refresh reads the board again and,
+only after a successful read, reloads its saved hours.
+
+Use scheduled hours and the On at / Off at fields are saved together by Save scheduled
+hours. The default is enabled,18:00 to06:00. Equal, empty or invalid times cannot be
+saved. Edited hours say Save to apply; pending and refused writes never claim success.
+The app confirms the saved pair and enabled flag with a guarded read. A lost reply
+keeps its error visible, preserves the draft and never replays the save on reconnect.
+Another controller's revision requires Refresh before trying again.
+
+Manual On or Off takes priority across restarts until Resume schedule. Saving hours
+or setting time does not release it. The card says when manual mode is temporary
+because it could not be saved. Resume confirms that manual mode ended. Save or refresh
+edited hours before resuming. Ordinary reads, syncs and reconnects to the same board
+preserve typed values; changing target or reading a different board clears them.
+Unsupported firmware leaves ordinary app controls working and timing controls
+disabled. Unreadable schedule metadata is shown explicitly and cannot be overwritten
+by guessed defaults. Every control has a label and at least a48-pixel touch target.
 
 ## Messages
 

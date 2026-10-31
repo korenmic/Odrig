@@ -12737,3 +12737,19 @@ observations. It can publish changed zone rules, but cannot set UTC or move the
 last-confirmed UTC time. The observation is remembered even when its initial read
 fails, so later status polls do not silently retry it. A zone that changes during
 preparation invalidates that preparation before any write.
+
+## Seed64: Settings drafts and confirmation
+
+**Question.** Can background reads or a lost save reply discard typed hours or
+present an unconfirmed pair as saved?
+
+**Answer.** Keep a dirty draft with its original physical board and revision through
+polls, sync and reconnect to that same board. A successful explicit Refresh reloads
+the saved pair; a failed Refresh retains the draft. Another board/target clears it.
+Save and Resume use the shared serialized guard and readback path. Saving hours
+never releases manual mode. A lost reply remains an error even while disconnected,
+and no reconnect replays the mutation. Corrupt metadata disables edits rather than
+repairing it with defaults; unsaved manual mode is explained as temporary.
+
+**Resolution.** `screens/time.js`, `timing.js`, the guarded command validators and
+native/stand-in browser scenarios implement and verify these choices.

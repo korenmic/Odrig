@@ -216,6 +216,23 @@
 <p id="clocks-state" role="status" hidden></p>
 <p id="clocks-said" role="status" aria-live="polite" hidden></p>
 </div>
+<div id="time-panel" class="panel">
+<h2>Time and schedule</h2>
+<p id="time-reading" role="status">Waiting for the board's time.</p>
+<label class="check" for="time-auto"><input id="time-auto" type="checkbox" checked><span><span class="title">Set time automatically from this phone</span><span class="small">On a connection, sync if the last confirmed sync was at least 15 minutes ago, or the board lost its clock. Follow this phone's time zone and daylight saving.</span></span></label>
+<div class="pair"><button id="time-refresh" type="button" disabled>Refresh</button><button id="time-sync" type="button" disabled>Sync now</button></div>
+<p id="time-state" role="status" aria-live="polite">Waiting for the board.</p>
+<label class="check" for="schedule-enabled"><input id="schedule-enabled" type="checkbox" disabled><span><span class="title">Use scheduled hours</span><span class="small">The LEDs are on between these hours, including overnight.</span></span></label>
+<div class="pair">
+<div><label for="schedule-on">On at</label><input id="schedule-on" type="time" step="60" disabled></div>
+<div><label for="schedule-off">Off at</label><input id="schedule-off" type="time" step="60" disabled></div>
+</div>
+<button id="schedule-save" type="button" disabled>Save scheduled hours</button>
+<p class="small">On and Off must differ. Refresh reloads the saved hours. Reset or power loss ignores the schedule until the time is set again.</p>
+<p id="schedule-state" role="status" aria-live="polite">Waiting for the board's schedule.</p>
+<button id="schedule-resume" type="button" disabled>Resume schedule</button>
+<p class="small">Manual On or Off takes priority and stays in force across restarts until you resume the schedule.</p>
+</div>
 <div id="mini-panel" class="panel">
 <h2>Miniature display</h2>
 <label class="check" for="debug-mini"><input id="debug-mini" type="checkbox" disabled><span><span class="title">Miniature display debug mode</span><span class="small">The full canvas fits on the central 6 &times; 6 pixels of the 10 &times; 6 matrix, at brightness 40 or less. Power off before rewiring: disconnect the full wall; matrix 5V to board 5V, GND to GND, IN to GPIO1. Follow the README wiring and power checks. This mode resets off on reboot.</span></span></label>

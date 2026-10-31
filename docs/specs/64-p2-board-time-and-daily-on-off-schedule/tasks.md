@@ -76,7 +76,7 @@ Only seed64 is in scope; do not implement seeds45 or61 or resume cancelled seed1
     old command-count assertions and a drag-fixture destination that followed its
     moving placeholder; all were corrected and the complete discovery rerun passes.
 
-- [ ] 5. Add confirmed Time and schedule controls to Settings
+- [x] 5. Add confirmed Time and schedule controls to Settings
   - Add time/zone readout, refresh, sync now, auto-sync preference, enabled flag,
     On/Off fields, Save, override status and explicit Resume schedule.
     Confirm replies, protect typed values/target changes and show plain-language
@@ -85,6 +85,12 @@ Only seed64 is in scope; do not implement seeds45 or61 or resume cancelled seed1
     stale replies, reconnects and unsupported firmware through shared browser UI.
     Observe missing controls first; any UI regression test must be red before fixing.
   - Run discovered app/onboarding suites and native emulator timing UI scenarios.
+  - Verified:491 discovered app tests and88 onboarding tests pass. Fifteen timing
+    UI scenarios cover native default/sync/blackout/manual/resume behavior, preference
+    persistence, paired edits, stale revisions, pending/refused/unconfirmed/lost
+    replies, reconnects, drafts, old firmware, corrupt metadata and accessible sizes.
+    Missing controls failed first; unsaved edits, a hidden lost-reply error and a
+    hidden sync acknowledgement were observed red before their UI-state fixes.
 
 - [ ] 6. Verify the integrated feature and document release acceptance
   - Run every board-free suite that works on this Windows host, using discovery.

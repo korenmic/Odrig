@@ -17,7 +17,7 @@ export function timingMessage(error) {
   if (code === "busy") return "The installation is busy. Try again when the upload or catalog work finishes.";
   if (code === "stale") return "The connection or settings changed. Refresh and try again.";
   if (code === "storage-error") return "The installation could not save its time-zone or schedule settings.";
-  if (code === "unconfirmed") return "The time change could not be confirmed. Refresh before trying again.";
+  if (code === "unconfirmed") return "The change could not be confirmed. Refresh before trying again.";
   if (code === "bad-argument") return "Check the phone's time and the selected hours, then try again.";
   if (code === "zone-unset") return "Set the board's time from this phone first.";
   if (error?.name === "ZoneFailure") return error.message;
@@ -140,11 +140,48 @@ export function makeTiming({peer = client, wire = commands, prepare = prepareZon
     }
   }
 
+  async function changeSchedule(draft, resume = false) {
+    if (!state.connected || !state.supported || state.busy || !visible() ||
+        draft.board !== state.board || state.schedule === null) return false;
+    const ctx = context();
+    state.busy = true;
+    state.phase = resume ? "resuming" : "saving";
+    state.error = null;
+    state.message = null;
+    state.lastResult = null;
+    changed();
+    try {
+      const result = await queued(ctx, async step => {
+        if (resume) await step(() => wire.scheduleResume(draft.board, draft.revision));
+        else await step(() => wire.scheduleSet(draft.board, draft.revision, draft.on, draft.off, draft.enabled));
+        return step(() => wire.scheduleRead(draft.board));
+      });
+      if (!current(ctx)) return false;
+      state.schedule = result;
+      if (!result.saved || result.on !== draft.on || result.off !== draft.off || result.enabled !== draft.enabled ||
+          (resume && result.override !== null)) throw new commands.Refusal("unconfirmed", "schedule");
+      state.phase = "ready";
+      state.lastResult = resume ? "schedule-resumed" : "schedule-saved";
+      state.message = resume ? "Schedule resumed." : "Saved scheduled hours.";
+      return true;
+    } catch (error) {
+      if (current(ctx)) { state.error = timingMessage(error); state.phase = "error"; }
+      return false;
+    } finally {
+      if (current(ctx)) { state.busy = false; changed(); }
+    }
+  }
+
   const api = {
     state,
     watch(watcher) { watchers.add(watcher); watcher(state); },
     refresh() { return run(); },
     syncNow() { return run({sync: true, force: true}); },
+    saveSchedule(draft) { return changeSchedule(draft); },
+    resumeSchedule() {
+      return state.schedule === null ? Promise.resolve(false) :
+        changeSchedule({...state.schedule, board: state.board}, true);
+    },
     setAuto(value) {
       if (typeof value !== "boolean") return;
       serial += 1;
