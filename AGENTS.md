@@ -129,7 +129,7 @@ keeping the seed in progress.
 - **A second firmware that does not use WLED**, seed 12: cancelled by the owner; do not resume its unfinished tasks.
 - **Current limits for the wall and each snake**, seed 45: implemented in open PR #15; not yet merged.
 - **Internal-storage clocks and messages**, seed 61: planned; recognize matching clock/message paths in internal storage and SD, with a later managed upload attempt of the seven approved messages. A persistent dropdown chooses SD card (default) or Internal storage for matching path/type duplicates; owner product questions are resolved.
-- **Board time and a daily on/off schedule**, seed 64: planned; read/set time over existing transports, default On 18:00/Off 06:00, ignore schedule until time is valid, and APK Settings with automatic phone-time sync on by default. Three owner decisions remain.
+- **Board time and a daily on/off schedule**, seed 64: ready for S2S; read/set time over existing transports, default On 18:00/Off 06:00, and ignore scheduling while time is invalid. APK auto-sync defaults on and waits for the next connection at least 15 minutes after the last confirmed sync. Follow the phone's zone/DST; manual On/Off overrides until explicitly returned to scheduling. No open product questions remain.
 
 The state of every seed is in the `state.json` of its folder.
 
