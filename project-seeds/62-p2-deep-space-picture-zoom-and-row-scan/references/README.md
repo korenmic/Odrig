@@ -14,5 +14,5 @@ It is the actual animation input reference, not a newly generated substitute.
 
 Keep this file byte-for-byte unchanged. Generated crops, previews and animation
 outputs are separate files produced during later implementation. The seed records
-the route and the open endpoint question; this folder does not contain a completed
-animation.
+the route, including the owner-approved final bottom-row pass; this folder does
+not contain a completed animation.
