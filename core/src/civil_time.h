@@ -32,6 +32,7 @@ struct CivilTime {
 };
 
 void civil_start(Core &core);
+bool civil_board(const Core &core, char *name);
 void civil_touch(Core &core, uint64_t now);
 bool civil_utc(const Core &core, uint64_t now, uint32_t *utc);
 uint32_t civil_reply(Core &core, uint64_t now, Reply &reply);

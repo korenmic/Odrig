@@ -2397,3 +2397,19 @@ with physical buses. No firmware compilation, flash, transfer timing measurement
 electrical check or 20–50 FPS board observation was performed for this feature.
 Compilation in this run is deferred by the owner to the future cross-platform
 firmware seed 60; that work is not a prerequisite for the remaining software seeds.
+
+## Board time and daily scheduling
+
+The shared core provides `time`, `schedule` and `guard` on USB serial, the UART and
+HTTP, with the same semantics described in [commands.md](commands.md#board-time).
+Its stable identity is `esp32-` plus the factory MAC read by `ESP.getEfuseMac()`;
+no fuse is written. The boot-local epoch always needs setting after reset. Retained
+zone rules and sticky manual mode do not restore epoch validity.
+
+`install-show` retains `timezone.bin` and `schedule.txt` unless the supplied show
+contains replacements; `read-show` includes both. Unfinished `.part` files never
+become settings. Runtime WLED power mirroring changes no saved WLED, hardware or
+power-supply configuration. Initialization/mirroring cannot create an override;
+explicit JSON On/Off (including reassertions/toggle) and other power transitions
+forward ordinary core manual commands. Colour-only updates do not override hours.
+Physical behavior remains an operator acceptance check.

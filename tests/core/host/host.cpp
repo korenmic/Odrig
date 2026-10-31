@@ -232,6 +232,7 @@ public:
         functions.drive_list = drive ? drive_list : nullptr;
         functions.drive_bind = drive ? drive_bind : nullptr;
         functions.drive_writable = drive ? drive_writable : nullptr;
+        functions.identity = nullptr;
         if (drive && !options_.drive_pulled) {
             plug();
         }

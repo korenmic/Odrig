@@ -23,6 +23,7 @@ COMMANDS = {
     "status": (),
     "schedule": ("[OPERATION]",),
     "time": ("[OPERATION]",),
+    "guard": ("TARGET-ID", "TIMING-COMMAND"),
     "fault": (),
     "space": (),
     "list": (),
@@ -105,6 +106,14 @@ def checked(made, arguments):
         if "\n" in arguments.arguments[0]:
             made.error("a command is one line")
         return ["upload", "external", arguments.arguments[0]]
+    if arguments.command == "guard":
+        words = arguments.arguments
+        if (len(words) < 2 or not 1 <= len(words[0]) <= 31 or
+                any(not (c.isascii() and (c.isalnum() or c in '-_')) for c in words[0]) or
+                words[1] not in ("time", "schedule") or
+                any("\n" in word or "\r" in word for word in words)):
+            made.error("guard takes TARGET-ID followed by a time or schedule command")
+        return ["guard", *words]
     if arguments.command in ("time", "schedule"):
         words = arguments.arguments
         if any("\n" in word or "\r" in word for word in words):

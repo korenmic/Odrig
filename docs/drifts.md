@@ -12696,3 +12696,20 @@ are one atomic publication, never partial field writes or writes at boundaries.
 
 **Resolution.** civil_time.cpp and commands.md define schedule set/resume, file
 grammar, validation/readback, startup and failed-persistence behavior.
+
+## Seed 64: physical timing identity and host feedback
+
+**Question.** Can an address or host build text identify a board for cooldowns and
+stale-write guards, and can show installs discard the timing metadata?
+
+**Answer.** Different boards share4.3.2.1. A bounded optional identity callback and
+atomic `guard BOARD ...` prefix are required plumbing for existing requirement5.4;
+address-only preflight is insufficient. Timing files are retained/replaced/read back
+like other operator metadata; an epoch is never persisted. Firmware mirrors effective
+visibility into volatile WLED power state without a command/callback, and forwards
+external explicit power requests or power transitions to ordinary core On/Off.
+Initialization and the mirror itself never establish a manual override.
+
+**Resolution.** `design.md`, `odrig_core.h`, `civil_time.cpp`, `commands.cpp`, the
+native binding/host, firmware adapter and `fwtool/storage.py` carry this contract.
+The earlier no-new-callback design assumption is replaced; seed scope is unchanged.

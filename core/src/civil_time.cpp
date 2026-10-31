@@ -301,6 +301,18 @@ void civil_touch(Core &core, uint64_t now) {
     }
 }
 
+bool civil_board(const Core &core, char *name) {
+    memset(name, 0xFF, 32);
+    if (core.host.identity == nullptr || core.host.identity(core.host.ctx, name, 32) != 1) return false;
+    for (uint32_t at = 0; at < 32; ++at) {
+        const char byte = name[at];
+        if (byte == 0) return at != 0;
+        if (!((byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') ||
+              (byte >= '0' && byte <= '9') || byte == '-' || byte == '_')) return false;
+    }
+    return false;
+}
+
 uint32_t civil_reply(Core &core, uint64_t now, Reply &reply) {
     civil_touch(core, now);
     char name[64];
@@ -325,6 +337,10 @@ uint32_t civil_reply(Core &core, uint64_t now, Reply &reply) {
     if (core.civil.zone_ok) reply.number(core.civil.from); else reply.text("null");
     reply.text(",\"until\":");
     if (core.civil.zone_ok) reply.number(core.civil.until); else reply.text("null");
+    char board[32];
+    reply.text(",\"board\":");
+    if (civil_board(core, board)) { reply.text("\""); reply.text(board); reply.text("\""); }
+    else reply.text("null");
     reply.text(",\"error\":");
     reply.text(core.civil.zone_error ? "\"zone-unreadable\"}\n" : "null}\n");
     return reply.length;

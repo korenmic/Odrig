@@ -39,7 +39,7 @@ Only seed64 is in scope; do not implement seeds45 or61 or resume cancelled seed1
     `assertTrue(state['ok'])`. Native RGB blackout preserves advancing loop counts;
     frame ticks do not write timing files. Core3768 bytes, drive arena131021 bytes.
 
-- [ ] 3. Integrate shared timing commands with hosts and command tools
+- [x] 3. Integrate shared timing commands with hosts and command tools
   - Ensure byte-feed/serial, TCP, HTTP and command tool reach the same timing state.
     Preserve schedule/zone files through ordinary show installs/readback as appropriate.
     Integrate external manual WLED control without turning scheduler output into an
@@ -48,6 +48,14 @@ Only seed64 is in scope; do not implement seeds45 or61 or resume cancelled seed1
     persistence regression failing before its fix and record the observed failure.
     Update commands/firmware/emulator docs and firmware-additions.
   - Run discovered emulator, firmware-tool, firmware-host and onboarding suites.
+  - Verified:1085 core tests(1 skip),672 emulator tests(20 platform skips),651
+    firmware-tool tests(1 skip),28 firmware-host tests(1 skip),88 onboarding tests.
+    Stable identity and atomic guards pass through HTTP/TCP/byte feed, including
+    a2048-byte largest zone command. Timing files survive show install/readback;
+    explicit manual power and initialization/feedback are distinguished in the
+    portable firmware adapter. Missing board/guard support and dropped timing
+    files were observed failing first. Core3776 bytes; drive arena131029 bytes.
+    Physical board/phone checks remain unperformed.
 
 - [ ] 4. Add phone-zone generation and guarded connection-triggered synchronization
   - Implement worker-based zone snapshots from phone Intl data, validated timing

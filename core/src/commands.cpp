@@ -1,4 +1,5 @@
 #include "commands.h"
+#include <string.h>
 
 #include "breaks.h"
 #include "catalog.h"
@@ -383,6 +384,19 @@ struct Words {
     uint32_t count;
 };
 
+ODRIG_NOINLINE const char *board_guard(const Core &core, const Words &words) {
+    if (words.count < 3 || words.size[1] == 0 || words.size[1] > 31) return "bad-argument";
+    for (uint32_t at = 0; at < words.size[1]; ++at) {
+        const char byte = words.text[1][at];
+        if (!((byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') ||
+              (byte >= '0' && byte <= '9') || byte == '-' || byte == '_')) return "bad-argument";
+    }
+    if (!words.is(2, "time") && !words.is(2, "schedule")) return "bad-argument";
+    char board[32];
+    if (!civil_board(core, board)) return "unsupported";
+    return strlen(board) == words.size[1] && memcmp(board, words.text[1], words.size[1]) == 0 ? nullptr : "stale";
+}
+
 // The value of a word that must be a number from `least` to `most`, written in decimal
 // digits only. False for an empty word, for any other character and for any other value.
 bool number_word(const Words &words, uint32_t word, uint32_t least, uint32_t most, uint32_t *value) {
@@ -577,6 +591,13 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
 
     Words words;
     words.split(line, length);
+
+    if (words.is(0, "guard")) {
+        const char *error = board_guard(core, words);
+        if (error != nullptr) return refuse(reply, error);
+        const char *inner = words.text[2];
+        words.split(inner, length - static_cast<uint32_t>(inner - line));
+    }
 
     if (words.is(0, "schedule")) {
         if (words.count == 1) return schedule_reply(core, now, reply);

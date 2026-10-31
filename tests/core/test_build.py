@@ -268,8 +268,8 @@ static void on_reply(void *ctx, const char *line, size_t line_length, const char
 int main(void) {
     odrig_host host = {0, give, open_file, read_file, close_file, log_line,
                        begin_file, add_bytes, end_file, rename_file, remove_file, tell_space, read_part,
-                       drive_number, drive_name, 0, 0, 0, 0, 0};
-    odrig_host plain = {0, give, open_file, read_file, close_file, log_line, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+                       drive_number, drive_name, 0, 0, 0, 0, 0, 0};
+    odrig_host plain = {0, give, open_file, read_file, close_file, log_line, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     odrig_leg leg;
     char line[ODRIG_LINE_MAX + 1] = "status";
     char reply[ODRIG_REPLY_MAX];
@@ -279,6 +279,7 @@ int main(void) {
     uint64_t now = 0;
     uint32_t legs = odrig_core_leg_count(core);
     int produced = odrig_core_poll(core, now);
+    int power = odrig_core_power(core);
     int found = odrig_core_leg(core, 0, &leg);
     size_t length = odrig_core_command(core, now, line, 6, reply, sizeof reply);
     const char *error = odrig_core_error(core);
@@ -286,7 +287,7 @@ int main(void) {
     uint16_t number = leg.leg, pin = leg.pin;
     uint32_t count = leg.led_count;
     odrig_core_feed(core, now, bytes, 1, answered, 0);
-    return (int)(legs + count + length) + produced + found + number + pin + (error != 0) + (rgb != 0)CHANGE;
+    return (int)(legs + count + length) + produced + power + found + number + pin + (error != 0) + (rgb != 0)CHANGE;
 }
 """
 
@@ -341,6 +342,7 @@ class HostInterface(unittest.TestCase):
                 "odrig_core_mini_complete",
                 "odrig_core_mini_support",
                 "odrig_core_poll",
+                "odrig_core_power",
             ],
         )
 

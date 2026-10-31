@@ -31,6 +31,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `time` | Reads the boot-local civil clock and accepted phone zone. |
 | `time zone <base64>` | Atomically installs a complete phone-zone snapshot. |
 | `time set <utc-seconds> <zone-crc32>` | Sets the clock against the accepted zone revision. |
+| `guard <board-id> <timing-command>` | Executes a time or schedule command only on the named board. |
 | `fault` | Reports the latest fault of a file since the start. |
 | `space` | Reports the free and the total storage and the number of animations. |
 | `list`, `list <from>` | Lists the items of the show and the root's level of a USB drive or a card: the playlists of its folders and its own animations. |
@@ -122,9 +123,19 @@ resets brightness. Unset/invalid time bypasses automatic scheduling.
 
 ## Board time
 
+`guard BOARD COMMAND` accepts only the complete `time` and `schedule` forms below.
+It checks the physical identity under the same core call before executing the inner
+command: a different board returns `stale` without applying it; no usable identity
+returns `unsupported`. IDs are complete 1..31 ASCII letters/digits/hyphen/underscore,
+never addresses or truncated names. Malformed wrappers yield `bad-argument`. This
+protects queued writes when different boards use the same Wi-Fi address. It is a
+target check, not authentication. A largest zone plus a 31-byte ID fits2048 bytes.
+The board reports its factory MAC as an opaque ID; the emulator hashes the resolved
+storage root, retaining the same ID across restarts and ports.
+
 `time` reports `ok`, `valid`, nullable UTC seconds `utc`, nullable IANA `zone`,
 nullable offset seconds `offset`, nullable eight-digit lowercase CRC-32 `revision`,
-zone coverage `from`/`until`, and nullable `error`. Time is invalid after every core
+zone coverage `from`/`until`, nullable stable `board` identity, and nullable `error`. Time is invalid after every core
 restart until a successful set, even when rules survive. Missing rules have null
 metadata; damaged rules report `zone-unreadable`. Reads work during show recovery.
 

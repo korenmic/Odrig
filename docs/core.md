@@ -96,6 +96,7 @@ Every function receives `ctx` as its first argument.
 | `about` | `int about(void *ctx, char *buffer, size_t capacity)`: optional; a text that names the host, its build, its storage and the reason of its last start, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when it has none. The core asks it at each `status`, with room for 96 bytes, and reports it as `host`. `NULL` for a host without it. |
 | `drive_list` | `int32_t drive_list(void *ctx, uint32_t drive)`: optional; lists the drive's folder `odrig` and its sub-folders to three levels now, depth first, a folder's animation files by the bytes of their names and then its sub-folders by the bytes of their names, every file or, as the firmware does, up to the 256th file and the 32nd sub-folder, and returns the number of files listed, or -1 when that drive is not plugged in any more. A host that has it lists the folder only when it is called: the core calls it for a drive without a catalog and for a rebuild of a drive's catalog. |
 | `drive_bind` | `int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name)`: optional; gives the place to the file of the drive's folder with this name, so that `drive_name` gives the name and `drive/<place>` opens it. Returns 1, or 0 when that drive is not plugged in any more or the name is not one of the drive. Without it every drive is listed. |
+| `identity` | `int identity(void *ctx, char *buffer, size_t capacity)`: optional stable board ID, complete NUL-terminated1..31 ASCII letters/digits/hyphen/underscore. Returns1 or0 unavailable; never truncate. |
 | `drive_writable` | `int drive_writable(void *ctx, uint32_t drive)`: optional; 1 when the core may change the files of that drive with the storage functions, by the names `drive/<name>`, 0 otherwise. Without it the drive is read only. |
 
 Capacity callbacks must meet the 50 ms per-call budget and must not start or wait
@@ -157,6 +158,7 @@ as for a file that is not there.
 | `int odrig_core_leg(const odrig_core *core, uint32_t index, odrig_leg *out)` | Fills in leg `index`, counted from 0 in the order of the mapping file. Returns 1, or 0 for an index that is not a leg. |
 | `size_t odrig_core_command(odrig_core *core, uint64_t now_ms, const char *line, size_t length, char *reply, size_t capacity)` | Takes one command line and writes its reply. Returns the length of the reply. `capacity` must be at least `ODRIG_REPLY_MAX`; with less the core does nothing and returns 0. |
 | `void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, size_t length, odrig_reply_fn on_reply, void *reply_ctx)` | Takes bytes of a transport, cuts them into lines, answers each line, and calls `on_reply` once for each. |
+| `int odrig_core_power(const odrig_core *core)` | Effective LED visibility after the latest command/poll; reads only,0 for a null core. Hosts mirror it without issuing a manual request. |
 | `const char *odrig_core_error(const odrig_core *core)` | The reason the show is invalid, as a text that ends in a zero, or `NULL` when the show is valid. |
 | `void odrig_core_mini_support(odrig_core *core)` | Opts the host into checked miniature output transitions, on a 60x60 canvas. |
 | `int odrig_core_mini(const odrig_core *core, odrig_mini *out)` | Reads miniature support, revision, requested/active/pending/failure state and its borrowed 180-byte RGB buffer. The chain index is `x*6+y` in a 10x6 bottom-left coordinate system. Normal legs are unchanged. |
@@ -295,7 +297,7 @@ normal brightness rounding at `min(selected brightness,40)`, then their 100 samp
 summed and divided with floor rounding. All side columns stay black. Physical
 order is `x*6+y`, bottom left, in the [README orientation](../README.md#approved-connection-and-orientation).
 The core uses three local channel sums per cell, with no per-frame allocation or
-second decoder. The measured host allocation with a drive is 131021 bytes, below
+second decoder. The measured host allocation with a drive is 131029 bytes, below
 131072. Off, invalid or blank output clears the image.
 
 `debug mini on|off` requests a RAM-only transition. Only the host acknowledgement
@@ -955,7 +957,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,768 |
+| The core object | fixed | 3,776 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -973,13 +975,13 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
 | Miniature state and physical RGB, only for a 60x60 canvas | fixed | 188 |
-| **Total** | | **125,233** |
+| **Total** | | **125,241** |
 
 That is about 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-45,776 of them. The example show on the two-leg mapping asks for 88,522 bytes. A host
+45,776 of them. The example show on the two-leg mapping asks for 88,530 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,693 bytes for the target file. A host with a drive
+of the check and the saved order: 77,701 bytes for the target file. A host with a drive
 is asked for three blocks more, after the three of the check: the table of a drive
 without a catalog, 12 bytes for each of 256 places, 3,072 bytes; the boot's memory of 16
 files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive's index,
@@ -990,7 +992,7 @@ a table of 33 records of 8 bytes and 104 bytes of room for the current playlist'
 368, the saved repeats of32 drive files at6 bytes each (192), and32 brightness
 preferences at5 bytes each (160), followed by128 external exclusion records at5 bytes
 each (640). Positions retain all32 bits. With it
-the target file takes 131,021 bytes, below 131,072. The clocks between the animations add
+the target file takes 131,029 bytes, below 131,072. The clocks between the animations add
 no block: their settings, their counts, the paused turn and the key and the place of their
 order are fields of the core object, and the order is a permutation computed from its key. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
@@ -1291,8 +1293,8 @@ values/presence use existing item padding/flags.32 external values use 5-byte
 records beside compact 6-byte repeat records with full 32-bit positions/16-bit counts.
 The independent 128-byte reader preserves the 512-byte stack-frame compiler bound.
 
-The measured 100-item Windows host requests 131021 bytes with a drive,21 allocation
-blocks, and the Core object is 3768 bytes. Existing 128 KiB/4096 limits remain unchanged;
+The measured 100-item Windows host requests 131029 bytes with a drive,21 allocation
+blocks, and the Core object is 3776 bytes. Existing 128 KiB/4096 limits remain unchanged;
 no allocation is added per frame. The store streams and verifies a part before
 publishing it, keeps prior usable cache after failed updates, and discards partial
 startup application if the settings file is damaged. `dimming` is additive status;
@@ -1331,7 +1333,7 @@ The zone grammar and commands are in [commands.md](commands.md#board-time). A
 complete snapshot fits the existing 1500-byte chunk and 2048-byte command line.
 Publication verifies the complete staged bytes before atomic rename. Missing or
 damaged rules never supply invented time. Routine clock sets write no storage.
-The combined clock and schedule state uses56 Core bytes; the target with a drive takes131,021 bytes in
+The combined clock and schedule state uses56 Core bytes; the target with a drive takes131,029 bytes in
 21 blocks, below the unchanged128 KiB bound. No allocation occurs after startup,
 and the512-byte compiler frame bound remains enabled.
 
@@ -1351,5 +1353,5 @@ no tick or boundary writes timing settings.
 The atomic grammar, revision guards and error semantics are specified in
 [commands.md](commands.md#daily-schedule-and-manual-control). Manual control is
 immediate even on a persistence failure, which remains explicitly observable.
-The current target takes131,021 host bytes with a drive in21blocks, and Core is
-3768 bytes. The existing128KiB/4096-byte limits and512-byte frame guard remain.
+The current target takes131,029 host bytes with a drive in21blocks, and Core is
+3776 bytes. The existing128KiB/4096-byte limits and512-byte frame guard remain.

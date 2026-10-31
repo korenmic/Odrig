@@ -865,6 +865,10 @@ int odrig_core_leg(const odrig_core *core, uint32_t index, odrig_leg *out) {
     return 1;
 }
 
+int odrig_core_power(const odrig_core *core) {
+    return core != nullptr && core->state.on != 0 ? 1 : 0;
+}
+
 const char *odrig_core_error(const odrig_core *core) {
     if (core == nullptr || !core->state.invalid) {
         return nullptr;

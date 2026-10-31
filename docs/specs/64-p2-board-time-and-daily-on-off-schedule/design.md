@@ -6,7 +6,7 @@ Requirements: [requirements.md](requirements.md).
 
 Add civil_time.h/cpp to the discovered core sources. Keep a compact inline state in
 Core: monotonic anchor, UTC seconds, zone revision/range/cursor/offset, schedule
-minutes/flags/revision and error flags. No new host callback, decoder, heap allocation
+minutes/flags/revision and error flags. One optional stable identity host callback; no new decoder, heap allocation
 or frame buffer. Remain below 131072 host bytes with a drive, 4096 Core bytes, the
 1024-byte reply and existing 512-byte compiler stack-frame bound. Use independent
 small readers and noinline helpers for storage operations. Compact existing bounded
@@ -22,6 +22,7 @@ The owner's autonomous request authorizes these exact in-scope additions:
 
 | Line | Result |
 |---|---|
+| `guard <board-id> <timing-command>` | Atomically verify board identity before a time or schedule command. |
 | `time` | Confirmed clock/zone state. |
 | `time zone <base64>` | Validate and atomically install a complete phone-zone snapshot. |
 | `time set <utc-seconds> <zone-crc32>` | Set boot-local UTC against the expected zone revision. |
@@ -32,7 +33,7 @@ The owner's autonomous request authorizes these exact in-scope additions:
 Revisions are eight lower-case hexadecimal CRC-32 digits. `status` adds boolean
 `timing:true`; old firmware without it remains usable without timing controls.
 `time` returns `ok`, `valid`, nullable `utc`, `zone`, `offset`, `revision`, `from`,
-`until`, and nullable `error`. `schedule` returns `ok`, `enabled`, `on`, `off`,
+`until`, nullable stable `board`, and nullable `error`. `schedule` returns `ok`, `enabled`, `on`, `off`,
 nullable `override` (`on`/`off`), `revision`, effective `power`, `active`, nullable
 `reason`, boolean `saved` and nullable `error`. Reads are available during show recovery.
 
@@ -104,6 +105,13 @@ the schedule's own output changes from external manual requests to prevent feedb
 ## App connection and Settings
 
 Add timing command validators and a serialized target-guarded client operation.
+Read physical `board` identity first; key cooldowns by it and wrap timing mutations
+and follow-up reads with `guard BOARD ...`. The core checks it atomically, so a
+same-address switch cannot receive another board's queued writes. A missing identity
+is explicit unsupported targeting, never a shared address-based cooldown. IDs are
+bounded31 bytes so the maximum zone still fits the unchanged2048-byte line. This
+needs one optional host callback: firmware reads the immutable factory MAC; native
+hosts hash their normalized resolved show root. Address/build text is not identity.
 Track a successful connection generation separately from status polling, plus the
 existing target generation. A timing controller reacts once to a fresh successful
 connection, verifies time and compares its per-target last-confirmed sync against
