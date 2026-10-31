@@ -1,0 +1,9 @@
+{
+  "number": 65,
+  "slug": "65-p2-quarter-turn-output-rotation",
+  "state": "remaining",
+  "title": "Quarter-turn output rotation",
+  "priority": "P2",
+  "addedAt": "2026-11-01",
+  "summary": "Global0/90/180/270-degree playback output rotation with proposed persistent controls; owner approval of shared commands and rectangular fitting policy remains open."
+}
