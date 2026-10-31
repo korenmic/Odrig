@@ -137,6 +137,8 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Miniature matrix debug mode**, seed 57: planned; app and firmware project the full canvas onto the purchased 10x6 display, with exact approved wiring documented and hardware acceptance checks retained.
 - **Persistent animation brightness overrides**, seed 58: planned; a checkbox saves an animation's brightness independently of the global default.
 - **Message clock widgets and clocks-only mode**, seed 59: planned; seven Hebrew message widgets, exclusive clock playback and ignored file/folder support in both clock modes.
+- **Deep-space picture zoom and row scan**, seed 62: planned; ten alternating rows at fixed 10x zoom, then the approved extra bottom-row pass ending bottom-right; original picture tracked, owner questions resolved.
+- **Ready-made animation uploads**, seed 63: planned; upload ODRG/ODRGX bytes without conversion into the explored folder; the mixed top-level view's destination needs an owner answer.
 
 The state of every seed is in the `state.json` of its folder.
 
