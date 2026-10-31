@@ -805,6 +805,20 @@ class ReferencePlayer:
         self.clock_message = False  # the message after each clock is on
         content = {name: data if isinstance(data, bytes) else data.encode("utf-8") for name, data in files.items()}
         self.files = content    # the files of the folder by name
+        self.schedule = (1, 1080, 360, 0)
+        self.schedule_error = False
+        kept_schedule = content.get("schedule.txt")
+        if kept_schedule is not None:
+            form = re.fullmatch(rb"odrig-schedule 1\n([01]) ([0-9]+) ([0-9]+) ([012])\n", kept_schedule)
+            values = tuple(int(value) for value in form.groups()) if form else None
+            if values is None or any(len(value) > 1 and value.startswith(b"0") for value in form.groups()) or not (0 <= values[1] < 1440 and 0 <= values[2] < 1440) or values[1] == values[2]:
+                self.schedule = (0, 1080, 360, 0)
+                self.schedule_error = True
+                self.start_logs.append("schedule unreadable")
+            else:
+                self.schedule = values
+                if values[3]:
+                    self.on = values[3] == 1
         if changeable:
             for name in self.PARTS:
                 content.pop(name, None)
@@ -1329,6 +1343,13 @@ class ReferencePlayer:
             self._remove(value)
         elif name not in (b"status", b"fault"):
             self.on = name == b"on"
+            self.schedule = (*self.schedule[:3], 1 if self.on else 2)
+            if self.changeable:
+                if self.schedule_error:
+                    return "storage-error"
+                if self.upload is not None:
+                    return "busy"
+                self.files["schedule.txt"] = ("odrig-schedule 1\n" + " ".join(map(str, self.schedule)) + "\n").encode("ascii")
         return None
 
     def _counts(self):

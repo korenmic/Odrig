@@ -820,6 +820,24 @@ send for 15 seconds is sent the comment line `: keep-alive`.
 
 ## The command tool
 
+Board time and scheduling use the same command path as other controls:
+
+```
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] time [OPERATION]
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] schedule [OPERATION]
+python -m odrigctl --port NAME time
+python -m odrigctl --port NAME schedule
+python -m odrigctl --tcp localhost:8766 time
+python -m odrigctl --tcp localhost:8766 schedule
+python -m odrigctl --http http://4.3.2.1 time
+python -m odrigctl --http http://4.3.2.1 schedule
+```
+
+Use `time zone BASE64`, `time set UTC ZONE-CRC32`, `schedule set REV ON OFF on|off`
+and `schedule resume REV` as [commands.md](commands.md#daily-schedule-and-manual-control)
+defines. A manual On/Off is persistent until resumed; an ordinary clock reset
+invalidates civil time and bypasses automatic scheduling until synchronized again.
+
 `odrigctl` sends the commands of [commands.md](commands.md) to the emulator or to the
 board, through a serial port, over TCP or over HTTP. It is a second small Python package
 at the repository root, uses only the Python standard library, and treats the two targets

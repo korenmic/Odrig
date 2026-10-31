@@ -840,6 +840,7 @@ private:
                            given == "order.txt" || given == "order.part" || given == "repeats.txt" || given == "repeats.part" || given == "clocks.txt" || given == "clocks.part" || given == "playlist.txt" || given == "playlist.part" || given == "catalog.txt" ||
                            given == "brightness.txt" || given == "brightness.part" || given == "ignored.txt" || given == "ignored.part" ||
                            given == "timezone.bin" || given == "timezone.part" ||
+                           given == "schedule.txt" || given == "schedule.part" ||
                            given == "catalog.new" || given == "catalog.do" || page;
         if (!sound || !(animation || fixed)) {
             stop("file misuse", kFileMisuse);

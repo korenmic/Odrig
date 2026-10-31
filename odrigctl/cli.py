@@ -21,6 +21,8 @@ COMMANDS = {
     "off": (),
     "brightness": ("N",),
     "status": (),
+    "schedule": ("[OPERATION]",),
+    "time": ("[OPERATION]",),
     "fault": (),
     "space": (),
     "list": (),
@@ -103,6 +105,19 @@ def checked(made, arguments):
         if "\n" in arguments.arguments[0]:
             made.error("a command is one line")
         return ["upload", "external", arguments.arguments[0]]
+    if arguments.command in ("time", "schedule"):
+        words = arguments.arguments
+        if any("\n" in word or "\r" in word for word in words):
+            made.error("a command is one line")
+        if arguments.command == "time":
+            valid = not words or (len(words) == 2 and words[0] == "zone") or (len(words) == 3 and words[0] == "set")
+            message = "time takes no argument, zone BASE64, or set UTC ZONE-CRC32"
+        else:
+            valid = not words or (len(words) == 2 and words[0] == "resume") or (len(words) == 5 and words[0] == "set")
+            message = "schedule takes no argument, set REV ON OFF on|off, or resume REV"
+        if not valid:
+            made.error(message)
+        return [arguments.command, *words]
     if arguments.command == "catalog":
         words = arguments.arguments
         page = len(words) == 4 and words[0] == "page" and words[1] in ("internal", "external") and all(word.isascii() and word.isdigit() for word in words[2:])

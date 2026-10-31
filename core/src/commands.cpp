@@ -560,6 +560,7 @@ uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
 uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t length, char *bytes) {
     const uint64_t now = clock_touch(core, now_ms);
     upload_touch(core, now);
+    schedule_touch(core, now);
     Reply reply;
     reply.bytes = bytes;
     reply.length = 0;
@@ -576,6 +577,19 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
 
     Words words;
     words.split(line, length);
+
+    if (words.is(0, "schedule")) {
+        if (words.count == 1) return schedule_reply(core, now, reply);
+        uint32_t revision = 0;
+        if (words.count == 3 && words.is(1, "resume") && crc_word(words, 2, &revision)) {
+            return schedule_resume(core, now, revision, reply);
+        }
+        uint16_t on = 0, off = 0;
+        if (words.count == 6 && words.is(1, "set") && crc_word(words, 2, &revision) &&
+            schedule_minute(words.text[3], words.size[3], &on) && schedule_minute(words.text[4], words.size[4], &off) &&
+            (words.is(5, "on") || words.is(5, "off"))) return schedule_set(core, now, revision, on, off, words.is(5, "on"), reply);
+        return refuse(reply, "bad-argument");
+    }
 
     if (words.is(0, "time")) {
         if (words.count == 1) return civil_reply(core, now, reply);
@@ -659,8 +673,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (words.count != 1) {
             return refuse(reply, "bad-argument");
         }
-        core.on = switch_on ? 1 : 0;
-        return succeed(reply);
+        return schedule_manual(core, switch_on, reply);
     }
     if (words.is(0, "clocks")) {
         // `clocks on`, `clocks off`, `clocks message on` and `clocks message off`.

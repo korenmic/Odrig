@@ -19,12 +19,15 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 |---|---|
 | `play <id>` | Plays the animation with that id, from its first frame, and then goes on with the playlist; plays the cycle with that id; makes the playlist of the card's folder with that id current and plays its first animation. An unavailable animation is refused. |
 | `play all` | Plays the playlist, from its first animation, and makes the root playlist current. |
-| `on` | Switches the LEDs on. |
-| `off` | Switches the LEDs off: every LED is dark. Playback time keeps running. |
+| `on` | Manually switches the LEDs on and saves an override of scheduling. |
+| `off` | Manually blacks out the LEDs and saves an override; playback keeps running. |
 | `brightness <n>` | Sets the runtime default brightness, 0 to 255. |
 | `brightness <id> <n> save` | Saves brightness for the listed animation's file, including zero, without changing the default. |
 | `brightness <id> default` | Removes that file's saved brightness, using the latest default immediately if it is playing. |
 | `status` | Reports the current state. |
+| `schedule` | Reads daily times, enablement and manual override. |
+| `schedule set <revision> <on-HH:MM> <off-HH:MM> <on-or-off>` | Atomically saves the daily pair and enablement. |
+| `schedule resume <revision>` | Releases manual control back to the saved schedule. |
 | `time` | Reads the boot-local civil clock and accepted phone zone. |
 | `time zone <base64>` | Atomically installs a complete phone-zone snapshot. |
 | `time set <utc-seconds> <zone-crc32>` | Sets the clock against the accepted zone revision. |
@@ -67,13 +70,13 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `debug mini on` | Requests temporary miniature output; status reports host acknowledgement. |
 | `debug mini off` | Requests restoration of normal output. |
 
-At power-on the LEDs are on, brightness is the value in `show.json`, and the show plays
-what [show.md](show.md) says it plays by itself: the playlist of its included animations, or
-the cycle its `start` names. What `on`, `off` and ordinary `brightness <n>` change is not kept across a
-restart, nor is a `play` of an animation or a cycle; the playlist that `play` makes
-current, a folder of the card or the root, is kept with the time spent in its window, see
-[show.md](show.md#the-playlist). What `remove` and `upload` change is: they change the
-installed show.
+At power-on brightness comes from `show.json` and the show plays what
+[show.md](show.md) specifies. The LEDs start on unless a saved manual override says
+otherwise. Scheduling waits for valid civil time after every reset. Manual `on` and
+`off` persist until explicit `schedule resume`; they never expire at a boundary.
+Ordinary `brightness <n>` and a `play` of an animation or cycle are not kept across a
+restart. The current playlist and its spent window are kept as [show.md](show.md#the-playlist)
+describes. `remove` and `upload` change the installed show.
 
 Brightness scales every colour value v to `(v * selected + 127) / 255`, rounded down,
 where selected is the file's saved override or the runtime default. Overrides replace
@@ -82,6 +85,40 @@ is zero. Power off always makes every LED black. Miniature output then caps the
 selected value at 40; WLED's existing current limiter remains in force.
 
 A number in a command is written in decimal digits.
+
+## Daily schedule and manual control
+
+`schedule` reports `ok`, boolean `enabled`, On/Off as HH:MM strings `on`/`off`,
+nullable `override` (on/off), CRC-32 `revision`, effective boolean `power`, boolean
+`active`, nullable `reason`, boolean `saved` and nullable `error`. Defaults are
+enabled, On 18:00, Off 06:00 and no override. An overnight On window includes18:00
+and excludes06:00; same-day windows use the same half-open rule. Clock/zone
+corrections evaluate the resulting current window without replaying missed edges.
+
+`schedule set REV ON OFF on|off` validates and atomically saves the complete pair
+and enablement against the read revision. Equal times, malformed HH:MM and values
+outside00:00..23:59 are bad-argument. `schedule resume REV` clears only the manual
+override and immediately evaluates an enabled schedule with valid time. Wrong
+revisions are stale. Disabled scheduling keeps its pair and manual mode.
+
+The canonical ASCII/LF `schedule.txt` is a header `odrig-schedule 1`, then one line
+`ENABLED ON_MINUTE OFF_MINUTE MODE`, then EOF. Enabled is0/1, minutes0..1439 and mode
+0 auto/1 on/2 off. Decimal tokens have no leading zeros. Missing means the defaults;
+its reported revision is the canonical defaults CRC without creating the file.
+Changed settings write `schedule.part`, close durably, verify every byte, and rename
+atomically. Unchanged settings write nothing. No tick/boundary/time sync writes it.
+Corrupt settings disable scheduling and report settings-unreadable; ordinary edits
+do not silently repair them. Restore a known-good file deliberately before editing.
+
+Manual `on`/`off` always immediately controls LED visibility and overrides scheduling,
+across boundaries, clock changes, reconnections, and reset after a successful save.
+Time-pair edits and auto-sync do not release it. If persistence fails, the immediate
+manual effect remains and the reply reports storage-error (or busy for a conflicting
+upload/rebuild). Read `schedule`: saved:false and manual-not-saved identify a volatile
+override; a corrupt file instead reports settings-unreadable. Hosts without write
+callbacks still accept ordinary volatile manual control. An off installation remains
+reachable and its playback keeps progressing; scheduled On never restarts it or
+resets brightness. Unset/invalid time bypasses automatic scheduling.
 
 ## Board time
 

@@ -19,7 +19,7 @@ Only seed64 is in scope; do not implement seeds45 or61 or resume cancelled seed1
     `assertTrue(state['ok'])` before implementation. Target memory131013 bytes,
     Core3760 bytes; existing limits and status prefix/suffix contracts retained.
 
-- [ ] 2. Implement persistent daily scheduling and sticky manual overrides
+- [x] 2. Implement persistent daily scheduling and sticky manual overrides
   - Add schedule settings validation/readback/atomic publication and wire operations.
     Integrate visibility evaluation with refresh/commands and preserve playback.
     Manual on/off always wins until explicit resume, including reset persistence.
@@ -30,6 +30,14 @@ Only seed64 is in scope; do not implement seeds45 or61 or resume cancelled seed1
     must first fail on unfixed code with its observed failure recorded.
   - Document schedule persistence and manual error semantics. Run discovered core,
     emulator and onboarding suites before the proof commit.
+  - The full emulator gate exposed Windows socket-buffer exhaustion before connect.
+    A controlled regression reproduced the error before its fix. The harness now
+    bounds recovery to two seconds before transmission, with explicit tests that
+    other errors remain immediate and this recovery never replays a sent command.
+  - Verified:1085 discovered core tests pass(1 skip),663 emulator tests pass(20
+    platform skips),88 onboarding tests pass. Missing schedule read first failed
+    `assertTrue(state['ok'])`. Native RGB blackout preserves advancing loop counts;
+    frame ticks do not write timing files. Core3768 bytes, drive arena131021 bytes.
 
 - [ ] 3. Integrate shared timing commands with hosts and command tools
   - Ensure byte-feed/serial, TCP, HTTP and command tool reach the same timing state.

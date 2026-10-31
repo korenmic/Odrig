@@ -12681,3 +12681,18 @@ these protocol choices without another permission question.
 
 **Resolution.** The spec design, commands.md and core.md define the format, strict
 validation, revision guard, atomic publication, reset invalidation and memory bound.
+
+## Seed64: persistent manual precedence and scheduling publication
+
+**Question.** What happens to a manual On/Off if internal settings cannot be saved
+while the owner requires manual control always to win?
+
+**Answer.** Apply visibility and manual mode immediately. Preserve that volatile
+control on a failed save, report storage-error/busy, and expose saved:false plus
+manual-not-saved. Read-only hosts retain their ordinary successful manual control.
+A successful save retains manual mode across reset; only explicit resume releases
+it. Ordinary clock/zone/times edits never release it. The daily pair/enabled flag
+are one atomic publication, never partial field writes or writes at boundaries.
+
+**Resolution.** civil_time.cpp and commands.md define schedule set/resume, file
+grammar, validation/readback, startup and failed-persistence behavior.

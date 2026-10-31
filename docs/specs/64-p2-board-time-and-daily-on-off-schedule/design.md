@@ -34,7 +34,7 @@ Revisions are eight lower-case hexadecimal CRC-32 digits. `status` adds boolean
 `time` returns `ok`, `valid`, nullable `utc`, `zone`, `offset`, `revision`, `from`,
 `until`, and nullable `error`. `schedule` returns `ok`, `enabled`, `on`, `off`,
 nullable `override` (`on`/`off`), `revision`, effective `power`, `active`, nullable
-`reason` and nullable `error`. Reads are available during show recovery.
+`reason`, boolean `saved` and nullable `error`. Reads are available during show recovery.
 
 Malformed forms/ranges/base64/schema yield `bad-argument`; unexpected revisions
 yield `stale`; no usable zone yields `zone-unset`; unsupported writable callbacks

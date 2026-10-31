@@ -256,7 +256,7 @@ class StateAfterStartup(Playback):
                     {"ok": True, "on": True, "brightness": 99, "playing": 3, "animation": animation, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None},
                 )
 
-    def test_a_jump_off_and_brightness_are_not_kept_from_one_startup_to_the_next(self):
+    def test_a_jump_and_default_brightness_reset_while_manual_off_persists(self):
         files = support.example_show()
         with support.installed(files) as folder:
             first = support.session(folder, [at(0, "off"), at(0, "brightness 3"), at(0, "play 2"), status_at(0)])
@@ -264,7 +264,7 @@ class StateAfterStartup(Playback):
         self.assertEqual((state(first.lines[-1])["playing"], state(first.lines[-1])["animation"]), ("all", 2))
         self.assertEqual(
             support.without_readiness(state(second.lines[0])),
-            {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None},
+            {"ok": True, "on": False, "brightness": 128, "playing": 3, "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None},
         )
 
 
