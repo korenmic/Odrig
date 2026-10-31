@@ -244,6 +244,7 @@ export default {
   "6d909590-330045": {"gif": "6d909590-330045.gif", "names": ["21-fx-183_fit.odrg"]},
   "6e050d28-1105": {"gif": "6e050d28-1105.gif", "names": ["pal-modes.odrg"]},
   "6e188b49-138571": {"gif": "6e188b49-138571.gif", "names": ["31-dd550029337681-5_fit.odrg"]},
+  "6e46a8c2-34410601": {"gif": "6e46a8c2-34410601.gif", "names": ["space/space-scan-10x.odrg"]},
   "6e9f950b-527": {"gif": "6e9f950b-527.gif", "names": ["clock-026.odrgx", "clocks/clock-026.odrgx"]},
   "6ff38fa6-64652208": {"gif": "6ff38fa6-64652208.gif", "names": ["long/yt-t6jlhqnxryk/yt-t6jlhqnxryk_08.odrg", "yt-t6jlhqnxryk_08.odrg"]},
   "705d076b-670": {"gif": "705d076b-670.gif", "names": ["clock-064.odrgx", "clocks/clock-064.odrgx"]},

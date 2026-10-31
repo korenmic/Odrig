@@ -1,0 +1,10 @@
+{
+  "number": 62,
+  "slug": "62-p2-deep-space-picture-zoom-and-row-scan",
+  "state": "completed",
+  "title": "Deep-space picture at 10x zoom, scanning alternate rows",
+  "priority": "P2",
+  "addedAt": "2026-10-31",
+  "addedCommit": "8686d0b1778095ab4b7eabdc980018b05d639c0b",
+  "summary": "Implemented the fixed-10x deep-space scan: ten alternating rows and the approved final bottom-row pass, 18004frames/720.16seconds. The34.41MB ODRG, previews and provenance are tracked and copied to the configured share/Drive with byte readback; a complete emulator loop/restart and57LED samples pass. Physical SD installation/catalog refresh and LED/phone acceptance remain unperformed."
+}
