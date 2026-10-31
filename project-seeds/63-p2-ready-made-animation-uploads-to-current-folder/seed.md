@@ -113,8 +113,9 @@ separate from what is playing and from list filters.
   disabled choices, re-detection, explicit Internal selection, preflight versus
   in-flight removal, insufficient internal capacity and storage/catalog changes.
   Native phone acceptance remains an owner check.
-- The owner requested creating this seed only. Do not enqueue or implement it as
-  part of seed62's animation work.
+- The owner authorized this seed's S2S, enqueue and implementation after seed62
+  was merged, with emulator tests, a refreshed APK, firmware when needed, and a
+  final delivery notification.
 
 ## Open Questions Requiring The Owner
 
@@ -139,4 +140,5 @@ explicit owner approval before implementation, as the repository requires.
    malformed files, canvas mismatch, collisions, stale destinations, cancellation,
    disconnects, read-only/missing media and old-firmware behavior.
 4. Relevant portable checks pass; any actual phone/board acceptance is reported
-   separately. Seed creation leaves this feature planned and unimplemented.
+   separately. Deliver the updated APK and any required firmware to the existing
+   Drive artifact files and notify the owner of exactly what was finished/uploaded.
