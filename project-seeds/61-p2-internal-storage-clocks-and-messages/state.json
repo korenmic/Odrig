@@ -1,0 +1,10 @@
+{
+  "number": 61,
+  "slug": "61-p2-internal-storage-clocks-and-messages",
+  "state": "remaining",
+  "title": "Internal-storage clocks and messages",
+  "priority": "P2",
+  "addedAt": "2026-10-31",
+  "addedCommit": "pending-local",
+  "summary": "Recognize the existing clocks/message relative paths across internal storage and SD in both clock modes, including compatible internal path/catalog support, storage-safe duplicate handling and an actual managed deployment attempt of the seven approved message widgets to internal storage. Duplicate precedence remains an explicit owner choice before S2S; no implementation or board upload is part of seed creation."
+}
