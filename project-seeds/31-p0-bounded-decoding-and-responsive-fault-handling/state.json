@@ -1,7 +1,7 @@
 {
   "number": 31,
   "slug": "31-p0-bounded-decoding-and-responsive-fault-handling",
-  "state": "in_progress",
+  "state": "completed",
   "title": "Bounded decoding and responsive fault handling",
   "priority": "P0",
   "addedAt": "2026-10-24T05:39:38+03:00",
