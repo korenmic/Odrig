@@ -129,6 +129,7 @@ const REFUSALS = {
   stale: (line) => line.startsWith("repeat ") ? "That animation's turn had already ended." :
     "Another controller changed this animation since it was opened. Your changes are still here; open it again to see the new one.",
   "storage-error": () => "The installation could not use its storage.",
+  "zone-unset": () => "Set the board's time from this phone first.",
   "no-space": (line) => line.startsWith("repeat ") ?
     "The installation has no room for another saved repeat: it keeps them for at most 32 files of a card or drive and 512 files in all." : ofNoSpace(Number(line.split(" ")[4]), null, line.split(" ")[2] === "external" ? "the card" : "the installation").replace(/ \(no-space\)$/, ""),
   "bad-file": (line, reason, refusal) => `The installation refused the file: ${refusal.reason === null ? "it is not a valid animation" : refusal.reason}.`,

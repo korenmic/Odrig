@@ -12713,3 +12713,27 @@ Initialization and the mirror itself never establish a manual override.
 **Resolution.** `design.md`, `odrig_core.h`, `civil_time.cpp`, `commands.cpp`, the
 native binding/host, firmware adapter and `fwtool/storage.py` carry this contract.
 The earlier no-new-callback design assumption is replaced; seed scope is unchanged.
+
+## Seed 64: connection generations and confirmation boundaries
+
+**Question.** What counts as a reconnect, and can a timing failure trigger another
+automatic sync merely by making the next status reply look like a recovery?
+
+**Answer.** A fresh successful status after begin, foreground or a failed status
+creates a connection generation. Ordinary polls and a timing-operation failure do
+not create one. This prevents self-induced retries. Target/connection/preference
+guards are checked when queued operations are sent and after every await; physical
+identity is also checked by firmware. Backgrounding cancels unfinished preparation.
+Clock confirmation and physical-ID cooldown are independent of schedule readback:
+if UTC was confirmed but a later settings read fails, that confirmed UTC remains a
+successful sync, while the later error is reported. New connections clear old-board
+metadata immediately; current attempts never display a previous attempt as success.
+
+**Resolution.** `app/www/client.js`, `timing.js`, `time-zone.js`, `commands.js`, the
+browser tests and the automatic-phone-time section of `android-app.md` carry it.
+
+A phone zone change while the app remains connected is checked on ordinary client
+observations. It can publish changed zone rules, but cannot set UTC or move the
+last-confirmed UTC time. The observation is remembered even when its initial read
+fails, so later status polls do not silently retry it. A zone that changes during
+preparation invalidates that preparation before any write.

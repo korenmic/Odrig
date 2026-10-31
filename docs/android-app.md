@@ -151,6 +151,7 @@ maps its actions to command lines, each sent as `POST /odrig` to the address tha
 | Nothing: after `catalog` showed a storage's catalog of another generation or number of entries than the one the app read, every page of it from offset 0 to its end, one request after the other | `catalog page <storage> <page> <offset>` |
 | Presses `Rebuild the board's catalog` or `Rebuild the card's catalog`, and then `Rebuild` | `catalog rebuild internal`, `catalog rebuild external` |
 | Presses `Cancel the rebuild` | `catalog cancel` |
+| Connects with timing-capable firmware; reads time, then follows the phone's zone and sets UTC when due | `time`, `guard <board-id> time`, `guard <board-id> time zone <base64>`, `guard <board-id> time set <utc-seconds> <zone-crc32>`, `guard <board-id> schedule` |
 
 It uses the shared command protocol and shows only what a reply said. Mapping saves
 require firmware that supports the mapping commands; an older target gives a readable
@@ -903,6 +904,33 @@ app reads the target once to reconcile, preserves the draft and asks for Reload 
 new attempt. Storage failures, busy/invalid shows, stale revisions and unsupported targets
 have readable messages in Settings.
 
+### Automatic phone time
+
+On a successful connection, the shared app reads the board's time and daily settings.
+Automatic phone-time synchronization is on by default and kept on the phone. Each
+physical board has its own last confirmed sync: a valid clock is set only after at
+least15 minutes, on the next connection. Expiry and ordinary status polls do not
+send a time set. An invalid clock bypasses the cooldown; a backwards phone clock
+also makes a sync due. A deliberate sync shares the same confirmation record.
+
+The phone's current time zone always supplies the offline rules, including DST.
+Preparation runs in a worker, leaving playback controls responsive. A zone-only
+update does not reset the UTC cooldown. Limits are checked explicitly: unsupported
+rules are reported, never truncated or guessed. The board's rules survive reset;
+its UTC validity does not. Manual LED On/Off remains in force until Resume schedule.
+
+Time operations share the ordinary serialized request queue. Every mutation and
+follow-up read binds to the physical board ID, in addition to address/connection
+generations, protecting boards with the same Wi-Fi address. Failed or unconfirmed
+time writes do not start a cooldown; a matching valid readback confirms a set.
+Older firmware keeps its ordinary controls without receiving unsupported timing
+writes. No APK-only web code or extra USB transport is introduced.
+
+Browser fixtures explicitly turn auto-sync off when testing unrelated behavior,
+so the real time of day cannot change their expected LED visibility. Timing tests
+also run the real app with the preference absent and prove the product default-on
+behavior against the native core. Phone/board acceptance remains separate.
+
 ## Messages
 
 The shared message panel gives each failure as a sentence with its code in brackets at
@@ -929,6 +957,7 @@ it is dismissed with `OK` or another takes its place.
 | `read-only` | An upload to the card while the installation cannot write it. | The card cannot be written now. Choose Internal storage to store the animation on the board. |
 | `read-only` | A rebuild of the catalog of a storage the installation cannot write. | That storage cannot be written now, so its catalog cannot be rebuilt. |
 | `storage-error` | The installation could not read or write its storage. | The installation could not use its storage. |
+| `zone-unset` | Time was set before usable time-zone rules were supplied. | Set the board's time from this phone first. |
 | `in-use` | An upload whose id or file name another item took meanwhile. | That name or id is in use on the installation. The list is asked for again; upload again. |
 | `in-use` | `Save` or `Restore default` of the bar for a cycle or a folder of the card. | That is a cycle or a folder, which keeps no repeat. |
 | `no-space` | An upload that does not fit, before it is sent or as the installation judges it. | The animation needs `<size>` KB, and the installation has `<free>` KB free. |

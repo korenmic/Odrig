@@ -2,6 +2,7 @@
 // system's back gesture does.
 
 import * as client from "./client.js";
+import "./timing.js";
 import * as messages from "./messages.js";
 import * as previews from "./previews.js";
 import * as authoring from "./screens/author.js";

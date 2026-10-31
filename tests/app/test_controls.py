@@ -19,14 +19,14 @@ class Controls(unittest.TestCase):
     def sent(self, emulator, scenario, done, **settings):
         """Runs a scenario against an emulator. Gives what it found, and the command lines
         the emulator took over HTTP that are no `status`, no `list`, no `space`, no saved
-        order and no catalog, each with the time it came at, up to the first one that `done`
+        order, catalog or timing read, each with the time it came at, up to the first one that `done`
         says is the last."""
         with emulator_support.EventStream(emulator.port) as stream:
             found = support.run(scenario, address=f"127.0.0.1:{emulator.port}", settings=settings)
             events = stream.read_until(lambda events: any(done(json.loads(event.data)["line"]) for event in events if event.kind == "log"), 10)
         logged = emulator_support.of_kind(events, "log")
         self.assertEqual({entry["transport"] for entry in logged}, {"http"})
-        return found.seen, [(entry["line"], entry["ms"]) for entry in logged if entry["line"].split(" ")[0] not in ("status", "list", "space", "catalog") and not entry["line"].startswith("order get")]
+        return found.seen, [(entry["line"], entry["ms"]) for entry in logged if entry["line"].split(" ")[0] not in ("status", "list", "space", "catalog") and not entry["line"].startswith("order get") and not support.timing_read(entry["line"])]
 
 
 class Buttons(Controls):

@@ -57,7 +57,7 @@ Only seed64 is in scope; do not implement seeds45 or61 or resume cancelled seed1
     files were observed failing first. Core3776 bytes; drive arena131029 bytes.
     Physical board/phone checks remain unperformed.
 
-- [ ] 4. Add phone-zone generation and guarded connection-triggered synchronization
+- [x] 4. Add phone-zone generation and guarded connection-triggered synchronization
   - Implement worker-based zone snapshots from phone Intl data, validated timing
     commands and serialized client operations with target/connection generations.
     Add persistent default-on auto-sync and per-board 15-minute confirmations;
@@ -68,6 +68,13 @@ Only seed64 is in scope; do not implement seeds45 or61 or resume cancelled seed1
     manual sync, target switches across awaits/queued sends and old firmware.
     Observe absent sync behavior before adding it; bug regressions are red first.
   - Run discovered app and onboarding suites; retain meaningful progress notifications.
+  - Verified:476 discovered app cases pass through the bounded parallel runner;
+    88 onboarding tests pass. Native auto-sync, named-zone transitions, worker
+    responsiveness, serialized target guards, cooldown and live zone changes pass.
+    Missing initial sync, stale/pending metadata, connected zone changes and an
+    unwanted read retry were observed failing first. The full run also exposed
+    old command-count assertions and a drag-fixture destination that followed its
+    moving placeholder; all were corrected and the complete discovery rerun passes.
 
 - [ ] 5. Add confirmed Time and schedule controls to Settings
   - Add time/zone readout, refresh, sync now, auto-sync preference, enabled flag,
