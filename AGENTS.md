@@ -129,7 +129,6 @@ keeping the seed in progress.
 - **A second firmware that does not use WLED**, seed 12: cancelled by the owner; do not resume its unfinished tasks.
 - **Current limits for the wall and each snake**, seed 45: implemented in open PR #15; not yet merged.
 - **Internal-storage clocks and messages**, seed 61: planned; recognize matching clock/message paths in internal storage and SD, with a later managed upload attempt of the seven approved messages. A persistent dropdown chooses SD card (default) or Internal storage for matching path/type duplicates; owner product questions are resolved.
-- **Board time and a daily on/off schedule**, seed 64: software built; read/set time over existing transports and use the Time and schedule card in Settings. Default On18:00/Off06:00; ignore scheduling while time is invalid. Automatic phone sync defaults on, waits for a due connection after15 minutes and follows the phone's zone/DST. Manual On/Off persists until Resume schedule. Portable verification and delivery are recorded in [verification.md](docs/specs/64-p2-board-time-and-daily-on-off-schedule/verification.md); physical phone/board acceptance is open.
 
 The state of every seed is in the `state.json` of its folder.
 

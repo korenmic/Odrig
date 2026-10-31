@@ -112,7 +112,29 @@ electrical or power-loss observations. No board was flashed or erased by this ru
 
 ## Artifact handoff
 
-Task7 owns clean-source firmware/APK builds, persistent signing, Android
-installation/update/launch, mounted Drive replacement and byte/identity checks.
-Its exact source hashes and artifact evidence belong in `delivery.json` after
-those actions succeed. This task does not claim deployment happened yet.
+Both artifacts were built from clean source `74eb4ac21cdbc4c973f581147ad5337a20dfd704`.
+The task7 proof changes documentation/state only; runtime/build inputs are unchanged.
+Exact hashes, sizes, source and mounted Drive identity evidence are in
+[delivery.json](delivery.json).
+
+- APK:19092430 bytes, SHA256
+  `273e64fa7bf2db869f273b0c3f06844edfb9cba8a34cd614d741cdbe3524fcc9`.
+  Eight discovered packaging tests pass; persistent signing certificate and alignment
+  were verified. The existing published APK upgrades successfully using the same key.
+- Firmware:1888176 bytes, SHA256
+  `989106abe5099dfc484ea07cf6fc29cdbba3a1fe0564b27b0592c3e6d7408635`.
+  Built only with fw.py on Windows. Offline image/size/ELF/source checks pass.
+  This is an ESP32-S3 application image for offset `0x10000`, not a factory image.
+- An owned read-only Android16 emulator clone passed clean install, previous-APK
+  upgrade and launch. With its zone explicitly set to Asia/Jerusalem, the actual
+  Android native Wi-Fi bridge and module worker synchronized time/zone to the native
+  core, confirmed saved hours, observed blackout, manual On and Resume schedule.
+  The original AVD configuration was unchanged; the clone and test servers stopped.
+- Existing `Artifacts/odrig/odrig-debug.apk`, firmware and five companion records
+  on the mounted Google Drive were overwritten in place. All seven sizes/hashes and
+  mounted device/inode identities were checked. Persistent key/certificate/reuse
+  backups match and remain unchanged. Independent Drive API file IDs were not queried.
+
+The final proof's exact pushed-head PR checks are a separate post-push gate. Task7
+and final delivery notifications wait for those results. These software and virtual
+device checks do not complete the physical acceptance checklist above.

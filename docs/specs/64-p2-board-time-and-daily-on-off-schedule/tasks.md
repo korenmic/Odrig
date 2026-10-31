@@ -111,7 +111,7 @@ Only seed64 is in scope; do not implement seeds45 or61 or resume cancelled seed1
     Arena131029/Core3776 and original bounds are retained. verification.md records
     exact run identities and the unperformed physical acceptance checklist.
 
-- [ ] 7. Build, deploy and verify the APK and firmware artifacts
+- [x] 7. Build, deploy and verify the APK and firmware artifacts
   - Build firmware only through fw.py on Windows and inspect its ESP32-S3 image and
     build inputs. Build the APK with the existing persistent dedicated signer;
     verify clean install, same-key update and launch on an owned Android emulator.
@@ -121,3 +121,12 @@ Only seed64 is in scope; do not implement seeds45 or61 or resume cancelled seed1
   - Commit this task's proof; audit one task per commit, push one PR to master and
     run the exact-head PR CI gate. Resolve in-scope regressions before ready handoff.
     Notify task completion, all-tasks finish and successful push/CI delivery separately.
+  - Verified: clean source74eb4ac produced the signed APK and ESP32-S3 application
+    image. Eight APK packaging tests pass; Android16 clean installation, same-key
+    upgrade, launch and actual native Wi-Fi time/schedule/manual/Resume checks pass.
+    Offline firmware image/source/ELF checks pass. Seven existing Drive files were
+    overwritten in place and their bytes and mounted identity verified; signing
+    backups remain unchanged. delivery.json records exact hashes and source.
+    This proof changes documentation/state only. Exact pushed-head CI follows the
+    proof's push; completion notifications wait for that gate. Physical acceptance
+    remains unperformed, as listed in verification.md.
