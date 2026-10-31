@@ -138,7 +138,6 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Miniature matrix debug mode**, seed 57: software and firmware built; app and firmware project the full canvas onto the purchased 10x6 display, with approved wiring documented. Electrical commissioning and board/phone acceptance remain open.
 - **Persistent animation brightness overrides**, seed 58: software built; a checkbox saves brightness by file independently of the runtime default. Board and phone acceptance are open.
 - **Message clock widgets and clocks-only mode**, seed 59: software built; seven complete Hebrew message widgets, exclusive clock playback and persistent own/ancestor exclusions in both clock modes. Board and phone acceptance remain open.
-- **Cross-platform firmware builds**, seed 60: host-aware setup/build and verification implemented; Windows x64 local build proof and a Windows/macOS/Linux CI matrix. Actual remote host results and final artifact delivery are recorded in its verification document. Board/phone acceptance remains open.
 
 The state of every seed is in the `state.json` of its folder.
 

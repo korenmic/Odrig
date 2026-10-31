@@ -295,3 +295,54 @@ The final commit audit extends the22 earlier proof commits with this task5 bound
 Every task has a separate checkbox/proof commit. Six earlier subjects omit the
 required Seed/task prefix: `541e702`, `907d812`, `f24aa9f`, `c59aa8d`, `b677d19`, `8ae2e35`. These naming deviations are disclosed;
 pushed history is preserved. They do not bundle implementation tasks.
+
+## Task 8 — actual Android installation and signing migration
+
+The owner reported `App not installed`. The exact previously delivered APK was
+installed and launched successfully on Android16, and updating it with the same
+signer succeeded. The installation gap was reproduced by first installing the backed-up
+Mac APK (`dec9baf06dd9de49265439191652820fe736ba6f8889461fadf360dd0d63e65d`) and then attempting the Windows-signed update:
+`INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package app.odrig.operators signatures
+do not match newer version`. Removing that old installation, installing the Windows
+APK and updating it again all succeed. The failure is Android's certificate transition,
+not an APK-content failure. The earlier package/signature assertions did not exercise
+this actual old-to-new installation path.
+
+The owner had authorized replacing the Mac signing key. Such a change requires a
+one-time uninstall on the phone unless the original private key is recovered; rebuilding
+or re-signing with the new key cannot make an old-key installation accept an update.
+The installation guide now explains the failure, the one-time migration and its data
+effect: phone-local app settings/previews reset, while the board's settings/animations
+remain on the board. The package name and app behavior are preserved. The physical
+phone's installation has not been observed, and owner confirmation remains open.
+
+A fresh APK was rebuilt from clean revision `49fe191689587b6006451e7d91e0ae1377795ad6` using
+the same dedicated key/certificate `5a489ec294e53cdec085d71092cf4e7285ae08d4d43c19929d84130f3649f0f1`.
+All eight original package/asset assertions, signature and alignment checks pass.
+The fresh APK also passes actual clean installation, cold launch, same-signer update
+and post-update launch, including checking its live process. Its old-Mac mismatch
+and successful one-time uninstall migration were reproduced again.
+
+| Delivered APK | Bytes | SHA256 |
+|---|---:|---|
+| `odrig-debug.apk` | 19046838 | `28205c1066990eb02c1db356bff69e869337aabef962d868d76648750890c623` |
+
+The existing `Medium_Phone_API_36.1` AVD was launched headlessly on owned port5580
+with read-only/no-snapshot flags; no original snapshot was saved, its configuration
+hash is unchanged, and every owned emulator process was stopped. Other projects'
+applications and original AVD were not installed over or erased. Retained native
+command/proof files are under `build/apk-install-diagnosis/`, `apk-install-upgrade/`
+and `apk-install-rebuilt/`; final proof binds installation results to the uploaded hash.
+
+The fresh APK and updated signer-reuse notes were written into the existing Drive
+files in place, flushed and read back; APK inode11084 is unchanged. Previous bytes
+are backed up under build/. The persistent key, credential backup and firmware
+remain byte-identical. Receipt version2 records APK source separately from firmware
+source `7e51b988de85603da1e396ca3a0ad53dd3c2f785` and includes the Android installation proof.
+Local upload proof is `build/apk-install-rebuilt/drive-proof.json`.
+
+The expanded verification also exposed a bookkeeping failure: the completed seed60
+was still named in AGENTS.md's coming list. The existing onboarding test failed on
+that exact stale entry; removing it restores all88 tests (run20261031-031658-111952).
+No runtime code or firmware settings changed. Final PR checks after this documentation
+and verification commit remain owned before the handoff.

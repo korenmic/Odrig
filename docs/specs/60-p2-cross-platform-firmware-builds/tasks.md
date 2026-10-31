@@ -61,3 +61,13 @@ checkbox and commit. Earlier board/phone tasks stay unchecked.
   core build to catch this before firmware downloads; run discovered core/emulator
   regression suites locally and own the actual Mac check. Commit this minimal build
   safety repair before final task5 delivery, then rebuild artifacts from that source.
+
+- [x] 8. Verify Android installation and repair the signing-migration delivery.
+  Reproduce the owner's installation failure against the previously published Mac
+  APK in an existing read-only Android emulator. Confirm clean install, launch and
+  same-signer update; document the one-time uninstall required when changing keys
+  and its effect on phone-local data. Rebuild with the same persistent Windows key,
+  rerun package and actual Android installation checks, replace the existing Drive
+  APK in place with byte/identity verification, and record the proof. Preserve the
+  package name, app behavior, firmware, original AVD and other projects' processes.
+  Push this verification correction to the existing PR and own its final checks.

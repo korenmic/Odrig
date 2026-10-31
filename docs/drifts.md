@@ -12560,3 +12560,21 @@ the PR does not schedule it. No compiler protection or runtime test is weakened.
 The verification record distinguishes observed Mac default/inspection/host success
 from the uncompleted newcomer walkthrough, and never calls the canceled overall
 run green. Final PR Windows/Linux checks remain owned before handoff.
+
+## Seed 60: verify the Android signing-key transition on an actual emulator
+
+**Question.** Package/signature checks pass, but the owner sees `App not installed`
+after the authorized move from the Mac signing key to a persistent Windows key.
+Which installation path must the delivery verify?
+
+**Answer.** Exercise both clean installation and updates on Android. The old Mac
+APK followed by the new signer reproduces `INSTALL_FAILED_UPDATE_INCOMPATIBLE`;
+one-time removal of the old installation permits the new APK, and later same-key
+updates succeed. Preserve package identity and the persistent key. Explain that
+the migration resets phone-local app data and leaves board storage unchanged.
+Do not describe rebuilding with a different key as a transparent upgrade.
+
+**Resolution.** The Android installation guide carries the migration instructions,
+and the verification record binds emulator install/launch/update results to the
+rebuilt APK's delivered bytes. The old-to-new path is a required publication check;
+physical phone acceptance remains open. No new application feature was added.

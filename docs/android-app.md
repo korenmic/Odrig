@@ -302,10 +302,25 @@ Either connect the phone by USB and run `python3 app/app.py install`, or copy
 `build/app/odrig-debug.apk` to the phone and open it there; the phone then asks whether
 apps from this source may be installed. The app is called `odrig`.
 
-The APK is a debug build, signed with a key that the first build made in
-`build/app/android-user/`. An app signed with another key does not replace it: after the
-work folder was removed, or on another computer, remove the app from the phone before
-installing a new build.
+Every APK is signed. Android will not replace an installed app with the same package
+name and a different signing certificate, even when installing from an allowed source.
+The installer may say only `App not installed`; USB installation reports
+`INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
+
+The Windows delivery uses the dedicated persistent key backed up beside the APK in
+Google Drive `Artifacts/odrig/`, with its credentials and reuse instructions. When
+moving from the former Mac-signed APK to this key, uninstall `odrig` from the phone's
+Settings, then install the downloaded APK. This is a one-time migration: uninstalling
+resets the app's phone-local settings and cached previews. The board's settings and
+animations are stored on the board and are not removed by uninstalling the phone app.
+Future builds must reuse the backed-up key and can update this installation normally.
+Retaining the original signing key instead is required to update a Mac-signed
+installation without uninstalling it; re-signing or rebuilding with a different key
+cannot bypass Android's certificate check.
+
+Before publishing an APK, verify its clean installation, launch and update on Android,
+as well as its package contents and signature. An emulator check covers those paths;
+the physical phone and board acceptance checks remain separate.
 
 The app needs Android 7 or later, and a web view of version 80 or later. On a phone with
 an older web view it says so, and says to update "Android System WebView" in the Play
