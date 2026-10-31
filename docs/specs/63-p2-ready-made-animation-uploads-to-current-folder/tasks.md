@@ -36,7 +36,7 @@ previously delivered seeds56–60; seed61 is not a dependency or part of this ru
     physical board/phone checks remain open. No hardware changes or flashing.
   - Requirements:4.1,3.2–3.4.
 
-- [ ] 4. Build and deliver signed APK and updated firmware
+- [x] 4. Build and deliver signed APK and updated firmware
   - Build firmware through the existing Windows pipeline and APK from the same
     clean software source using the persistent dedicated key. Verify signer,
     packaging and native Android clean install/same-key update/launch.

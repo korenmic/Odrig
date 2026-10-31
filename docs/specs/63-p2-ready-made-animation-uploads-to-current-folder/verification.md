@@ -69,8 +69,31 @@ every initial broad run was green.
 
 ## Delivery and owner acceptance
 
-APK and firmware delivery evidence will be added by task 4. Both must use the same
-clean software source; firmware changes are required for nested guarded uploads.
+APK and required firmware were built from the same clean software source,
+`9c5b996ee8505d086bfa81b18e56f3513d873a68`. The later task-4 proof commit
+changes only documentation and completion bookkeeping. See [delivery.json](delivery.json)
+for hashes, lengths, source and mounted file identities.
 Windows verification is authorized; macOS verification is deferred by the owner.
 Physical phone installation, SD removal/reinsertion on the board, and observed LED
 playback remain open owner checks. Emulator and Android AVD checks do not close them.
+
+
+The APK passed all eight original packaging assertions using native Windows SDK
+tool resolution, signature verification and alignment. A temporary read-only clone
+of the existing Android16 AVD passed clean install, launch, same-key update and
+relaunch with a live application process. Its original configuration was unchanged,
+and the owned emulator was stopped. This does not claim a physical phone check.
+
+The default microSD firmware was built through `firmware/fw.py build` on Windows,
+using the pinned tools in the supported shared cache. Offline inspection passed the
+ESP32-S3 application header, checksum, source/input provenance, size and linked
+player entry points. It is the application image for offset `0x10000`; no board was
+flashed and no flash erase was performed.
+
+The existing `G:/My Drive/Artifacts/odrig/odrig-debug.apk` and
+`odrig-firmware.bin` were overwritten in place, along with the firmware checksum,
+build provenance, inspection and delivery sidecars. Readback verified every byte
+hash and length, and retained the existing mounted file identities. This is mounted
+Drive evidence, not an independent Drive API check. The dedicated signing key and
+all four existing signing backup files remained byte-identical. The global Android
+debug key was also unchanged.

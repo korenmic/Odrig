@@ -139,7 +139,6 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Persistent animation brightness overrides**, seed 58: software built; a checkbox saves brightness by file independently of the runtime default. Board and phone acceptance are open.
 - **Message clock widgets and clocks-only mode**, seed 59: software built; seven complete Hebrew message widgets, exclusive clock playback and persistent own/ancestor exclusions in both clock modes. Board and phone acceptance remain open.
 - **Internal-storage clocks and messages**, seed 61: planned; recognize matching clock/message paths in internal storage and SD, with a later managed upload attempt of the seven approved messages. A persistent dropdown chooses SD card (default) or Internal storage for matching path/type duplicates; owner product questions are resolved.
-- **Ready-made animation uploads**, seed 63: planned; upload ODRG/ODRGX without conversion into the explored folder, with selectable storage, External default and Internal fallback while absent External is grayed out. Owner product questions are resolved.
 
 The state of every seed is in the `state.json` of its folder.
 
