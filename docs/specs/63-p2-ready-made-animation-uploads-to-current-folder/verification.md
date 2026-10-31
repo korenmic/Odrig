@@ -135,3 +135,26 @@ The correction changes only app code. The delivered firmware's input digest rema
 its image, checksum and provenance remain unchanged for this correction.
 Task 6 records the new APK and retains that firmware. Phone folder-browsing
 acceptance remains open until the owner tries the updated APK.
+
+
+## Updated APK delivery for folder recovery
+
+The corrected APK was built from clean app source `0dc6fa20037c58be73c0379baacecd852abd0238`.
+All eight original packaging assertions, signature and alignment passed. The
+read-only Android16 AVD passed clean install, launch, same-key update and relaunch;
+its original configuration was unchanged and the owned emulator stopped. The
+browser/native-core tests verify folder recovery; the AVD proof verifies the exact
+APK's installation and launch, not an observed physical-phone folder session.
+
+The existing Drive `odrig-debug.apk` and delivery record were overwritten in place
+and re-read by SHA256, length and mounted identity. The APK is 19096231 bytes,
+SHA256 `5e75884d3b935bc43cd2520d66d53aa19b2cbbc88ded1db7ffaf182c9bdabf47`.
+See [the follow-up delivery record](folder-recovery-delivery.json).
+
+The already-delivered firmware remains byte-identical, with its original source
+`9c5b996ee8505d086bfa81b18e56f3513d873a68` and unchanged firmware-input digest.
+It was neither rebuilt nor re-uploaded for this app-only fix. The persistent
+signer and existing signing backups remain unchanged. The task6 proof commit
+changes documentation/completion metadata only; it does not change packaged code.
+Physical phone folder-browsing acceptance and the separately reported storage
+failure remain open; the navigation correction does not claim to repair SD/flash IO.

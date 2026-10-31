@@ -1,0 +1,38 @@
+{
+  "deliveredUtc": "2026-10-31T10:16:07.921581+00:00",
+  "seed": 63,
+  "task": 6,
+  "apkSourceCommit": "0dc6fa20037c58be73c0379baacecd852abd0238",
+  "pullRequest": "https://github.com/korenmic/Odrig/pull/37",
+  "certificateSha256": "5a489ec294e53cdec085d71092cf4e7285ae08d4d43c19929d84130f3649f0f1",
+  "apk": {
+    "bytes": 19096231,
+    "sha256": "5e75884d3b935bc43cd2520d66d53aa19b2cbbc88ded1db7ffaf182c9bdabf47",
+    "device": 428019990,
+    "inode": 11084,
+    "overwrittenInPlace": true,
+    "mountedReadbackVerified": true
+  },
+  "android": {
+    "packagingTests": 8,
+    "cleanInstall": true,
+    "sameSignerUpdate": true,
+    "launch": true,
+    "androidVersion": "16"
+  },
+  "firmware": {
+    "rebuilt": false,
+    "uploaded": false,
+    "reason": "App-only navigation correction; firmware source inputs unchanged.",
+    "sourceCommit": "9c5b996ee8505d086bfa81b18e56f3513d873a68",
+    "inputsSha256": "3d8b6dd472e4f9c30827a1f4c706496fd2ad7faf9afe2ce0a47677fe66f961cd",
+    "bytes": 1880416,
+    "sha256": "288d6989dc5d298beaf5a5d5f41d8ef5826e6a3c0f1bf8bca3205c3f77f2c440",
+    "device": 428019990,
+    "inode": 11087
+  },
+  "signingBackupsVerifiedUnchanged": true,
+  "identityEvidence": "In-place write and mounted SHA256/length/file-identity readback; no independent Drive API check.",
+  "physicalFolderAcceptance": false,
+  "physicalStorageFailureDiagnosis": "Awaiting the owner storage reports; not claimed fixed by the navigation correction."
+}
