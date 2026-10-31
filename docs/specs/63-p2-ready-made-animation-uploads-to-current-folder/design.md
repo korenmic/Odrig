@@ -12,8 +12,9 @@ redesign, new format, hardware change or new command tokens are needed.
 Extend the existing external begin's `<file>` argument to a valid catalog path.
 Split it into a basename and an existing indexed folder's stable id (zero means
 root). Reconstruct its canonical path on the stack when committing. Keep only
-the basename and compact folder id in Upload; pack boolean/state fields to avoid
-growing the fixed arena. Do not borrow the live playback/index row's name buffer.
+the basename and full32-bit folder id in Upload; a modular32-bit quiet timer
+keeps its existing allocation unchanged. Do not borrow the live playback/index
+row's name buffer. URI-encode spaces/percent signs in the existing path argument.
 Resolve the folder by id and confirm the path before opening a part. Existing
 drive-number change handling must discard the transaction before a different
 medium can be written. Recheck the folder at commit.
@@ -30,8 +31,9 @@ Keep existing explicit external replacement clients compatible. Extend the
 existing `upload expect <crc32>` to external storage: `00000000` requires the
 destination to be absent, both before accepting data and immediately before
 publication. An occupied path returns `stale`; it never replaces a file. Nonzero
-values retain bounded expected-content checking for explicit replacements where
-supported. The app sends the absence guard for every new external upload.
+external values are refused; existing internal expectations retain bounded
+expected-content checking for explicit replacements. The app sends the absence
+guard for every new external upload.
 Internal new uploads use a fresh id and name checked against the current root
 and retain the existing in-use protections. Existing text/clock edits are untouched.
 This extends argument handling of existing command forms on all core transports;

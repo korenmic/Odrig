@@ -4,7 +4,7 @@ Each task runs through TACTIC as one proof commit with only its own checkbox
 ticked. Regression tests must be observed failing before the fix. Preserve
 previously delivered seeds56–60; seed61 is not a dependency or part of this run.
 
-- [ ] 1. Support guarded external uploads into existing indexed folders
+- [x] 1. Support guarded external uploads into existing indexed folders
   - Extend existing begin path parsing, compact Upload destination lifetime and
     external absence expectation without adding command spellings.
   - Update atomic catalog/index publication for nested insertion and preserve

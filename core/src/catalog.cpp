@@ -12,6 +12,7 @@
 #include "brightness.h"
 #include "ignored.h"
 #include "storage.h"
+#include "upload.h"
 
 namespace odrig {
 
@@ -823,7 +824,7 @@ struct TableEdit {
     uint32_t folders_of;
 };
 
-// A change of the map: the line `<add_id> f 0 <add_row>` put before line `insert_at`, or
+// A change of the map: `<add_id> f <ordinal> <add_row>` put before line `insert_at`, or
 // none for kNothing; the line of the id `drop_id` left out, or none for 0; the lines of the
 // folders whose ordinals are from `gone_from`, `gone_count` of them, left out and the
 // ordinals after them less as many; the rows after `row` of the folder `ordinal` one less,
@@ -1054,7 +1055,7 @@ ODRIG_NOINLINE bool write_map(Core &core, const IndexChange &change, uint32_t *l
     for (uint32_t line_at = 0; line_at <= count; ++line_at) {
         if (line_at == edit.insert_at) {
             const uint32_t start = writer.length;
-            put_id_line(core, &writer.length, edit.add_id, 'f', 0, edit.add_row);
+            put_id_line(core, &writer.length, edit.add_id, 'f', edit.ordinal == kNothing ? 0 : edit.ordinal, edit.add_row);
             if (!writer_line(core, writer, start, kIndexIdRow)) {
                 return false;
             }
@@ -1074,7 +1075,7 @@ ODRIG_NOINLINE bool write_map(Core &core, const IndexChange &change, uint32_t *l
         if (id == edit.drop_id || (kind == 'd' && ordinal >= edit.gone_from && ordinal < past)) {
             continue;
         }
-        if (kind == 'f' && ordinal == edit.ordinal && row > edit.row) {
+        if (edit.drop_id != 0 && kind == 'f' && ordinal == edit.ordinal && row > edit.row) {
             --row;
         }
         if (kind == 'f' && ordinal == edit.move_ordinal) {
@@ -1681,24 +1682,43 @@ void current_again(Core &core) {
 
 }  // namespace
 
-bool catalog_install_external(Core &core, uint32_t *id) {
+namespace {
+
+// A nested insertion also changes its parent's row with its own-file count.
+ODRIG_NOINLINE bool add_parent(const Core &core, const IndexFolder &folder, IndexChange &index) {
+    if (folder.depth == 0) return true;
+    uint32_t before = folder.ordinal;
+    IndexFolder parent;
+    do {
+        if (before == 0 || !drive_folder(core, --before, parent)) return false;
+    } while (parent.depth + 1 != folder.depth);
+    index.folders[1] = index.folders[0];
+    index.folders[0] = edit_of(parent);
+    index.folders[0].child = folder.id;
+    index.folders[0].child_files = folder.files + 1;
+    index.folder_count = 2;
+    return true;
+}
+
+ODRIG_NOINLINE bool install_external_path(Core &core, const char *name, uint32_t *id) {
     const Upload &upload = core.upload;
     if (!core.indexed) {
         return false;
     }
-    // A file of the root of this name is replaced, keeping its row and its id.
+    // An explicit replacement keeps its own row and id in the chosen folder.
     IndexFolder root;
-    if (!drive_folder(core, 0, root)) {
+    uint32_t ordinal = 0;
+    if ((upload.folder != 0 && drive_find(core, upload.folder, &ordinal) != 'd') || !drive_folder(core, ordinal, root)) {
         return false;
     }
     uint32_t replaced = kNothing;
     uint32_t kept_id = 0;
     for (uint32_t row = 0; row < root.files && replaced == kNothing; ++row) {
-        const DriveRow *found = drive_row(core, row);
+        const DriveRow *found = drive_row(core, root.first + row);
         if (found == nullptr) {
             return false;
         }
-        if (same_text(found->name, upload.name)) {
+        if (same_text(found->name, name)) {
             replaced = row;
             kept_id = found->id;
         }
@@ -1709,7 +1729,7 @@ bool catalog_install_external(Core &core, uint32_t *id) {
     index.folders[0] = edit_of(root);
     uint32_t new_id = kept_id;
     if (replaced != kNothing) {
-        player_releases_file(core, kDriveBase + replaced);
+        player_releases_file(core, kDriveBase + root.first + replaced);
         index.folders[0].replace_row = replaced;
     } else {
         uint32_t line_at = 0;
@@ -1718,17 +1738,19 @@ bool catalog_install_external(Core &core, uint32_t *id) {
             return false;
         }
         index.folders[0].add_id = new_id;
-        index.table.files_of = 0;
+        index.table.files_of = ordinal;
         index.table.files_delta = 1;
-        index.table.firsts_after = 0;
+        index.table.firsts_after = ordinal;
         index.table.first_delta = 1;
         index.map_changes = true;
         index.map.insert_at = line_at;
         index.map.add_id = new_id;
         index.map.add_row = root.files;
+        index.map.ordinal = ordinal;
+        if (!add_parent(core, root, index)) return false;
     }
     CatalogChange change;
-    change.added = upload.name;
+    change.added = name;
     change.added_bytes = upload.size;
     change.added_crc = crc_value(upload.crc);
     change.added_total_ms = upload.total_ms;
@@ -1745,14 +1767,21 @@ bool catalog_install_external(Core &core, uint32_t *id) {
     ignored_start(core);
     if (replaced != kNothing) {
         // What plays it plays the new file from its start.
-        player_file_replaced(core, kDriveBase + replaced);
+        player_file_replaced(core, kDriveBase + root.first + replaced);
     } else {
-        // The new file is the root's last: every position at or after it moves on by one.
-        player_drive_shifted(core, root.files, 1);
-        player_drive_joined(core, root.files);
+        // Every walk position at or after the folder's new last file moves on by one.
+        player_drive_shifted(core, root.first + root.files, 1);
+        player_drive_joined(core, root.first + root.files);
     }
     *id = new_id;
     return true;
+}
+
+}  // namespace
+
+bool catalog_install_external(Core &core, uint32_t *id) {
+    char name[kDrivePathRoom];
+    return upload_external_name(core, name) && install_external_path(core, name, id);
 }
 
 namespace {

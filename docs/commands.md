@@ -390,6 +390,25 @@ seconds is discarded too: no data arrived, and no check is running.
 Playback goes on during an upload. Nothing of the show changes before `upload end`
 succeeds.
 
+### External folder destinations and guarded creation
+
+The existing `upload begin external <file> <bytes> [<crc32>]` also accepts the
+full canonical path of a file in an existing indexed folder. Its basename keeps
+the internal32-byte naming rule; its folders and full path obey the catalog's
+100-byte/three-level limits. URI-encode spaces and percent signs in that argument
+(for example `space%20room/new.odrg`); the core decodes once, then validates the
+entire path. Absolute paths, traversal, bad escapes and unsafe components are
+`bad-argument`; a missing indexed folder is `unknown-id`. No folder is created.
+
+For a new external file, follow begin with `upload expect 00000000` before data.
+This requires an absent catalog and physical destination, checks it again just
+before publication, and discards the upload with `stale` on collision. External
+nonzero expectations and an expectation after data are `bad-argument`. Existing
+explicit external uploads without the absence guard retain replacement behavior;
+existing internal edit expectations keep their CRC semantics. Card removal ends
+the external transaction; later data/end answer `no-upload`, including after
+reinsertion. A new manual attempt is needed and never continues in other storage.
+
 ## Miniature display debug mode
 
 `status.mini` reports `supported`, acknowledged `on` (null after failed setup),

@@ -127,7 +127,8 @@ struct Upload {
     uint8_t state;
     uint8_t outcome;        // of a check that has ended
     uint8_t reason;         // why the file is not valid, a Reason
-    uint8_t header_read;    // the first step of the check has been taken
+    uint8_t header_read : 1; // the first step of the check has been taken
+    uint8_t absent : 1;     // the external destination must remain absent
     uint16_t id;            // the id the item gets, or has
     char name[33];          // the name the file gets
     uint8_t installed;      // the file is installed: the id, the name, the size and the CRC-32 are its
@@ -136,7 +137,8 @@ struct Upload {
     uint32_t crc;           // the running CRC-32 of the bytes received
     uint32_t records_left;  // the frame records the check has still to decode
     uint64_t total_ms;      // the sum of the durations of the records decoded
-    uint64_t progress;      // the time something last moved
+    uint32_t progress;      // low timestamp bits; quiet intervals use modular subtraction
+    uint32_t folder;        // external folder id, zero for the root
 };
 
 // What the core knows of the file at one place of a drive's list: its size, its length and
