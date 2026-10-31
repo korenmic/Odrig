@@ -3,7 +3,7 @@
 Run through TACTIC in order, one task/test/checkbox/proof commit at a time.
 This seed's owner questions are resolved. Seed63 remains planning only.
 
-- [ ] 1. Implement the deterministic camera route and source generator
+- [x] 1. Implement the deterministic camera route and source generator
   - First add discovered converter tests demonstrating the missing generator;
     observe and record the failing import/feature assertion before implementing.
   - Implement source validation, the twenty timed segments, bilinear60x60
