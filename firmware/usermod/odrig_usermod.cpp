@@ -220,10 +220,10 @@ void requestRefreshes(void *) {
       ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(50));
       continue;
     }
-    const bool due = refreshDue();
-    if (!due) {
-      vTaskDelay(1);
-    }
+    refreshDue();
+    // A queued notification need not block. Leave time for idle even when every
+    // rendered frame is already overdue and the consumer takes it immediately.
+    vTaskDelay(1);
   }
 }
 

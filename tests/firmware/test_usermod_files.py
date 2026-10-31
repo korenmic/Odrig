@@ -259,7 +259,7 @@ class TheTask(unittest.TestCase):
         self.assertRegex(setup, r"if \(core != nullptr\) \{\n\s+xTaskCreatePinnedToCore\(")
 
     def test_the_task_asks_again_only_when_the_loop_has_taken_the_last_refresh(self):
-        steps = [self.task.index(step) for step in ("if (refreshReady || updating || outputChanging) {", "ulTaskNotifyTake(", "continue;", "const bool due = refreshDue();", "vTaskDelay(1);")]
+        steps = [self.task.index(step) for step in ("if (refreshReady || updating || outputChanging) {", "ulTaskNotifyTake(", "continue;", "refreshDue();", "vTaskDelay(1);")]
         self.assertEqual(steps, sorted(steps))
         polling = self.usermod[self.usermod.index("bool refreshDue() {"):self.usermod.index("const char TASK_NAME[]")]
         steps = [polling.index(step) for step in ("Locked held;", "if (outputChanging) return false;", "odrig_core_poll(", "if (due) refreshReady = true;", "return due;")]

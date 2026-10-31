@@ -1237,6 +1237,12 @@ so a call that held the lock for seconds would still restart the chip. WLED's ow
 of its loop is off (`WLED_WATCHDOG_TIMEOUT=0`), as it has been since seed 04. The board
 session of seed 31 measures these budgets.
 
+After each request for a refresh, the producer blocks for one scheduler tick outside
+the core lock. This lets idle run even when rendering takes longer than the refresh
+interval and the consumer has already queued its notification. A notification that
+is already queued returns immediately, so waiting for it alone provides no idle time.
+The watchdog remains enabled and is never fed to cover up a blocked core call.
+
 ## What the firmware changes in WLED
 
 | Changed | Left as it is |
