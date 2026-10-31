@@ -1,0 +1,13 @@
+{
+  "file": "collection/card/space/space-scan-10x.odrg",
+  "bytes": 34410601,
+  "sha256": "a93e82f12cbea0f5937ac74d761dcd5f2fc3c4590129496a1b8b9e126d297f19",
+  "key": "6e46a8c2-34410601",
+  "frames": 18004,
+  "loopMs": 720160,
+  "referenceSha256": "e24ee5296bb539f15dfb5f693b233481a6c9598967963799340dbf4621339135",
+  "generatorCommit": "5b5a094ccfcc065fb9a4291ed4b14d3d09b23cf7",
+  "generatedJsonSha256": "fefbfdef4da0719c97db037421342bbaed84d0025a3699a70d9204623d01b345",
+  "mappingSha256": "ad5093270241adcfd72eb6f20648b153de8a22e5c4a17c3a6c86e8614a849b0c",
+  "showSha256": "8fb01e6031eb0d60010796e248a5fcee273973fea1e31d4376caab9ce8bce995"
+}

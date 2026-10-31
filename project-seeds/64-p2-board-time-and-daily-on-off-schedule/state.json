@@ -1,0 +1,9 @@
+{
+  "number": 64,
+  "slug": "64-p2-board-time-and-daily-on-off-schedule",
+  "state": "remaining",
+  "title": "Board time and a daily on/off schedule",
+  "priority": "P2",
+  "addedAt": "2026-10-31",
+  "summary": "Read and set boot-local board time over every existing transport, schedule LEDs On at 18:00 and Off at 06:00 by default, bypass scheduling while time is invalid, and expose schedule plus enabled-by-default phone-time synchronization in APK Settings. Planning only; reconnect sync interval, time-zone/DST policy and manual on/off precedence remain owner questions."
+}
