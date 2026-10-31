@@ -1,0 +1,9 @@
+{
+  "number": 68,
+  "slug": "68-p0-clocks-only-freeze-and-watchdog-recovery",
+  "state": "remaining",
+  "title": "Clocks-only freeze and watchdog recovery",
+  "priority": "P0",
+  "addedAt": "2026-11-01",
+  "summary": "Track the repeated freeze/Wi-Fi loss report, reuse the proven scheduler-starvation candidate already in PR39, and diagnose residual failures without claiming physical confirmation. Zero open product questions."
+}
