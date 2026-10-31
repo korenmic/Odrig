@@ -12,6 +12,7 @@ export default async function (app) {
     await app.until(() => app.text("level-title") === path, "the explored folder");
   }
   app.press("Upload");
+  await app.until(() => /^Internal storage: Free [0-9]/.test(app.raw("upload-space")), "detected storage capacity");
   const response = await fetch(`/m/${settings.file}`);
   if (!response.ok) throw new Error(`fixture fetch failed: ${response.status}`);
   const blob = await response.blob();
@@ -35,6 +36,7 @@ export default async function (app) {
   seen.destination = app.text("upload-destination");
   seen.reason = app.text("upload-destination-reason");
   seen.preview = app.text("ready-preview-note");
+  seen.pickerReset = field.value === "";
   if (settings.navigate === true) {
     app.press("Animations");
     await app.until(() => app.shown() === "animations", "Animations after preparing");

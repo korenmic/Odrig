@@ -25,7 +25,7 @@ previously delivered seeds56–60; seed61 is not a dependency or part of this ru
     discovered app and converter-npm suites and relevant emulator checks.
   - Requirements:1.1–1.3,2.1–2.4,3.1–3.4.
 
-- [ ] 3. Prove ready-made uploads against the emulator and document acceptance
+- [x] 3. Prove ready-made uploads against the emulator and document acceptance
   - Exercise shared app/core root/nested uploads, default/fallback/reconnect,
     explicit Internal, staleness, collisions, malformed/mismatched files,
     read-only/full storage, cancellation, removal and old-target refusal.
