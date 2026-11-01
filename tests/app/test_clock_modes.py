@@ -172,19 +172,18 @@ class ModePanel(unittest.TestCase):
                                            dict(value='between', text='Between animations', disabled=False),
                                            dict(value='only', text='Clocks only', disabled=True)])
 
-    def test_only_opens_clocks_once_and_browsing_outside_keeps_play_disabled(self):
+    def test_only_opens_clocks_and_back_keeps_the_browsing_boundary(self):
         target = ModeTarget(self)
         acts = [dict(screen='Settings'), dict(mode='only', pending='pending', until=dict(mode='only', disabled=False, screen='animations', level='clocks', rows=1), look='only'),
-                dict(back=True, until=dict(level='Root', rows=2), look='root'),
-                dict(wait=1800, look='later'), dict(enter='other', until=dict(level='other', rows=1), look='other'),
+                dict(back=True, until=dict(level='clocks', rows=1), look='boundary'),
+                dict(wait=1800, look='later'),
                 dict(restart=True, wait=500)]
         seen = ui(target, acts)
         self.assertTrue(seen['pending']['disabled'])
         self.assertEqual(seen['only']['level'], 'clocks')
-        self.assertEqual(seen['later']['level'], 'Root')
-        self.assertTrue(all(row['disabled'] for row in seen['root']['rows']))
-        self.assertEqual(seen['root']['global']['text'], 'Restart clocks')
-        self.assertTrue(seen['other']['rows'][0]['disabled'])
+        self.assertEqual(seen['later']['level'], 'clocks')
+        self.assertTrue(all(not row['disabled'] for row in seen['boundary']['rows']))
+        self.assertEqual(seen['boundary']['global']['text'], 'Restart clocks')
         self.assertEqual(target.lines('play'), ['play 60007'])
 
     def test_folder_ignore_is_available_on_read_only_media_and_inherited_by_children(self):
