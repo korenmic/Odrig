@@ -295,8 +295,9 @@ class ModePanel(unittest.TestCase):
         target.only_folder = None
         target.only_state = 'missing-folder'
         target.levels[None] = target.levels[None][:2]
-        seen = ui(target, [dict(screen='Settings', look='missing')])
+        seen = ui(target, [dict(screen='Settings', look='missing')], rows=0)
         self.assertEqual(seen['missing']['mode'], 'only')
+        self.assertEqual(seen['missing']['level'], 'clocks')
         self.assertIn('missing', seen['missing']['reason'])
         self.assertTrue(seen['missing']['global']['disabled'])
 

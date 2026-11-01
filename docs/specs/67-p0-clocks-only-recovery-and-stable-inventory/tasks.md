@@ -8,11 +8,12 @@ Stable inventory caching and the other feature PRs are excluded.
   - Port bounded policy recovery and its shared Settings diagnostic without time/schedule.
   - Run discovered core plus focused native emulator and saved-policy Settings checks.
     Retain broad-run partial/failure evidence; task2 owns final app/emulator discovery.
-- [ ] 2. Keep automatic Only recovery inside Clocks without inventory caching
+- [x] 2. Keep automatic Only recovery inside Clocks without inventory caching
   - Observe unknown-ID/absent-media automatic Root fallback before repair.
   - Reconcile Only context, preserve valid descendants and retry unresolved paths while
     guarding Restart clocks. Keep confirmed Off/Between and target reset usable.
-  - Run discovered app/emulator suites and record independent feature scope.
+  - Run discovered app/emulator suites on frozen source, then affected discovery for
+    final uncertainty guards. Record the exact source relationship and feature scope.
 - [ ] 3. Build and publish the standalone recovery APK and firmware
   - Build from clean committed source, verify source/signer/image bytes and exercise
     the shared native core/Android app. Publish to its own Drive subfolder and one PR.

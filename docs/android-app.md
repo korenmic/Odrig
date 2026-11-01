@@ -861,10 +861,16 @@ status shows the actual setting without claiming the reply was acknowledged. A d
 reported choice is shown as such. Reconnect and other controllers update the controls;
 changing targets clears pending state and ignores replies belonging to the old target.
 
-Selecting Only initially opens the resolved Clocks folder on Animations once. Later
-browsing may go to root or any other folder without changing playback or being forced
-back on each poll. Outside Play buttons are disabled with an explanation. `Restart clocks`
-targets the currently resolved Clocks folder ID even while another level is browsed;
+Selecting Only opens the resolved Clocks folder on Animations. Later status reconciles
+its current ID while preserving valid Clocks descendants. If automatic recovery cannot
+resolve that location, the app shows an unavailable Clocks view and retries its ancestry
+without publishing Root. Unknown mode metadata preserves the confirmed Only context;
+confirmed Off/Between or a target change releases it. Settings and Target stay available.
+An unresolved ID keeps `Restart clocks` disabled and is not sent by a direct restart.
+
+Explicit browsing may still go to root or another folder without changing playback or
+being forced back on each poll. Outside Play buttons are disabled with an explanation.
+`Restart clocks` targets the currently resolved Clocks folder ID even while another level is browsed;
 the raw `play all` command remains refused by the core. Inside files and folders remain
 manually playable when ignored or when automatic messages are off. Display tests require
 leaving Only first. Missing storage, missing Clocks or no eligible face keeps Only

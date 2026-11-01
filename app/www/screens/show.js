@@ -659,10 +659,12 @@ function rowsState(state, animations, here) {
     if (!allowed) play.setAttribute("aria-describedby", "only-boundary");
     else play.removeAttribute("aria-describedby");
   }
-  const only = state.status?.clockMode === "only";
+  const only = state.status?.clockMode === "only" || state.onlyUnavailable;
   byId("play-all").textContent = only ? "Restart clocks" : "Play this folder";
-  byId("play-all").disabled = only && (state.status.clockOnly?.folder == null || !state.statusFresh);
-  say("only-boundary", only ? "Clocks only: browsing is unrestricted. Play outside the Clocks folder is disabled; leave Clocks only in Settings to play it." : null);
+  byId("play-all").disabled = only && (state.onlyUnavailable || state.status?.clockOnly?.folder == null || !state.statusFresh);
+  say("only-boundary", state.onlyUnavailable ?
+    "Clocks folder unavailable. The app will retry without returning to Root. Settings and Target remain available." :
+    only ? "Clocks only: browsing is unrestricted. Play outside the Clocks folder is disabled; leave Clocks only in Settings to play it." : null);
 }
 
 function draw(state) {
