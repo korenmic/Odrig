@@ -252,10 +252,10 @@ class TheSettings(Playback):
                      b"odrig-clocks 1\nclocks yes\nmessage on\n", whole + b"x" * 60, b"odrig-clocks 1\nclocks on\n"):
             with self.subTest(data=data):
                 files = {**three(), "clocks.txt": data}
-                run, kept = support.start_and_keep(files, asked(0, "status", "clocks message on", "status"))
+                run, kept = support.start_and_keep(files, asked(0, "status", "clocks message on", "status", "clocks off", "clocks message on", "status"))
                 self.assertEqual(logged(run).count("clocks unreadable"), 1)
                 self.assertEqual(list(run.logs), support.ReferencePlayer(files).start_logs)
-                self.assertEqual(settings_of(run), [(False, False), (False, True)])
+                self.assertEqual(settings_of(run), [(True, False), (True, False), (False, True)])
                 self.assertEqual(kept["clocks.txt"], saved_clocks_file("off", "on"))
 
     def test_a_part_left_by_a_cut_is_removed_at_the_start(self):

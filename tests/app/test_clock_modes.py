@@ -29,6 +29,7 @@ class ModeTarget:
         self.change_gate = None
         self.only_folder = 60007
         self.only_state = 'playing'
+        self.clock_error = None
         self.levels = {
             None: [dict(id=1, file='one.odrg', bytes=100, external=False, ignored=False),
                    dict(id=60001, file='outside.odrg', bytes=100, external=True),
@@ -51,6 +52,8 @@ class ModeTarget:
         words = line.decode().split()
         if words[0] == 'status':
             extra = dict(clock_mode=self.mode, clock_only=dict(folder=self.only_folder, state=self.only_state) if self.mode == 'only' else None) if self.mode_members else {}
+            if self.clock_error is not None:
+                extra['clock_error'] = self.clock_error
             playing = self.mode != 'only' or self.only_state == 'playing'
             return self.answer({**STATUS, 'clocks': self.mode != 'off', 'clock_message': self.message,
                                 'playing': (self.only_folder if self.mode == 'only' else 'all') if playing else None,
@@ -80,6 +83,7 @@ class ModeTarget:
                     self.message = words[2] == 'on'
                 else:
                     self.mode = 'between' if words[1] == 'on' else words[1]
+                    self.clock_error = None
             if self.lose_reply:
                 self.lose_reply = False
                 return 500, ''
@@ -121,6 +125,16 @@ class ModeProtocol(unittest.TestCase):
         self.assertEqual([s.get('clockMode') for s in seen], ['only', 'between', 'off'])
         self.assertEqual([s.get('hasClockMode') for s in seen], [True, False, False])
         self.assertEqual(seen[0]['clockOnly'], dict(folder=60007, state='playing'))
+
+    def test_unreadable_policy_is_explicit_and_operator_can_replace_it(self):
+        target = ModeTarget(self, 'only')
+        target.clock_error = 'unreadable'
+        target.only_state = 'no-clocks'
+        found = support.run('clock-policy-error', address=target.stand_in.address).seen
+        self.assertIn('could not be read', found['before']['reason'])
+        self.assertTrue(found['before']['messageDisabled'])
+        self.assertFalse(found['before']['modeDisabled'])
+        self.assertEqual(found['after'], dict(mode='off', error=None))
 
     def test_external_folders_and_files_keep_own_and_inherited_inclusion(self):
         items = [dict(id=60007, playlist='clocks', files=2, external=True, ignored=True, inherited_ignored=False),

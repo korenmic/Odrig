@@ -3,10 +3,11 @@
 Standalone recovery extraction on master. One task and checkbox per proof commit.
 Stable inventory caching and the other feature PRs are excluded.
 
-- [ ] 1. Fail closed on uncertain saved clock settings
+- [x] 1. Fail closed on uncertain saved clock settings
   - Observe the actual-core read-error/corrupt-policy regression fail before repair.
   - Port bounded policy recovery and its shared Settings diagnostic without time/schedule.
-  - Run discovered core, emulator and app suites; retain failures and passing evidence.
+  - Run discovered core plus focused native emulator and saved-policy Settings checks.
+    Retain broad-run partial/failure evidence; task2 owns final app/emulator discovery.
 - [ ] 2. Keep automatic Only recovery inside Clocks without inventory caching
   - Observe unknown-ID/absent-media automatic Root fallback before repair.
   - Reconcile Only context, preserve valid descendants and retry unresolved paths while
