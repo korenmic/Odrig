@@ -132,3 +132,56 @@ Its application is 1,887,664 bytes, SHA-256
 It remains local and unflashed, not a delivered fix. Source-bisection can use it
 if the log cannot narrow the cause. The primary PR and usual Drive artifacts
 were not changed by this diagnostic build. The physical boot-repair task remains open.
+
+## Exact retained-loader reset path identified
+
+The owner confirmed the capture used the socket marked USB. An independent audit
+found a public copy of `bootloader_s3.bin` matching the historical checksum in
+`firmware/stock.sha256`: 13,600 bytes, SHA-256
+`53f1e17c81e72cdd99ce362ad9a8181a229d3879b11561b2e76052e1afa17c45`.
+Its entry and all three loaded addresses/lengths exactly match the physical trace.
+The unmodified vendor header specifies 8 MB; the documented physical loader has
+the 16 MB header adjustment. Its code is unchanged by that adjustment.
+
+Disassembly of these exact bytes identifies `0x403cc99c` as the loader's reset
+routine. It calls the ROM reset function at `0x403cc9ae`, then loops at
+`0x403cc9b1`, exactly the reported saved PC. Callers are failed early loader
+initialization (`0x403c8871`) and exhaustion of bootable application candidates
+(`0x403cca29`). This locates the captured resets **before application execution**;
+it does not by itself distinguish those two callers or prove a corrupted download.
+Rotation, WLED power callbacks and the core scheduler are not executing at this site.
+
+The loader's candidate-image wrapper unconditionally uses load mode 3, the
+`ESP_IMAGE_LOAD_NO_VALIDATE` mode of ESP-IDF. Its image-error logging is absent.
+Consequently another COM capture may also be silent, and a payload bit flip is
+not an effective rejection control: the descriptor-bit-flip case still boots.
+
+Isolated 16 MB emulator fixtures use the matched loader, its documented 16 MB
+header adjustment, the same partition/storage fixture and the exact published
+application bytes. ESP-EMU 0.51 reaches runtime and answers `status` and `fault`
+for both master (`df61d0b5...`) and PR (`429d2ebe...`), with zero resets in each
+45-second host run. These cover approximately 1.9 seconds of emulated time,
+not a sustained physical board/radio/SD test.
+
+A negative control changes only the first application's segment length from an
+aligned value to an unaligned value. The same loader then requests a software
+reset before runtime, with the windowed return address corresponding to
+`0x403cc9b1`. This reproduces the relevant loader rejection path, **not the
+unknown original byte difference or physical cause**. QEMU attempts with the
+retained loader did not reach the reset breakpoint before their bounds; they
+remain inconclusive and are not counted as passes.
+
+`retained-loader-verification.json` records input hashes, exact addresses,
+bounded results, negative-control mutation and the outstanding evidence.
+The useful next physical evidence is an application-region flash readback,
+compared byte-for-byte with the exact file downloaded on the phone. There is
+no reason to request a whole-flash/NVS export or overwrite the retained loader.
+
+`Artifacts/odrig/odrig-pr41-429d2ebe.bin` is a freshly named, byte-identical PR
+application, with checksum, existing source provenance and a diagnostic readme.
+It allows an explicit fresh-file retry with Compression off, at `0x10000`
+without Erase, then an application-only readback if needed. This is a controlled
+delivery/write-path test, **not a rebuilt or newly repaired firmware**. Mounted
+Drive readback is verified; independent cloud/phone bytes are still unverified.
+The usual firmware, working master control, APK and signing backups are unchanged.
+Task4 and physical acceptance remain open.
