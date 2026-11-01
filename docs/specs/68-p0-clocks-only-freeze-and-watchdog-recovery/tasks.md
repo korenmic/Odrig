@@ -4,7 +4,7 @@ Requirements/design reviewed against the seed and inherited PR39 candidate. The
 fairness repair is already implemented: these tasks verify/reuse it, never duplicate it.
 One numbered task per proof commit. Final task waits for65–67 software completion.
 
-- [ ] 1. Audit and retain the existing watchdog-starvation repair
+- [x] 1. Audit and retain the existing watchdog-starvation repair
   - Confirm production-body fairness tests, candidate/source provenance and unchanged
     watchdog/priority/stack/output gates. Reuse inherited before/after evidence, label
     model limits and unknown installed physical version/reset cause explicitly.
