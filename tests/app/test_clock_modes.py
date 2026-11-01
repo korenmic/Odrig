@@ -164,6 +164,15 @@ class ModeProtocol(unittest.TestCase):
 
 
 class ModePanel(unittest.TestCase):
+    def test_only_settings_explains_the_browsing_boundary_and_mode_exit(self):
+        target = ModeTarget(self, mode='only')
+        seen = ui(target, [dict(screen='Settings', look='settings')], rows=1)['settings']
+        self.assertEqual(seen['screen'], 'settings')
+        self.assertFalse(seen['reasonHidden'])
+        self.assertIn('inside Clocks', seen['reason'])
+        self.assertIn('leave this mode', seen['reason'])
+        self.assertNotIn('browse anywhere', seen['reason'])
+
     def test_legacy_target_has_mode_dropdown_with_only_unavailable(self):
         seen = run(Target(self), [])['first']
         self.assertEqual(seen['kind'], 'SELECT')

@@ -14,6 +14,9 @@ branches; no firmware, time/schedule, rotation or inventory-cache changes.
   - Run final frozen discovered app and onboarding suites with one worker. Reuse the
     successful 657-case emulator suite because core/firmware remain unchanged; document
     the qualified interim run, policy and evidence.
+- [x] 2.1. Align visible Clocks-only Settings help with the browsing boundary
+  - Observe a browser regression for the visible Settings explanation, correct its
+    contradictory unrestricted-browsing text, and run the affected discovered checks.
 - [ ] 3. Build the isolated APK and publish it with the verified master firmware control
   - Parent delivery task: build/verify the signed APK and prove core/firmware source
     equivalence before reusing the exact physically working master application image.
