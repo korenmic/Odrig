@@ -3,7 +3,7 @@ import {measure} from "./look.js";
 
 function look(app) {
   return {
-    screen: app.shown(), level: app.raw("level-title"),
+    screen: app.shown(), level: app.raw("level-title"), backHidden: app.byId('level-back').hidden,
     mode: app.byId("clocks").value, message: app.byId("clock-message").checked,
     disabled: app.byId("clocks").disabled, said: app.raw("clocks-said"),
     reason: app.raw("clocks-state"), support: app.raw("clocks-support"),

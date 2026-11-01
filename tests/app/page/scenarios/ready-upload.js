@@ -28,6 +28,8 @@ export default async function (app) {
   const select = app.byId("upload-storage");
   seen.default = select.value;
   seen.externalDisabled = select.options[0].disabled;
+  seen.internalDisabled = select.options[1].disabled;
+  seen.uploadDisabled = app.byId("upload-made").disabled;
   if (settings.store !== undefined) {
     select.value = settings.store;
     select.dispatchEvent(new view.Event("change", {bubbles: true}));

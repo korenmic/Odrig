@@ -872,6 +872,15 @@ manually playable when ignored or when automatic messages are off. Display tests
 leaving Only first. Missing storage, missing Clocks or no eligible face keeps Only
 selected, with an explanation and dark output; a missing resolved folder disables restart.
 
+In Only, upload preparation and final preflight require a writable external destination
+inside Clocks. Missing external storage cannot redirect the attempt to internal root,
+and Internal is unavailable in the storage selector. A prepared destination stays fixed;
+entering Only later cannot move an outside draft into Clocks silently. Shared upload
+jobs recheck the boundary before each next step and cancel an opened staging upload
+when a confirmed mode change makes its destination invalid. The text/clock authoring
+form still previews, but its internal-root Upload/Save stays disabled until leaving Only.
+Ordinary Off/Between uploads retain their normal storage choices and fallback behavior.
+
 Older clock-capable firmware without explicit mode metadata maps its existing booleans
 to Off and Between; the Only option is unavailable, with an update explanation. A target
 without clock settings hides the panel. Browser Controller and APK use the same controls.

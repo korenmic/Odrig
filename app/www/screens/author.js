@@ -40,7 +40,7 @@ function byId(id) {
 // Whether an upload cannot begin now: one is under way, another job holds the target, or
 // the target does not answer.
 function locked() {
-  return sending !== null || client.contentBusy() || client.state.link !== "answers";
+  return client.clocksOnly() || sending !== null || client.contentBusy() || client.state.link !== "answers";
 }
 
 // A colour of a colour field, `#rrggbb`, as the integer of the JSON sources.
@@ -167,6 +167,9 @@ function draw() {
     return;
   }
   byId("author-upload").disabled = made === null || reading || locked();
+  byId("author-boundary").hidden = !client.clocksOnly();
+  byId("author-boundary").textContent = client.clocksOnly() ?
+    "Clocks only: this form saves to internal storage outside Clocks. Leave this mode in Settings to upload or save it." : "";
 }
 
 // What the form is about: its title and the words of its button.

@@ -460,5 +460,6 @@ exclusive program continues. Outside play and output-taking diagnostics are refu
 
 Only remains selected when media is absent, Clocks is missing or no face is eligible.
 Output stays dark and responsive with the reason in `clock_only`; a relevant media or
-inclusion change retries selection. Browsing is unrestricted, and Ignore remains an
+inclusion change retries selection. Raw command browsing is unrestricted; the operators'
+app keeps visible navigation and upload destinations inside Clocks in Only. Ignore remains an
 automatic exclusion rather than a manual-play ban inside the exclusive boundary.

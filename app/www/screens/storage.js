@@ -47,14 +47,17 @@ function say(id, text) {
 
 function chooseStore(where) {
   if (form === null || sending !== null || preparing) return;
-  destinations.select(form, where, client.state.space);
+  destinations.select(form, where, client.state.space, client.clocksOnly());
   draw(client.state);
 }
 
 // Whether an upload cannot begin now: one is under way, a deletion runs, or the target
 // does not answer.
 function locked() {
-  return preparing || sending !== null || client.contentBusy() || client.state.link !== "answers";
+  const only = client.clocksOnly();
+  return preparing || sending !== null || client.contentBusy() || client.state.link !== "answers" ||
+    only && (form === null || destinations.blocked(form, client.state.space, only) !== null ||
+      !client.canUpload({external: form.storage === "external", file: `${form.level.path}/pending.odrg` }));
 }
 
 function draw(state) {
@@ -62,16 +65,18 @@ function draw(state) {
   say("upload-card-space", capacity.external(state.space, undefined));
   const frozen = sending !== null || preparing;
   if (form !== null) {
-    if (!frozen) destinations.synchronize(form, state.space);
+    if (!frozen) destinations.synchronize(form, state.space, client.clocksOnly());
     for (const storage of ["internal", "external"]) {
       if (form.generations[storage] === null && state.catalog?.[storage]?.generation != null) form.generations[storage] = state.catalog[storage].generation;
     }
     const selector = byId("upload-storage");
     selector.value = form.storage;
     selector.options[0].disabled = !destinations.present(state.space);
+    selector.options[1].disabled = client.clocksOnly();
     selector.disabled = frozen;
     byId("upload-destination").textContent = destinations.label(form, byId("upload-name").value);
-    byId("upload-destination-reason").textContent = frozen && form.storage === "external" && !destinations.present(state.space)
+    const boundary = destinations.blocked(form, state.space, client.clocksOnly());
+    byId("upload-destination-reason").textContent = boundary !== null ? boundary : frozen && form.storage === "external" && !destinations.present(state.space)
       ? "External storage disconnected. This attempt keeps its original destination and will not move to Internal."
       : destinations.reason(form, state.space);
   }
@@ -191,11 +196,14 @@ async function upload(message) {
   try {
   const fresh = await client.uploadSnapshot(captured.storage === "external" ? captured.level : {path: "", id: null});
   if (form !== captured || made !== prepared) throw new Error("The selected animation changed. Prepare it again.");
-  if (destinations.synchronize(captured, fresh.space)) {
+  const moved = destinations.synchronize(captured, fresh.space, client.clocksOnly());
+  const boundary = destinations.blocked(captured, fresh.space, client.clocksOnly());
+  if (boundary !== null) throw new Error(boundary);
+  if (moved) {
     message(`The destination changed to ${destinations.label(captured, byId("upload-name").value)}. Review it and press Upload again.`);
     return;
   }
-  const checked = destinations.validate(captured, fresh, byId("upload-name").value, bytes.length, client.targetVersion());
+  const checked = destinations.validate(captured, fresh, byId("upload-name").value, bytes.length, client.targetVersion(), client.clocksOnly());
   const {external, path: file} = checked;
   if (checked.noSpace !== undefined) {
     message(messages.ofNoSpace(bytes.length, checked.noSpace, external ? "the card" : undefined));
@@ -236,6 +244,8 @@ async function upload(message) {
             message("The chosen id was taken, or the firmware cannot confirm a safe new upload. No file bytes were sent. Select the file again or update the firmware.");
           } else if (error instanceof Refusal && external && ["bad-argument", "unknown-command", "no-upload", "stale"].includes(error.code)) {
             message("The destination changed, already exists, or the firmware lacks safe folder uploads. Check the folder and filename, or update the firmware. Nothing was acknowledged as installed.");
+          } else if (error instanceof Refusal && error.code === "read-only" && client.clocksOnly()) {
+            message(destinations.ONLY_REASON);
           } else if (error instanceof Refusal) {
             message(messages.ofRefusal(error, client.state.status === null ? null : client.state.status.error));
           } else if (error instanceof Failure) {
@@ -263,7 +273,7 @@ function choose(file) {
   if (running !== null) running.stop();
   picked = file;
   forget();
-  form = destinations.capture(client.state, client.targetVersion());
+  form = destinations.capture(client.state, client.targetVersion(), client.clocksOnly());
   byId("media-controls").hidden = false;
   byId("chosen").hidden = false;
   byId("media-name").textContent = file.name;
@@ -281,7 +291,7 @@ async function chooseReady(file, message) {
   if (running !== null) running.stop();
   picked = file;
   forget();
-  form = destinations.capture(client.state, client.targetVersion());
+  form = destinations.capture(client.state, client.targetVersion(), client.clocksOnly());
   const captured = form;
   byId("chosen").hidden = false;
   byId("media-controls").hidden = true;

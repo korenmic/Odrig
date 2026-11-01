@@ -872,3 +872,12 @@ app API, `mapping cross` command and `cross` reply member. Generic mapping forma
 support remains; editing pins preserves installed geometry without a wiring change.
 The owner also requested a confirmed mapping-edit lock in Settings; its app interaction
 guard uses the existing mapping protocol and adds no board command.
+
+
+### 2026-11-01: Clocks-only app browsing and destinations
+
+The owner replaces unrestricted app browsing in Only with a visible boundary at the
+resolved Clocks folder and its descendants. Settings, Target and leaving the mode remain
+available. Uploads in Only require a writable external Clocks destination; the app does
+not fall back to internal root, and its flat-root authoring save is disabled. Raw command
+browsing and the firmware command list remain unchanged.

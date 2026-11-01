@@ -8,10 +8,12 @@ branches; no firmware, time/schedule, rotation or inventory-cache changes.
     guards and matching visible controls. Preserve Settings/Target and mode exit.
   - Run fresh discovered boundary regressions; record the interim selected-suite run
     separately. Task2 runs the final frozen app/emulator suites after destination changes.
-- [ ] 2. Keep upload and authoring destinations inside the boundary
+- [x] 2. Keep upload and authoring destinations inside the boundary
   - Observe internal-root and outside upload authorization before implementing capture,
     final policy preflight and shared-job guards. Preserve ordinary upload fallback.
-  - Run discovered app, emulator and onboarding suites; document policy and evidence.
+  - Run final frozen discovered app and onboarding suites with one worker. Reuse the
+    successful 657-case emulator suite because core/firmware remain unchanged; document
+    the qualified interim run, policy and evidence.
 - [ ] 3. Build the isolated APK and publish it with the verified master firmware control
   - Parent delivery task: build/verify the signed APK and prove core/firmware source
     equivalence before reusing the exact physically working master application image.

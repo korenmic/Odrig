@@ -249,13 +249,14 @@ class ModePanel(unittest.TestCase):
                  lambda: setattr(target, 'answering', True), lambda: setattr(target, 'mode', 'between'),
                  lambda: setattr(target, 'mode', 'only')]
         acts = [dict(step=True, until=dict(mode='only', level='clocks', rows=1)),
-                dict(back=True, until=dict(level='Root', rows=2)),
+                dict(enter='clocks/message', until=dict(level='clocks/message', rows=1)),
                 dict(step=True, until=dict(disabled=True)),
-                dict(step=True, until=dict(disabled=False, mode='only', level='Root'), look='reconnected'),
-                dict(step=True, until=dict(mode='between', level='Root')),
+                dict(step=True, until=dict(disabled=False, mode='only', level='clocks/message', rows=1), look='reconnected'),
+                dict(step=True, until=dict(mode='between', level='clocks/message')),
+                dict(back=True, until=dict(level='clocks', rows=1)), dict(back=True, until=dict(level='Root', rows=2)),
                 dict(step=True, until=dict(mode='only', level='clocks', rows=1), look='newTransition')]
         seen = ui(target, acts, steps=steps)
-        self.assertEqual(seen['reconnected']['level'], 'Root')
+        self.assertEqual(seen['reconnected']['level'], 'clocks/message')
         self.assertEqual(seen['newTransition']['level'], 'clocks')
         self.assertEqual(target.lines('clocks'), [])
 
@@ -280,7 +281,7 @@ class ModePanel(unittest.TestCase):
         target.only_folder = None
         target.only_state = 'missing-folder'
         target.levels[None] = target.levels[None][:2]
-        seen = ui(target, [dict(screen='Settings', look='missing')])
+        seen = ui(target, [dict(screen='Settings', look='missing')], rows=0)
         self.assertEqual(seen['missing']['mode'], 'only')
         self.assertIn('missing', seen['missing']['reason'])
         self.assertTrue(seen['missing']['global']['disabled'])
@@ -343,12 +344,13 @@ class RealEmulator(unittest.TestCase):
                 dict(enter='clocks/message', until=dict(level='clocks/message', rows=1)),
                 dict(play=message, wait=300), dict(back=True, until=dict(level='clocks', rows=1)),
                 dict(folderMenu='clocks/message'), dict(choose='Ignore folder', until=dict(ignored=message_folder)),
-                dict(back=True, until=dict(level='Root', rows=3), look='root'), dict(restart=True, wait=300)]
+                dict(back=True, until=dict(level='clocks', rows=1), look='boundary'), dict(restart=True, wait=300)]
         self.assertEqual(json.loads(emulator.command('status'))['clock_mode'], 'off')
         with emulator_support.EventStream(emulator.port) as stream:
             result = support.run('clock-mode-ui', address=f'127.0.0.1:{emulator.port}', settings=dict(rows=3, acts=acts))
             events = stream.read_until(lambda events: any(event.kind == 'log' and json.loads(event.data)['line'] == f'play {clock_folder}' for event in events), 10)
-        self.assertTrue(all(row['disabled'] for row in result.seen['root']['rows']))
+        self.assertTrue(result.seen['boundary']['backHidden'])
+        self.assertTrue(all(row['file'].startswith('clocks/') for row in result.seen['boundary']['rows']))
         sent = [entry['line'] for entry in emulator_support.of_kind(events, 'log')]
         self.assertIn(f'play {clock_folder}', sent)
         self.assertIn(f'play {message}', sent)
