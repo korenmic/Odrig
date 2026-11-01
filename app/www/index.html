@@ -236,6 +236,13 @@
 <button id="schedule-resume" type="button" disabled>Resume schedule</button>
 <p class="small">Manual On or Off takes priority and stays in force across restarts until you resume the schedule.</p>
 </div>
+<div id="rotation-panel" class="panel">
+<h2>Output rotation</h2>
+<label for="output-rotation">Clockwise from the front of the square display</label>
+<select id="output-rotation" aria-describedby="rotation-state" disabled><option value="0">0&deg;</option><option value="90">90&deg;</option><option value="180">180&deg;</option><option value="270">270&deg;</option></select>
+<p id="rotation-state" role="status" aria-live="polite">Reading output rotation...</p>
+<button id="rotation-refresh" type="button" disabled>Refresh rotation</button>
+</div>
 <div id="mini-panel" class="panel">
 <h2>Miniature display</h2>
 <label class="check" for="debug-mini"><input id="debug-mini" type="checkbox" disabled><span><span class="title">Miniature display debug mode</span><span class="small">The full canvas fits on the central 6 &times; 6 pixels of the 10 &times; 6 matrix, at brightness 40 or less. Power off before rewiring: disconnect the full wall; matrix 5V to board 5V, GND to GND, IN to GPIO1. Follow the README wiring and power checks. This mode resets off on reboot.</span></span></label>

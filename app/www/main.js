@@ -9,6 +9,7 @@ import * as authoring from "./screens/author.js";
 import * as catalogs from "./screens/catalogs.js";
 import * as clocksScreen from "./screens/clocks.js";
 import * as miniScreen from "./screens/mini.js";
+import * as rotationScreen from "./screens/rotation.js";
 import * as timeScreen from "./screens/time.js";
 import * as animationsScreen from "./screens/show.js";
 import * as uploadScreen from "./screens/storage.js";
@@ -43,6 +44,7 @@ function show(name) {
   photomap.showing(name === "settings");
   catalogs.showing(name === "settings");
   timeScreen.showing(name === "settings");
+  rotationScreen.showing(name === "settings");
   animationsScreen.showing(name === "animations");
   targetScreen.showing(name === "target");
 }
@@ -147,6 +149,7 @@ authoring.start({message, go});
 settingsScreen.start();
 clocksScreen.start({go});
 miniScreen.start();
+rotationScreen.start();
 timeScreen.start();
 photomap.start();
 catalogs.start({message});

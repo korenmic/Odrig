@@ -156,6 +156,8 @@ maps its actions to command lines, each sent as `POST /odrig` to the address tha
 | Connects with timing-capable firmware; reads time, then follows the phone's zone and sets UTC when due | `time`, `guard <board-id> time`, `guard <board-id> time zone <base64>`, `guard <board-id> time set <utc-seconds> <zone-crc32>`, `guard <board-id> schedule` |
 | Saves the daily hours and whether to use them | `guard <board-id> schedule set <revision> <on-HH:MM> <off-HH:MM> <on-or-off>` |
 | Ends manual On/Off and returns to the saved hours | `guard <board-id> schedule resume <revision>` |
+| Opens Settings, reconnects there or taps Refresh rotation | `rotation` |
+| Chooses0/90/180/270 clockwise output orientation | `rotation set <revision> <degrees>` |
 
 It uses the shared command protocol and shows only what a reply said. Mapping saves
 require firmware that supports the mapping commands; an older target gives a readable
@@ -1444,3 +1446,20 @@ physical acceptance are in [verification.md](specs/64-p2-board-time-and-daily-on
   claim automatic setup support for another entry in the toolchain file.
 - `npm audit` names three advisories of moderate severity in a package that Capacitor's
   command line uses at build time. Nothing of it is in the APK.
+
+### Square output rotation
+
+Settings offers exactly0,90,180,270 degrees clockwise from the front of the square
+display. The installation is permanently1:1, so there is no fit/crop/stretch choice.
+Opening Settings or reconnecting there reads the board's saved orientation. Refresh
+rotation rereads it after changes by another controller. A selection stays on the
+last confirmed value while saving; only the full board acknowledgement changes it.
+Refusals/lost replies are reconciled by reading, never automatic write replay.
+Leaving Settings, hiding the app, changing targets or losing the link cancels unsent
+changes and invalidates old callbacks. Old firmware disables only this control.
+
+Rotation is installation-wide and survives reset; source previews/files and mapping
+diagnostics keep their canonical/physical orientation. Miniature output rotates the
+same square picture before its centered projection. Mapping edits remain separately
+locked until explicitly confirmed. Physical wall/miniature direction still requires
+the owner's acceptance after installing the paired APK/FW.

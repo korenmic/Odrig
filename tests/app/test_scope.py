@@ -12,7 +12,7 @@ LINES = {"status", "list", "list <n>", "play <n>", "play all", "on", "off", "bri
          "order get", "order get <n>", "list in <n> <n>", "order get in <n>", "order get in <n> <n>", "order move <n> <n> <n>", "mapping test snake <n>", "read <n> <n>", "upload expect <n>", "fault",
          "upload begin external <n> <n>", "catalog", "catalog page <n> <n> <n>", "catalog rebuild <n>", "catalog cancel", "repeat <n> <n>", "repeat <n> <n> save",
          "repeat <n> default", "clocks <n>", "clocks message <n>", "debug mini <n>",
-         "time", "schedule", "guard <n> time", "guard <n> schedule", "guard <n> time zone <n>",
+         "rotation", "rotation set <n> <n>", "time", "schedule", "guard <n> time", "guard <n> schedule", "guard <n> time zone <n>",
          "guard <n> time set <n> <n>", "guard <n> schedule set <n> <n> <n> <n>", "guard <n> schedule resume <n>"}
 
 

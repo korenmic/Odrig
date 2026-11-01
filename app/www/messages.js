@@ -126,6 +126,7 @@ const REFUSALS = {
     line.startsWith("upload ") ? "The card cannot be written now. Choose Internal storage to store the animation on the board." :
     `Animation ${line.split(" ")[1]} cannot be removed: the card cannot be written now.`,
   "mapping-conflict": () => "Mapping changed on the target. Reload before saving.",
+  "rotation-conflict": () => "Another controller changed the rotation. The saved angle is read again.",
   "order-conflict": () => "The order changed on the installation since the app read it. The list is read again; move the animation again.",
   stale: (line) => line.startsWith("repeat ") ? "That animation's turn had already ended." :
     "Another controller changed this animation since it was opened. Your changes are still here; open it again to see the new one.",
