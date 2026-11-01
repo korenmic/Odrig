@@ -282,11 +282,10 @@ function reconcileOnly(reply) {
     return;
   }
   if (reply.clockMode !== "only") return;
-  const entering = !onlyActive;
+  const entering = !onlyActive || !inClocks(state.level.path);
   const before = onlyFolder;
   onlyActive = true;
   onlyFolder = reply.clockOnly.folder;
-  if (!entering && !inClocks(state.level.path)) return;
   if (onlyFolder === null) {
     unavailableClocks();
   } else if (entering) {
@@ -503,6 +502,12 @@ async function askListPart() {
       return;
     }
     heard();
+    if (onlyActive && inClocks(level.path) && reply.items.some(item => !inClockFolder(item) ||
+        parentOf(item.playlist ?? item.file) !== level.path)) {
+      state.inventoryFresh = false;
+      await recoverLevel(asked, level, true);
+      return;
+    }
     const items = part.items.concat(reply.items);
     if (reply.next !== null) {
       listing = {items, from: reply.next, proof: part.proof};
@@ -826,9 +831,11 @@ async function give(request) {
     request.reject?.(new commands.Refusal("stale", "timing operation"));
     return;
   }
-  if (["remove", "ignore", "order", "repeat", "play", "read"].includes(request.kind) &&
-      (!state.inventoryFresh || !state.statusFresh) || request.kind === "play-all" && onlyActive &&
-      state.level.path !== "" && state.level.id === null) {
+  const staleIds = ["remove", "ignore", "order", "repeat", "play", "read"].includes(request.kind) &&
+    (!state.inventoryFresh || !state.statusFresh);
+  const unconfirmedClocks = request.kind === "play-all" && onlyActive &&
+    (!state.statusFresh || state.status?.clockMode !== "only" || state.level.path !== "" && state.level.id === null);
+  if (staleIds || unconfirmedClocks) {
     const error = new commands.Refusal("stale", request.kind);
     if (request.reject) request.reject(error);
     else refused(error);
@@ -1073,18 +1080,39 @@ export function showing(name) {
 // Shows another level of the card's folders: `folder`, `{id, playlist}`, a folder of the
 // level shown, entered; or with `back` the level above. Its list is read at once, and
 // nothing of the level left is kept.
+export function clocksOnly() {
+  return onlyActive;
+}
+
+export function canEnter(folder) {
+  return !onlyActive || state.inventoryFresh && state.statusFresh && inClocks(state.level.path) &&
+    typeof folder?.playlist === "string" && inClocks(folder.playlist) &&
+    state.folders.some(known => known.id === folder.id && known.playlist === folder.playlist);
+}
+
+export function canGoBack() {
+  return trail.length > 0 && (!onlyActive || trail.length > 1 && inClocks(state.level.path));
+}
+
 export function enter(folder) {
+  if (!canEnter(folder)) return false;
   trail.push({path: folder.playlist, id: folder.id});
   toLevel();
+  return true;
 }
 
 export function back() {
+  if (!canGoBack()) return false;
   trail.pop();
   toLevel();
+  return true;
 }
 
 function toLevel() {
   rememberLevel();
+  if (onlyActive && !inClocks(trail[trail.length - 1]?.path ?? "")) {
+    trail.splice(0, trail.length, {path: "clocks", id: onlyFolder});
+  }
   const top = trail[trail.length - 1];
   state.level = top === undefined ? {path: "", id: null} : {path: top.path, id: top.id};
   if (onlyActive && inClocks(state.level.path) && state.level.id !== null) onlyDesired = state.level.path;
@@ -1176,12 +1204,12 @@ export function inClockFolder(item) {
 }
 
 export function canPlay(item) {
-  return state.status?.clockMode !== "only" || inClockFolder(item);
+  return !onlyActive || inClockFolder(item);
 }
 
 export function play(id) {
   want("play", () => {
-    if (state.status?.clockMode === "only" && id !== state.status.clockOnly?.folder) {
+    if (onlyActive && id !== state.status?.clockOnly?.folder) {
       const item = [...(state.animations || []), ...state.folders].find((candidate) => candidate.id === id);
       if (item === undefined || !inClockFolder(item)) throw new commands.Refusal("in-use", `play ${id}`);
     }
@@ -1191,8 +1219,8 @@ export function play(id) {
 
 export function playAll() {
   want("play-all", () => {
-    if (state.status?.clockMode !== "only") return commands.playAll();
-    if (!state.statusFresh) throw new commands.Refusal("stale", "play all");
+    if (!onlyActive) return commands.playAll();
+    if (!state.statusFresh || state.status?.clockMode !== "only") throw new commands.Refusal("stale", "play all");
     const folder = state.status.clockOnly?.folder;
     if (folder == null) throw new commands.Refusal("in-use", "play all");
     return commands.play(folder);

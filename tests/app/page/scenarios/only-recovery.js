@@ -5,6 +5,7 @@ export default async function(app) {
   let missing = app.settings.case === 'initial';
   let remapped = false;
   let mode = 'only';
+  let offline = false;
   let hold = null;
   let release = null;
   let held = false;
@@ -22,6 +23,7 @@ export default async function(app) {
     nativePromise: async (_plugin, _method, request) => {
       const line = request.line;
       sent.push(line);
+      if (offline) return {status: 500, body: ''};
       if (hold !== null && line.startsWith('list in')) {
         const waiting = hold;
         hold = null;
@@ -36,7 +38,9 @@ export default async function(app) {
             state: missing ? 'no-clocks' : 'playing'} : null})};
       else if (line.startsWith('list')) {
         const match = /^list in (\d+)/.exec(line);
-        const items = rows(match === null ? null : Number(match[1]));
+        const folder = match === null ? null : Number(match[1]);
+        const items = app.settings.case === 'reused' && remapped && folder === 60007 ?
+          [{id: 60002, file: 'other/outside.odrg', bytes: 100, external: true}] : rows(folder);
         answer = items === null ? {ok: false, error: 'unknown-id'} : {ok: true, items, next: null};
       } else if (line === 'catalog') answer = {ok: true, internal: {state: 'none', uncataloged: 0},
         external: {state: missing ? 'absent' : 'none'}, rebuild: null};
@@ -58,6 +62,53 @@ export default async function(app) {
       rootRequests: sent.filter(line => line === 'list' || line.startsWith('list ' ) && !line.startsWith('list in')).length};
   }
   await app.until(() => client.state.level.path === 'clocks' && client.state.inventoryFresh, 'initial Clocks list');
+  if (app.settings.case === 'uncertain') {
+    if (app.settings.offline) {
+      offline = true;
+      await app.until(() => client.state.link === 'no-answer', 'lost connection');
+    } else {
+      mode = 'unknown';
+      await app.until(() => client.state.status?.clockMode === null, 'unknown mode metadata');
+    }
+    client.back();
+    client.enter({playlist: 'other', id: 60009});
+    if (app.settings.restart) {
+      const before = sent.filter(line => line.startsWith('play ')).length;
+      let claimedReply = false;
+      client.watch(state => { if (state.link === 'answers') claimedReply = true; });
+      client.playAll();
+      await app.sleep(50);
+      return {link: client.state.link, sent: sent.filter(line => line.startsWith('play ')).length - before, claimedReply};
+    }
+    return {level: client.state.level, only: client.clocksOnly(), paths};
+  }
+  if (app.settings.case === 'release') {
+    mode = 'between';
+    await app.until(() => client.state.status?.clockMode === 'between', 'confirmed Between');
+    client.back();
+    return {level: client.state.level, only: client.clocksOnly()};
+  }
+  if (app.settings.case === 'reused') {
+    let outsideVisible = false;
+    client.watch(state => {
+      if (state.animations?.some(item => item.file === 'other/outside.odrg')) outsideVisible = true;
+    });
+    remapped = true;
+    client.refreshContent();
+    await app.until(() => client.state.level.id === rootId() && client.state.inventoryFresh, 'verified replacement folder');
+    return {outsideVisible, level: client.state.level};
+  }
+  if (app.settings.case === 'navigation') {
+    paths.length = 0;
+    client.back();
+    const back = client.state.level.path;
+    client.enter({playlist: 'other', id: 60009});
+    const outside = client.state.level.path;
+    client.enter({playlist: 'clocks-other', id: 60010});
+    const prefix = client.state.level.path;
+    client.enter({playlist: 'clocks/message', id: 60099});
+    return {paths, back, outside, prefix, level: client.state.level};
+  }
   if (app.settings.case === 'target') {
     hold = new Promise(resolve => { release = resolve; });
     client.refreshContent();

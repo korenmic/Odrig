@@ -3,7 +3,7 @@
 Requirements/design reviewed against the seed. Depends on67's shared recovery seam;
 does not depend on65. One numbered task per proof commit.
 
-- [ ] 1. Enforce the Only boundary in shared navigation and browsing controls
+- [x] 1. Enforce the Only boundary in shared navigation and browsing controls
   - First observe direct enter/back and visible navigation escaping Clocks. Guard the
     shared trail before publication, preserve descendants, stop Back at Clocks and keep
     Settings/Target/mode exit available. Test prefix collisions, stale replies, missing

@@ -884,10 +884,11 @@ status shows the actual setting without claiming the reply was acknowledged. A d
 reported choice is shown as such. Reconnect and other controllers update the controls;
 changing targets clears pending state and ignores replies belonging to the old target.
 
-Selecting Only initially opens the resolved Clocks folder on Animations once. Later
-browsing may go to root or any other folder without changing playback or being forced
-back on each poll. Outside Play buttons are disabled with an explanation. `Restart clocks`
-targets the currently resolved Clocks folder ID even while another level is browsed;
+Selecting Only opens the resolved Clocks folder on Animations. Browsing stays in Clocks
+and its descendants, with Back stopping at Clocks. The shared client rejects outside
+paths, prefix collisions and unverified folder IDs before changing the visible location.
+Stale/disconnected status retains the last confirmed boundary; confirmed Off or Between
+releases it. `Restart clocks` targets the currently resolved Clocks folder ID;
 the raw `play all` command remains refused by the core. Inside files and folders remain
 manually playable when ignored or when automatic messages are off. Display tests require
 leaving Only first. Missing storage, missing Clocks or no eligible face keeps Only

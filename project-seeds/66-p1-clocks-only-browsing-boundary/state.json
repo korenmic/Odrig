@@ -1,7 +1,7 @@
 {
   "number": 66,
   "slug": "66-p1-clocks-only-browsing-boundary",
-  "state": "remaining",
+  "state": "in_progress",
   "title": "Browsing stays inside Clocks in Only mode",
   "priority": "P1",
   "addedAt": "2026-11-01",
