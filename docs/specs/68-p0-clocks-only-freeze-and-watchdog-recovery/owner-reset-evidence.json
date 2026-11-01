@@ -1,0 +1,19 @@
+{
+  "bytes": 901088,
+  "sha256": "7c599db5146b7ccc659dd45bff9daff0af4e8dff78c5fe95abcb4c965312328e",
+  "lines": 34929,
+  "romBanners": 3494,
+  "resetReasons": {
+    "rst:0x3 (RTC_SW_SYS_RST),boot:0x8 (SPI_FAST_FLASH_BOOT)": 3488
+  },
+  "savedPCs": {
+    "Saved PC:0x403cc9b1": 3489
+  },
+  "runtimeLogLines": 0,
+  "panicLines": 0,
+  "capturedLoaderEntry": "0x403c885c",
+  "captureDriver": "CdcAcmSerialDriver",
+  "masterControlPhysicallyBooted": true,
+  "prImagePhysicallyFailed": true,
+  "rootCauseConfirmed": false
+}
