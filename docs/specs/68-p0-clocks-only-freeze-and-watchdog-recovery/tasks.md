@@ -44,6 +44,12 @@ One numbered task per proof commit. Final task waits for65–67 software complet
     verify its existing clean Windows build through fw.py's offline inspector.
   - Upload a separately named master control with checksum, provenance and phone-flasher
     instructions. Preserve the usual artifacts; leave its physical outcome pending.
+- [x] 7. Analyze the supplied reset capture and prepare an isolated firmware midpoint
+  - Record the owner's positive master-control result and negative PR result. Preserve
+    the raw log privately and publish only its hash and sanitized reset summary.
+  - Distinguish confirmed reset evidence from its unknown cause. Prepare/inspect the
+    timing-plus-fairness source midpoint without publishing it as a repair or flashing.
+  - Record which further physical trace or bisection result is required; task4 stays open.
 
 ## Owner acceptance (not executable queue tasks)
 
