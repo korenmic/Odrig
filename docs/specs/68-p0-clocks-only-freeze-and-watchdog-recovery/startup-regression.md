@@ -98,3 +98,37 @@ compatibility against the operator's known-working binary. A phone USB capture o
 panic/reset output remains the quickest way to identify the actual failing path;
 an empty or disconnected capture is also useful evidence. Keep the known-working
 backup available for normal operation. No repeated speculative repair is warranted.
+
+## Master control boots; physical reset capture analyzed
+
+The operator confirmed that `odrig-master-control.bin` boots correctly, while the
+latest PR image still fails. This rules out a general failure of this Windows
+build pipeline; the difference remains in the PR image or its delivery/loading.
+
+The supplied USB text capture was located in the desktop transfer cache and copied
+to ignored investigation output without changing its source. It is 901,088 bytes,
+34,929 lines, SHA-256
+`7c599db5146b7ccc659dd45bff9daff0af4e8dff78c5fe95abcb4c965312328e`.
+It contains 3,488 complete `RTC_SW_SYS_RST` reset lines and 3,489 occurrences of
+`Saved PC:0x403cc9b1`, with no runtime `#log` lines, Guru Meditation or backtrace.
+The ROM repeatedly loads a bootloader whose entry is `0x403c885c`. This confirms
+a real software-reset loop, but does **not** identify its trigger. The captured
+loader differs from the fresh factory loader used in earlier emulator runs.
+Nearby official loader symbol files did not match its exact layout; their decoded
+addresses are not accepted as the physical fault site.
+
+The captured driver is CDC-ACM, which does not by itself prove which physical
+socket was used. The firmware documentation specifies runtime logs on the socket
+marked COM at 115200 baud. Clarify the capture socket and obtain any missing
+COM-side error/backtrace before assigning the reset to a particular code path.
+No bootloader/partition overwrite or erase is proposed.
+
+An isolated midpoint was also built through fw.py from `317eca0` plus current
+master, retaining time/schedule integration and producer fairness but excluding
+the later clocks recovery, inventory and rotation changes. The clean diagnostic
+merge is `09ee6f0b17d785849f830e11fdac7e79800f8d3e`; offline verification passes.
+Its application is 1,887,664 bytes, SHA-256
+`2320cb37599f6a54faf3593889ca2a8d6ddcef214dd72eae446d9873762bbfe3`.
+It remains local and unflashed, not a delivered fix. Source-bisection can use it
+if the log cannot narrow the cause. The primary PR and usual Drive artifacts
+were not changed by this diagnostic build. The physical boot-repair task remains open.
