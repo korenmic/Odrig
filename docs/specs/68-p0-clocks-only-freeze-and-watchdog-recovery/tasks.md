@@ -16,7 +16,7 @@ One numbered task per proof commit. Final task waits for65–67 software complet
     after observing its own regression fail first.
   - Run discovered core/emulator/app/firmware suites; retain bounded-run evidence and
     distinguish native-core/model coverage from unperformed physical acceptance.
-- [ ] 3. Build and publish the integrated APK and firmware and hand off one PR
+- [x] 3. Build and publish the integrated APK and firmware and hand off one PR
   - After65–67, run all supported discovered suites, build firmware through fw.py and
     build/sign the APK from clean runtime source. Verify offline image/provenance and
     Android VM installation/upgrade plus shared emulator functionality.
