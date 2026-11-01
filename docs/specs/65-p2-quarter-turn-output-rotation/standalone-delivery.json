@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "variant": "rotation",
+  "feature": "Runtime output rotation",
+  "pr": "https://github.com/korenmic/Odrig/pull/44",
+  "baseCommit": "56e2d58bbe7d6d9977d89cc37c148946a0a918b2",
+  "runtimeSourceCommit": "0f3bfb67c13397d6110909fa93ddeb56f30b23a2",
+  "firmwareSourceCommit": "1658636070403ca9328d9169a62eb6e99070e43e",
+  "firmwareRebuilt": true,
+  "firmwareInputEquivalence": {
+    "variant": "rotation",
+    "apkSourceCommit": "0f3bfb67c13397d6110909fa93ddeb56f30b23a2",
+    "firmwareSourceCommit": "1658636070403ca9328d9169a62eb6e99070e43e",
+    "firmwareInputsByteIdentical": true,
+    "inputsSha256": "162dccb5adf84ff11598d70b5cce61aae25e7827157bc6dbb2f53045ac8f9265",
+    "firmwareRebuilt": true,
+    "buildWasCleanCommittedSnapshot": true,
+    "verifiedUtc": "2026-11-01T22:37:08.577350+00:00"
+  },
+  "publishedUtc": "2026-11-01T22:47:15.726272+00:00",
+  "destination": "G:\\My Drive\\Artifacts\\odrig\\standalone-rotation",
+  "apk": {
+    "file": "odrig-rotation-debug.apk",
+    "bytes": 19084022,
+    "sha256": "8333dbe332189b3610b7f15bd23c0e6ced473d64cfdf00c5459d35cb8a37cf9a",
+    "certificateSha256": "5a489ec294e53cdec085d71092cf4e7285ae08d4d43c19929d84130f3649f0f1"
+  },
+  "firmware": {
+    "file": "odrig-rotation-firmware.bin",
+    "bytes": 1881472,
+    "sha256": "7a62b36ca4bb6e90811e9e9ff0e64b6a00b19fb624dc9e9a34ea869146e66c9d",
+    "offset": "0x10000",
+    "environment": "odrig_microsd",
+    "offlineInspectionPassed": true
+  },
+  "apkPackagingTests": {
+    "testedUtc": "2026-11-01T22:39:29.395566+00:00",
+    "tests": 8,
+    "sha256": "8333dbe332189b3610b7f15bd23c0e6ced473d64cfdf00c5459d35cb8a37cf9a",
+    "allPassed": true
+  },
+  "android": {
+    "testedUtc": "2026-11-01T22:46:38.858582+00:00",
+    "variant": "rotation",
+    "androidVersion": "16",
+    "avd": "Odrig_Usb_Diagnostics_70",
+    "ownedAvdOnly": true,
+    "readOnly": true,
+    "cleanInstallPassed": true,
+    "previousPublishedUpgradePassed": true,
+    "launchPassed": true,
+    "apkSha256": "8333dbe332189b3610b7f15bd23c0e6ced473d64cfdf00c5459d35cb8a37cf9a",
+    "previousApkSha256": "7058f799edce216286a3cd8004eb48b9c418fa2209fbcdf95ae59a6f711bf8dd",
+    "nativeCoreFeature": {
+      "nativeAndroidWifi": true,
+      "variant": "rotation",
+      "unrelatedTimeSettingsAbsent": true,
+      "fourAnglesConfirmed": true
+    },
+    "httpTransport": "Native Android Wi-Fi through a transparent local HTTP framing adapter; all commands and replies use the real native core. Direct emulator HTTP framing produced unexpected EOF and a safe upload cancellation in retained earlier attempts.",
+    "physicalAcceptance": false,
+    "ownedAvdConfigUnchanged": true
+  },
+  "firmwareEmulator": {
+    "variant": "rotation",
+    "runtimeSourceCommit": "1658636070403ca9328d9169a62eb6e99070e43e",
+    "imageSha256": "7a62b36ca4bb6e90811e9e9ff0e64b6a00b19fb624dc9e9a34ea869146e66c9d",
+    "imageBytes": 1881472,
+    "retainedLoaderOriginalSha256": "53f1e17c81e72cdd99ce362ad9a8181a229d3879b11561b2e76052e1afa17c45",
+    "retainedLoaderFixtureSha256": "c9f1a7d30d5f81053b04bea05ddc1f45bbe8209eac1742c4275dbb55a1436f93",
+    "loaderAdjustment": "Documented 8MB-to-16MB header change, hash recomputed, code unchanged",
+    "hostSeconds": 60,
+    "emulatedSeconds": 1.7444941625,
+    "restarts": 0,
+    "statusReplies": 1,
+    "faultReplies": 1,
+    "allRepliesOk": true,
+    "passed": true,
+    "physicalBootAcceptance": false,
+    "limitations": [
+      "No physical SPI flash readback, radio, USB cable, SD card, LEDs or power supply.",
+      "This is bounded startup/command coverage, not sustained playback or confirmation that the original physical boot incident is fixed.",
+      "The model did not demonstrate animation playback; native shared-core output tests supply functional rendering verification separately."
+    ],
+    "statusSamples": [
+      {
+        "fps": 0,
+        "readiness": "checking",
+        "playing": "all",
+        "checked": 0,
+        "toCheck": 1
+      }
+    ],
+    "renderingDemonstrated": false
+  },
+  "physicalAcceptance": false,
+  "originalArtifactAndSigningFilesUnchanged": true,
+  "identityEvidence": "New separate feature subfolder; mounted bytes read back. Independent cloud/phone readback not performed.",
+  "files": [
+    {
+      "file": "odrig-rotation-debug.apk",
+      "bytes": 19084022,
+      "sha256": "8333dbe332189b3610b7f15bd23c0e6ced473d64cfdf00c5459d35cb8a37cf9a"
+    },
+    {
+      "file": "odrig-rotation-firmware.bin",
+      "bytes": 1881472,
+      "sha256": "7a62b36ca4bb6e90811e9e9ff0e64b6a00b19fb624dc9e9a34ea869146e66c9d"
+    },
+    {
+      "file": "odrig-rotation-firmware.bin.build.json",
+      "bytes": 15494,
+      "sha256": "8fe94325ed5d2162b42c373ed6d0875f348be1ac9c49c21b647797813aaa4856"
+    },
+    {
+      "file": "firmware-verification.json",
+      "bytes": 845,
+      "sha256": "aea74b59ec4185825cbf1450c206c0a841c048b57d5c9e1100ff4bc5f7d04d76"
+    },
+    {
+      "file": "firmware-image-info.txt",
+      "bytes": 1501,
+      "sha256": "2d1391b28f4a3b4546652de7369efd79a4f522415e2fe3f2d20c126781dc2c0f"
+    },
+    {
+      "file": "firmware-emulator-verification.json",
+      "bytes": 1272,
+      "sha256": "2823cf091a0d78b36138e0332b1b638f45fd7b6a36b12aec38470b169965bb86"
+    },
+    {
+      "file": "android-verification.json",
+      "bytes": 941,
+      "sha256": "2fea19ef91e45d263fa832b1a3ff4b61c9211b30f84c6138cc55885cab64900e"
+    },
+    {
+      "file": "SHA256SUMS.txt",
+      "bytes": 185,
+      "sha256": "24ae62ed958a2e01ecaa84e7935378280143f5c967c16ba1593b472c053cbb52"
+    },
+    {
+      "file": "README.txt",
+      "bytes": 2160,
+      "sha256": "e465e88ae8b93a3c865a5d3bbbc19ee01d67239fd36be66683b116df8bda198a"
+    }
+  ]
+}

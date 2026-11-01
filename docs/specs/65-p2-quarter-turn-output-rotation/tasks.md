@@ -16,7 +16,7 @@ task and checkbox per proof commit. Standalone packaging/publication is a separa
     actual native output and retained mapping lock behavior. Update operator docs.
   - Run discovered app, emulator, core documentation and onboarding checks; record
     evidence and tick only2, then proceed to standalone APK/FW delivery.
-- [ ] 3. Build and publish the standalone rotation APK and firmware
+- [x] 3. Build and publish the standalone rotation APK and firmware
   - Build clean committed rotation-only source through the repository tools, inspect
     firmware provenance, verify the APK signer and exercise installation and controls
     against the native emulator in an owned Android VM when available.
