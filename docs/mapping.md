@@ -204,10 +204,9 @@ along the chain.
 
 A leg with `starts` does not alternate: its row r starts on the side `starts[r]` names, and
 its column s at the end `starts[s]` names, and the rest of the rule is as above. It is for
-a leg wired in another order, as snake 10 of the installation is when its chain runs up
-column 28, up column 30 and down column 29 around a dead output:
-`"columns": [28, 30, 29], "starts": ["bottom", "bottom", "top"]`. Starts that alternate
-place the LEDs as a leg without them.
+a leg wired in another order. Starts that alternate place the LEDs as a leg without
+them. Pin-assignment edits preserve the installed columns and starting ends; they do
+not offer a special wiring transform for any numbered snake.
 
 In the two files below every strip has 60 LEDs and every leg has three strips, so each leg
 has 180 LEDs.
@@ -356,6 +355,11 @@ x=60  | 121 -------------------------------------------> 180 |
 
 ## Editing an installed target mapping
 
+The operators' app starts with mapping editing locked. Its Settings toggle requires
+confirmation before unlocking or relocking. It protects pin moves, Restore defaults
+and applying photo fixes. Leaving Settings or changing target relocks. Reads and
+diagnostics remain available; this is an app interaction guard, not a wire permission.
+
 The pin table above is the default. The mapping controls in the shared operators'
 app can permute the twenty existing GPIOs among the canonical twenty three-column
 snakes. Snake identities, canvas positions and chain directions remain unchanged.
@@ -375,7 +379,7 @@ owner's check; software cannot detect whether a wire actually reaches a snake.
 
 Temporary miniature mode is a host-output exception, not another installed mapping.
 The 60x60 logical canvas and its files stay unchanged. The miniature reads logical
-RGB before the normal twenty-snake pin permutation and snake 10 cross-wiring,
+RGB before the normal twenty-snake pin permutation and installed strip mapping,
 then places its 6x6 average in columns 2..7 of a 10x6 display. Columns 0,1,8,9 are
 black. With zero-based coordinates from bottom left, physical index is `x*6+y`:
 straight columns upward, left to right. The [root README](../README.md#approved-connection-and-orientation)

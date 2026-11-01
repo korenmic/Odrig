@@ -53,10 +53,7 @@ class HostRouting(unittest.TestCase):
                     else:running.feed(line+b'\n',transport)
                 published=connection.take(.01)
                 changed=[json.loads(value) for kind,value in published if kind=='mapping']
-                # The page reads the mapping file again for the save; the refusal publishes
-                # nothing, and the same word again only once more.
-                self.assertEqual(len(changed),2)
-                self.assertEqual([leg[1] for leg in changed[0]],PINS)
+                self.assertEqual(changed, [])
                 events.disconnect(connection)
 
     def test_pin_bytes_follow_the_saved_assignment_without_changing_canvas_data(self):

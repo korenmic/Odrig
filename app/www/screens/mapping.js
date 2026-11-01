@@ -30,8 +30,6 @@ let polling = false;
 // The saving of moves: the assignment the target confirmed last and its revision, the one
 // wanted now, whether a call is out, and the pin that was moved.
 let live = null;
-// The saving of snake 10's wiring is under way.
-let crossing = false;
 let problem = "";
 let note = "";
 let fresh = false;
@@ -41,13 +39,18 @@ let press = null;
 let focused = null;
 // A click right after a drag is no press on a handle.
 let swallowClick = false;
+let editLocked = true;
+let lockEpoch = 0;
+let lockRequest = null;
+const watchers = new Set();
 
 const byId = id => document.getElementById(id);
 const same = (a, b) => a.length === b.length && a.every((value, at) => value === b[at]);
 const editable = () => latest?.editable === true && latest.pins.length === SNAKES;
 // The pins of snakes 1 to 20 that the column shows.
 const shownPins = () => live !== null ? live.wanted ?? live.confirmed : editable() ? latest.pins : [];
-const locked = () => pending || !fresh || !editable() || crossing;
+const permissionLocked = () => editLocked || lockRequest !== null || !visible || document.hidden || client.state.link !== "answers";
+const locked = () => permissionLocked() || pending || !fresh || !editable();
 const defaultsAvailable = () => editable() && same([...latest.pins].sort((a, b) => a - b), [...DEFAULTS].sort((a, b) => a - b));
 // The revision of an assignment: the CRC-32 of its twenty pin bytes, snake 1 first.
 const revisionOf = pins => parseInt(crc32(Uint8Array.from(pins)), 16);
@@ -65,14 +68,55 @@ function setDisabled(element, disabled) {
   if (element.disabled !== disabled) element.disabled = disabled;
 }
 
-function reset() {
+function closePrompt() {
+  lockRequest = null;
+  const dialog = byId("mapping-lock-dialog");
+  if (dialog.open) dialog.close();
+}
+
+function relock() {
+  editLocked = true;
+  lockEpoch += 1;
+  closePrompt();
+  if (live !== null) {
+    live.wanted = null;
+    if (!live.sending) live = null;
+  }
   cancel();
+}
+
+function requestLock() {
+  if (!visible || document.hidden || pending || live !== null || press !== null || !fresh || !editable() || client.state.link !== "answers") return;
+  lockRequest = {version, epoch: lockEpoch, locked: !editLocked};
+  byId("mapping-lock-question").textContent = lockRequest.locked ?
+    "Are you sure you want to lock mapping edits?" :
+    "Are you sure you want to unlock mapping edits? Pin moves and photo fixes will save immediately.";
+  byId("mapping-lock-yes").textContent = lockRequest.locked ? "Lock mapping" : "Unlock mapping";
+  byId("mapping-lock-dialog").showModal();
+  draw();
+}
+
+function confirmLock() {
+  const request = lockRequest;
+  closePrompt();
+  if (request !== null && request.version === version && request.epoch === lockEpoch && visible &&
+      !document.hidden && fresh && editable() && client.state.link === "answers") {
+    if (request.locked) relock();
+    else {
+      editLocked = false;
+      lockEpoch += 1;
+    }
+  }
+  draw();
+}
+
+function reset() {
+  relock();
   version = client.targetVersion();
   latest = null;
   pending = false;
   polling = false;
   live = null;
-  crossing = false;
   problem = "";
   note = "";
   fresh = false;
@@ -130,7 +174,7 @@ function rows() {
   // While moves are saved after a pin is let go no pin can be taken, but the handles stay
   // enabled: a disabled one would lose the focus.
   column.dataset.locked = String(locked() || (live !== null && press === null));
-  const off = !fresh || !editable();
+  const off = permissionLocked() || !fresh || !editable();
   for (const handle of column.querySelectorAll(".handle")) setDisabled(handle, off);
 }
 
@@ -146,44 +190,12 @@ function draw() {
   const error = problem || (latest !== null && !editable() ? "This editor only supports the 60 \u00d7 60 installation with twenty three-column snakes." : "");
   setText(byId("mapping-error"), error);
   setHidden(byId("mapping-error"), error === "");
-  setDisabled(byId("mapping-defaults"), locked() || live !== null || crossing || !defaultsAvailable() || same(latest.pins, DEFAULTS));
-  setDisabled(byId("mapping-reload"), pending || live !== null || crossing);
-  // The box shows the target's wiring, and what was tapped while it is being saved.
-  const box = byId("mapping-cross");
-  if (!crossing) {
-    const crossed = editable() && latest.cross === true;
-    if (box.checked !== crossed) box.checked = crossed;
-  }
-  setDisabled(box, crossing || locked() || live !== null || press !== null);
-}
-
-// Saves snake 10's wiring as the box was set, at once, as a move is saved.
-async function cross() {
-  const box = byId("mapping-cross");
-  if (crossing || locked() || live !== null || press !== null) {
-    draw();
-    return;
-  }
-  const crossed = box.checked;
-  const asked = version;
-  crossing = true;
-  note = "";
-  problem = "";
-  draw();
-  try {
-    await client.mappingCross(crossed);
-    if (asked !== version) return;
-    latest = {...latest, cross: crossed};
-    note = crossed ? "Saved: snake 10 is cross-wired." : "Saved: snake 10 is wired as the others.";
-  } catch (error) {
-    if (asked !== version) return;
-    problem = explanation(error);
-  } finally {
-    if (asked === version) {
-      crossing = false;
-      await read(true);
-    }
-  }
+  setDisabled(byId("mapping-defaults"), locked() || live !== null || !defaultsAvailable() || same(latest.pins, DEFAULTS));
+  setDisabled(byId("mapping-reload"), pending || live !== null);
+  byId("mapping-lock").setAttribute("aria-pressed", String(editLocked));
+  setDisabled(byId("mapping-lock"), pending || live !== null || press !== null || !fresh || !editable() || client.state.link !== "answers");
+  setText(byId("mapping-lock-state"), editLocked ? "Mapping edits are locked." : "Mapping edits are unlocked. Changes are saved immediately.");
+  for (const watcher of watchers) watcher();
 }
 
 function explanation(error) {
@@ -230,13 +242,13 @@ async function read(quiet = false) {
 // mapping did, never while a pin is held or moves are saved, and a reply that does not come
 // changes nothing.
 async function poll() {
-  if (!ready || pending || polling || press !== null || live !== null || crossing || document.hidden) return;
+  if (!ready || pending || polling || press !== null || live !== null || document.hidden) return;
   const asked = version;
   polling = true;
   try {
     const reply = await client.mappingGet();
-    if (asked !== version || pending || live !== null || crossing) return;
-    const changed = latest === null || !fresh || latest.revision !== reply.revision || latest.editable !== reply.editable || latest.cross !== reply.cross ||
+    if (asked !== version || pending || live !== null) return;
+    const changed = latest === null || !fresh || latest.revision !== reply.revision || latest.editable !== reply.editable ||
       !same(latest.pins, reply.pins);
     latest = reply;
     fresh = true;
@@ -254,6 +266,7 @@ async function poll() {
 // Asks for an assignment to be saved: at once, or as soon as the call that is out has been
 // answered, so that only the latest of several quick moves waits.
 function want(pins, moved) {
+  if (locked()) return;
   if (live === null) {
     live = {confirmed: [...latest.pins], revision: latest.revision, wanted: null, sending: false, version, moved};
   }
@@ -266,13 +279,20 @@ function want(pins, moved) {
 async function pump() {
   if (live === null || live.sending) return;
   const asked = version;
-  while (live !== null && live.wanted !== null && !same(live.wanted, live.confirmed)) {
+  while (live !== null && live.wanted !== null && !same(live.wanted, live.confirmed) && !locked()) {
     const pins = live.wanted;
     live.sending = true;
     draw();
     try {
-      await client.mappingSet(live.revision, pins);
+      const permitted = lockEpoch;
+      const saved = await client.mappingSet(live.revision, pins, () => asked === version && permitted === lockEpoch && !locked());
       if (asked !== version || live === null) return;
+      if (saved === false) {
+        live = null;
+        cancel();
+        await read(true);
+        return;
+      }
       live.confirmed = pins;
       live.revision = revisionOf(pins);
       const snake = pins.indexOf(live.moved) + 1;
@@ -452,6 +472,15 @@ export function saving() {
   return live !== null;
 }
 
+export function canEdit() {
+  return !locked() && live === null;
+}
+
+export function watch(watcher) {
+  watchers.add(watcher);
+  watcher();
+}
+
 // Saves an assignment read from a photo as a drag saves one; false when none can be saved
 // now.
 export function saveFromPhoto(pins) {
@@ -463,7 +492,10 @@ export function saveFromPhoto(pins) {
 
 export function showing(shown) {
   visible = shown;
-  if (!shown) cancel();
+  if (!shown) {
+    relock();
+    draw();
+  }
   if (shown) {
     if (latest === null) read();
     else poll();
@@ -519,6 +551,11 @@ export function start() {
     if (press !== null && press.lifted) event.preventDefault();
   }, {passive: false});
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && lockRequest !== null) {
+      event.preventDefault();
+      closePrompt();
+      draw();
+    }
     if (event.key === "Escape" && press !== null) cancel();
   });
   column.addEventListener("click", (event) => {
@@ -552,12 +589,35 @@ export function start() {
     note = "";
     read();
   });
-  byId("mapping-cross").addEventListener("change", cross);
+  byId("mapping-lock").addEventListener("click", requestLock);
+  byId("mapping-lock-yes").addEventListener("click", confirmLock);
+  byId("mapping-lock-no").addEventListener("click", () => {
+    closePrompt();
+    draw();
+  });
+  byId("mapping-lock-dialog").addEventListener("cancel", event => {
+    event.preventDefault();
+    closePrompt();
+    draw();
+  });
+  byId("mapping-lock-dialog").addEventListener("close", () => {
+    if (!byId("mapping-lock-dialog").open && lockRequest !== null) {
+      lockRequest = null;
+      draw();
+    }
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      relock();
+      draw();
+    }
+  });
   client.watch(() => {
     if (version !== client.targetVersion()) {
       reset();
       if (visible) read();
     }
+    if (client.state.link !== "answers" && (!editLocked || lockRequest !== null)) relock();
     draw();
   });
   setInterval(() => {

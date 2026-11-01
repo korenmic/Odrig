@@ -135,15 +135,16 @@ class Miniature(unittest.TestCase):
             self.assertEqual(frame(run), bytes(180))
             self.assertEqual(frame(run, "chain"), bytes(180))
 
-    def test_mapping_permutation_and_cross_wiring_do_not_change_projection(self):
+    def test_mapping_permutation_and_custom_strip_starts_do_not_change_projection(self):
         files = files_for()
         mapping = json.loads(files["mapping.json"])
         pins = [leg["pin"] for leg in mapping["legs"]][::-1]
         for leg, pin in zip(mapping["legs"], pins):
             leg["pin"] = pin
+        mapping["legs"][9].update(columns=[28, 30, 29], starts=["bottom", "bottom", "top"])
         files["mapping.json"] = json.dumps(mapping)
         first = support.start(files_for(), [*ENABLE, "poll 0", "mini frame"])
-        second = support.start(files, [*ENABLE, support.line(0, "mapping cross on"), "poll 0", "mini frame"])
+        second = support.start(files, [*ENABLE, "poll 0", "mini frame"])
         self.assertEqual(replies(second)[-1], {"ok": True})
         self.assertEqual(frame(second), frame(first))
 

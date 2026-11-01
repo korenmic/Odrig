@@ -137,7 +137,6 @@ maps its actions to command lines, each sent as `POST /odrig` to the address tha
 | Presses `Save` for a text or a clock it edits | `upload begin <id> <file> <bytes>`, then `upload expect <crc32>` with the CRC-32 of the file it read, then the pieces and the end as for an upload |
 | Opens Settings, reloads, or waits two seconds while Settings is visible; on Animations every two seconds while nothing plays, which is so during a test, and after a test is started or stopped | `mapping get` |
 | Drags a pin of the mapping into another place, presses an arrow key on its handle, or presses Restore defaults | `mapping set <revision> <pins>` |
-| Ticks or clears `Snake 10 is cross-wired` | `mapping cross on`, `mapping cross off` |
 | Presses `Diagonal` in the Tests group, or `Stop test` | `mapping test on`, `mapping test off` |
 | Presses a snake's test in the Tests group | `mapping test snake <n>` |
 | Nothing: after every complete list, and its further parts for a long one | `order get`, and `order get <next>` |
@@ -785,7 +784,18 @@ limit. It never leaves the phone, and each phone has its own; the Controller vie
 kept, a web view without IndexedDB, or one that refuses a write, keeps the preview for the
 run alone, and nothing of this is said. No plugin is added for it.
 
-**Mapping.** The twenty snakes stand in a fixed column, `Snake n · columns a–b`, left to
+**Mapping edit lock.** `Lock mapping edits` is a toggle, pressed by default, with the
+status `Mapping edits are locked.` Both unlocking and relocking open an "Are you sure?"
+dialog with explicit confirm/cancel buttons. Cancel or Escape keeps the existing state.
+While locked, pin handles, held-row/keyboard moves, Restore defaults, photo Apply and
+Other reading cannot save. Their handlers also enforce the lock. Mapping reads/Reload,
+photo analysis and display diagnostics remain available. Unlocking applies only to
+this Settings session on this app; leaving Settings, hiding the app, losing the link
+or changing target relocks and closes a pending confirmation. Unsent queued edits are
+dropped before transport; an already-sent edit still needs its normal reconciliation.
+The lock adds no board command and does not restrict another controller or odrigctl.
+
+**Mapping.** After confirmed unlock, the twenty snakes stand in a fixed column, `Snake n · columns a–b`, left to
 right when viewed from the front, each starting at the bottom and running up, down, up;
 beside each snake stands the data pin that drives it, `GPIO p`. Only the installed 60x60
 geometry is editable. A pin is moved by dragging its handle `≡` up or down, or by holding
@@ -802,19 +812,6 @@ twice. Restore defaults saves the default assignment at once, offered only when 
 installed pin set matches those defaults; Reload reads the assignment again. No new pin
 can be entered. The read every two seconds changes the column only when the target's
 mapping changed, and never while a pin is held or moves are saved.
-
-**Snake 10 is cross-wired.** Under the column a checkbox, off by default, says whether the
-installation's snake 10 is chained around its dead data output: up line 28, up line 30
-and down line 29, where the other snakes run up, down, up. It shows what the installation
-says, `cross` of `mapping get`, and the read every two seconds follows a change made by
-another controller. A tap saves at once with `mapping cross on` or `mapping cross off`, as
-a drag saves a move, and the summary says `Saved: snake 10 is cross-wired.` or `Saved:
-snake 10 is wired as the others.`; a refusal is said as a save's is, and the box shows the
-installation's state again. The box cannot be used while the mapping is not editable, while
-a move is saved or a pin is held. It changes no pin: whatever pin drives position 10, its
-three lines are wired as the box says. On, the snake's LEDs show the picture right, the
-test of snake 10 climbs its three lines together, and the diagonal's stub at position 10
-rises like the others.
 
 **The mapping from a photo.** Under the mapping's column, `From a photo` takes an image
 file of the phone, a JPEG or a PNG, through the phone's own chooser: no camera is part of
@@ -847,12 +844,7 @@ apart, and after Apply whether the diagonal begins at the bottom left; `Other re
 applies the next one. Bright spots off the grid are ignored and counted; a photo with no
 steady set of bright spots, with fewer than two lit LEDs, or with LEDs that fit no grid,
 is refused with the count found and the advice, and `Try another photo`. Nothing of the
-photo leaves the phone. A photo of the installation with snake 10 cross-wired and `Snake
-10 is cross-wired` off shows position 10's stub broken: its first LED in its place, its
-other two on the position's other two lines in the rows of another snake. The reading
-leaves that snake with the position that shows it whole, gives position 10 no snake and
-then the snake no other position shows, its own, and says `Position 10 shows no snake`;
-apply the reading, then tick the box.
+photo leaves the phone.
 
 **Clocks.** The Settings panel has one `Clocks` dropdown: `Off`, `Between animations`,
 `Clocks only`. Between inserts a clock after five animations or five minutes and resumes

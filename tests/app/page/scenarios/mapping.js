@@ -1,4 +1,5 @@
 import {shown} from "../reading.js";
+import {unlockMapping} from '../mapping-lock.js';
 
 // The pins of snakes 1 to 20 as the column beside the snakes shows them.
 const pins = (app) => [...app.doc.querySelectorAll("#mapping-pins > .map-pin")].map((item) => Number(item.dataset.pin));
@@ -48,6 +49,7 @@ export default async function(app) {
     await app.until(() => /does not support|only supports/.test(app.text("mapping-error") ?? ""), "unsupported mapping explanation");
     return {error: app.text("mapping-error"), count: app.doc.querySelectorAll("#mapping-pins > .map-pin").length};
   }
+  await unlockMapping(app);
   await app.until(() => pins(app).length === 20 && !handleOf(app, pins(app)[0]).disabled, "twenty movable pins");
   const seen = {
     before: pins(app),

@@ -245,11 +245,12 @@
 <h2>Mapping</h2>
 <p class="small">Each three-column snake has the board's data pin that drives it beside it. Viewed from the front, snake 1 is columns 1&ndash;3 at the left; each snake starts at the bottom and runs up, down, up.</p>
 <p id="mapping-summary" role="status" aria-live="polite">Reading mapping&hellip;</p>
+<button id="mapping-lock" type="button" aria-pressed="true" aria-describedby="mapping-lock-state" disabled>Lock mapping edits</button>
+<p id="mapping-lock-state" role="status">Mapping edits are locked.</p>
 <p id="mapping-error" role="alert" hidden></p>
 <div id="mapping-rows"></div>
 <button id="mapping-defaults" type="button" disabled>Restore defaults</button>
 <button id="mapping-reload" type="button">Reload</button>
-<label class="check" for="mapping-cross"><input id="mapping-cross" type="checkbox"><span><span class="title">Snake 10 is cross-wired</span><span class="small">Its chain runs up line 28, up line 30 and down line 29, around a dead output.</span></span></label>
 <div id="photo-take" hidden>
 <h3>From a photo</h3>
 <p class="small">One photo of the wall with the diagonal showing tells which snake each position drives: the app reads it and offers the mapping that puts every position right. A snake that does not light is put where a place remains.</p>
@@ -294,6 +295,13 @@
 </div>
 </section>
 </main>
+<dialog id="mapping-lock-dialog" aria-labelledby="mapping-lock-question">
+<p id="mapping-lock-question"></p>
+<div class="pair">
+<button id="mapping-lock-no" type="button" autofocus>Cancel</button>
+<button id="mapping-lock-yes" type="button">Unlock mapping</button>
+</div>
+</dialog>
 <div id="row-menu" role="menu" hidden></div>
 <div id="message" hidden>
 <p id="message-text"></p>
