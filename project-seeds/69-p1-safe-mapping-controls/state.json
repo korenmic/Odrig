@@ -1,0 +1,9 @@
+{
+  "number": 69,
+  "slug": "69-p1-safe-mapping-controls",
+  "state": "remaining",
+  "title": "Remove Snake10 cross-wiring and lock mapping edits",
+  "priority": "P1",
+  "addedAt": "2026-11-01",
+  "summary": "Owner-requested cross-wiring feature retirement and confirmed app-local mapping edit lock; no open owner questions."
+}
