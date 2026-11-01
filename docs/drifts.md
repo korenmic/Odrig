@@ -12885,3 +12885,20 @@ autonomous implementation authorizes the proposed rotation read/set command form
 **Resolution.** AGENTS.md, the hardened seed65, its spec, rotation.h/rotation.cpp and
 commands.md record this. Legacy rectangular playback stays unchanged/unsupported
 for this setting. The previous fit-question deferral is superseded.
+
+## WLED power-state callbacks and storage pacing
+
+**Question.** May WLED's synchronous state hooks wait for player storage pacing
+or perform the manual command's persistence while processing an initial/preset,
+unrelated or manual state event?
+
+**Answer.** No. Record explicit/observed power intent under an independent,
+memory-only guard and return. Apply the latest request in the usermod loop once
+pacing permits, through the existing core manual command. Initialization and
+scheduled feedback still create no manual override. This changes execution context,
+not the owner's power policy, command list, hardware settings or watchdog.
+
+**Resolution.** The production-body callback harness reproduced the previous wait
+with permanently busy storage before repair. The firmware adapter and its queued
+power helper now defer persistence. This confirmed code defect is separate from
+the still unconfirmed physical reset reason reported by the operator.

@@ -592,7 +592,7 @@ class Pacing(unittest.TestCase):
         for path in SOURCES:
             text = text_of(path)
             if path.name == 'odrig_usermod.cpp':
-                start = text.index('void manualPower(uint8_t mode) {')
+                start = text.index('void applyPower() {')
                 end = text.index('\n}\n', start) + 3
                 adapter = text[start:end]
                 self.assertIn('const char *line = on ? "on" : "off";', adapter)

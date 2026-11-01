@@ -2418,4 +2418,8 @@ become settings. Runtime WLED power mirroring changes no saved WLED, hardware or
 power-supply configuration. Initialization/mirroring cannot create an override;
 explicit JSON On/Off (including reassertions/toggle) and other power transitions
 forward ordinary core manual commands. Colour-only updates do not override hours.
+State callbacks only record power intent under a short memory-only guard. They
+never wait for storage, take the player lock or write files. The main loop applies
+the latest queued request once storage pacing allows it; repeated callbacks cannot
+hold up initialization or WLED's network handling while storage remains busy.
 Physical behavior remains an operator acceptance check.
