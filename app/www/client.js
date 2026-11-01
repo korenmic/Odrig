@@ -61,7 +61,9 @@ let listTimer = null;
 let listing = null;
 // The folders entered from the root down to the level shown, each `{path, id}`.
 const trail = [];
-let onlyOpened = false;
+let onlyActive = false;
+let onlyFolder = null;
+let onlyDesired = "clocks";
 // Whether the root's names are due while another level is shown, and the root's list that
 // is being asked for in parts for them: the ids and the files so far and the position to
 // ask for next.
@@ -258,6 +260,51 @@ function failed(error) {
   delayBackground();
 }
 
+function inClocks(path) {
+  return path === "clocks" || path.startsWith("clocks/");
+}
+
+function unavailableClocks() {
+  if (state.level.path === "clocks" && state.level.id === null) return;
+  trail.splice(0, trail.length, {path: "clocks", id: null});
+  toLevel();
+}
+
+function reconcileOnly(reply) {
+  if (["off", "between"].includes(reply.clockMode)) {
+    onlyActive = false;
+    onlyFolder = null;
+    onlyDesired = "clocks";
+    if (state.level.path !== "" && state.level.id === null) {
+      trail.length = 0;
+      toLevel();
+    }
+    return;
+  }
+  if (reply.clockMode !== "only") return;
+  const entering = !onlyActive;
+  const before = onlyFolder;
+  onlyActive = true;
+  onlyFolder = reply.clockOnly.folder;
+  if (!entering && !inClocks(state.level.path)) return;
+  if (onlyFolder === null) {
+    unavailableClocks();
+  } else if (entering) {
+    onlyDesired = "clocks";
+    trail.splice(0, trail.length, {path: "clocks", id: onlyFolder});
+    toLevel();
+  } else if (before !== onlyFolder && state.level.id !== null) {
+    trail[0] = {path: "clocks", id: onlyFolder};
+    if (state.level.path === "clocks") toLevel();
+    else {
+      state.inventoryFresh = false;
+      listing = null;
+      pendingList = null;
+      listDue = true;
+    }
+  }
+}
+
 async function askStatus() {
   const asked = target;
   clearTimeout(statusTimer);
@@ -278,13 +325,7 @@ async function askStatus() {
       connectionDue = false;
       state.connectionVersion += 1;
     }
-    if (reply.clockMode !== "only") onlyOpened = false;
-    else if (!onlyOpened && reply.clockOnly?.folder != null) {
-      onlyOpened = true;
-      trail.length = 0;
-      trail.push({path: "clocks", id: reply.clockOnly.folder});
-      toLevel();
-    }
+    reconcileOnly(reply);
     const named = reply.animation;
     const here = typeof reply.file === "string" && parentOf(reply.file) === state.level.path && (state.level.id === null || reply.file.includes("/"));
     if (named !== null && state.animations !== null && named !== askedFor && here && !state.animations.some((animation) => animation.id === named)) {
@@ -372,13 +413,23 @@ function namesOf(items) {
 
 // Resolve the captured path without changing the visible level. A failed lookup
 // or an unavailable catalog does not establish that the folder was removed.
-async function recoverLevel(asked, level) {
+async function recoverLevel(asked, level, fromRoot = false) {
   const current = () => asked === target && level === state.level;
   const found = [];
   let path = "";
   let parent = null;
+  const bounded = onlyActive && inClocks(level.path);
+  const desired = bounded && level.id === null ? onlyDesired : level.path;
+  let names = desired.split("/");
+  const knownRoot = bounded && !fromRoot && level.id !== null && desired !== "clocks" && onlyFolder !== null;
+  if (knownRoot) {
+    path = "clocks";
+    parent = onlyFolder;
+    found.push({path, id: parent});
+    names = names.slice(1);
+  }
   try {
-    for (const name of level.path.split("/")) {
+    for (const name of names) {
       path += (path ? "/" : "") + name;
       let from = 0;
       let folder = null;
@@ -396,6 +447,16 @@ async function recoverLevel(asked, level) {
         if (!current()) return;
         if (catalog === null || ["ok", "absent", "none"].includes(catalog.external.state)) {
           heard();
+          if (bounded) {
+            if (found.length > 0) {
+              onlyDesired = "clocks";
+              trail.splice(0, trail.length, found[0]);
+              toLevel();
+              return;
+            }
+            unavailableClocks();
+            break;
+          }
           trail.length = 0;
           toLevel();
           return;
@@ -405,9 +466,9 @@ async function recoverLevel(asked, level) {
       found.push({path, id: folder.id});
       parent = folder.id;
     }
-    if (found.length === level.path.split("/").length) {
+    if (found.length === desired.split("/").length) {
       trail.splice(0, trail.length, ...found);
-      if (parent !== level.id) {
+      if (parent !== level.id || desired !== level.path) {
         heard();
         toLevel();
         return;
@@ -416,18 +477,21 @@ async function recoverLevel(asked, level) {
     heard();
   } catch (error) {
     if (!current()) return;
+    if (knownRoot && error instanceof commands.Refusal && error.code === "unknown-id") {
+      return recoverLevel(asked, level, true);
+    }
     if (error instanceof commands.Refusal) heard();
     else failed(error);
   }
   listing = null;
-  state.listBusy = true;
+  state.listBusy = state.level.id !== null;
   listAgainLater(LIST_WHEN_BUSY_MS);
   changed();
 }
 
 // Asks for one part of the list of the level shown. The new list takes the place of the
 // old one only when its last part has come; when a part fails, the old list stays. A
-// folder that is no more brings the list to the root.
+// missing folder is resolved against its current ancestry before the view changes.
 async function askListPart() {
   const asked = target;
   const level = state.level;
@@ -763,7 +827,8 @@ async function give(request) {
     return;
   }
   if (["remove", "ignore", "order", "repeat", "play", "read"].includes(request.kind) &&
-      (!state.inventoryFresh || !state.statusFresh)) {
+      (!state.inventoryFresh || !state.statusFresh) || request.kind === "play-all" && onlyActive &&
+      state.level.path !== "" && state.level.id === null) {
     const error = new commands.Refusal("stale", request.kind);
     if (request.reject) request.reject(error);
     else refused(error);
@@ -876,7 +941,8 @@ function due() {
   if (listWaits) {
     listDue = false;
     listWaited = false;
-    return askListPart;
+    return state.level.id === null && state.level.path !== "" ?
+      () => recoverLevel(target, state.level) : askListPart;
   }
   if (rootDue || rooting !== null) {
     rootDue = false;
@@ -947,7 +1013,9 @@ export function begin() {
   state.since = Date.now();
   state.answered = false;
   trail.length = 0;
-  onlyOpened = false;
+  onlyActive = false;
+  onlyFolder = null;
+  onlyDesired = "clocks";
   state.level = {path: "", id: null};
   state.rootNames = null;
   rootDue = false;
@@ -1019,13 +1087,15 @@ function toLevel() {
   rememberLevel();
   const top = trail[trail.length - 1];
   state.level = top === undefined ? {path: "", id: null} : {path: top.path, id: top.id};
+  if (onlyActive && inClocks(state.level.path) && state.level.id !== null) onlyDesired = state.level.path;
   const known = snapshots.get(state.level.path);
   state.animations = known?.animations ?? null;
   state.folders = known?.folders ?? [];
   state.cycles = known?.cycles ?? [];
   state.order = known?.order ?? null;
   displayProof = known?.proof ?? null;
-  state.inventoryFresh = known?.level.id === state.level.id && sameProof(displayProof, inventory);
+  state.inventoryFresh = (state.level.path === "" || state.level.id !== null) &&
+    known?.level.id === state.level.id && sameProof(displayProof, inventory);
   state.orderVersion += 1;
   listing = null;
   pendingList = null;

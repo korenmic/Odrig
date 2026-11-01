@@ -12806,3 +12806,22 @@ checks. Bound per-path snapshots to8 and namespace persisted keys by board/manif
 
 **Resolution.** inventory.cpp, catalog publication, shared client/catalog parsing and
 browser/native regressions implement these choices. No wire command was added.
+
+## Seed67: missing Clocks during automatic recovery
+
+**Question.** What should replace an Only folder when a missing-ID lookup finds no
+Clocks entry, or when status has no resolved Clocks ID?
+
+**Answer.** Keep a virtual Clocks location with no usable folder ID. Retain last-good
+rows visibly stale, perform bounded invisible ancestry lookups, and never interpret
+that null ID as a request to display Root. Preserve valid descendants and the preferred
+Clocks path through media absence; resolve changed IDs before enabling actions. Repeated
+Only status updates identity without collapsing a valid descendant. Unknown metadata
+does not clear the last confirmed Only context; confirmed Off/Between and a different
+target do. Explicit navigation restrictions are a separate scope.
+
+**Resolution.** The shared client replaces the one-shot entry flag with reconciled
+recovery context and validates delayed replies against target and level. Shared-browser
+regressions observe the former Clocks-to-Root trace before repair and cover unavailable
+media, remapped descendants, mode uncertainty and operator recovery. No physical cause
+is inferred from those controlled tests.

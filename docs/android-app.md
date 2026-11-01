@@ -67,16 +67,19 @@ a top bar with the app's name and whether the installation answers.
   that folder's own files and the rows of its sub-folders. A folder with no file of its
   own keeps its row, `0 animations` and its way in. The app reads the level it shows and
   no other, in parts, with `list` and `order get` at the root and `list in` and `order get
-  in` inside a folder; entering a folder or going Back reads that level anew, and nothing
-  of the level left is kept, so that a card of any size takes one level's rows on the
-  phone. The heading is marked while the level's playlist is current, and so is the
+  in` inside a folder; entering a folder or going Back restores a bounded last-good
+  snapshot when available, then validates it. Up to eight paths are kept. The heading
+  is marked while the level's playlist is current, and so is the
   folder row that leads to the current playlist at every level above it, from the path
   that `status` names as `playlist`; the line of what plays names the file from `status`
   as well. The list comes back to the root when the target changes, when the card goes
   out and when the folder shown is confirmed gone from the card. A refused folder lookup
   first rechecks its path through fresh parent listings. An existing path keeps its
   location, including when its id changed; an unavailable verification keeps the last
-  complete rows and retries. A later reply cannot undo Back or a target change.
+  complete rows and retries. In confirmed Clocks only mode automatic recovery stays
+  inside Clocks; missing storage shows an unavailable Clocks location with stale known
+  rows and bounded retries. It never publishes an ordinary Root fallback. A later reply
+  cannot undo Back or a target change.
   An upload chooses its id and its
   name against the root's level, which the app reads for it when another level is
   shown. Each row
@@ -889,6 +892,14 @@ the raw `play all` command remains refused by the core. Inside files and folders
 manually playable when ignored or when automatic messages are off. Display tests require
 leaving Only first. Missing storage, missing Clocks or no eligible face keeps Only
 selected, with an explanation and dark output; a missing resolved folder disables restart.
+
+Automatic Clocks recovery continuously reconciles folder identity while preserving a
+valid descendant. A failed path lookup rechecks its ancestry; it does not replace the
+view with Root. Missing Clocks is a virtual unavailable location, with last-good rows
+marked stale and unsafe actions disabled. It cannot be mistaken for a root-list request.
+Storage return resolves the preferred Clocks path again, including changed IDs. Unknown
+mode metadata retains the last confirmed Only recovery context; confirmed Off or Between
+releases it. Settings, Target and mode exit remain usable throughout.
 
 Older clock-capable firmware without explicit mode metadata maps its existing booleans
 to Off and Between; the Only option is unavailable, with an update explanation. A target

@@ -295,10 +295,11 @@ class ModePanel(unittest.TestCase):
         target.only_folder = None
         target.only_state = 'missing-folder'
         target.levels[None] = target.levels[None][:2]
-        seen = ui(target, [dict(screen='Settings', look='missing')])
+        seen = ui(target, [dict(screen='Settings', look='missing')], rows=0)
         self.assertEqual(seen['missing']['mode'], 'only')
         self.assertIn('missing', seen['missing']['reason'])
         self.assertTrue(seen['missing']['global']['disabled'])
+        self.assertEqual(seen['missing']['level'], 'clocks')
 
     def test_refused_external_inclusion_keeps_the_previous_choice_until_a_retry(self):
         target = ModeTarget(self)

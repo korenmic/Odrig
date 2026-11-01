@@ -662,13 +662,16 @@ function rowsState(state, animations, here) {
   const only = state.status?.clockMode === "only";
   byId("play-all").textContent = only ? "Restart clocks" : "Play this folder";
   byId("play-all").disabled = state.link !== "answers" || !state.statusFresh ||
+    state.level.path !== "" && state.level.id === null ||
     !only && state.level.id !== null && !state.inventoryFresh || only && state.status.clockOnly?.folder == null;
   say("only-boundary", only ? "Clocks only: browsing is unrestricted. Play outside the Clocks folder is disabled; leave Clocks only in Settings to play it." : null);
 }
 
 function draw(state) {
-  say("inventory-state", state.animations !== null && (!state.inventoryFresh || !state.statusFresh) ?
-    "Known playlist: verifying the connection and any changes. Playback controls wait for confirmation." : null);
+  say("inventory-state", state.level.path === "clocks" && state.level.id === null ?
+    "Clocks folder unavailable. Waiting for storage to return; Settings and Target remain available." :
+    state.animations !== null && (!state.inventoryFresh || !state.statusFresh) ?
+      "Known playlist: verifying the connection and any changes. Playback controls wait for confirmation." : null);
   const counted = capacity.counts(state);
   byId("show-space").textContent = `Internal storage: ${capacity.internal(state.space, counted.internal)}`;
   byId("show-external-space").textContent = capacity.external(state.space, counted.external);

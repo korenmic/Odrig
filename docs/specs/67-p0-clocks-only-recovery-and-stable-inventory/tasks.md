@@ -16,7 +16,7 @@ numbered task is one proof commit; state becomes in_progress with the first task
     validate authoritative revisions cheaply and retain arrays/keys/order on no change.
     Test real changes, targets, incomplete pagination and legacy bounded fallback.
   - Run discovered app/core/emulator suites for touched layers. Do not fake readiness.
-- [ ] 3. Keep automatic Only recovery inside Clocks
+- [x] 3. Keep automatic Only recovery inside Clocks
   - First observe the recorded empty-root/catalog-absent escape followed by repeated
     Only status. Replace one-shot reconciliation, preserve valid descendants and handle
     changed IDs/media/stale responses with explicit unavailable Clocks state and retry.
