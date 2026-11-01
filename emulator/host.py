@@ -1,6 +1,7 @@
 """The files of a show folder, handed out and changed as the core asks."""
 
 import collections
+import hashlib
 import os
 import platform
 import shutil
@@ -304,6 +305,11 @@ class FolderHost:
     def about(self):
         """The name the emulator gives itself in `status`."""
         return f"odrig emulator on {platform.system()} {platform.machine()}"
+
+    def identity(self):
+        """Stable identity of this emulated board's storage, independent of its ports."""
+        root = os.path.normcase(os.path.realpath(self.folder))
+        return 'emu-' + hashlib.sha256(os.fsencode(root)).hexdigest()[:24]
 
     def drive_list(self, drive):
         """Lists the drive's folder now: the number of its files, or `None`."""

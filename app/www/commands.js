@@ -126,8 +126,10 @@ export async function status() {
     countOrNull(reply.loop, MOST_LOOPS) &&
     countOrNull(reply.saved, MOST_SAVED) &&
     (reply.clocks === undefined || typeof reply.clocks === "boolean") &&
-    (reply.clock_message === undefined || typeof reply.clock_message === "boolean");
-  if (!sound || !miniSound || !dimmingSound || !modeSound) {
+    (reply.clock_message === undefined || typeof reply.clock_message === "boolean") &&
+    (reply.timing === undefined || typeof reply.timing === "boolean");
+  if (!sound || !miniSound || !dimmingSound || !modeSound ||
+      (reply.clock_error !== undefined && reply.clock_error !== null && reply.clock_error !== "unreadable")) {
     throw new Failure("bad-reply", address());
   }
   return {
@@ -154,9 +156,81 @@ export async function status() {
     clockMessage: reply.clock_message ?? null,
     hasClockMode,
     clockMode,
+    clockError: reply.clock_error ?? null,
     clockOnly: hasClockMode && only !== null ? {...only} : null,
     mini: mini === undefined ? null : {...mini},
+    ...(reply.timing === undefined ? {} : {timing: reply.timing}),
   };
+}
+
+const TIMING_FIRST = 946684800;
+const TIMING_UNTIL = 4102444800;
+const TIMING_REVISION = /^[0-9a-f]{8}$/;
+const TIMING_ID = /^[A-Za-z0-9_-]{1,31}$/;
+const TIMING_ZONE = /^[A-Za-z0-9_+/-]{1,63}$/;
+const DAILY_MINUTE = /^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/;
+
+function timingLine(line, identity, reading = false) {
+  if (identity === null && reading) return line;
+  if (typeof identity !== "string" || !TIMING_ID.test(identity)) throw new Refusal("bad-argument", "timing target");
+  return `guard ${identity} ${line}`;
+}
+
+export async function timeRead(identity = null) {
+  const reply = await carriedOut(timingLine("time", identity, true));
+  const metadata = reply.zone !== null;
+  const sound = reply.ok === true && typeof reply.valid === "boolean" &&
+    (reply.board === null || (typeof reply.board === "string" && TIMING_ID.test(reply.board))) &&
+    (identity === null || reply.board === identity) &&
+    (reply.error === null || typeof reply.error === "string") &&
+    (metadata ? typeof reply.zone === "string" && TIMING_ZONE.test(reply.zone) &&
+      !reply.zone.startsWith("/") && !reply.zone.endsWith("/") && !reply.zone.includes("//") &&
+      whole(reply.offset, -86400, 86400) && typeof reply.revision === "string" && TIMING_REVISION.test(reply.revision) &&
+      whole(reply.from, TIMING_FIRST, TIMING_UNTIL - 1) && whole(reply.until, reply.from + 1, TIMING_UNTIL) :
+      reply.offset === null && reply.revision === null && reply.from === null && reply.until === null) &&
+    (reply.valid ? metadata && reply.error === null && whole(reply.utc, reply.from, reply.until - 1) : reply.utc === null);
+  if (!sound) throw new Failure("bad-reply", address());
+  return {...reply};
+}
+
+export async function timeZone(identity, base64) {
+  if (typeof base64 !== "string" || base64.length % 4 === 1 || !/^[A-Za-z0-9_-]{160,2000}$/.test(base64)) {
+    throw new Refusal("bad-argument", "phone zone");
+  }
+  await carriedOut(timingLine(`time zone ${base64}`, identity));
+}
+
+export async function timeSet(identity, utc, revision) {
+  if (!whole(utc, TIMING_FIRST, TIMING_UNTIL - 1) || typeof revision !== "string" || !TIMING_REVISION.test(revision)) {
+    throw new Refusal("bad-argument", "phone time");
+  }
+  await carriedOut(timingLine(`time set ${utc} ${revision}`, identity));
+}
+
+export async function scheduleRead(identity = null) {
+  const reply = await carriedOut(timingLine("schedule", identity, true));
+  const sound = reply.ok === true && typeof reply.enabled === "boolean" &&
+    typeof reply.on === "string" && DAILY_MINUTE.test(reply.on) && typeof reply.off === "string" && DAILY_MINUTE.test(reply.off) &&
+    reply.on !== reply.off && (reply.override === null || ["on", "off"].includes(reply.override)) &&
+    typeof reply.revision === "string" && TIMING_REVISION.test(reply.revision) &&
+    typeof reply.power === "boolean" && typeof reply.active === "boolean" && typeof reply.saved === "boolean" &&
+    (reply.reason === null || ["manual", "disabled", "time-unset", "settings-unreadable"].includes(reply.reason)) &&
+    (reply.error === null || typeof reply.error === "string") &&
+    (!reply.active || (reply.enabled && reply.override === null && reply.reason === null && reply.error === null));
+  if (!sound) throw new Failure("bad-reply", address());
+  return {...reply};
+}
+
+export async function scheduleSet(identity, revision, on, off, enabled) {
+  if (typeof revision !== "string" || !TIMING_REVISION.test(revision) ||
+      typeof on !== "string" || !DAILY_MINUTE.test(on) || typeof off !== "string" || !DAILY_MINUTE.test(off) ||
+      on === off || typeof enabled !== "boolean") throw new Refusal("bad-argument", "schedule times");
+  await carriedOut(timingLine(`schedule set ${revision} ${on} ${off} ${enabled ? "on" : "off"}`, identity));
+}
+
+export async function scheduleResume(identity, revision) {
+  if (typeof revision !== "string" || !TIMING_REVISION.test(revision)) throw new Refusal("bad-argument", "schedule revision");
+  await carriedOut(timingLine(`schedule resume ${revision}`, identity));
 }
 
 // The works in which a target meets a fault of a file.
@@ -380,6 +454,24 @@ export async function debugMini(on) {
   await carriedOut(`debug mini ${on ? "on" : "off"}`);
 }
 
+function rotationOf(reply) {
+  if (reply.ok !== true || typeof reply.supported !== "boolean" ||
+      ![0, 90, 180, 270].includes(reply.degrees) || !whole(reply.revision, 0, MOST_ID) ||
+      !(reply.error === null || reply.error === "unreadable")) throw new Failure("bad-reply", address());
+  return {supported: reply.supported, degrees: reply.degrees, revision: reply.revision, error: reply.error};
+}
+
+export async function rotation() {
+  return rotationOf(await carriedOut("rotation"));
+}
+
+export async function rotationSet(revision, degrees) {
+  if (!whole(revision, 0, MOST_ID) || ![0, 90, 180, 270].includes(degrees)) throw new RangeError("invalid rotation");
+  const reply = rotationOf(await carriedOut(`rotation set ${revision} ${degrees}`));
+  if (!reply.supported || reply.degrees !== degrees || reply.error !== null) throw new Failure("bad-reply", address());
+  return reply;
+}
+
 // Switches the message after each clock on or off.
 export async function clockMessage(on) {
   await carriedOut(`clocks message ${on ? "on" : "off"}`);
@@ -483,15 +575,24 @@ export async function catalog() {
   const internal = catalogOf(reply.internal, true);
   const external = catalogOf(reply.external, false);
   const rebuild = reply.rebuild;
+  const inventory = reply.inventory;
+  const inventorySound = inventory === undefined || inventory !== null &&
+    typeof inventory === "object" && typeof inventory.board === "string" && TIMING_ID.test(inventory.board) &&
+    whole(inventory.internal, 0, MOST_BYTES) && whole(inventory.external, 0, MOST_BYTES) &&
+    whole(inventory.internal_keys, 0, MOST_BYTES) && whole(inventory.external_keys, 0, MOST_BYTES) &&
+    typeof inventory.authoritative === "boolean";
   const sound =
     internal !== null &&
     external !== null &&
     (rebuild === null ||
       (typeof rebuild === "object" && STORAGES.includes(rebuild.storage) && whole(rebuild.read, 0, 65535) && whole(rebuild.to_read, 0, 65535)));
-  if (!sound) {
+  if (!sound || !inventorySound) {
     throw new Failure("bad-reply", address());
   }
-  return {internal, external, rebuild: rebuild === null ? null : {storage: rebuild.storage, read: rebuild.read, toRead: rebuild.to_read}};
+  return {internal, external, rebuild: rebuild === null ? null : {storage: rebuild.storage, read: rebuild.read, toRead: rebuild.to_read},
+    ...(inventory === undefined ? {} : {inventory: {board: inventory.board, internal: inventory.internal,
+      external: inventory.external, internalKeys: inventory.internal_keys, externalKeys: inventory.external_keys,
+      authoritative: inventory.authoritative}})};
 }
 
 // Starts the rebuild of the catalog of a storage, "internal" or "external": the target

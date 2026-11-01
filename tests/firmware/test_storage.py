@@ -134,6 +134,14 @@ class ShowFolders(Temporary):
         (self.show / "brightness.txt").write_bytes(saved)
         self.assertEqual(storage.folder_files(self.show), dict(before, **{"brightness.txt": saved}))
 
+    def test_timing_files_are_allowed_beside_show_content(self):
+        from tests.core.test_civil_time import snapshot
+        kept = {'schedule.txt': b'odrig-schedule 1\n1 1080 360 2\n', 'timezone.bin': snapshot(), 'rotation.txt': b'1 90\n'}
+        for name, data in kept.items():
+            (self.show / name).write_bytes(data)
+        loaded = storage.folder_files(self.show)
+        self.assertEqual({name: loaded[name] for name in kept}, kept)
+
     def test_a_folder_without_its_mapping_is_refused_with_the_converters_reason(self):
         (self.show / "mapping.json").unlink()
         self.assertEqual(self.reason(), "mapping-missing")
@@ -358,6 +366,31 @@ class Commands(Temporary):
         result = self.install(esptool)
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(expected, **{"brightness.txt": replacement}))
+
+    def test_show_install_preserves_replaces_and_reads_back_timing_files(self):
+        from tests.core.test_civil_time import snapshot
+        kept = {'schedule.txt': b'odrig-schedule 1\n1 1080 360 2\n', 'timezone.bin': snapshot(), 'rotation.txt': b'1 90\n'}
+        self.old = support.storage_image({**support.WLED_FILES, **{'/odrig/' + name: data for name, data in kept.items()}})
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        installed = self.on_the_board(esptool)
+        expected = {**storage.folder_files(self.show), **kept}
+        self.assertEqual(storage.show_of(installed), expected)
+        self.assertEqual(storage.other_files(installed), storage.other_files(self.old))
+        with support.no_board(self.esptool(installed)):
+            result = support.run_main('read-show', self.folder / 'timing-copy')
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(support.files_of(self.folder / 'timing-copy'), expected)
+        changed = {'schedule.txt': b'odrig-schedule 1\n0 540 1020 0\n',
+                   'timezone.bin': snapshot('Etc/Test', (3600,)), 'rotation.txt': b'1 270\n'}
+        for name, data in changed.items():
+            (self.show / name).write_bytes(data)
+        self.old = installed
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(storage.show_of(self.on_the_board(esptool)), {**expected, **changed})
 
     def test_three_state_clocks_are_preserved_and_read_back_without_schema_conversion(self):
         saved = b"odrig-clocks 2\nmode only\nmessage on\n"

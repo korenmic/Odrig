@@ -12667,6 +12667,185 @@ before the app fix; eight focused recovery tests and the actual native-emulator
 Clocks collection now pass. This fixes UI recovery, without claiming that a
 physical SD/flash I/O fault was reproduced or repaired.
 
+## Seed 64: civil-time wire forms and offline phone zones
+
+**Question.** How can the board follow phone time-zone rules offline without a
+platform time API, a new host callback or a second unbounded memory buffer?
+
+**Answer.** Use a boot-local UTC anchor and a validated compact phone-zone snapshot
+in the existing chunk. The supported civil range is2000..2099; the snapshot holds
+up to8 offsets and276 exact transitions, each five bytes. The phone supplies rules
+from its own Intl data. `time`, `time zone DATA` and `time set UTC REVISION` use
+shared dispatch. The owner's autonomous implementation instruction authorizes
+these protocol choices without another permission question.
+
+**Resolution.** The spec design, commands.md and core.md define the format, strict
+validation, revision guard, atomic publication, reset invalidation and memory bound.
+
+## Seed64: persistent manual precedence and scheduling publication
+
+**Question.** What happens to a manual On/Off if internal settings cannot be saved
+while the owner requires manual control always to win?
+
+**Answer.** Apply visibility and manual mode immediately. Preserve that volatile
+control on a failed save, report storage-error/busy, and expose saved:false plus
+manual-not-saved. Read-only hosts retain their ordinary successful manual control.
+A successful save retains manual mode across reset; only explicit resume releases
+it. Ordinary clock/zone/times edits never release it. The daily pair/enabled flag
+are one atomic publication, never partial field writes or writes at boundaries.
+
+**Resolution.** civil_time.cpp and commands.md define schedule set/resume, file
+grammar, validation/readback, startup and failed-persistence behavior.
+
+## Seed 64: physical timing identity and host feedback
+
+**Question.** Can an address or host build text identify a board for cooldowns and
+stale-write guards, and can show installs discard the timing metadata?
+
+**Answer.** Different boards share4.3.2.1. A bounded optional identity callback and
+atomic `guard BOARD ...` prefix are required plumbing for existing requirement5.4;
+address-only preflight is insufficient. Timing files are retained/replaced/read back
+like other operator metadata; an epoch is never persisted. Firmware mirrors effective
+visibility into volatile WLED power state without a command/callback, and forwards
+external explicit power requests or power transitions to ordinary core On/Off.
+Initialization and the mirror itself never establish a manual override.
+
+**Resolution.** `design.md`, `odrig_core.h`, `civil_time.cpp`, `commands.cpp`, the
+native binding/host, firmware adapter and `fwtool/storage.py` carry this contract.
+The earlier no-new-callback design assumption is replaced; seed scope is unchanged.
+
+## Seed 64: connection generations and confirmation boundaries
+
+**Question.** What counts as a reconnect, and can a timing failure trigger another
+automatic sync merely by making the next status reply look like a recovery?
+
+**Answer.** A fresh successful status after begin, foreground or a failed status
+creates a connection generation. Ordinary polls and a timing-operation failure do
+not create one. This prevents self-induced retries. Target/connection/preference
+guards are checked when queued operations are sent and after every await; physical
+identity is also checked by firmware. Backgrounding cancels unfinished preparation.
+Clock confirmation and physical-ID cooldown are independent of schedule readback:
+if UTC was confirmed but a later settings read fails, that confirmed UTC remains a
+successful sync, while the later error is reported. New connections clear old-board
+metadata immediately; current attempts never display a previous attempt as success.
+
+**Resolution.** `app/www/client.js`, `timing.js`, `time-zone.js`, `commands.js`, the
+browser tests and the automatic-phone-time section of `android-app.md` carry it.
+
+A phone zone change while the app remains connected is checked on ordinary client
+observations. It can publish changed zone rules, but cannot set UTC or move the
+last-confirmed UTC time. The observation is remembered even when its initial read
+fails, so later status polls do not silently retry it. A zone that changes during
+preparation invalidates that preparation before any write.
+
+## Seed64: Settings drafts and confirmation
+
+**Question.** Can background reads or a lost save reply discard typed hours or
+present an unconfirmed pair as saved?
+
+**Answer.** Keep a dirty draft with its original physical board and revision through
+polls, sync and reconnect to that same board. A successful explicit Refresh reloads
+the saved pair; a failed Refresh retains the draft. Another board/target clears it.
+Save and Resume use the shared serialized guard and readback path. Saving hours
+never releases manual mode. A lost reply remains an error even while disconnected,
+and no reconnect replays the mutation. Corrupt metadata disables edits rather than
+repairing it with defaults; unsaved manual mode is explained as temporary.
+
+**Resolution.** `screens/time.js`, `timing.js`, the guarded command validators and
+native/stand-in browser scenarios implement and verify these choices.
+
+## Seed64: initial inventory before authoring
+
+**Question.** Can the added connection-time reads expose authoring before the
+initial root-name inventory has arrived, causing an existing id to be chosen?
+
+**Answer.** Integration testing observed a new text uploaded as id1 instead of the
+free id3. Unknown names must keep new-authoring Upload disabled with a readable
+waiting explanation. A new text/clock also uses the existing internal creation-only
+begin guard, so a later id claim is refused atomically. Existing-file editing keeps
+its read CRC. This restores the intended free-id/no-replacement behavior under
+the shared queue's delayed initial inventory.
+
+**Resolution.** `screens/author.js` and native preview/authoring regression cases
+verify both missing inventory and an id claimed since the inventory. Both failed
+before the fix; no new command or file format is introduced.
+
+## Seed67: uncertain saved clock policy
+
+**Question.** The independent read callback combines missing and IO errors. How can
+startup distinguish a new installation from a saved policy that could not be read,
+without a new command or borrowing the player's open file during playback?
+
+**Answer.** Before playback, probe with sequential open's existing missing/error
+contract and close immediately. Only authoritative missing selects default Off.
+Other failures or malformed bytes select effective Only with dark output and an
+explicit unconfirmed-policy diagnostic. Independent bounded reads retry once a
+second; they do not write defaults. A valid read restores saved policy. An explicit
+mode save replaces corrupt state atomically, even if it selects effective Only;
+a message-only change cannot choose an unknown mode. Additive clock_error leaves
+old clients' mode/state enums compatible while new clients explain uncertainty.
+
+**Resolution.** breaks.cpp/h, player.cpp, commands.cpp, shared command parsing and
+the Settings clock panel implement this behavior; commands.md and actual-core IO
+fault regressions distinguish missing, read failure, malformed and operator recovery.
+
+## Seed67: inventory identity and change evidence
+
+**Question.** Can catalog generation alone confirm that a reconnect has the same
+board, media and list, and can listVersion also count identical validations?
+
+**Answer.** No. Ignore is stored independently, and different media can have equal
+generation/count. Compatible catalog metadata combines stable host identity with
+separate storage revisions and validated manifest fingerprints. Hash only bounded
+canonical state already in memory; never scan media for a cheap validation. Keep
+preview-key identity distinct from list inclusion/order. Unmanaged/legacy targets
+retain stale data while bounded full validation proceeds. A complete consistent
+candidate replaces a snapshot only after target/path/revision validation; unchanged
+arrays/orders keep their identity. A separate validationVersion counts completed
+checks. Bound per-path snapshots to8 and namespace persisted keys by board/manifest.
+
+**Resolution.** inventory.cpp, catalog publication, shared client/catalog parsing and
+browser/native regressions implement these choices. No wire command was added.
+
+## Seed67: missing Clocks during automatic recovery
+
+**Question.** What should replace an Only folder when a missing-ID lookup finds no
+Clocks entry, or when status has no resolved Clocks ID?
+
+**Answer.** Keep a virtual Clocks location with no usable folder ID. Retain last-good
+rows visibly stale, perform bounded invisible ancestry lookups, and never interpret
+that null ID as a request to display Root. Preserve valid descendants and the preferred
+Clocks path through media absence; resolve changed IDs before enabling actions. Repeated
+Only status updates identity without collapsing a valid descendant. Unknown metadata
+does not clear the last confirmed Only context; confirmed Off/Between and a different
+target do. Explicit navigation restrictions are a separate scope.
+
+**Resolution.** The shared client replaces the one-shot entry flag with reconciled
+recovery context and validates delayed replies against target and level. Shared-browser
+regressions observe the former Clocks-to-Root trace before repair and cover unavailable
+media, remapped descendants, mode uncertainty and operator recovery. No physical cause
+is inferred from those controlled tests.
+
+## Seed66: Only navigation and upload scope
+
+**Question.** Can an unavailable SD destination fall back to internal root in Only,
+and can authoring continue saving there because it has no external folder picker?
+
+**Answer.** No. The owner's Clocks browsing boundary also constrains destinations.
+Keep External selected but unavailable, disable Internal and submission, and explain
+how to leave Only. Preserve the prepared path rather than silently moving a Root draft
+into Clocks. Authoring preview remains local and usable; its flat internal-root save
+waits for confirmed Off/Between. Existing ordinary defaults/fallback remain unchanged.
+Fresh policy and path preflight precede transfer; every shared job checks its scope.
+If an outside transfer was opened before Only became confirmed, cancel its staging
+transaction before publishing a file. Background Root-name reads remain invisible.
+
+**Resolution.** Shared navigation rejects paths/IDs before publication, including
+out-of-level replies after ID reuse. Upload destination helpers and both forms enforce
+the current boundary. Status acceptance is shared with upload preflight. Upload jobs
+carry storage identity and can report a policy rejection while cancelling an opened
+transaction. Controlled races first observed outside commits; regressions now stop them.
+Native-emulator upload retains original bytes within Clocks. Physical checks stay open.
 ## Seed69: generic mapping data during feature retirement
 
 **Question.** Should removing Snake10's control rewrite existing saved strip geometry?
@@ -12691,3 +12870,35 @@ available while locked; applying either photo reading is an edit.
 
 **Resolution.** `app/www/screens/mapping.js`, `app/www/screens/photomap.js`,
 `app/www/client.js` and `docs/android-app.md`.
+
+## Seed 65: permanently square output and rotation direction
+
+**Question.** Does legacy rectangular test geometry require a fit decision before
+the owner's installation can rotate, and which sample direction is clockwise?
+
+**Answer.** The owner fixes the installation at1:1 permanently; rectangular fitting
+is outside scope and never a delivery blocker. For bottom-left coordinates growing
+upward,90 clockwise samples source(N-1-y,x). Rotate the complete composition once
+before physical mapping and mini averaging. Diagnostics remain physical. Approving
+autonomous implementation authorizes the proposed rotation read/set command forms.
+
+**Resolution.** AGENTS.md, the hardened seed65, its spec, rotation.h/rotation.cpp and
+commands.md record this. Legacy rectangular playback stays unchanged/unsupported
+for this setting. The previous fit-question deferral is superseded.
+
+## WLED power-state callbacks and storage pacing
+
+**Question.** May WLED's synchronous state hooks wait for player storage pacing
+or perform the manual command's persistence while processing an initial/preset,
+unrelated or manual state event?
+
+**Answer.** No. Record explicit/observed power intent under an independent,
+memory-only guard and return. Apply the latest request in the usermod loop once
+pacing permits, through the existing core manual command. Initialization and
+scheduled feedback still create no manual override. This changes execution context,
+not the owner's power policy, command list, hardware settings or watchdog.
+
+**Resolution.** The production-body callback harness reproduced the previous wait
+with permanently busy storage before repair. The firmware adapter and its queued
+power helper now defer persistence. This confirmed code defect is separate from
+the still unconfirmed physical reset reason reported by the operator.

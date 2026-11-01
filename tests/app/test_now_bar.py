@@ -166,7 +166,7 @@ class ItsActions(unittest.TestCase):
     def test_its_buttons_are_disabled_while_the_selection_is_locked(self):
         target = Target(self, **{"remove": lambda line: (support.time.sleep(2.5), OK)[1]})
         acts = [{"untilBar": "Select 1 one.odrg"}, {"bar": "Select 1 one.odrg"}, {"press": "Select all"}, {"press": "Delete selected"},
-                {"press": "Remove it", "wait": 600, "look": "deleting"}, {"wait": 4000, "look": "after"}]
+                {"press": "Remove it", "wait": 600, "look": "deleting"}, {"untilActions": True, "ms": 25000, "look": "after"}]
         seen = run(target, acts)
         self.assertEqual(seen["deleting"]["bar"]["lines"], [["Ignore (disabled)", "Select (disabled)", "Delete (disabled)"], []])
         self.assertEqual(seen["after"]["bar"]["lines"], INTERNAL)

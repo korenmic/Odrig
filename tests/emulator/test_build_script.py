@@ -19,7 +19,7 @@ from emulator import binding
 from . import BUILD_SCRIPT, LIBRARY, ROOT, support
 
 MAKEFILE = ROOT / "core" / "Makefile"
-PUBLIC_API = ["odrig_core_begin", "odrig_core_poll", "odrig_core_leg_count", "odrig_core_leg", "odrig_core_mini_support", "odrig_core_mini", "odrig_core_mini_complete", "odrig_core_command", "odrig_core_feed", "odrig_core_error"]
+PUBLIC_API = ["odrig_core_begin", "odrig_core_poll", "odrig_core_power", "odrig_core_leg_count", "odrig_core_leg", "odrig_core_mini_support", "odrig_core_mini", "odrig_core_mini_complete", "odrig_core_command", "odrig_core_feed", "odrig_core_error"]
 
 # A library of Windows itself: its kernel, or one of the sets its C run-time is reached by.
 OF_WINDOWS = re.compile(r"\A(kernel32|ntdll|ucrtbase|msvcrt|api-ms-win-[a-z0-9-]+)\.dll\Z")

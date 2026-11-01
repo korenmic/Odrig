@@ -31,7 +31,7 @@ int main(void) {
     MEMBER(odrig_host, write_open); MEMBER(odrig_host, write); MEMBER(odrig_host, write_close);
     MEMBER(odrig_host, rename); MEMBER(odrig_host, remove); MEMBER(odrig_host, space); MEMBER(odrig_host, read_at);
     MEMBER(odrig_host, drive); MEMBER(odrig_host, drive_name); MEMBER(odrig_host, drive_space); MEMBER(odrig_host, about);
-    MEMBER(odrig_host, drive_list); MEMBER(odrig_host, drive_bind); MEMBER(odrig_host, drive_writable);
+    MEMBER(odrig_host, drive_list); MEMBER(odrig_host, drive_bind); MEMBER(odrig_host, drive_writable); MEMBER(odrig_host, identity);
     printf("odrig_leg %zu\\n", sizeof(odrig_leg));
     MEMBER(odrig_leg, leg); MEMBER(odrig_leg, pin); MEMBER(odrig_leg, led_count); MEMBER(odrig_leg, rgb);
     printf("odrig_mini %zu\\n", sizeof(odrig_mini));
@@ -50,7 +50,7 @@ class Declarations(unittest.TestCase):
     def test_it_declares_exactly_the_functions_of_the_header(self):
         declared = re.findall(r"\b(odrig_core_[a-z_]+)\(", header_code())
         self.assertEqual(len(declared), len(set(declared)))
-        self.assertEqual(len(declared), 10)
+        self.assertEqual(len(declared), 11)
         self.assertEqual(sorted(binding.FUNCTIONS), sorted(declared))
 
     def test_every_function_has_as_many_arguments_as_the_header_gives_it(self):
@@ -63,7 +63,7 @@ class Declarations(unittest.TestCase):
         body = re.search(r"typedef struct odrig_host \{(.*?)\} odrig_host;", header_code(), flags=re.S).group(1)
         members = re.findall(r"(?:\(\*|[ *])([a-z_]+)\)?(?:\([^;]*\))?;", body)
         self.assertEqual([name for name, _ in binding.HostRecord._fields_], members)
-        self.assertEqual(members[6:], ["write_open", "write", "write_close", "rename", "remove", "space", "read_at", "drive", "drive_name", "drive_space", "about", "drive_list", "drive_bind", "drive_writable"])
+        self.assertEqual(members[6:], ["write_open", "write", "write_close", "rename", "remove", "space", "read_at", "drive", "drive_name", "drive_space", "about", "drive_list", "drive_bind", "drive_writable", "identity"])
 
     def test_every_storage_function_has_as_many_arguments_as_the_header_gives_it(self):
         body = re.search(r"typedef struct odrig_host \{(.*?)\} odrig_host;", header_code(), flags=re.S).group(1)

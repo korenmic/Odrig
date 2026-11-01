@@ -133,6 +133,18 @@ ODRIG_NOINLINE bool write_file(Core &core, const Plan &plan, bool existed) {
 void ignored_drive_found(Core &core) {
     if (entries(core) != nullptr) memset(entries(core), 0, kIgnoredMost * sizeof(IgnoredOf));
 }
+
+uint32_t ignored_fingerprint(const Core &core) {
+    const IgnoredOf *cache = entries(core);
+    uint32_t crc = kCrcStart;
+    if (cache != nullptr) {
+        for (uint32_t i = 0; i < kIgnoredMost && cache[i].kind != 0; ++i) {
+            crc = crc_add(crc, cache[i].kind);
+            for (uint32_t at = 0; at < 4; ++at) crc = crc_add(crc, cache[i].position[at]);
+        }
+    }
+    return crc_value(crc);
+}
 void ignored_start(Core &core) {
     ignored_drive_found(core);
     if (!supported(core)) return;

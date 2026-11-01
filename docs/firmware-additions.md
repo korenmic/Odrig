@@ -61,6 +61,8 @@ takes every line marked *No*.
 | 27 | Lists the sub-folders of the drive's folder `odrig` too, to three levels down, depth first, a folder's files by their names and then its sub-folders by their names, at most 256 files and 32 sub-folders counted as a sub-folder's first file is taken, one directory open at a time and the folders still to walk in a table of 256; each file known by its path from `odrig`; the log line of the listing counts the files and the folders passed over. | 41 | `odrig_drive.cpp`; see [microsd.md](microsd.md#preparing-a-card) | Written again | No: its spec lists one folder |
 | 28 | Renders bounded runtime message widgets, saves Off/Between/Only clock mode, shuffles independent complete-message turns, and applies persisted own/ancestor external exclusions without outside fallback in Only. | 59 | `core/src/message_clock.cpp`, `breaks.cpp`, `ignored.cpp`, `player.cpp` | The core | No: full standalone player remains pending |
 
+| 29 | Keeps boot-local civil time with phone-zone rules, persistent daily LED hours and sticky manual control; all timing routes share atomic board identity guards. | 64 | `core/src/civil_time.cpp`; host identity and manual WLED feedback in `odrig_usermod.cpp` | Core plus host identity/power integration | No: standalone player remains cancelled |
+
 ## Coming
 
 Nothing at present. Seed 22, a USB stick through a hub, was superseded by the microSD

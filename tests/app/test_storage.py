@@ -39,7 +39,7 @@ class TheListOfAnimations(unittest.TestCase):
 
     def test_it_shows_the_free_storage_and_each_animation_with_its_size_badge_and_menu(self):
         emulator, address = self.emulator(self.three())
-        found = support.run("storage", address=address, settings={"rows": 3}).seen
+        found = support.run("storage", address=address, settings={"rows": 3, "order": True}).seen
         space = json.loads(emulator.command("space"))
         listed = json.loads(emulator.command("list"))["items"]
         self.assertEqual(found["before"]["space"], f"Internal storage: {space['animations']} animations, free {space['free'] / 1e6:.1f} MB of {space['total'] / 1e6:.1f} MB")
@@ -84,7 +84,7 @@ class TheListOfAnimations(unittest.TestCase):
         self.assertEqual(found["question"], "Remove animation 1 one.odrg from the installation?")
         self.assertEqual([row["id"] for row in found["after"]["rows"]], [1, 2, 3])
         self.assertIsNone(found["message"])
-        self.assertEqual([line for line in lines_of(events) if not line.startswith(("status", "list", "space", "order get", "catalog"))], [])
+        self.assertEqual([line for line in lines_of(events) if not line.startswith(("status", "list", "space", "order get", "catalog")) and not support.timing_read(line)], [])
 
     def test_an_animation_a_cycle_lists_is_refused_in_words(self):
         emulator, address = self.emulator(entered(self, emulator_support.example_show()))

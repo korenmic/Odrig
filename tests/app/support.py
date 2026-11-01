@@ -280,6 +280,14 @@ def converted_by_the_command_line(media, mapping, fit="fill", start=None, length
         return Converted(len(listed), sum(frame["ms"] for frame in listed), made.read_bytes())
 
 
+def timing_read(line):
+    """Only the two timing queries, including a physical-target guard."""
+    words = line.split(" ")
+    if len(words) == 3 and words[0] == "guard":
+        words = words[2:]
+    return words in (["time"], ["schedule"])
+
+
 def commands_elsewhere(found):
     """The command lines a run sent to other computers than this one, each as
     `(address, line)`."""
@@ -291,7 +299,7 @@ def commands_elsewhere(found):
     return sent
 
 
-def run(scenario, address=None, settings=None, steps=(), size=SIZE, media=None, thumbnails=None):
+def run(scenario, address=None, settings=None, steps=(), size=SIZE, media=None, thumbnails=None, auto_time=False):
     """Runs one scenario of `page/scenarios/` against the web code in Chrome without a
     window, and gives what the scenario found and what the pages asked other computers
     for, each as `(method, address, body)`.
@@ -313,6 +321,8 @@ def run(scenario, address=None, settings=None, steps=(), size=SIZE, media=None, 
     asked = {"scenario": scenario, "settings": json.dumps(settings or {}), "width": str(size[0]), "height": str(size[1])}
     if address is not None:
         asked["address"] = address
+    if auto_time is not None:
+        asked["autoTime"] = "on" if auto_time else "off"
     command = [
         chrome(), "--headless=new", "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--disable-background-networking",
         # No scrollbar takes room from the page, as on macOS; Chrome on Windows would give it one.

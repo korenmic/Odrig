@@ -62,11 +62,11 @@ class ValidShow(unittest.TestCase):
         self.assertEqual(run.legs, EXAMPLE_LEGS)
         self.assertEqual(run.lines, ["error none", "error none"])
 
-    def test_startup_reads_the_mapping_then_the_show_then_every_file(self):
+    def test_startup_reads_settings_then_mapping_then_show_then_every_file(self):
         run = support.start(example(), options=["--trace-files"])
         self.assertEqual(
             run.opened,
-            (("catalog.do", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 1), ("show.json", 1), ("pending.txt", 0), ("catalog.txt", 0), ("hello.odrg", 1), ("dvd.odrg", 1)),
+            (("schedule.txt", 0), ("catalog.do", 0), ("clocks.txt", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 1), ("show.json", 1), ("pending.txt", 0), ("catalog.txt", 0), ("hello.odrg", 1), ("dvd.odrg", 1)),
         )
 
     def test_a_file_named_twice_is_opened_for_checking_once(self):
@@ -327,9 +327,9 @@ class OrderOfTheChecks(unittest.TestCase):
         self.assertIn(("hello.odrg", 0), run.opened)
         self.assertIn(("dvd.odrg", 1), run.opened)
         run = support.start(example(show_json=None), options=["--trace-files"])
-        self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 0)))
+        self.assertEqual(run.opened, (("schedule.txt", 0), ("catalog.do", 0), ("clocks.txt", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 0)))
         run = support.start(example(mapping_json=None), options=["--trace-files"])
-        self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 0)))
+        self.assertEqual(run.opened, (("schedule.txt", 0), ("catalog.do", 0), ("clocks.txt", 0), ("mapping.json", 0)))
 
     def test_a_show_with_wrong_ids_asks_for_no_file(self):
         run = support.start(example(show_json=show(start=9)), options=["--trace-files"])
@@ -354,13 +354,14 @@ class Leftovers(unittest.TestCase):
         self.assertEqual(sorted(left), sorted(expected))
         self.assertEqual(left, expected)
 
-    def test_a_folder_without_leftovers_gets_two_removals_one_opening_and_no_other_storage_call(self):
+    def test_a_folder_without_leftovers_only_removes_upload_and_show_parts(self):
         for files in (example(), support.demo_show()):
             run, left = self.started(files)
             self.assertIsNone(run.error)
             self.assertEqual(run.stored, ("remove upload.part 0", "remove show.part 0"))
             self.assertEqual(run.opened.count(("pending.txt", 0)), 1)
-            self.assertEqual(run.opened.index(("pending.txt", 0)), 5)
+            self.assertEqual(run.opened[0], ("schedule.txt", 0))
+            self.assertEqual(run.opened.index(("pending.txt", 0)), 7)
             self.assertFalse(any(line.startswith("store ") for line in run.lines))
             self.assertEqual(left, {name: content if isinstance(content, bytes) else content.encode() for name, content in files.items()})
 

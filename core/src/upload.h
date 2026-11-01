@@ -33,6 +33,7 @@ bool upload_external_absent(const Core &core);
 // section 5, without padding and with the unused bits of its last character zero; 0 when
 // the text is not that, or stands for no byte or for more than kChunkSize.
 uint32_t base64_size(const char *text, uint32_t length);
+uint32_t base64_read(const char *text, uint32_t length, uint8_t *bytes);
 
 // Called by every entry of the core that carries a timestamp, before it does anything
 // else: discards an open upload on which nothing has moved for kUploadQuietMs.

@@ -10,12 +10,12 @@ export default async function(app) {
   const seen = {};
   if (app.settings.refuseToggle) {
     const client = await app.frame.contentWindow.eval('import("/client.js")');
-    const before = client.state.listVersion;
+    const before = client.state.validationVersion;
     menuOf(app, 1);
     choose(app, "Ignore in playlist");
     seen.pending = saving();
     await app.until(() => app.says("busy") && !saving(), "refused inclusion change");
-    await app.until(() => client.state.listVersion > before, "list refresh after refused toggle");
+    await app.until(() => client.state.validationVersion > before, "list refresh after refused toggle");
     seen.checked = !ignored();
     return seen;
   }
@@ -26,7 +26,8 @@ export default async function(app) {
     seen.menu = menuOf(app, 1);
     choose(app, "Ignore in playlist");
     seen.pending = saving() && rowOf(app, 1).querySelector(".row-state").textContent === "Saving…";
-    await app.until(() => !saving() && ignored(), "confirmed exclusion");
+    await app.until(() => !saving() && ignored() && client.state.inventoryFresh && client.state.statusFresh,
+      "confirmed exclusion");
     seen.ignoredNote = rowOf(app, 1).querySelector(".row-state").textContent;
     seen.ignoredMenu = menuOf(app, 1);
     app.doc.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true}));

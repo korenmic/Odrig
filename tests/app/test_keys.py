@@ -68,7 +68,13 @@ class Paged:
             return None
         if words[:2] != ["catalog", "page"]:
             with self.lock:
-                return (200, json.dumps({"ok": True, "internal": self.part("internal"), "external": self.part("external"), "rebuild": None}) + "\n")
+                fingerprints = {storage: zlib.crc32(json.dumps(self.files[storage]).encode('utf-8'))
+                                for storage in ('internal', 'external')}
+                evidence = dict(board='paged-board', authoritative=False,
+                                internal=fingerprints['internal'], external=fingerprints['external'],
+                                internal_keys=fingerprints['internal'], external_keys=fingerprints['external'])
+                return (200, json.dumps({"ok": True, "internal": self.part("internal"), "external": self.part("external"),
+                                        "rebuild": None, "inventory": evidence}) + "\n")
         time.sleep(self.delay)
         with self.lock:
             storage, page, offset = words[2], int(words[3]), int(words[4])
@@ -273,7 +279,7 @@ class OlderTargets(unittest.TestCase):
 
 
 class Dropped(unittest.TestCase):
-    def test_the_keys_go_at_a_silence_and_at_another_target_and_come_back_kept_on_the_phone(self):
+    def test_the_keys_survive_a_silence_and_clear_at_another_target(self):
         target = Paged(INTERNAL, EXTERNAL)
         marks = []
 
@@ -291,8 +297,8 @@ class Dropped(unittest.TestCase):
             after = sent(stand_in)[marks[0]:]
         self.assertIn("catalog", after)
         self.assertEqual(page_lines(after), [], "the kept keys come back with no page read")
-        self.assertGreater(seen["again"]["version"], seen["before"]["version"])
-        self.assertTrue(seen["again"]["internal"] is None or seen["again"]["version"] >= seen["before"]["version"] + 2)
+        self.assertEqual(seen["again"]["version"], seen["before"]["version"])
+        self.assertEqual(seen["again"]["internal"], seen["before"]["internal"])
         self.assertEqual(seen["read"]["internal"]["byName"], target.keys("internal"))
         self.assertEqual((seen["other"]["internal"], seen["other"]["external"]), (None, None))
 

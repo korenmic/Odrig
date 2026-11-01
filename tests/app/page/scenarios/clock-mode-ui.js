@@ -3,7 +3,7 @@ import {measure} from "./look.js";
 
 function look(app) {
   return {
-    screen: app.shown(), level: app.raw("level-title"),
+    screen: app.shown(), level: app.raw("level-title"), backHidden: app.byId('level-back').hidden,
     mode: app.byId("clocks").value, message: app.byId("clock-message").checked,
     disabled: app.byId("clocks").disabled, said: app.raw("clocks-said"),
     reason: app.raw("clocks-state"), support: app.raw("clocks-support"),
@@ -25,9 +25,12 @@ function look(app) {
 }
 
 async function settled(app, until) {
+  const client = await app.frame.contentWindow.eval('import("/client.js")');
+  const needsInventory = ['level', 'rows', 'ignored', 'included'].some(key => key in until);
   await app.until(() => {
     const now = look(app);
-    return Object.entries(until).every(([key, value]) => key === 'ignored' || key === 'included' ?
+    return (!needsInventory || client.state.inventoryFresh && client.state.statusFresh) &&
+      Object.entries(until).every(([key, value]) => key === 'ignored' || key === 'included' ?
       [...now.rows, ...now.folders].some((row) => row.id === value && row.ignored === (key === 'ignored') && !row.note.includes('Saving')) :
       key === 'rows' ? now.rows.length === value :
       key === 'said' ? now.said.includes(value) : now[key] === value);
@@ -50,8 +53,12 @@ export default async function(app) {
     if (act.wait) await app.sleep(act.wait);
     if (act.back) app.byId('level-back').click();
     if (act.enter) app.doc.querySelector(`.folder-row[data-path="${act.enter}"]`).click();
-    if (act.menu !== undefined) app.doc.querySelector(`.row[data-id="${act.menu}"] .more`).click();
+    if (act.menu !== undefined) {
+      await app.until(() => app.doc.querySelector(`.row[data-id="${act.menu}"] .more`)?.disabled === false, 'confirmed animation actions');
+      app.doc.querySelector(`.row[data-id="${act.menu}"] .more`).click();
+    }
     if (act.folderMenu) {
+      await app.until(() => app.doc.querySelector(`.folder-row[data-path="${act.folderMenu}"] .more`)?.disabled === false, 'confirmed folder actions');
       const button = app.doc.querySelector(`.folder-row[data-path="${act.folderMenu}"] .more`);
       if (button === null) throw new Error('folder has no inclusion menu');
       button.click();

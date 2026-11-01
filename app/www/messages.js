@@ -111,6 +111,7 @@ const REFUSALS = {
     : `Animation ${line.split(" ")[1]} cannot be played until it is replaced: its file has a fault. The list says which.`,
   busy: () => "The installation is busy. Try again in a moment.",
   "in-use": (line) =>
+    line === "upload" ? "Clocks only: choose a writable external folder inside Clocks, or leave this mode in Settings." :
     line.startsWith("play ") ? "Clocks only allows playback inside the Clocks folder. Leave Clocks only in Settings to play elsewhere." :
     line.startsWith("mapping test ") ? "Leave Clocks only in Settings before starting a display test." :
     line.startsWith("remove many ") ? "Some selected animations cannot be removed: a cycle plays them, or they are on external storage." :
@@ -125,10 +126,12 @@ const REFUSALS = {
     line.startsWith("upload ") ? "The card cannot be written now. Choose Internal storage to store the animation on the board." :
     `Animation ${line.split(" ")[1]} cannot be removed: the card cannot be written now.`,
   "mapping-conflict": () => "Mapping changed on the target. Reload before saving.",
+  "rotation-conflict": () => "Another controller changed the rotation. The saved angle is read again.",
   "order-conflict": () => "The order changed on the installation since the app read it. The list is read again; move the animation again.",
   stale: (line) => line.startsWith("repeat ") ? "That animation's turn had already ended." :
     "Another controller changed this animation since it was opened. Your changes are still here; open it again to see the new one.",
   "storage-error": () => "The installation could not use its storage.",
+  "zone-unset": () => "Set the board's time from this phone first.",
   "no-space": (line) => line.startsWith("repeat ") ?
     "The installation has no room for another saved repeat: it keeps them for at most 32 files of a card or drive and 512 files in all." : ofNoSpace(Number(line.split(" ")[4]), null, line.split(" ")[2] === "external" ? "the card" : "the installation").replace(/ \(no-space\)$/, ""),
   "bad-file": (line, reason, refusal) => `The installation refused the file: ${refusal.reason === null ? "it is not a valid animation" : refusal.reason}.`,

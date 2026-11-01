@@ -67,16 +67,19 @@ a top bar with the app's name and whether the installation answers.
   that folder's own files and the rows of its sub-folders. A folder with no file of its
   own keeps its row, `0 animations` and its way in. The app reads the level it shows and
   no other, in parts, with `list` and `order get` at the root and `list in` and `order get
-  in` inside a folder; entering a folder or going Back reads that level anew, and nothing
-  of the level left is kept, so that a card of any size takes one level's rows on the
-  phone. The heading is marked while the level's playlist is current, and so is the
+  in` inside a folder; entering a folder or going Back restores a bounded last-good
+  snapshot when available, then validates it. Up to eight paths are kept. The heading
+  is marked while the level's playlist is current, and so is the
   folder row that leads to the current playlist at every level above it, from the path
   that `status` names as `playlist`; the line of what plays names the file from `status`
   as well. The list comes back to the root when the target changes, when the card goes
   out and when the folder shown is confirmed gone from the card. A refused folder lookup
   first rechecks its path through fresh parent listings. An existing path keeps its
   location, including when its id changed; an unavailable verification keeps the last
-  complete rows and retries. A later reply cannot undo Back or a target change.
+  complete rows and retries. In confirmed Clocks only mode automatic recovery stays
+  inside Clocks; missing storage shows an unavailable Clocks location with stale known
+  rows and bounded retries. It never publishes an ordinary Root fallback. A later reply
+  cannot undo Back or a target change.
   An upload chooses its id and its
   name against the root's level, which the app reads for it when another level is
   shown. Each row
@@ -119,7 +122,7 @@ maps its actions to command lines, each sent as `POST /odrig` to the address tha
 | The operator | The line |
 |---|---|
 | Nothing: once a second while the app is on the screen | `status` |
-| Nothing: when the target first answers, every ten seconds, when the list is out of date, and every second while the target answers `busy` | `list 0`, and `list <next>` for a long show |
+| Nothing: initial or explicit validation and detected changes; legacy/unmanaged targets every ten seconds; retry at most once a second while busy | `list 0`, and `list <next>` for a long show |
 | Taps a row of the list, or presses `Play this folder` inside a folder | `play <id>` |
 | Presses `Play this folder` at the root | `play all` |
 | Presses the power icon while the LEDs are off, or while they are on | `on`, `off` |
@@ -150,6 +153,11 @@ maps its actions to command lines, each sent as `POST /odrig` to the address tha
 | Nothing: after `catalog` showed a storage's catalog of another generation or number of entries than the one the app read, every page of it from offset 0 to its end, one request after the other | `catalog page <storage> <page> <offset>` |
 | Presses `Rebuild the board's catalog` or `Rebuild the card's catalog`, and then `Rebuild` | `catalog rebuild internal`, `catalog rebuild external` |
 | Presses `Cancel the rebuild` | `catalog cancel` |
+| Connects with timing-capable firmware; reads time, then follows the phone's zone and sets UTC when due | `time`, `guard <board-id> time`, `guard <board-id> time zone <base64>`, `guard <board-id> time set <utc-seconds> <zone-crc32>`, `guard <board-id> schedule` |
+| Saves the daily hours and whether to use them | `guard <board-id> schedule set <revision> <on-HH:MM> <off-HH:MM> <on-or-off>` |
+| Ends manual On/Off and returns to the saved hours | `guard <board-id> schedule resume <revision>` |
+| Opens Settings, reconnects there or taps Refresh rotation | `rotation` |
+| Chooses0/90/180/270 clockwise output orientation | `rotation set <revision> <degrees>` |
 
 It uses the shared command protocol and shows only what a reply said. Mapping saves
 require firmware that supports the mapping commands; an older target gives a readable
@@ -170,6 +178,44 @@ The web code, `app/www/`, is plain JavaScript, HTML and CSS: a browser runs the 
 they are. Capacitor wraps them into the Android app. One class of Java, the sender,
 carries each line to the target; see [The phone and the installation's
 network](#the-phone-and-the-installations-network).
+
+## USB diagnostics from a phone
+
+Target also offers **USB diagnostics** in the Android APK, independently of Wi-Fi.
+It uses Android USB host/OTG and the pinned
+[usb-serial-for-android 3.11.0](https://github.com/mik3y/usb-serial-for-android/tree/3.11.0)
+driver for CDC-ACM and supported USB/UART bridges. The browser shares the panel but
+explains that physical capture needs the Android app. USB host is an optional device
+feature, so phones without it can still use the Wi-Fi app.
+
+1. Close the flasher and other USB apps. Connect the board's **COM/UART** USB socket
+   to the phone through OTG. That socket carries the full player/startup log; the
+   chip's native USB interface may disappear during a crash and has different output.
+2. In Target, refresh the USB ports, select the port and tap **Start capture**.
+   Accept Android's permission prompt. Capture uses 115200, 8N1; opening does not send
+   commands or request a reset/bootloader sequence. RTS is cleared before DTR, as in
+   the existing command tools. Actual adapter/reset-line behavior needs physical checking.
+3. **Read status + fault** explicitly sends only the existing `status` and `fault`
+   commands. Their raw replies and arriving log text remain visible without JSON parsing.
+   There is no generic serial terminal, firmware flash, erase or automatic time sync.
+4. **Stop capture** preserves the text. Unplugging, leaving Target or backgrounding the
+   app also stops it; no automatic reconnect happens. **Share log** stops capture and
+   opens Android's share chooser for `odrig-usb-log.txt`. Choose where to send/save it.
+
+The displayed tail is at most 32 KiB; the full capture stops at 1 MiB and its beginning
+is retained. Starting another capture replaces that log. The private UTF-8 export
+contains device/driver, phone start time, settings, state, received byte count and the
+complete captured text; invalid UTF-8 bytes are replaced. Logs are not uploaded by the
+app. Share uses a temporary FileProvider read grant, with no broad storage permission.
+Permission denial, an absent/unsupported/busy device and disconnects are reported in
+the panel. Closing the app loses the in-memory log unless it was shared/saved.
+
+Capture cannot recover bytes printed before it was started. Collect `status`/`fault`
+before any reset when possible. A silent port does not prove a healthy board. Host
+tests cover bounded capture, fragmented text, cancellation, stale callbacks and UI;
+Android VM verifies the actual plugin and no-device behavior, not physical USB hardware.
+Phone/adapter permissions, reset lines, real boot/panic logs and sharing to an actual
+recipient remain the operator's checks.
 
 ## What you need
 
@@ -597,7 +643,7 @@ resizing or timing changes. Compressed frame bodies never inflate on the phone f
 a preview. The app reuses its content-key preview catalog/cache; otherwise it says
 that no preview is available and the target will check the complete animation.
 
-Every new ready-made or converted-media selection starts with `External storage`
+Outside Clocks only, every new ready-made or converted-media selection starts with `External storage`
 when detected, even if Internal was chosen for the previous form. Choose `Internal
 storage` for this form if desired. Absent/not-detected External stays visible,
 disabled and gray, with automatic Internal fallback. Redetection restores automatic
@@ -612,7 +658,7 @@ and explains that a browsed SD folder was not retained. Navigation cannot move t
 prepared destination. The editable basename must obey the32-byte naming rule; the
 external full path obeys the100-byte/three-level catalog rule. Folders must exist.
 
-Before sending, fresh target, storage, catalog and folder observations detect stale
+Before sending, fresh target policy, storage, catalog and folder observations detect stale
 destinations and collisions. A preflight absence fallback discovered by the click
 is shown and requires another Upload click. Collisions require a different basename;
 they never silently overwrite. New external files use `upload expect 00000000` and
@@ -623,10 +669,20 @@ transaction. Explicit text/clock edits keep their original file and CRC stale gu
 Known capacity is checked first, including the upload reserve; the target remains
 authoritative when capacity is unavailable. After begin the storage/path are frozen.
 A disconnected card stops that attempt; it does not continue in Internal. A new
-manual attempt can use the visibly updated fallback. Cancellation, failed checks
+manual attempt outside Only can use the visibly updated fallback. Cancellation, failed checks
 and uncertain completion are distinct from an acknowledged installed file. After
 success the destination catalog/list/preview refresh normally. Authored texts and
 clocks remain in Internal; ready-made containers can use either selected storage.
+
+In Clocks only, uploads require a verified writable external destination in Clocks or a
+descendant. External stays selected even when absent; Internal is disabled, and no
+internal-root fallback is permitted. Missing storage or an unresolved folder disables
+submission with an explanation. A Root draft prepared before Only starts is not silently
+repointed. Fresh policy is read during preflight and the shared upload job checks its
+destination before sending; an already opened outside transaction is cancelled if Only
+becomes confirmed before completion. Invisible Root-name queries remain permitted for
+collision checks. Text/clock authoring keeps its local preview, but its internal-root
+save is disabled in Only. Confirmed Off/Between restores normal choices and saving.
 
 To make a text, press `Make a text` on Upload. A form opens under it: the text, written
 with English letters, digits, signs and Hebrew letters, and line feeds; its font,
@@ -651,6 +707,12 @@ will, with a time, a speed and, for the melting watch, a shape chosen at random 
 turn of it on the installation chooses them; `New random time` shows another. A line says
 `One loop takes 30.00 seconds.`, or names a number that is out of its range. It is
 uploaded as a text is, as `clock-<kind>.odrgx`, `clock-analog.odrgx` for one with hands.
+
+New texts and clocks wait for the installed animation names before choosing the
+lowest free id and a filename. The form explains that wait and disables Upload.
+New uploads use the existing creation-only begin form, so a place taken by another
+controller is refused without replacing an installed animation. Editing retains
+its separate existing-file CRC guard.
 
 A text or a clock of the board's own storage has `Edit` in its row's menu. The app reads its
 file back from the installation, opens its form on Upload, titled with its id and its
@@ -749,16 +811,19 @@ It keeps each line's key by the file's name, a card file's by its path from `odr
 row takes the key of its storage and name only when the key's size is the row's size. The
 lines of each reply give their rows their keys at once, before the read has ended; until
 then a row keeps the key of the storage's last read. The keys of a read stand until the
-next read of that storage has ended; they go at once when `catalog` shows the storage in
-another state than `ok`, when the target answers again after a silence, and when the
-target changes. A page of another generation than the first page
+next read of that storage has ended. A brief silence preserves them and the last-good
+playlist as visibly stale while the connection and revisions are verified. A different
+board or confirmed manifest change invalidates the affected keys. A page of another generation than the first page
 of the read starts the read again; a page refused with `busy` is asked again two seconds
 later; a page whose generation is `null`, and any other refusal, end the read without keys.
 An installation that refuses `catalog page` is from before it: it is asked for no page
 again, and `catalog` only by Settings, until the target changes. The keys of each read
 that has ended whole are kept on the phone, in the web view's IndexedDB beside its own
-previews, by the target's address and the storage. When `catalog` shows a storage `ok`
-with the generation and number of entries of its kept keys, at a start, after a silence or
+previews, by target address, stable board identity, storage and manifest fingerprint.
+Legacy replies without identity cannot authorize persisted-key reuse; their pages are
+read, while keys already read in the current connection survive a short failure.
+When `catalog` shows a storage `ok` with the same identity/fingerprint, generation and
+number of entries of its kept keys, at a start, after a silence or
 after another address, those keys are the storage's at once and none of its pages is read;
 a read of it under way ends. No page is asked before the kept keys have been taken, and at
 most three seconds after the start. A storage shown `damaged`, `incompatible` or `none`
@@ -861,14 +926,23 @@ status shows the actual setting without claiming the reply was acknowledged. A d
 reported choice is shown as such. Reconnect and other controllers update the controls;
 changing targets clears pending state and ignores replies belonging to the old target.
 
-Selecting Only initially opens the resolved Clocks folder on Animations once. Later
-browsing may go to root or any other folder without changing playback or being forced
-back on each poll. Outside Play buttons are disabled with an explanation. `Restart clocks`
-targets the currently resolved Clocks folder ID even while another level is browsed;
+Selecting Only opens the resolved Clocks folder on Animations. Browsing stays in Clocks
+and its descendants, with Back stopping at Clocks. The shared client rejects outside
+paths, prefix collisions and unverified folder IDs before changing the visible location.
+Stale/disconnected status retains the last confirmed boundary; confirmed Off or Between
+releases it. `Restart clocks` targets the currently resolved Clocks folder ID;
 the raw `play all` command remains refused by the core. Inside files and folders remain
 manually playable when ignored or when automatic messages are off. Display tests require
 leaving Only first. Missing storage, missing Clocks or no eligible face keeps Only
 selected, with an explanation and dark output; a missing resolved folder disables restart.
+
+Automatic Clocks recovery continuously reconciles folder identity while preserving a
+valid descendant. A failed path lookup rechecks its ancestry; it does not replace the
+view with Root. Missing Clocks is a virtual unavailable location, with last-good rows
+marked stale and unsafe actions disabled. It cannot be mistaken for a root-list request.
+Storage return resolves the preferred Clocks path again, including changed IDs. Unknown
+mode metadata retains the last confirmed Only recovery context; confirmed Off or Between
+releases it. Settings, Target and mode exit remain usable throughout.
 
 Older clock-capable firmware without explicit mode metadata maps its existing booleans
 to Off and Between; the Only option is unavailable, with an update explanation. A target
@@ -894,6 +968,58 @@ the target clears the draft and discards older replies. A failed save is not ret
 app reads the target once to reconcile, preserves the draft and asks for Reload before a
 new attempt. Storage failures, busy/invalid shows, stale revisions and unsupported targets
 have readable messages in Settings.
+
+### Automatic phone time
+
+On a successful connection, the shared app reads the board's time and daily settings.
+Automatic phone-time synchronization is on by default and kept on the phone. Each
+physical board has its own last confirmed sync: a valid clock is set only after at
+least15 minutes, on the next connection. Expiry and ordinary status polls do not
+send a time set. An invalid clock bypasses the cooldown; a backwards phone clock
+also makes a sync due. A deliberate sync shares the same confirmation record.
+
+The phone's current time zone always supplies the offline rules, including DST.
+Preparation runs in a worker, leaving playback controls responsive. A zone-only
+update does not reset the UTC cooldown. Limits are checked explicitly: unsupported
+rules are reported, never truncated or guessed. The board's rules survive reset;
+its UTC validity does not. Manual LED On/Off remains in force until Resume schedule.
+
+Time operations share the ordinary serialized request queue. Every mutation and
+follow-up read binds to the physical board ID, in addition to address/connection
+generations, protecting boards with the same Wi-Fi address. Failed or unconfirmed
+time writes do not start a cooldown; a matching valid readback confirms a set.
+Older firmware keeps its ordinary controls without receiving unsupported timing
+writes. No APK-only web code or extra USB transport is introduced.
+
+Browser fixtures explicitly turn auto-sync off when testing unrelated behavior,
+so the real time of day cannot change their expected LED visibility. Timing tests
+also run the real app with the preference absent and prove the product default-on
+behavior against the native core. Phone/board acceptance remains separate.
+
+### Time and schedule controls
+
+Settings has a Time and schedule card after Clocks. Board time shows the confirmed
+local date, time and phone-supplied zone at the last refresh. An unset clock explains
+that the schedule is ignored. Sync now follows the phone even with automatic sync
+off. The automatic-sync choice is kept on the phone; a storage failure explains
+that the choice applies only for this session. Refresh reads the board again and,
+only after a successful read, reloads its saved hours.
+
+Use scheduled hours and the On at / Off at fields are saved together by Save scheduled
+hours. The default is enabled,18:00 to06:00. Equal, empty or invalid times cannot be
+saved. Edited hours say Save to apply; pending and refused writes never claim success.
+The app confirms the saved pair and enabled flag with a guarded read. A lost reply
+keeps its error visible, preserves the draft and never replays the save on reconnect.
+Another controller's revision requires Refresh before trying again.
+
+Manual On or Off takes priority across restarts until Resume schedule. Saving hours
+or setting time does not release it. The card says when manual mode is temporary
+because it could not be saved. Resume confirms that manual mode ended. Save or refresh
+edited hours before resuming. Ordinary reads, syncs and reconnects to the same board
+preserve typed values; changing target or reading a different board clears them.
+Unsupported firmware leaves ordinary app controls working and timing controls
+disabled. Unreadable schedule metadata is shown explicitly and cannot be overwritten
+by guessed defaults. Every control has a label and at least a48-pixel touch target.
 
 ## Messages
 
@@ -921,6 +1047,7 @@ it is dismissed with `OK` or another takes its place.
 | `read-only` | An upload to the card while the installation cannot write it. | The card cannot be written now. Choose Internal storage to store the animation on the board. |
 | `read-only` | A rebuild of the catalog of a storage the installation cannot write. | That storage cannot be written now, so its catalog cannot be rebuilt. |
 | `storage-error` | The installation could not read or write its storage. | The installation could not use its storage. |
+| `zone-unset` | Time was set before usable time-zone rules were supplied. | Set the board's time from this phone first. |
 | `in-use` | An upload whose id or file name another item took meanwhile. | That name or id is in use on the installation. The list is asked for again; upload again. |
 | `in-use` | `Save` or `Restore default` of the bar for a cycle or a folder of the card. | That is a cycle or a folder, which keeps no repeat. |
 | `no-space` | An upload that does not fit, before it is sent or as the installation judges it. | The animation needs `<size>` KB, and the installation has `<free>` KB free. |
@@ -1008,7 +1135,7 @@ installed; the phone with mobile data on.
 1. **Install.** `python3 app/app.py install` with the phone on USB, or copy
    `build/app/odrig-debug.apk` to the phone and open it. *Seen:* the app `odrig` is on the
    phone and starts on the target screen with the address `4.3.2.1`.
-2. **The emulator.** On the Mac: `python -m emulator build/demo-20/show --lan`; allow
+2. **The emulator.** On the computer: `python -m emulator build/demo-20/show --lan`; allow
    incoming connections if macOS asks. Phone and Mac on the same Wi-Fi network. Give the
    app the address of the emulator's `lan:` line. *Seen:* `Answers`, `Sent over Wi-Fi.`,
    and then the show screen.
@@ -1117,14 +1244,25 @@ installed; the phone with mobile data on.
     and with the phone held sideways the whole screen scrolls.
 23. **The clocks.** With current firmware and populated `clocks` and `clocks/message`,
     *Seen:* choose Between in Settings and enable messages. Check the clock break, complete
-    message turns and persistence after restart. Choose Only: Clocks opens once, outside
-    playback stops, and browsing elsewhere leaves outside Play disabled. Restart clocks
+    message turns and persistence after restart. Choose Only: Clocks opens, outside
+    playback stops, and Back stops at Clocks while descendants remain accessible. Outside
+    navigation and internal-root uploads stay blocked, including after a reconnect.
+    Check a ready-made upload inside Clocks and normal choices after leaving Only. Restart clocks
     still targets Clocks. Play an inside message with automatic messages off; try Ignore
     on a face, a message and their folders, including an inherited child choice, then
     Include. Check dark recovery when all faces are excluded, mode restoration, reconnect
     and another controller's changes. Repeat upright and sideways. These physical and
     phone observations remain open until actually performed.
-24. **Note** the phone's model, its Android version, the web view's version from the
+24. **Time and scheduled hours.** Keep board brightness at40 or less. In Settings,
+    *Seen:* the confirmed time/zone matches the phone, automatic sync starts on, and
+    disabling it survives reopening. Set a short daily interval excluding now, save,
+    and see the LEDs off while playback progresses. Manual On wins through a restart;
+    Resume schedule returns to the saved hours. With automatic sync off, reset and
+    see that invalid time ignores the schedule; Sync now restores it. Check a changed
+    phone zone/DST, a due reconnection after15 minutes, and no periodic time writes
+    while connected. Restore the original hours, auto-sync choice and manual mode.
+    These physical phone/LED observations remain unperformed.
+25. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1135,8 +1273,9 @@ python3 -m unittest discover -s tests/apk -t .
 ```
 
 The first runs the web code in Chrome without a window against an emulator and against
-stand-in targets of its own, and takes about two minutes. It needs the core's library,
-`make -C core shared`, and Chrome: the one in `/Applications`, or the program the
+stand-in targets of its own. Duration depends on the host; the parallel runner bounds
+the app to four workers. It needs the core's library (`python core/build.py shared`
+on Windows, `make -C core shared` on macOS) and installed Chrome, or the program the
 variable `ODRIG_CHROME` names. Nothing it does reaches another computer: what the app
 would send to the installation's address ends at the suite's own server.
 
@@ -1149,7 +1288,12 @@ Neither needs a phone.
 
 ## What is verified
 
-By programs, on a Mac:
+By programs, on macOS and Windows:
+
+Board-time and Settings tests cover real native scheduling blackout, sticky manual
+On/Off and Resume, clock loss, named-zone DST, guarded target changes, confirmation,
+lost replies, preserved edits and phone-size controls. Release evidence and remaining
+physical acceptance are in [verification.md](specs/64-p2-board-time-and-daily-on-off-schedule/verification.md).
 
 - The four tabs and every action of the web code, in Chrome against the emulator:
   the address, the status, the list for shows of up to 40 animations, `play`,
@@ -1277,6 +1421,10 @@ By programs, on a Mac:
 
 ## What is open
 
+- **Board time and scheduled hours on the owner's phone and board.** Step24 above
+  remains unperformed. Browser/native and Android virtual-device evidence cannot
+  observe real LEDs, real power loss or the phone's network behavior.
+
 - **Message clock modes and external inclusion on a phone and on the board.** The
   shared browser/emulator proofs do not replace physical acceptance of all seven
   sequences, Only boundaries, inherited exclusions, restarts and complete turns.
@@ -1330,7 +1478,26 @@ By programs, on a Mac:
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.
-- The build is verified on one system, macOS on Apple Silicon. `app/toolchain.json` has
-  no entry for another.
+- Automatic toolchain setup remains pinned to macOS on Apple Silicon in
+  `app/toolchain.json`. Windows packaging has also been verified with the existing
+  Android Studio JDK/SDK and the persistent dedicated signing key. That does not
+  claim automatic setup support for another entry in the toolchain file.
 - `npm audit` names three advisories of moderate severity in a package that Capacitor's
   command line uses at build time. Nothing of it is in the APK.
+
+### Square output rotation
+
+Settings offers exactly0,90,180,270 degrees clockwise from the front of the square
+display. The installation is permanently1:1, so there is no fit/crop/stretch choice.
+Opening Settings or reconnecting there reads the board's saved orientation. Refresh
+rotation rereads it after changes by another controller. A selection stays on the
+last confirmed value while saving; only the full board acknowledgement changes it.
+Refusals/lost replies are reconciled by reading, never automatic write replay.
+Leaving Settings, hiding the app, changing targets or losing the link cancels unsent
+changes and invalidates old callbacks. Old firmware disables only this control.
+
+Rotation is installation-wide and survives reset; source previews/files and mapping
+diagnostics keep their canonical/physical orientation. Miniature output rotates the
+same square picture before its centered projection. Mapping edits remain separately
+locked until explicitly confirmed. Physical wall/miniature direction still requires
+the owner's acceptance after installing the paired APK/FW.

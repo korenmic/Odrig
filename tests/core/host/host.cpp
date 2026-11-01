@@ -232,6 +232,7 @@ public:
         functions.drive_list = drive ? drive_list : nullptr;
         functions.drive_bind = drive ? drive_bind : nullptr;
         functions.drive_writable = drive ? drive_writable : nullptr;
+        functions.identity = nullptr;
         if (drive && !options_.drive_pulled) {
             plug();
         }
@@ -839,6 +840,9 @@ private:
                            given == "show.part" || given == "pending.txt" || given == "mapping.part" ||
                            given == "order.txt" || given == "order.part" || given == "repeats.txt" || given == "repeats.part" || given == "clocks.txt" || given == "clocks.part" || given == "playlist.txt" || given == "playlist.part" || given == "catalog.txt" ||
                            given == "brightness.txt" || given == "brightness.part" || given == "ignored.txt" || given == "ignored.part" ||
+                           given == "timezone.bin" || given == "timezone.part" ||
+                           given == "schedule.txt" || given == "schedule.part" ||
+                            given == "rotation.txt" || given == "rotation.part" ||
                            given == "catalog.new" || given == "catalog.do" || page;
         if (!sound || !(animation || fixed)) {
             stop("file misuse", kFileMisuse);

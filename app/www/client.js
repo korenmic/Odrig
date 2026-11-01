@@ -42,7 +42,8 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, level: {path: "", id: null}, rootNames: null,
   animations: null, cycles: [], folders: [], space: null,
   listVersion: 0, listBusy: false, order: null, orderVersion: 0, orderKnown: true, catalog: null, keys: {internal: null, external: null}, keysVersion: 0,
-  catalogNone: false, pagesRefused: false, statusCount: 0, statusFresh: false};
+  catalogNone: false, pagesRefused: false, statusCount: 0, statusFresh: false, connectionVersion: 0,
+  inventoryFresh: false, validationVersion: 0, orderValidationVersion: 0};
 
 const watchers = new Set();
 // What the operator asked for and was not sent yet, in its order: each a kind and the
@@ -60,7 +61,9 @@ let listTimer = null;
 let listing = null;
 // The folders entered from the root down to the level shown, each `{path, id}`.
 const trail = [];
-let onlyOpened = false;
+let onlyActive = false;
+let onlyFolder = null;
+let onlyDesired = "clocks";
 // Whether the root's names are due while another level is shown, and the root's list that
 // is being asked for in parts for them: the ids and the files so far and the position to
 // ask for next.
@@ -97,7 +100,112 @@ let keptUnder = null;
 let keptTaken = false;
 // Counts the targets: a reply that belongs to an earlier address is dropped.
 let target = 0;
+let connectionDue = true;
 let contentLocked = false;
+let inventory = null;
+let displayProof = null;
+let pendingList = null;
+const snapshots = new Map();
+const keyProof = {internal: null, external: null};
+let retryAt = 0;
+let retryTimer = null;
+
+function delayBackground() {
+  retryAt = Date.now() + LIST_WHEN_BUSY_MS;
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => { retryAt = 0; retryTimer = null; next(); }, LIST_WHEN_BUSY_MS);
+}
+
+function equal(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function sameEvidence(left, right, level = state.level) {
+  return left !== null && right !== null && left.board === right.board &&
+    left.external === right.external && (level.path !== "" || left.internal === right.internal);
+}
+
+function sameProof(left, right, level = state.level) {
+  return left?.authoritative === true && right?.authoritative === true && sameEvidence(left, right, level);
+}
+
+function keysUnder(storage, evidence = inventory) {
+  return evidence === null ? keptUnder : `${keptUnder}#${evidence.board}#${evidence[`${storage}Keys`]}`;
+}
+
+function keptBoard() {
+  return inventory === null ? keptUnder : `${keptUnder}#${inventory.board}`;
+}
+
+function rememberLevel() {
+  if (state.animations === null) return;
+  snapshots.delete(state.level.path);
+  snapshots.set(state.level.path, {level: state.level, animations: state.animations,
+    folders: state.folders, cycles: state.cycles, order: state.order, proof: displayProof});
+  while (snapshots.size > 8) snapshots.delete(snapshots.keys().next().value);
+}
+
+function publishList(items, proof) {
+  const animations = items.filter(item => typeof item.file === "string");
+  const folders = items.filter(item => typeof item.playlist === "string");
+  const cycles = items.filter(item => item.cycle === true).map(item => item.id);
+  if (!equal(animations, state.animations) || !equal(folders, state.folders) || !equal(cycles, state.cycles)) {
+    state.animations = animations;
+    state.folders = folders;
+    state.cycles = cycles;
+    state.listVersion += 1;
+  }
+  state.validationVersion += 1;
+  state.listBusy = false;
+  state.inventoryFresh = true;
+  displayProof = proof;
+  if (state.level.id === null) {
+    const names = namesOf(items);
+    if (!equal(names, state.rootNames)) state.rootNames = names;
+  }
+  orderDue = state.orderKnown;
+  ordering = null;
+  rememberLevel();
+  listAgainLater();
+}
+
+function noteInventory(evidence) {
+  const before = inventory;
+  if (before !== null && evidence !== null && before.board !== evidence.board) {
+    begin();
+  }
+  inventory = evidence;
+  if (before !== null && evidence === null) dropKeys();
+  if (before !== null && evidence !== null && before.board === evidence.board) {
+    for (const storage of STORAGES) {
+      if (before[`${storage}Keys`] !== evidence[`${storage}Keys`]) {
+        for (let i = reads.length - 1; i >= 0; --i) if (reads[i].storage === storage) reads.splice(i, 1);
+      }
+    }
+  }
+  if (pendingList !== null) {
+    const pending = pendingList;
+    pendingList = null;
+    if (pending.target === target && pending.level === state.level &&
+        (sameProof(pending.proof, evidence) || pending.proof === null && evidence?.authoritative !== true)) {
+      publishList(pending.items, evidence);
+    } else {
+      listing = null;
+      listDue = true;
+      state.inventoryFresh = false;
+    }
+  } else if (sameProof(displayProof, evidence)) {
+    state.inventoryFresh = true;
+    listAgainLater();
+  } else if (state.animations !== null && evidence !== null && (!sameEvidence(displayProof, evidence) ||
+      displayProof?.authoritative === true && evidence.authoritative !== true)) {
+    state.inventoryFresh = false;
+    listing = null;
+    listDue = true;
+  } else if (!state.inventoryFresh && evidence?.authoritative !== true) {
+    listDue = true;
+  }
+}
 
 // Calls a function now and whenever the state changes.
 export function watch(watcher) {
@@ -113,6 +221,7 @@ function changed() {
 
 // Forgets the keys of every storage and every read of a page.
 function dropKeys() {
+  keyProof.internal = keyProof.external = null;
   reads.length = 0;
   clearTimeout(pageWait);
   pageWait = null;
@@ -124,18 +233,17 @@ function dropKeys() {
 
 function heard() {
   if (state.link !== "answers") {
-    // The target answers, for the first time or again: what it has installed is asked, and
-    // its catalogs, whose keys may be of another storage now.
-    listDue = true;
-    listing = null;
+    if (!state.answered || state.catalogNone || state.pagesRefused) listDue = true;
     spaceDue = true;
-    dropKeys();
     catalogDue = !state.catalogNone && !state.pagesRefused;
   }
   state.link = "answers";
   state.failure = null;
   state.heardAt = Date.now();
   state.answered = true;
+  retryAt = 0;
+  clearTimeout(retryTimer);
+  retryTimer = null;
 }
 
 function failed(error) {
@@ -146,6 +254,78 @@ function failed(error) {
   state.failure = error;
   state.space = null;
   state.statusFresh = false;
+  state.inventoryFresh = false;
+  listing = null;
+  pendingList = null;
+  delayBackground();
+}
+
+function inClocks(path) {
+  return path === "clocks" || path.startsWith("clocks/");
+}
+
+function unavailableClocks() {
+  if (state.level.path === "clocks" && state.level.id === null) return;
+  trail.splice(0, trail.length, {path: "clocks", id: null});
+  toLevel();
+}
+
+function reconcileOnly(reply) {
+  if (["off", "between"].includes(reply.clockMode)) {
+    onlyActive = false;
+    onlyFolder = null;
+    onlyDesired = "clocks";
+    if (state.level.path !== "" && state.level.id === null) {
+      trail.length = 0;
+      toLevel();
+    }
+    return;
+  }
+  if (reply.clockMode !== "only") return;
+  const entering = !onlyActive || !inClocks(state.level.path);
+  const before = onlyFolder;
+  onlyActive = true;
+  onlyFolder = reply.clockOnly.folder;
+  if (onlyFolder === null) {
+    unavailableClocks();
+  } else if (entering) {
+    onlyDesired = "clocks";
+    trail.splice(0, trail.length, {path: "clocks", id: onlyFolder});
+    toLevel();
+  } else if (before !== onlyFolder && state.level.id !== null) {
+    trail[0] = {path: "clocks", id: onlyFolder};
+    if (state.level.path === "clocks") toLevel();
+    else {
+      state.inventoryFresh = false;
+      listing = null;
+      pendingList = null;
+      listDue = true;
+    }
+  }
+}
+
+function takeStatus(reply) {
+  heard();
+  state.status = reply;
+  state.statusFresh = true;
+  state.statusCount += 1;
+  if (connectionDue) {
+    connectionDue = false;
+    state.connectionVersion += 1;
+  }
+  reconcileOnly(reply);
+  const named = reply.animation;
+  const here = typeof reply.file === "string" && parentOf(reply.file) === state.level.path && (state.level.id === null || reply.file.includes("/"));
+  if (named !== null && state.animations !== null && named !== askedFor && here && !state.animations.some((animation) => animation.id === named)) {
+    askedFor = named;
+    listDue = true;
+  }
+  const playing = reply.playing;
+  if (typeof playing === "number" && typeof reply.playlist === "string" && parentOf(reply.playlist) === state.level.path && state.animations !== null &&
+      playing !== askedFor && !state.folders.some((folder) => folder.id === playing)) {
+    askedFor = playing;
+    listDue = true;
+  }
 }
 
 async function askStatus() {
@@ -160,36 +340,12 @@ async function askStatus() {
     if (asked !== target) {
       return;
     }
-    heard();
-    state.status = reply;
-    state.statusFresh = true;
-    state.statusCount += 1;
-    if (reply.clockMode !== "only") onlyOpened = false;
-    else if (!onlyOpened && reply.clockOnly?.folder != null) {
-      onlyOpened = true;
-      trail.length = 0;
-      trail.push({path: "clocks", id: reply.clockOnly.folder});
-      toLevel();
-    }
-    const named = reply.animation;
-    const here = typeof reply.file === "string" && parentOf(reply.file) === state.level.path && (state.level.id === null || reply.file.includes("/"));
-    if (named !== null && state.animations !== null && named !== askedFor && here && !state.animations.some((animation) => animation.id === named)) {
-      // The target plays an animation of the level shown that its list does not have.
-      askedFor = named;
-      listDue = true;
-    }
-    const playing = reply.playing;
-    if (typeof playing === "number" && typeof reply.playlist === "string" && parentOf(reply.playlist) === state.level.path && state.animations !== null &&
-      playing !== askedFor && !state.folders.some((folder) => folder.id === playing)) {
-      // The target plays a playlist of this level that its list does not have: a folder of a
-      // card just put in.
-      askedFor = playing;
-      listDue = true;
-    }
+    takeStatus(reply);
   } catch (error) {
     if (asked !== target) {
       return;
     }
+    connectionDue = true;
     failed(error);
   }
   changed();
@@ -200,7 +356,8 @@ function listAgainLater(after = LIST_EVERY_MS) {
   listTimer = setTimeout(() => {
     listTimer = null;
     if (showScreen || storageScreen) {
-      listDue = true;
+      if (after === LIST_EVERY_MS && inventory?.authoritative && !state.catalogNone && !state.pagesRefused) catalogDue = true;
+      else listDue = true;
       next();
     }
   }, after);
@@ -256,13 +413,23 @@ function namesOf(items) {
 
 // Resolve the captured path without changing the visible level. A failed lookup
 // or an unavailable catalog does not establish that the folder was removed.
-async function recoverLevel(asked, level) {
+async function recoverLevel(asked, level, fromRoot = false) {
   const current = () => asked === target && level === state.level;
   const found = [];
   let path = "";
   let parent = null;
+  const bounded = onlyActive && inClocks(level.path);
+  const desired = bounded && level.id === null ? onlyDesired : level.path;
+  let names = desired.split("/");
+  const knownRoot = bounded && !fromRoot && level.id !== null && desired !== "clocks" && onlyFolder !== null;
+  if (knownRoot) {
+    path = "clocks";
+    parent = onlyFolder;
+    found.push({path, id: parent});
+    names = names.slice(1);
+  }
   try {
-    for (const name of level.path.split("/")) {
+    for (const name of names) {
       path += (path ? "/" : "") + name;
       let from = 0;
       let folder = null;
@@ -280,6 +447,16 @@ async function recoverLevel(asked, level) {
         if (!current()) return;
         if (catalog === null || ["ok", "absent", "none"].includes(catalog.external.state)) {
           heard();
+          if (bounded) {
+            if (found.length > 0) {
+              onlyDesired = "clocks";
+              trail.splice(0, trail.length, found[0]);
+              toLevel();
+              return;
+            }
+            unavailableClocks();
+            break;
+          }
           trail.length = 0;
           toLevel();
           return;
@@ -289,9 +466,9 @@ async function recoverLevel(asked, level) {
       found.push({path, id: folder.id});
       parent = folder.id;
     }
-    if (found.length === level.path.split("/").length) {
+    if (found.length === desired.split("/").length) {
       trail.splice(0, trail.length, ...found);
-      if (parent !== level.id) {
+      if (parent !== level.id || desired !== level.path) {
         heard();
         toLevel();
         return;
@@ -300,22 +477,25 @@ async function recoverLevel(asked, level) {
     heard();
   } catch (error) {
     if (!current()) return;
+    if (knownRoot && error instanceof commands.Refusal && error.code === "unknown-id") {
+      return recoverLevel(asked, level, true);
+    }
     if (error instanceof commands.Refusal) heard();
     else failed(error);
   }
   listing = null;
-  state.listBusy = true;
+  state.listBusy = state.level.id !== null;
   listAgainLater(LIST_WHEN_BUSY_MS);
   changed();
 }
 
 // Asks for one part of the list of the level shown. The new list takes the place of the
 // old one only when its last part has come; when a part fails, the old list stays. A
-// folder that is no more brings the list to the root.
+// missing folder is resolved against its current ancestry before the view changes.
 async function askListPart() {
   const asked = target;
   const level = state.level;
-  const part = listing === null ? {items: [], from: 0} : listing;
+  const part = listing === null ? {items: [], from: 0, proof: inventory} : listing;
   listing = null;
   try {
     const reply = await commands.list(part.from, level.id);
@@ -323,23 +503,21 @@ async function askListPart() {
       return;
     }
     heard();
+    if (onlyActive && inClocks(level.path) && reply.items.some(item => !inClockFolder(item) ||
+        parentOf(item.playlist ?? item.file) !== level.path)) {
+      state.inventoryFresh = false;
+      await recoverLevel(asked, level, true);
+      return;
+    }
     const items = part.items.concat(reply.items);
     if (reply.next !== null) {
-      listing = {items, from: reply.next};
+      listing = {items, from: reply.next, proof: part.proof};
     } else {
-      state.listVersion += 1;
-      state.listBusy = false;
-      state.animations = items.filter((item) => typeof item.file === "string");
-      state.folders = items.filter((item) => typeof item.playlist === "string");
-      state.cycles = items.filter((item) => item.cycle === true).map((item) => item.id);
-      if (level.id === null) {
-        state.rootNames = namesOf(items);
+      if (part.proof?.authoritative || part.proof === null && !state.catalogNone && !state.pagesRefused) {
+        pendingList = {items, proof: part.proof, level, target: asked};
       }
-      orderDue = state.orderKnown;
-      ordering = null;
-      if (!state.orderKnown) state.order = null;
+      else publishList(items, part.proof);
       catalogDue = !state.catalogNone && !state.pagesRefused;
-      listAgainLater();
     }
   } catch (error) {
     if (asked !== target || level !== state.level) {
@@ -358,9 +536,7 @@ async function askListPart() {
       // The target answers and has no list to give: its show is invalid.
       heard();
       state.listBusy = false;
-      state.animations = null;
-      state.cycles = [];
-      state.folders = [];
+      state.inventoryFresh = false;
       listAgainLater();
     } else {
       failed(error);
@@ -393,8 +569,12 @@ async function askOrderPart() {
     } else {
       const listed = new Set((state.animations || []).map((item) => item.id));
       if (ids.length === listed.size && ids.every((id) => listed.has(id))) {
-        state.order = {ids, revision: reply.revision};
-        state.orderVersion += 1;
+        if (state.order?.revision !== reply.revision || !equal(state.order.ids, ids)) {
+          state.order = {ids, revision: reply.revision};
+          state.orderVersion += 1;
+        }
+        state.orderValidationVersion += 1;
+        rememberLevel();
       } else {
         state.order = null;
         listing = null;
@@ -407,11 +587,16 @@ async function askOrderPart() {
     }
     if (error instanceof commands.Refusal) {
       heard();
-      state.order = null;
       if (["unknown-command", "bad-argument"].includes(error.code)) {
         // A target whose software has no saved order: the list stays in its own order.
         state.orderKnown = false;
+        state.order = null;
         state.orderVersion += 1;
+        state.orderValidationVersion += 1;
+      } else if (error.code === "busy") {
+        ordering = null;
+        orderDue = true;
+        delayBackground();
       }
     } else {
       failed(error);
@@ -424,40 +609,44 @@ async function askOrderPart() {
 // any more; one that is `ok` is read again when its keys, or the read under way, are of
 // another generation or another number of entries. The keys stand meanwhile.
 export function noteCatalog(reply) {
+  noteInventory(reply.inventory ?? null);
   state.catalog = reply;
   for (const storage of STORAGES) {
     const part = reply[storage];
     const at = reads.findIndex((read) => read.storage === storage);
     if (part.state !== "ok") {
       if (["damaged", "incompatible", "none"].includes(part.state)) {
-        keeper.forget(keptUnder, storage);
+        keeper.forget(keptBoard(), storage);
       }
       if (at !== -1) {
         reads.splice(at, 1);
       }
-      if (state.keys[storage] !== null) {
+      if (part.state !== "loading" && state.keys[storage] !== null) {
         state.keys[storage] = null;
+        keyProof[storage] = null;
         state.keysVersion += 1;
       }
       continue;
     }
     const kept = state.keys[storage];
-    const same = (read) => read.generation === part.generation && read.entries === part.entries;
+    const shape = (read) => read.generation === part.generation && read.entries === part.entries;
+    const same = (read) => shape(read) && (read === kept ? keyProof[storage] : read.namespace) === keysUnder(storage);
     // Keys kept on the phone of this generation and number of entries are the storage's at
     // once, and its pages are not read.
-    const record = state.pagesRefused || (kept !== null && same(kept)) ? null : keeper.kept(keptUnder, storage);
-    if (record !== null && same(record)) {
+    const record = inventory === null || state.pagesRefused || (kept !== null && same(kept)) ? null : keeper.kept(keptBoard(), storage);
+    if (record !== null && shape(record) && record.fingerprint === inventory[`${storage}Keys`]) {
       if (at !== -1) {
         reads.splice(at, 1);
       }
       state.keys[storage] = {generation: record.generation, entries: record.entries, byName: record.byName};
+      keyProof[storage] = keysUnder(storage);
       state.keysVersion += 1;
       continue;
     }
     if (state.pagesRefused || (at !== -1 && same(reads[at])) || (at === -1 && kept !== null && same(kept))) {
       continue;
     }
-    const read = {storage, generation: part.generation, entries: part.entries, pageGeneration: null, page: 0, offset: 0, tail: "", byName: new Map()};
+    const read = {storage, namespace: keysUnder(storage), generation: part.generation, entries: part.entries, pageGeneration: null, page: 0, offset: 0, tail: "", byName: new Map()};
     if (at !== -1) {
       reads[at] = read;
     } else {
@@ -479,10 +668,12 @@ export function keptKeysReady() {
   keptTaken = true;
   let took = false;
   for (const read of [...reads]) {
-    const record = keeper.kept(keptUnder, read.storage);
-    if (record !== null && record.generation === read.generation && record.entries === read.entries) {
+    const record = inventory === null ? null : keeper.kept(keptBoard(), read.storage);
+    if (record !== null && record.generation === read.generation && record.entries === read.entries &&
+        record.fingerprint === inventory[`${read.storage}Keys`]) {
       reads.splice(reads.indexOf(read), 1);
       state.keys[read.storage] = {generation: record.generation, entries: record.entries, byName: record.byName};
+      keyProof[read.storage] = keysUnder(read.storage);
       state.keysVersion += 1;
       took = true;
     }
@@ -495,6 +686,7 @@ export function keptKeysReady() {
 
 // Says that the target keeps no catalogs: it is asked for none again until it changes.
 export function noCatalogs() {
+  noteInventory(null);
   state.catalogNone = true;
   catalogDue = false;
   dropKeys();
@@ -517,6 +709,9 @@ async function askCatalog() {
       heard();
       if (["unknown-command", "bad-argument"].includes(error.code)) {
         noCatalogs();
+      } else if (error.code === "busy") {
+        catalogDue = true;
+        delayBackground();
       }
     } else {
       failed(error);
@@ -571,8 +766,10 @@ async function askPage() {
       } else {
         reads.shift();
         state.keys[read.storage] = {generation: read.pageGeneration, entries: read.entries, byName: read.byName};
+        keyProof[read.storage] = read.namespace;
         state.keysVersion += 1;
-        keeper.keep(keptUnder, read.storage, state.keys[read.storage]);
+        keeper.keep(keptBoard(), read.storage, {...state.keys[read.storage],
+          fingerprint: inventory?.[`${read.storage}Keys`]});
       }
     }
   } catch (error) {
@@ -620,7 +817,10 @@ export function keyOf(animation) {
   }
   const read = reads.find((one) => one.storage === storage);
   const kept = state.keys[storage];
-  const key = (read === undefined ? undefined : read.byName.get(animation.file)) ?? (kept === null ? undefined : kept.byName.get(animation.file));
+  const usable = keyProof[storage] === keysUnder(storage) || !state.inventoryFresh && displayProof !== null &&
+    displayProof.board === inventory?.board && keyProof[storage] === keysUnder(storage, displayProof);
+  const key = (read === undefined ? undefined : read.byName.get(animation.file)) ??
+    (kept === null || !usable ? undefined : kept.byName.get(animation.file));
   return key !== undefined && key.endsWith(`-${animation.bytes}`) ? key : null;
 }
 
@@ -633,6 +833,21 @@ async function give(request) {
     return;
   }
   const asked = target;
+  if (request.guard && !request.guard()) {
+    request.reject?.(new commands.Refusal("stale", "timing operation"));
+    return;
+  }
+  const staleIds = ["remove", "ignore", "order", "repeat", "play", "read"].includes(request.kind) &&
+    (!state.inventoryFresh || !state.statusFresh);
+  const unconfirmedClocks = request.kind === "play-all" && onlyActive &&
+    (!state.statusFresh || state.status?.clockMode !== "only" || state.level.path !== "" && state.level.id === null);
+  if (staleIds || unconfirmedClocks) {
+    const error = new commands.Refusal("stale", request.kind);
+    if (request.reject) request.reject(error);
+    else refused(error);
+    request.settle?.(false);
+    return;
+  }
   try {
     const reply = await request.carry();
     if (asked !== target) {
@@ -719,6 +934,7 @@ function due() {
     const request = wanted.shift();
     return () => give(request);
   }
+  if (Date.now() < retryAt) return null;
   const listWaits = listing !== null || listDue;
   if (statusDue && !(listWaits && listWaited)) {
     statusDue = false;
@@ -727,6 +943,11 @@ function due() {
   }
   if (job !== null) {
     const running = job;
+    if (!canUpload(running)) {
+      const error = new commands.Refusal("in-use", "upload");
+      if (typeof running.block === "function") running.block(error);
+      else running.failed(error);
+    }
     const line = running.next();
     if (line !== null) {
       return () => sendJobLine(running, line);
@@ -738,7 +959,8 @@ function due() {
   if (listWaits) {
     listDue = false;
     listWaited = false;
-    return askListPart;
+    return state.level.id === null && state.level.path !== "" ?
+      () => recoverLevel(target, state.level) : askListPart;
   }
   if (rootDue || rooting !== null) {
     rootDue = false;
@@ -783,9 +1005,20 @@ async function next() {
 // upload to the earlier target ends.
 export function begin() {
   target += 1;
+  connectionDue = true;
   keptUnder = address();
   contentLocked = false;
   state.listVersion = 0;
+  state.validationVersion = 0;
+  state.orderValidationVersion = 0;
+  state.inventoryFresh = false;
+  inventory = null;
+  displayProof = null;
+  pendingList = null;
+  snapshots.clear();
+  retryAt = 0;
+  clearTimeout(retryTimer);
+  retryTimer = null;
   if (job !== null) {
     job.failed(new Error("the address changed"));
     job = null;
@@ -798,7 +1031,9 @@ export function begin() {
   state.since = Date.now();
   state.answered = false;
   trail.length = 0;
-  onlyOpened = false;
+  onlyActive = false;
+  onlyFolder = null;
+  onlyDesired = "clocks";
   state.level = {path: "", id: null};
   state.rootNames = null;
   rootDue = false;
@@ -840,7 +1075,8 @@ export function showing(name) {
   showScreen = name === "animations";
   storageScreen = name === "upload";
   if ((showScreen || storageScreen) && !was && state.answered && listTimer === null) {
-    listDue = true;
+    if (inventory?.authoritative && !state.catalogNone && !state.pagesRefused) catalogDue = true;
+    else listDue = true;
   }
   if ((showScreen || storageScreen) && (!was || storageScreen !== wasStorage)) {
     spaceDue = true;
@@ -855,28 +1091,57 @@ export function showing(name) {
 // Shows another level of the card's folders: `folder`, `{id, playlist}`, a folder of the
 // level shown, entered; or with `back` the level above. Its list is read at once, and
 // nothing of the level left is kept.
+export function clocksOnly() {
+  return onlyActive;
+}
+
+export function canEnter(folder) {
+  return !onlyActive || state.inventoryFresh && state.statusFresh && inClocks(state.level.path) &&
+    typeof folder?.playlist === "string" && inClocks(folder.playlist) &&
+    state.folders.some(known => known.id === folder.id && known.playlist === folder.playlist);
+}
+
+export function canGoBack() {
+  return trail.length > 0 && (!onlyActive || trail.length > 1 && inClocks(state.level.path));
+}
+
 export function enter(folder) {
+  if (!canEnter(folder)) return false;
   trail.push({path: folder.playlist, id: folder.id});
   toLevel();
+  return true;
 }
 
 export function back() {
+  if (!canGoBack()) return false;
   trail.pop();
   toLevel();
+  return true;
 }
 
 function toLevel() {
+  rememberLevel();
+  if (onlyActive && !inClocks(trail[trail.length - 1]?.path ?? "")) {
+    trail.splice(0, trail.length, {path: "clocks", id: onlyFolder});
+  }
   const top = trail[trail.length - 1];
   state.level = top === undefined ? {path: "", id: null} : {path: top.path, id: top.id};
-  state.animations = null;
-  state.folders = [];
-  state.cycles = [];
-  state.order = null;
+  if (onlyActive && inClocks(state.level.path) && state.level.id !== null) onlyDesired = state.level.path;
+  const known = snapshots.get(state.level.path);
+  state.animations = known?.animations ?? null;
+  state.folders = known?.folders ?? [];
+  state.cycles = known?.cycles ?? [];
+  state.order = known?.order ?? null;
+  displayProof = known?.proof ?? null;
+  state.inventoryFresh = (state.level.path === "" || state.level.id !== null) &&
+    known?.level.id === state.level.id && sameProof(displayProof, inventory);
   state.orderVersion += 1;
   listing = null;
+  pendingList = null;
   ordering = null;
   orderDue = false;
-  listDue = true;
+  listDue = !state.inventoryFresh;
+  catalogDue = !state.catalogNone && !state.pagesRefused;
   askedFor = null;
   changed();
   next();
@@ -934,6 +1199,13 @@ export function upload(made) {
   next();
 }
 
+export function canUpload(destination) {
+  return !onlyActive || state.statusFresh && state.status?.clockMode === "only" &&
+    destination.external === true && typeof destination.file === "string" && destination.file.startsWith("clocks/") &&
+    state.space?.external?.present === true && state.space.external.read_only === false &&
+    state.catalog?.external?.state === "ok" && state.catalog.external.writable === true;
+}
+
 // Asks for the next request again, as a job does when it has a line again.
 export function wake() {
   next();
@@ -950,12 +1222,12 @@ export function inClockFolder(item) {
 }
 
 export function canPlay(item) {
-  return state.status?.clockMode !== "only" || inClockFolder(item);
+  return !onlyActive || inClockFolder(item);
 }
 
 export function play(id) {
   want("play", () => {
-    if (state.status?.clockMode === "only" && id !== state.status.clockOnly?.folder) {
+    if (onlyActive && id !== state.status?.clockOnly?.folder) {
       const item = [...(state.animations || []), ...state.folders].find((candidate) => candidate.id === id);
       if (item === undefined || !inClockFolder(item)) throw new commands.Refusal("in-use", `play ${id}`);
     }
@@ -964,8 +1236,9 @@ export function play(id) {
 }
 
 export function playAll() {
-  want("play", () => {
-    if (state.status?.clockMode !== "only") return commands.playAll();
+  want("play-all", () => {
+    if (!onlyActive) return commands.playAll();
+    if (!state.statusFresh || state.status?.clockMode !== "only") throw new commands.Refusal("stale", "play all");
     const folder = state.status.clockOnly?.folder;
     if (folder == null) throw new commands.Refusal("in-use", "play all");
     return commands.play(folder);
@@ -1038,6 +1311,14 @@ export function debugMini(on) {
   return requestOperation("mini", () => commands.debugMini(on));
 }
 
+export function rotationRead(allowed) {
+  return requestOperation("rotation", () => commands.rotation(), undefined, undefined, allowed);
+}
+
+export function rotationSet(revision, degrees, allowed) {
+  return requestOperation("rotation", () => commands.rotationSet(revision, degrees), undefined, undefined, allowed);
+}
+
 // Names the function that is told of every refusal of what the operator asked for.
 export function onRefusal(handler) {
   refused = handler;
@@ -1048,6 +1329,7 @@ document.addEventListener("visibilitychange", () => {
     // What was asked for and not sent is not sent later, when the app comes back.
     cancelWaiting();
   } else {
+    connectionDue = true;
     statusDue = true;
     refreshContent();
   }
@@ -1064,6 +1346,12 @@ export function uploadSnapshot(level) {
   return requestOperation("upload-preflight", async () => {
     const asked = target;
     const unchanged = () => { if (asked !== target) throw new Error("the target changed"); };
+    const status = await commands.status();
+    unchanged();
+    takeStatus(status);
+    if (onlyActive && (!inClocks(level.path) || level.id === null)) {
+      throw new commands.Refusal("in-use", "upload");
+    }
     const space = await commands.space();
     unchanged();
     state.space = space;
@@ -1105,11 +1393,24 @@ export function uploadSnapshot(level) {
   });
 }
 
-function requestOperation(kind, carry, confirm, allowed) {
+function requestOperation(kind, carry, confirm, guard, allowed) {
   return new Promise((resolve, reject) => {
-    wanted.push({kind, carry, confirm, allowed, resolve, reject});
+    wanted.push({kind, carry, confirm, guard, allowed, resolve, reject});
     next();
   });
+}
+
+export function timingOperation(carry, version, current = () => true) {
+  const guard = () => version === target && current() && state.link === "answers" && state.statusFresh && !document.hidden;
+  return requestOperation("timing", async () => {
+    const send = async action => {
+      if (!guard()) throw new commands.Refusal("stale", "timing operation");
+      const result = await action();
+      if (!guard()) throw new commands.Refusal("stale", "timing operation");
+      return result;
+    };
+    return carry(send);
+  }, undefined, guard);
 }
 
 function cancelWaiting() {
@@ -1125,7 +1426,7 @@ export function mappingGet() {
 }
 
 export function mappingSet(revision, pins, allowed) {
-  return requestOperation("mapping", () => commands.mappingSet(revision, pins), undefined, allowed);
+  return requestOperation("mapping", () => commands.mappingSet(revision, pins), undefined, undefined, allowed);
 }
 
 export function mappingTest(enabled) {

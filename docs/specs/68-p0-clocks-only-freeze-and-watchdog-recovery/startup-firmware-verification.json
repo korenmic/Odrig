@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "source": {
+    "commit": "22758471c861fd6a0d10dfad49839a741e5bf0a7",
+    "trackedDirty": false
+  },
+  "host": {
+    "system": "win32",
+    "architecture": "x86_64",
+    "os": "Windows-11-10.0.26200-SP0"
+  },
+  "inputsSha256": "9b77fb90d65843bf4ef0f5aa23c95fab1c561b1575928ffd7478da0386f053fe",
+  "image": {
+    "file": "odrig-firmware.bin",
+    "bytes": 1890944,
+    "sha256": "429d2ebe8072923acbd11a40b1e764ac29e08f20cfb3830d5dfe00b8cdddf0bb"
+  },
+  "elf": {
+    "bytes": 33101624,
+    "sha256": "1113dfd00914fde408d527ad3d1b34d0b2457534c7b10b89b253b5a8e25185dc"
+  },
+  "chip": "ESP32-S3",
+  "environment": "odrig_microsd",
+  "symbolTool": "xtensa-esp-elf-gcc-nm.exe",
+  "symbols": [
+    "42025098 T odrig_core_begin",
+    "42022d80 T odrig_core_feed",
+    "4202d6c0 T odrig_core_poll"
+  ],
+  "physicalAcceptance": false
+}

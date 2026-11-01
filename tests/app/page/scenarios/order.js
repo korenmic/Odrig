@@ -112,8 +112,8 @@ export default async function (app) {
     seen.saving = rowOf(app, id).querySelector(".row-state").textContent;
     await app.until(() => app.text("message-text") !== null, "a message", 8000);
     seen.message = app.text("message-text");
-    const version = client.state.orderVersion;
-    await app.until(() => client.state.orderVersion > version || rowOf(app, id).dataset.saving !== "true", "the order read again", 8000);
+    const version = client.state.orderValidationVersion;
+    await app.until(() => client.state.orderValidationVersion > version || rowOf(app, id).dataset.saving !== "true", "the order read again", 8000);
     await app.sleep(1000);
     seen.after = ids(app);
   }

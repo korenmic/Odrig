@@ -11,12 +11,28 @@
 #include "repeats.h"
 #include "brightness.h"
 #include "ignored.h"
+#include "inventory.h"
 #include "storage.h"
 #include "upload.h"
 
 namespace odrig {
 
 namespace {
+
+uint32_t marker_fingerprint(const Marker &marker) {
+    uint32_t crc = kCrcStart;
+    for (uint32_t page = 0; page < kCatalogPages; ++page) {
+        const uint32_t values[2] = {marker.counts[page], marker.crcs[page]};
+        for (uint32_t value : values) {
+            for (uint32_t at = 0; at < 4; ++at) crc = crc_add(crc, static_cast<uint8_t>(value >> (at * 8)));
+        }
+    }
+    const uint32_t index[4] = {marker.folders, marker.folders_crc, marker.ids, marker.ids_crc};
+    for (uint32_t value : index) {
+        for (uint32_t at = 0; at < 4; ++at) crc = crc_add(crc, static_cast<uint8_t>(value >> (at * 8)));
+    }
+    return crc_value(crc);
+}
 
 // The names of a catalog's files for the host: of the internal storage [kInternal], and of
 // the drive [kExternal], which are the same after `drive/`.
@@ -1238,6 +1254,7 @@ ODRIG_NOINLINE bool commit_change(Core &core, uint32_t storage, const CatalogCha
     // of the storage, or at the next start or plug-in.
     finish(core, place);
     catalog.generation = marker.generation;
+    catalog.fingerprint = marker_fingerprint(marker);
     catalog.entries = entries_of(marker);
     if (storage == kExternal) {
         // The drive's marker is now this one: the look does not take it for another.
@@ -1380,6 +1397,7 @@ void publish(Core &core, const Marker &marker) {
     catalog.state = kCatalogOk;
     catalog.detail = 0;
     catalog.generation = marker.generation;
+    catalog.fingerprint = marker_fingerprint(marker);
     catalog.entries = entries_of(marker);
     core.catalog_looked = core.latest;
     // The drive's saved repeats, before any of its files plays.
@@ -1487,6 +1505,7 @@ bool catalog_settle(Core &core, uint32_t storage) {
         catalog.state = kCatalogOk;
         catalog.detail = 0;
         catalog.generation = marker.generation;
+        catalog.fingerprint = marker_fingerprint(marker);
         catalog.entries = entries_of(marker);
     }
     return true;
@@ -1502,6 +1521,7 @@ void catalog_read_internal(Core &core) {
     catalog.state = kCatalogNone;
     catalog.detail = 0;
     catalog.generation = 0;
+    catalog.fingerprint = 0;
     catalog.entries = 0;
     uint32_t mask = 0;
     const Place place = {kInternal, false};
@@ -1544,12 +1564,14 @@ void catalog_read_internal(Core &core) {
         return;
     }
     catalog.generation = marker.generation;
+    catalog.fingerprint = marker_fingerprint(marker);
     catalog.entries = entries_of(marker);
 }
 
 void catalog_drive_plugged(Core &core) {
     CatalogState &catalog = core.catalogs[kExternal];
     catalog.generation = 0;
+    catalog.fingerprint = 0;
     catalog.entries = 0;
     catalog.detail = 0;
     const bool given_names = core.drive != nullptr && core.index != nullptr && core.host.drive_bind != nullptr && core.drive_number != 0;
@@ -2153,6 +2175,7 @@ bool rebuild_commit(Core &core) {
     catalog.state = kCatalogOk;
     catalog.detail = 0;
     catalog.generation = marker.generation;
+    catalog.fingerprint = marker_fingerprint(marker);
     catalog.entries = entries_of(marker);
     // A file whose name the catalog cannot hold is checked as without a catalog.
     check_takes_up(core);
@@ -3284,7 +3307,9 @@ uint32_t catalog_reply(const Core &core, Reply &reply) {
         reply.text(",\"writable\":");
         reply.text(core.host.drive_writable != nullptr && core.host.drive_writable(core.host.ctx, core.drive_number) == 1 ? "true" : "false");
     }
-    reply.text("},\"rebuild\":");
+    reply.text("}");
+    inventory_reply(core, reply);
+    reply.text(",\"rebuild\":");
     if (core.rebuild == 0) {
         reply.text("null}\n");
         return reply.length;

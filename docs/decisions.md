@@ -872,3 +872,37 @@ app API, `mapping cross` command and `cross` reply member. Generic mapping forma
 support remains; editing pins preserves installed geometry without a wiring change.
 The owner also requested a confirmed mapping-edit lock in Settings; its app interaction
 guard uses the existing mapping protocol and adds no board command.
+
+- 2026-10-31: Seed64's owner authorized autonomous protocol choices and delivery.
+  Add shared `time`, `time zone DATA` and `time set UTC REVISION` operations with
+  verified phone-zone rules, boot-local epoch validity and no per-sync flash writes;
+  the exact format and refusals are in commands.md.
+
+- 2026-10-31: The owner chose manual override always for real-time scheduling.
+  Existing manual On/Off now persist mode across reset when saved, never expire at
+  a scheduled boundary, and remain immediate even if saving fails. Add schedule
+  read/set/resume with atomic daily hours (default18:00/06:00), invalid-time bypass
+  and no per-tick writes. These protocol choices use the autonomous authorization.
+
+### Seed 64: physical identity and timing metadata integration
+
+Timing cooldowns/queued writes bind to a stable board ID, not a shared Wi-Fi address.
+The bounded identity callback and atomic guard prefix retain existing line/arena
+bounds. Ordinary show installs preserve schedule/zone files, never clock validity.
+Runtime WLED power mirroring does not create an override; external manual control does.
+
+### Seed66: owner-requested Clocks only browsing and destination boundary
+
+The owner requested that app browsing in Only stay in Clocks and its descendants.
+This supersedes earlier unrestricted browsing in that mode. Back stops at Clocks;
+unknown/disconnected status retains the last confirmed boundary and confirmed Off or
+Between releases it. Settings/Target and mode exit remain accessible. Root metadata
+queries for collision checks are invisible and remain allowed.
+
+Uploads in Only must target writable external Clocks paths. Missing external storage
+cannot redirect them to internal root. Authored texts/clocks currently save to internal
+root, so their preview remains usable but saving waits until Only is left. This does
+not introduce internal subfolders or a new authoring destination. Prepared outside drafts
+must be reviewed after mode change; an outside transaction opened before Only is cancelled
+when the new policy becomes confirmed. Normal-mode storage choices retain their existing
+defaults and fallback. No wire command is added or restricted by this app policy.

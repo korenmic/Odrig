@@ -1,0 +1,194 @@
+export const withoutTheApp = true;
+
+export default async function(app) {
+  const sent = [];
+  let missing = app.settings.case === 'initial';
+  let remapped = false;
+  let mode = 'only';
+  let offline = false;
+  let hold = null;
+  let release = null;
+  let held = false;
+  const rootId = () => remapped ? 60017 : 60007;
+  const childId = () => remapped ? 60018 : 60008;
+  const rows = folder => folder === null ? (missing ? [] : [
+    {id: rootId(), playlist: 'clocks', files: 1, external: true}]) :
+    folder === rootId() && !missing ? [
+      {id: 60003, file: 'clocks/c.odrg', bytes: 100, external: true},
+      {id: childId(), playlist: 'clocks/message', files: 1, external: true}] :
+    folder === childId() && !missing ? [
+      {id: 60006, file: 'clocks/message/m.odrg', bytes: 100, external: true}] : null;
+  window.Capacitor = {
+    isNativePlatform: () => true,
+    nativePromise: async (_plugin, _method, request) => {
+      const line = request.line;
+      sent.push(line);
+      if (offline) return {status: 500, body: ''};
+      if (hold !== null && line.startsWith('list in')) {
+        const waiting = hold;
+        hold = null;
+        held = true;
+        await waiting;
+      }
+      let answer;
+      if (line === 'status') answer = {ok: true, on: true, brightness: 40,
+        playing: missing ? null : rootId(), animation: null, fps: 50, error: null,
+        ...(mode === 'unknown' ? {} : {clocks: mode !== 'off', clock_mode: mode,
+          clock_only: mode === 'only' ? {folder: app.settings.case === 'initial' ? null : rootId(),
+            state: missing ? 'no-clocks' : 'playing'} : null})};
+      else if (line.startsWith('list')) {
+        const match = /^list in (\d+)/.exec(line);
+        const folder = match === null ? null : Number(match[1]);
+        const items = app.settings.case === 'reused' && remapped && folder === 60007 ?
+          [{id: 60002, file: 'other/outside.odrg', bytes: 100, external: true}] : rows(folder);
+        answer = items === null ? {ok: false, error: 'unknown-id'} : {ok: true, items, next: null};
+      } else if (line === 'catalog') answer = {ok: true, internal: {state: 'none', uncataloged: 0},
+        external: {state: missing ? 'absent' : 'none'}, rebuild: null};
+      else if (line.startsWith('upload begin')) {
+        if (app.settings.case === 'upload-race') { mode = 'only'; await app.sleep(1100); }
+        answer = {ok: true, chunk: 1500, replacing: false};
+      } else if (line.startsWith('upload data')) answer = {ok: true, received: 4};
+      else if (line.startsWith('upload end')) answer = {ok: true};
+      else if (line === 'upload cancel') answer = {ok: true};
+      else if (line === 'space') answer = {ok: true, free: 1000, total: 2000};
+      else answer = {ok: false, error: 'unknown-command'};
+      return {status: 200, body: JSON.stringify(answer)};
+    },
+  };
+  const client = await import('/client.js');
+  client.showing('animations');
+  client.keptKeysReady();
+  client.begin();
+  await app.until(() => client.state.status?.clockMode === 'only', 'confirmed Only');
+  const paths = [];
+  client.watch(state => paths.push(state.level.path));
+  if (app.settings.case === 'initial') {
+    await app.sleep(1200);
+    return {paths, level: client.state.level, fresh: client.state.inventoryFresh,
+      rootRequests: sent.filter(line => line === 'list' || line.startsWith('list ' ) && !line.startsWith('list in')).length};
+  }
+  await app.until(() => client.state.level.path === 'clocks' && client.state.inventoryFresh, 'initial Clocks list');
+  if (['upload-snapshot', 'upload-snapshot-race'].includes(app.settings.case)) {
+    if (app.settings.case === 'upload-snapshot-race') {
+      mode = 'off';
+      await app.until(() => client.state.status?.clockMode === 'off', 'confirmed Off');
+      mode = 'only';
+    }
+    let error = null;
+    try { await client.uploadSnapshot({path: '', id: null}); }
+    catch (caught) { error = caught.code ?? caught.message; }
+    return {error, mode: client.state.status.clockMode};
+  }
+  if (['upload-job', 'upload-race'].includes(app.settings.case)) {
+    if (app.settings.case === 'upload-race') {
+      mode = 'off';
+      await app.until(() => client.state.status?.clockMode === 'off', 'confirmed Off');
+    }
+    const upload = await import('/upload.js');
+    let ended = null;
+    client.upload(upload.uploading({id: 2, file: 'outside.odrg', bytes: new Uint8Array([1, 2, 3, 4]), create: true},
+      {report() {}, end(how) { ended = how; }, wake: client.wake}));
+    await app.until(() => ended !== null, 'root upload ends');
+    return {begins: sent.filter(line => line.startsWith('upload begin')).length,
+      ends: sent.filter(line => line.startsWith('upload end')).length,
+      cancels: sent.filter(line => line === 'upload cancel').length,
+      error: ended.error?.code ?? null, done: ended.done === true};
+  }
+  if (app.settings.case === 'uncertain') {
+    if (app.settings.offline) {
+      offline = true;
+      await app.until(() => client.state.link === 'no-answer', 'lost connection');
+    } else {
+      mode = 'unknown';
+      await app.until(() => client.state.status?.clockMode === null, 'unknown mode metadata');
+    }
+    client.back();
+    client.enter({playlist: 'other', id: 60009});
+    if (app.settings.restart) {
+      const before = sent.filter(line => line.startsWith('play ')).length;
+      let claimedReply = false;
+      client.watch(state => { if (state.link === 'answers') claimedReply = true; });
+      client.playAll();
+      await app.sleep(50);
+      return {link: client.state.link, sent: sent.filter(line => line.startsWith('play ')).length - before, claimedReply};
+    }
+    return {level: client.state.level, only: client.clocksOnly(), paths};
+  }
+  if (app.settings.case === 'release') {
+    mode = 'between';
+    await app.until(() => client.state.status?.clockMode === 'between', 'confirmed Between');
+    client.back();
+    return {level: client.state.level, only: client.clocksOnly()};
+  }
+  if (app.settings.case === 'reused') {
+    let outsideVisible = false;
+    client.watch(state => {
+      if (state.animations?.some(item => item.file === 'other/outside.odrg')) outsideVisible = true;
+    });
+    remapped = true;
+    client.refreshContent();
+    await app.until(() => client.state.level.id === rootId() && client.state.inventoryFresh, 'verified replacement folder');
+    return {outsideVisible, level: client.state.level};
+  }
+  if (app.settings.case === 'navigation') {
+    paths.length = 0;
+    client.back();
+    const back = client.state.level.path;
+    client.enter({playlist: 'other', id: 60009});
+    const outside = client.state.level.path;
+    client.enter({playlist: 'clocks-other', id: 60010});
+    const prefix = client.state.level.path;
+    client.enter({playlist: 'clocks/message', id: 60099});
+    return {paths, back, outside, prefix, level: client.state.level};
+  }
+  if (app.settings.case === 'target') {
+    hold = new Promise(resolve => { release = resolve; });
+    client.refreshContent();
+    await app.until(() => held, 'old folder request held');
+    mode = 'off';
+    client.begin();
+    paths.length = 0;
+    release();
+    await app.until(() => client.state.status?.clockMode === 'off' && client.state.inventoryFresh, 'new target confirmed');
+    return {paths, level: client.state.level, mode: client.state.status.clockMode};
+  }
+  if (['child', 'remap'].includes(app.settings.case)) {
+    client.enter({playlist: 'clocks/message', id: childId()});
+    await app.until(() => client.state.level.path === 'clocks/message' && client.state.inventoryFresh, 'child list');
+    paths.length = 0;
+    if (app.settings.case === 'child') {
+      const count = client.state.statusCount;
+      await app.until(() => client.state.statusCount >= count + 2, 'repeated Only');
+      return {paths, level: client.state.level};
+    }
+    remapped = true;
+    client.refreshContent();
+    await app.until(() => client.state.level.id === childId() && client.state.inventoryFresh, 'remapped descendant');
+    return {paths, level: client.state.level};
+  }
+  const before = client.state.animations;
+  missing = true;
+  client.refreshContent();
+  await app.sleep(1800);
+  const absent = {paths: [...paths], level: client.state.level,
+    retained: client.state.animations === before, fresh: client.state.inventoryFresh};
+  if (app.settings.restart) {
+    const played = sent.filter(line => line.startsWith('play ')).length;
+    client.playAll();
+    await app.sleep(50);
+    return {sent: sent.filter(line => line.startsWith('play ')).length - played};
+  }
+  if (app.settings.case === 'unknown') {
+    mode = 'unknown';
+    const count = client.state.statusCount;
+    await app.until(() => client.state.statusCount > count && client.state.status.clockMode === null, 'unknown policy');
+    return {...absent, afterUnknown: client.state.level};
+  }
+  if (!app.settings.restore) return absent;
+  missing = false;
+  remapped = true;
+  client.refreshContent();
+  await app.until(() => client.state.level.path === 'clocks' && client.state.level.id === rootId() &&
+    client.state.inventoryFresh, 'Clocks returns');
+  return {...absent, restored: client.state.level};
+}

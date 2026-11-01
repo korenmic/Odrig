@@ -1,0 +1,9 @@
+{
+  "number": 67,
+  "slug": "67-p0-clocks-only-recovery-and-stable-inventory",
+  "state": "in_progress",
+  "title": "Preserve Clocks Only and known inventory during recovery",
+  "priority": "P0",
+  "addedAt": "2026-11-01",
+  "summary": "Fix locally reproduced Only-to-root recovery, saved-mode read-error root playback, and unconditional reconnect cache invalidation; retain truthful readiness and safe revalidation. Zero open owner product questions."
+}

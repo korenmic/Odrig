@@ -78,13 +78,19 @@ export default async function (app) {
   Object.defineProperty(app.doc, "hidden", {configurable: true, get: () => hidden});
   const looks = {};
   for (const act of app.settings.acts) {
+    if (act.untilActions) {
+      await app.until(() => [...app.byId('now-bar').querySelectorAll('button')]
+        .filter(displayed).every(button => !button.disabled), 'confirmed actions after selection', act.ms ?? 20000);
+    }
     if (act.until !== undefined) {
       await app.until(() => app.says(act.until), act.until, act.ms ?? 8000);
     }
     if (act.untilBar !== undefined) {
       await app.until(() => {
         const bar = barOf(app);
-        return bar !== null && bar.named.includes(act.untilBar);
+        return bar !== null && bar.named.includes(act.untilBar) &&
+          [...app.byId('now-bar').querySelectorAll('button,input')]
+            .some(element => element.getAttribute('aria-label') === act.untilBar && !element.disabled);
       }, `the bar with ${act.untilBar}`);
     }
     if (act.untilNoBar) {

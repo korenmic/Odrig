@@ -569,8 +569,9 @@ function row(animation) {
 
 // What tells a row of the list from another, as the list holds it and as the rows would
 // be drawn now.
-function rowKey(animation) {
-  return [animation.id, animation.file, isExternal(animation), isEditable(animation), onWritableCard(animation), animation.fault ?? "", metaOf(animation)].join("|");
+function rowKey(animation, kept) {
+  const writable = client.state.space === null && kept?.dataset.file === animation.file ? kept.dataset.writable : onWritableCard(animation);
+  return [animation.id, animation.file, isExternal(animation), isEditable(animation), writable, animation.fault ?? "", metaOf(animation)].join("|");
 }
 
 function keyOfChild(child) {
@@ -589,7 +590,10 @@ function keyOfChild(child) {
 // sub-folders.
 function drawRows(here) {
   const place = byId("animations-list");
-  const wanted = [...here.shown.map(rowKey), ...here.folders.map((entry) => `#${entry.path}|${entry.id}|${canIgnore(entry)}`)];
+  // Unknown capacity keeps the last-rendered badge; action permissions still use current observations.
+  const kept = new Map(client.state.space === null ? [...place.children].filter(child => child.classList.contains("row"))
+    .map(child => [child.dataset.id, child]) : []);
+  const wanted = [...here.shown.map(animation => rowKey(animation, kept.get(String(animation.id)))), ...here.folders.map((entry) => `#${entry.path}|${entry.id}|${canIgnore(entry)}`)];
   const shown = [...place.children].map(keyOfChild);
   if (shown.length === wanted.length && shown.every((key, at) => key === wanted[at])) {
     return;
@@ -603,7 +607,7 @@ function drawRows(here) {
 
 // Whether the target can be asked to change something now.
 export function answers() {
-  return client.state.link === "answers";
+  return client.state.link === "answers" && client.state.statusFresh && client.state.inventoryFresh;
 }
 
 function rowsState(state, animations, here) {
@@ -613,7 +617,7 @@ function rowsState(state, animations, here) {
   // current; each folder row's count, and its mark when it leads to the current playlist.
   const marked = markedPath(state.status);
   byId("level-title").textContent = here.path === "" ? "Root" : here.path;
-  byId("level-back").hidden = here.path === "";
+  byId("level-back").hidden = !client.canGoBack();
   byId("level-head").setAttribute("aria-current", String(marked === here.path));
   for (const made of byId("animations-list").querySelectorAll(":scope > .folder-row")) {
     const entry = here.folders.find((item) => item.path === made.dataset.path);
@@ -629,6 +633,8 @@ function rowsState(state, animations, here) {
     note.hidden = note.textContent === "";
     const more = made.querySelector(".more");
     if (more) more.disabled = !answers() || saving;
+    const open = made.matches("button") ? made : made.querySelector(".folder-open");
+    if (open) open.disabled = !client.canEnter({id: entry.id, playlist: entry.path});
     made.setAttribute("aria-current", String(marked !== null && (marked === entry.path || marked.startsWith(`${entry.path}/`))));
   }
   for (const made of byId("animations-list").querySelectorAll(":scope > .row")) {
@@ -649,23 +655,29 @@ function rowsState(state, animations, here) {
     const check = made.querySelector(".pick input");
     if (check) {
       check.checked = selection.has(animation.id);
-      check.disabled = selection.locked();
+      check.disabled = selection.locked() || !(isEditable(animation) || onWritableCard(animation));
     }
     made.querySelector(".more").disabled = !answers();
     const play = made.querySelector(".play");
     const allowed = client.canPlay(animation);
-    play.disabled = typeof animation.fault === "string" || !allowed;
-    play.title = allowed ? "" : "Leave Clocks only to play an animation outside the Clocks folder.";
+    play.disabled = !answers() || typeof animation.fault === "string" || !allowed;
+    play.title = !answers() ? "Waiting for playlist validation." : allowed ? "" : "Leave Clocks only to play an animation outside the Clocks folder.";
     if (!allowed) play.setAttribute("aria-describedby", "only-boundary");
     else play.removeAttribute("aria-describedby");
   }
-  const only = state.status?.clockMode === "only";
+  const only = client.clocksOnly();
   byId("play-all").textContent = only ? "Restart clocks" : "Play this folder";
-  byId("play-all").disabled = only && (state.status.clockOnly?.folder == null || !state.statusFresh);
-  say("only-boundary", only ? "Clocks only: browsing is unrestricted. Play outside the Clocks folder is disabled; leave Clocks only in Settings to play it." : null);
+  byId("play-all").disabled = state.link !== "answers" || !state.statusFresh ||
+    state.level.path !== "" && state.level.id === null ||
+    !only && state.level.id !== null && !state.inventoryFresh || only && state.status.clockOnly?.folder == null;
+  say("only-boundary", only ? "Clocks only. Browsing stays inside Clocks; leave this mode in Settings to browse elsewhere." : null);
 }
 
 function draw(state) {
+  say("inventory-state", state.level.path === "clocks" && state.level.id === null ?
+    "Clocks folder unavailable. Waiting for storage to return; Settings and Target remain available." :
+    state.animations !== null && (!state.inventoryFresh || !state.statusFresh) ?
+      "Known playlist: verifying the connection and any changes. Playback controls wait for confirmation." : null);
   const counted = capacity.counts(state);
   byId("show-space").textContent = `Internal storage: ${capacity.internal(state.space, counted.internal)}`;
   byId("show-external-space").textContent = capacity.external(state.space, counted.external);
@@ -907,7 +919,7 @@ export function start(options) {
   // The level's button: the root's playlist at the root, the folder's inside one.
   byId("play-all").addEventListener("click", () => {
     const level = client.state.level;
-    if (client.state.status?.clockMode === "only" || level.id === null) client.playAll();
+    if (client.clocksOnly() || level.id === null) client.playAll();
     else client.play(level.id);
   });
   byId("level-back").addEventListener("click", () => enter(null));

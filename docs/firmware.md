@@ -1237,6 +1237,12 @@ so a call that held the lock for seconds would still restart the chip. WLED's ow
 of its loop is off (`WLED_WATCHDOG_TIMEOUT=0`), as it has been since seed 04. The board
 session of seed 31 measures these budgets.
 
+After each request for a refresh, the producer blocks for one scheduler tick outside
+the core lock. This lets idle run even when rendering takes longer than the refresh
+interval and the consumer has already queued its notification. A notification that
+is already queued returns immediately, so waiting for it alone provides no idle time.
+The watchdog remains enabled and is never fed to cover up a blocked core call.
+
 ## What the firmware changes in WLED
 
 | Changed | Left as it is |
@@ -2397,3 +2403,23 @@ with physical buses. No firmware compilation, flash, transfer timing measurement
 electrical check or 20–50 FPS board observation was performed for this feature.
 Compilation in this run is deferred by the owner to the future cross-platform
 firmware seed 60; that work is not a prerequisite for the remaining software seeds.
+
+## Board time and daily scheduling
+
+The shared core provides `time`, `schedule` and `guard` on USB serial, the UART and
+HTTP, with the same semantics described in [commands.md](commands.md#board-time).
+Its stable identity is `esp32-` plus the factory MAC read by `ESP.getEfuseMac()`;
+no fuse is written. The boot-local epoch always needs setting after reset. Retained
+zone rules and sticky manual mode do not restore epoch validity.
+
+`install-show` retains `timezone.bin` and `schedule.txt` unless the supplied show
+contains replacements; `read-show` includes both. Unfinished `.part` files never
+become settings. Runtime WLED power mirroring changes no saved WLED, hardware or
+power-supply configuration. Initialization/mirroring cannot create an override;
+explicit JSON On/Off (including reassertions/toggle) and other power transitions
+forward ordinary core manual commands. Colour-only updates do not override hours.
+State callbacks only record power intent under a short memory-only guard. They
+never wait for storage, take the player lock or write files. The main loop applies
+the latest queued request once storage pacing allows it; repeated callbacks cannot
+hold up initialization or WLED's network handling while storage remains busy.
+Physical behavior remains an operator acceptance check.

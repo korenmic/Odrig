@@ -117,7 +117,7 @@ async function deleteSelected(question) {
   } finally {
     if (ownVersion === client.targetVersion()) {
       deleting = false;
-      awaitingRefresh = client.state.listVersion;
+      awaitingRefresh = client.state.validationVersion;
       client.setContentBusy(false);
       client.refreshContent();
       redraw();
@@ -140,7 +140,7 @@ export function draw(state) {
   // A row that the list no longer has, or that a filter hides, leaves the selection.
   const ids = new Set(animations.filter(selectable).map((item) => item.id));
   for (const id of selected) if (!ids.has(id)) selected.delete(id);
-  if (awaitingRefresh !== null && state.listVersion > awaitingRefresh) awaitingRefresh = null;
+  if (awaitingRefresh !== null && state.validationVersion > awaitingRefresh) awaitingRefresh = null;
   byId("bulk-progress").dataset.refreshing = String(awaitingRefresh !== null);
   const canSelect = animations.some(selectable);
   byId("selection-bar").hidden = !selecting;

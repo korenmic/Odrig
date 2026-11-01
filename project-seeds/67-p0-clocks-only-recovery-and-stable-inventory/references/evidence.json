@@ -1,0 +1,53 @@
+{
+  "inspectedRef": "d39bb3576c17c92a17043852d0e8357e4e9eb2b4",
+  "nativeCoreBuildRef": "74eb4ac21cdbc4c973f581147ad5337a20dfd704",
+  "app": {
+    "initial": {
+      "path": "clocks",
+      "onlyOpened": true
+    },
+    "recovery": {
+      "path": "",
+      "clockMode": "only",
+      "onlyOpened": true,
+      "animations": null
+    },
+    "reconnect": {
+      "keysBefore": {
+        "internal": {
+          "revision": "same-internal"
+        },
+        "external": {
+          "revision": "same-external"
+        }
+      },
+      "keysAfter": {
+        "internal": null,
+        "external": null
+      },
+      "listDue": true,
+      "catalogDue": true,
+      "keysVersion": 1
+    }
+  },
+  "native": {
+    "healthy": {
+      "mode": "only",
+      "file": "clocks/face.odrgx",
+      "settingsBytesUnchanged": true,
+      "logs": []
+    },
+    "read-error": {
+      "mode": "off",
+      "file": "picture.odrg",
+      "settingsBytesUnchanged": true,
+      "logs": []
+    }
+  },
+  "sourceHashes": {
+    "app\\www\\client.js": "54232b6e6c0f7eae47cb4cdfe53f58bf347660f003ee83f17a7f07bb5c1a3eee",
+    "core\\src\\breaks.cpp": "d6bf85195fb90702ab304c0fefee80c91425b73db9778db80e8cbf04d3ef63b3",
+    "core\\src\\player.cpp": "5752fd4b90dd275a7fb857c2910880a8252853cd584ac5452577caa765759de4"
+  },
+  "conditions": "Controlled transient folder lookup and settings-read faults; not a reproduction of the owner physical incident."
+}
