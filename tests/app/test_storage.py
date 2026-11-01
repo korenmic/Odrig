@@ -39,7 +39,7 @@ class TheListOfAnimations(unittest.TestCase):
 
     def test_it_shows_the_free_storage_and_each_animation_with_its_size_badge_and_menu(self):
         emulator, address = self.emulator(self.three())
-        found = support.run("storage", address=address, settings={"rows": 3}).seen
+        found = support.run("storage", address=address, settings={"rows": 3, "order": True}).seen
         space = json.loads(emulator.command("space"))
         listed = json.loads(emulator.command("list"))["items"]
         self.assertEqual(found["before"]["space"], f"Internal storage: {space['animations']} animations, free {space['free'] / 1e6:.1f} MB of {space['total'] / 1e6:.1f} MB")

@@ -604,7 +604,7 @@ resizing or timing changes. Compressed frame bodies never inflate on the phone f
 a preview. The app reuses its content-key preview catalog/cache; otherwise it says
 that no preview is available and the target will check the complete animation.
 
-Every new ready-made or converted-media selection starts with `External storage`
+Outside Clocks only, every new ready-made or converted-media selection starts with `External storage`
 when detected, even if Internal was chosen for the previous form. Choose `Internal
 storage` for this form if desired. Absent/not-detected External stays visible,
 disabled and gray, with automatic Internal fallback. Redetection restores automatic
@@ -619,7 +619,7 @@ and explains that a browsed SD folder was not retained. Navigation cannot move t
 prepared destination. The editable basename must obey the32-byte naming rule; the
 external full path obeys the100-byte/three-level catalog rule. Folders must exist.
 
-Before sending, fresh target, storage, catalog and folder observations detect stale
+Before sending, fresh target policy, storage, catalog and folder observations detect stale
 destinations and collisions. A preflight absence fallback discovered by the click
 is shown and requires another Upload click. Collisions require a different basename;
 they never silently overwrite. New external files use `upload expect 00000000` and
@@ -630,10 +630,20 @@ transaction. Explicit text/clock edits keep their original file and CRC stale gu
 Known capacity is checked first, including the upload reserve; the target remains
 authoritative when capacity is unavailable. After begin the storage/path are frozen.
 A disconnected card stops that attempt; it does not continue in Internal. A new
-manual attempt can use the visibly updated fallback. Cancellation, failed checks
+manual attempt outside Only can use the visibly updated fallback. Cancellation, failed checks
 and uncertain completion are distinct from an acknowledged installed file. After
 success the destination catalog/list/preview refresh normally. Authored texts and
 clocks remain in Internal; ready-made containers can use either selected storage.
+
+In Clocks only, uploads require a verified writable external destination in Clocks or a
+descendant. External stays selected even when absent; Internal is disabled, and no
+internal-root fallback is permitted. Missing storage or an unresolved folder disables
+submission with an explanation. A Root draft prepared before Only starts is not silently
+repointed. Fresh policy is read during preflight and the shared upload job checks its
+destination before sending; an already opened outside transaction is cancelled if Only
+becomes confirmed before completion. Invisible Root-name queries remain permitted for
+collision checks. Text/clock authoring keeps its local preview, but its internal-root
+save is disabled in Only. Confirmed Off/Between restores normal choices and saving.
 
 To make a text, press `Make a text` on Upload. A form opens under it: the text, written
 with English letters, digits, signs and Hebrew letters, and line feeds; its font,
@@ -1202,8 +1212,10 @@ installed; the phone with mobile data on.
     and with the phone held sideways the whole screen scrolls.
 23. **The clocks.** With current firmware and populated `clocks` and `clocks/message`,
     *Seen:* choose Between in Settings and enable messages. Check the clock break, complete
-    message turns and persistence after restart. Choose Only: Clocks opens once, outside
-    playback stops, and browsing elsewhere leaves outside Play disabled. Restart clocks
+    message turns and persistence after restart. Choose Only: Clocks opens, outside
+    playback stops, and Back stops at Clocks while descendants remain accessible. Outside
+    navigation and internal-root uploads stay blocked, including after a reconnect.
+    Check a ready-made upload inside Clocks and normal choices after leaving Only. Restart clocks
     still targets Clocks. Play an inside message with automatic messages off; try Ignore
     on a face, a message and their folders, including an inherited child choice, then
     Include. Check dark recovery when all faces are excluded, mode restoration, reconnect

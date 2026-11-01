@@ -7,6 +7,10 @@ import {choose, menuOf, shown, spaceKnown, storage} from "../reading.js";
 export default async function (app) {
   await shown(app, app.settings.rows);
   await app.until(() => spaceKnown(app) && storage(app).rows.length === app.settings.rows, `the space and ${app.settings.rows} rows`);
+  if (app.settings.order === true) {
+    const client = await app.frame.contentWindow.eval('import("/client.js")');
+    await app.until(() => client.state.order !== null, 'confirmed playlist order for movement controls');
+  }
   const seen = {before: storage(app), buttons: [...app.doc.querySelectorAll("nav button")].map((button) => button.textContent.trim()), menus: {}};
   for (const row of seen.before.rows) {
     seen.menus[row.id] = menuOf(app, row.id);

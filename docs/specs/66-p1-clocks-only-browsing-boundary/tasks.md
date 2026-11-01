@@ -9,7 +9,7 @@ does not depend on65. One numbered task per proof commit.
     Settings/Target/mode exit available. Test prefix collisions, stale replies, missing
     media, target/reload/reconnect and confirmed mode transitions.
   - Run discovered app/emulator suites; set seed in_progress in this proof commit.
-- [ ] 2. Keep upload and authoring destinations inside the boundary
+- [x] 2. Keep upload and authoring destinations inside the boundary
   - First observe an external-missing fallback attempting internal root in Only. Disable
     preparation and final guarded submission without a verified in-bound destination.
     Keep invisible root collision queries and ordinary Off/Between uploads compatible.

@@ -74,6 +74,7 @@ export function uploading({id, file, bytes, expect = null, external = false, cre
   let received = 0;
   let waitUntil = 0;
   let cancelled = false;
+  let blocked = null;
   const samples = [];
 
   function finish(how) {
@@ -96,12 +97,17 @@ export function uploading({id, file, bytes, expect = null, external = false, cre
   return {
     id,
     file,
+    external,
     over() {
       return stage === "over";
     },
     cancel() {
       cancelled = true;
       wake();
+    },
+    block(error) {
+      cancelled = true;
+      blocked = error;
     },
     // The line that ended the job threw: a refusal or a failure of the way.
     failed(error) {
@@ -113,7 +119,7 @@ export function uploading({id, file, bytes, expect = null, external = false, cre
       }
       if (cancelled) {
         if (stage === "begin") {
-          finish({cancelled: true});
+          finish(blocked === null ? {cancelled: true} : {error: blocked});
           return null;
         }
         return async () => {
@@ -124,7 +130,7 @@ export function uploading({id, file, bytes, expect = null, external = false, cre
               throw error;
             }
           }
-          finish({cancelled: true});
+          finish(blocked === null ? {cancelled: true} : {error: blocked});
         };
       }
       if (performance.now() < waitUntil) {

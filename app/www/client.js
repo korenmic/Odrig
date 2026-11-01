@@ -304,6 +304,30 @@ function reconcileOnly(reply) {
   }
 }
 
+function takeStatus(reply) {
+  heard();
+  state.status = reply;
+  state.statusFresh = true;
+  state.statusCount += 1;
+  if (connectionDue) {
+    connectionDue = false;
+    state.connectionVersion += 1;
+  }
+  reconcileOnly(reply);
+  const named = reply.animation;
+  const here = typeof reply.file === "string" && parentOf(reply.file) === state.level.path && (state.level.id === null || reply.file.includes("/"));
+  if (named !== null && state.animations !== null && named !== askedFor && here && !state.animations.some((animation) => animation.id === named)) {
+    askedFor = named;
+    listDue = true;
+  }
+  const playing = reply.playing;
+  if (typeof playing === "number" && typeof reply.playlist === "string" && parentOf(reply.playlist) === state.level.path && state.animations !== null &&
+      playing !== askedFor && !state.folders.some((folder) => folder.id === playing)) {
+    askedFor = playing;
+    listDue = true;
+  }
+}
+
 async function askStatus() {
   const asked = target;
   clearTimeout(statusTimer);
@@ -316,30 +340,7 @@ async function askStatus() {
     if (asked !== target) {
       return;
     }
-    heard();
-    state.status = reply;
-    state.statusFresh = true;
-    state.statusCount += 1;
-    if (connectionDue) {
-      connectionDue = false;
-      state.connectionVersion += 1;
-    }
-    reconcileOnly(reply);
-    const named = reply.animation;
-    const here = typeof reply.file === "string" && parentOf(reply.file) === state.level.path && (state.level.id === null || reply.file.includes("/"));
-    if (named !== null && state.animations !== null && named !== askedFor && here && !state.animations.some((animation) => animation.id === named)) {
-      // The target plays an animation of the level shown that its list does not have.
-      askedFor = named;
-      listDue = true;
-    }
-    const playing = reply.playing;
-    if (typeof playing === "number" && typeof reply.playlist === "string" && parentOf(reply.playlist) === state.level.path && state.animations !== null &&
-      playing !== askedFor && !state.folders.some((folder) => folder.id === playing)) {
-      // The target plays a playlist of this level that its list does not have: a folder of a
-      // card just put in.
-      askedFor = playing;
-      listDue = true;
-    }
+    takeStatus(reply);
   } catch (error) {
     if (asked !== target) {
       return;
@@ -937,6 +938,11 @@ function due() {
   }
   if (job !== null) {
     const running = job;
+    if (!canUpload(running)) {
+      const error = new commands.Refusal("in-use", "upload");
+      if (typeof running.block === "function") running.block(error);
+      else running.failed(error);
+    }
     const line = running.next();
     if (line !== null) {
       return () => sendJobLine(running, line);
@@ -1188,6 +1194,13 @@ export function upload(made) {
   next();
 }
 
+export function canUpload(destination) {
+  return !onlyActive || state.statusFresh && state.status?.clockMode === "only" &&
+    destination.external === true && typeof destination.file === "string" && destination.file.startsWith("clocks/") &&
+    state.space?.external?.present === true && state.space.external.read_only === false &&
+    state.catalog?.external?.state === "ok" && state.catalog.external.writable === true;
+}
+
 // Asks for the next request again, as a job does when it has a line again.
 export function wake() {
   next();
@@ -1320,6 +1333,12 @@ export function uploadSnapshot(level) {
   return requestOperation("upload-preflight", async () => {
     const asked = target;
     const unchanged = () => { if (asked !== target) throw new Error("the target changed"); };
+    const status = await commands.status();
+    unchanged();
+    takeStatus(status);
+    if (onlyActive && (!inClocks(level.path) || level.id === null)) {
+      throw new commands.Refusal("in-use", "upload");
+    }
     const space = await commands.space();
     unchanged();
     state.space = space;

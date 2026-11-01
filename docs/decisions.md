@@ -881,3 +881,19 @@ Timing cooldowns/queued writes bind to a stable board ID, not a shared Wi-Fi add
 The bounded identity callback and atomic guard prefix retain existing line/arena
 bounds. Ordinary show installs preserve schedule/zone files, never clock validity.
 Runtime WLED power mirroring does not create an override; external manual control does.
+
+### Seed66: owner-requested Clocks only browsing and destination boundary
+
+The owner requested that app browsing in Only stay in Clocks and its descendants.
+This supersedes earlier unrestricted browsing in that mode. Back stops at Clocks;
+unknown/disconnected status retains the last confirmed boundary and confirmed Off or
+Between releases it. Settings/Target and mode exit remain accessible. Root metadata
+queries for collision checks are invisible and remain allowed.
+
+Uploads in Only must target writable external Clocks paths. Missing external storage
+cannot redirect them to internal root. Authored texts/clocks currently save to internal
+root, so their preview remains usable but saving waits until Only is left. This does
+not introduce internal subfolders or a new authoring destination. Prepared outside drafts
+must be reviewed after mode change; an outside transaction opened before Only is cancelled
+when the new policy becomes confirmed. Normal-mode storage choices retain their existing
+defaults and fallback. No wire command is added or restricted by this app policy.

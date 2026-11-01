@@ -111,6 +111,7 @@ const REFUSALS = {
     : `Animation ${line.split(" ")[1]} cannot be played until it is replaced: its file has a fault. The list says which.`,
   busy: () => "The installation is busy. Try again in a moment.",
   "in-use": (line) =>
+    line === "upload" ? "Clocks only: choose a writable external folder inside Clocks, or leave this mode in Settings." :
     line.startsWith("play ") ? "Clocks only allows playback inside the Clocks folder. Leave Clocks only in Settings to play elsewhere." :
     line.startsWith("mapping test ") ? "Leave Clocks only in Settings before starting a display test." :
     line.startsWith("remove many ") ? "Some selected animations cannot be removed: a cycle plays them, or they are on external storage." :

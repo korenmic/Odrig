@@ -12825,3 +12825,24 @@ recovery context and validates delayed replies against target and level. Shared-
 regressions observe the former Clocks-to-Root trace before repair and cover unavailable
 media, remapped descendants, mode uncertainty and operator recovery. No physical cause
 is inferred from those controlled tests.
+
+## Seed66: Only navigation and upload scope
+
+**Question.** Can an unavailable SD destination fall back to internal root in Only,
+and can authoring continue saving there because it has no external folder picker?
+
+**Answer.** No. The owner's Clocks browsing boundary also constrains destinations.
+Keep External selected but unavailable, disable Internal and submission, and explain
+how to leave Only. Preserve the prepared path rather than silently moving a Root draft
+into Clocks. Authoring preview remains local and usable; its flat internal-root save
+waits for confirmed Off/Between. Existing ordinary defaults/fallback remain unchanged.
+Fresh policy and path preflight precede transfer; every shared job checks its scope.
+If an outside transfer was opened before Only became confirmed, cancel its staging
+transaction before publishing a file. Background Root-name reads remain invisible.
+
+**Resolution.** Shared navigation rejects paths/IDs before publication, including
+out-of-level replies after ID reuse. Upload destination helpers and both forms enforce
+the current boundary. Status acceptance is shared with upload preflight. Upload jobs
+carry storage identity and can report a policy rejection while cancelling an opened
+transaction. Controlled races first observed outside commits; regressions now stop them.
+Native-emulator upload retains original bytes within Clocks. Physical checks stay open.
