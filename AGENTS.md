@@ -16,6 +16,11 @@ before it. It is now a library that reads and writes the project's files for the
 the tools, and it holds the generators; what it answered to the converter's tests is
 stored with them.
 
+The installation will always have a 1:1 canvas. The miniature display projects that
+square into its square active area. Do not present rectangular fitting choices as
+product questions or delivery blockers; legacy rectangular fixtures do not expand
+the installation's scope.
+
 ## Read first
 
 1. [agent/README.md](agent/README.md): what the project is and what its parts are.
@@ -130,7 +135,7 @@ keeping the seed in progress.
 - **Current limits for the wall and each snake**, seed 45: implemented in open PR #15; not yet merged.
 - **Internal-storage clocks and messages**, seed 61: planned; recognize matching clock/message paths in internal storage and SD, with a later managed upload attempt of the seven approved messages. A persistent dropdown chooses SD card (default) or Internal storage for matching path/type duplicates; owner product questions are resolved.
 
-- **Quarter-turn output rotation**, seed 65: proposed0/90/180/270-degree output setting; shared-command approval and rectangular fitting policy remain open.
+- **Quarter-turn output rotation**, seed 65: approved0/90/180/270-degree persistent square output setting; no open product questions. The installation is permanently1:1.
 - **Clocks-only browsing boundary**, seed 66: planned; visible navigation stays inside the resolved Clocks subtree, with no open owner product questions.
 - **Clocks-only recovery and stable inventory**, seed 67: planned; locally reproduced automatic root fallback, saved-mode read-error root playback and reconnect cache invalidation; no open owner product questions.
 - **Clocks-only freeze and watchdog recovery**, seed 68: planned follow-up; reuse the scheduler-starvation candidate in PR39, distinguish model proof from the physical incident, and diagnose any residual freeze. No open product questions.
