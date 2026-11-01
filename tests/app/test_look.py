@@ -176,7 +176,7 @@ class Touch(unittest.TestCase):
             listened |= set(re.findall(r"""addEventListener\(\s*["']([a-z]+)["']""", text))
             self.assertNotRegex(text, r"\bon(mouse|touch|pointer|contextmenu)[a-z]*\s*=", path.name)
         self.assertEqual(listened, {"click", "input", "change", "visibilitychange", "popstate", "contextmenu", "resize", "focusin", "focusout", "keydown", "scroll",
-                                    "pointerdown", "pointermove", "pointerup", "pointercancel", "touchmove"})
+                                "pointerdown", "pointermove", "pointerup", "pointercancel", "touchmove", "cancel", "close"})
         # A long press or a drag is only ever the lifting of a row of the playlist, which Move
         # up and Move down in the row's menu do as well, or of a pin of the mapping, which the
         # arrow keys on its handle move as well.

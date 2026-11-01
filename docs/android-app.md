@@ -784,7 +784,18 @@ limit. It never leaves the phone, and each phone has its own; the Controller vie
 kept, a web view without IndexedDB, or one that refuses a write, keeps the preview for the
 run alone, and nothing of this is said. No plugin is added for it.
 
-**Mapping.** The twenty snakes stand in a fixed column, `Snake n · columns a–b`, left to
+**Mapping edit lock.** `Lock mapping edits` is a toggle, pressed by default, with the
+status `Mapping edits are locked.` Both unlocking and relocking open an "Are you sure?"
+dialog with explicit confirm/cancel buttons. Cancel or Escape keeps the existing state.
+While locked, pin handles, held-row/keyboard moves, Restore defaults, photo Apply and
+Other reading cannot save. Their handlers also enforce the lock. Mapping reads/Reload,
+photo analysis and display diagnostics remain available. Unlocking applies only to
+this Settings session on this app; leaving Settings, hiding the app, losing the link
+or changing target relocks and closes a pending confirmation. Unsent queued edits are
+dropped before transport; an already-sent edit still needs its normal reconciliation.
+The lock adds no board command and does not restrict another controller or odrigctl.
+
+**Mapping.** After confirmed unlock, the twenty snakes stand in a fixed column, `Snake n · columns a–b`, left to
 right when viewed from the front, each starting at the bottom and running up, down, up;
 beside each snake stands the data pin that drives it, `GPIO p`. Only the installed 60x60
 geometry is editable. A pin is moved by dragging its handle `≡` up or down, or by holding

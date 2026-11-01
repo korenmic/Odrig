@@ -355,6 +355,11 @@ x=60  | 121 -------------------------------------------> 180 |
 
 ## Editing an installed target mapping
 
+The operators' app starts with mapping editing locked. Its Settings toggle requires
+confirmation before unlocking or relocking. It protects pin moves, Restore defaults
+and applying photo fixes. Leaving Settings or changing target relocks. Reads and
+diagnostics remain available; this is an app interaction guard, not a wire permission.
+
 The pin table above is the default. The mapping controls in the shared operators'
 app can permute the twenty existing GPIOs among the canonical twenty three-column
 snakes. Snake identities, canvas positions and chain directions remain unchanged.

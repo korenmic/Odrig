@@ -627,6 +627,11 @@ export function keyOf(animation) {
 // Sends what the operator asked for, once. A status is due at once after its reply, and
 // after a removal the list and the space are due too.
 async function give(request) {
+  if (request.allowed && !request.allowed()) {
+    request.resolve?.(false);
+    request.settle?.(false);
+    return;
+  }
   const asked = target;
   try {
     const reply = await request.carry();
@@ -1100,9 +1105,9 @@ export function uploadSnapshot(level) {
   });
 }
 
-function requestOperation(kind, carry, confirm) {
+function requestOperation(kind, carry, confirm, allowed) {
   return new Promise((resolve, reject) => {
-    wanted.push({kind, carry, confirm, resolve, reject});
+    wanted.push({kind, carry, confirm, allowed, resolve, reject});
     next();
   });
 }
@@ -1119,8 +1124,8 @@ export function mappingGet() {
   return requestOperation("mapping", () => commands.mappingGet());
 }
 
-export function mappingSet(revision, pins) {
-  return requestOperation("mapping", () => commands.mappingSet(revision, pins));
+export function mappingSet(revision, pins, allowed) {
+  return requestOperation("mapping", () => commands.mappingSet(revision, pins), undefined, allowed);
 }
 
 export function mappingTest(enabled) {

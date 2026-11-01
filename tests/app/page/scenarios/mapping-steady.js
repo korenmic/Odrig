@@ -1,4 +1,5 @@
 import {shown} from "../reading.js";
+import {unlockMapping} from '../mapping-lock.js';
 
 // The mapping editor while the app reads the target in the background, every two seconds:
 // a focused handle keeps the focus, no handle is disabled, the column is not drawn again,
@@ -15,6 +16,7 @@ export default async function(app) {
   await shown(app, 2);
   app.press("Settings");
   await app.until(() => app.shown() === "settings", "Settings");
+  await unlockMapping(app);
   await app.until(() => pins(app).length === 20 && !handleOf(app, pins(app)[0]).disabled, "twenty movable pins");
   const [one, two] = pins(app);
   const seen = {disabled: 0, redrawn: 0, reading: 0, blurred: 0};
