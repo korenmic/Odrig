@@ -13403,6 +13403,104 @@ The original global inventory redesign stays deferred in the aggregate PR.
 
 **Resolution.** `app/www/client.js`, `screens/show.js`, `android-app.md` and the
 standalone recovery specification carry the isolated behavior and its tests.
+**Resolution.** inventory.cpp, catalog publication, shared client/catalog parsing and
+browser/native regressions implement these choices. No wire command was added.
+
+## Seed67: missing Clocks during automatic recovery
+
+**Question.** What should replace an Only folder when a missing-ID lookup finds no
+Clocks entry, or when status has no resolved Clocks ID?
+
+**Answer.** Keep a virtual Clocks location with no usable folder ID. Retain last-good
+rows visibly stale, perform bounded invisible ancestry lookups, and never interpret
+that null ID as a request to display Root. Preserve valid descendants and the preferred
+Clocks path through media absence; resolve changed IDs before enabling actions. Repeated
+Only status updates identity without collapsing a valid descendant. Unknown metadata
+does not clear the last confirmed Only context; confirmed Off/Between and a different
+target do. Explicit navigation restrictions are a separate scope.
+
+**Resolution.** The shared client replaces the one-shot entry flag with reconciled
+recovery context and validates delayed replies against target and level. Shared-browser
+regressions observe the former Clocks-to-Root trace before repair and cover unavailable
+media, remapped descendants, mode uncertainty and operator recovery. No physical cause
+is inferred from those controlled tests.
+
+## Seed66: Only navigation and upload scope
+
+**Question.** Can an unavailable SD destination fall back to internal root in Only,
+and can authoring continue saving there because it has no external folder picker?
+
+**Answer.** No. The owner's Clocks browsing boundary also constrains destinations.
+Keep External selected but unavailable, disable Internal and submission, and explain
+how to leave Only. Preserve the prepared path rather than silently moving a Root draft
+into Clocks. Authoring preview remains local and usable; its flat internal-root save
+waits for confirmed Off/Between. Existing ordinary defaults/fallback remain unchanged.
+Fresh policy and path preflight precede transfer; every shared job checks its scope.
+If an outside transfer was opened before Only became confirmed, cancel its staging
+transaction before publishing a file. Background Root-name reads remain invisible.
+
+**Resolution.** Shared navigation rejects paths/IDs before publication, including
+out-of-level replies after ID reuse. Upload destination helpers and both forms enforce
+the current boundary. Status acceptance is shared with upload preflight. Upload jobs
+carry storage identity and can report a policy rejection while cancelling an opened
+transaction. Controlled races first observed outside commits; regressions now stop them.
+Native-emulator upload retains original bytes within Clocks. Physical checks stay open.
+## Seed69: generic mapping data during feature retirement
+
+**Question.** Should removing Snake10's control rewrite existing saved strip geometry?
+
+**Answer.** No. Remove the dedicated control/command and all numbered-snake special
+cases. Generic valid mapping data still describes the installed geometry; pin edits
+preserve it. This avoids silently changing an installation's physical layout.
+
+**Resolution.** `core/src/mapping_control.cpp`, `docs/commands.md`, `docs/mapping.md`.
+
+## Seed69: lock lifetime and queued mapping edits
+
+**Question.** How long does an unlock last, and what happens to a move waiting behind
+another command when the operator leaves Settings?
+
+**Answer.** Unlock belongs to the current app Settings session and target. Exit,
+visibility loss, a lost connection or target change relocks and invalidates unsent
+work. Check permission immediately before transport without fabricating a target
+reply. A command already sent cannot be recalled and uses normal reconciliation.
+Both directions of the toggle require confirmation. Reading and photo analysis are
+available while locked; applying either photo reading is an edit.
+
+**Resolution.** `app/www/screens/mapping.js`, `app/www/screens/photomap.js`,
+`app/www/client.js` and `docs/android-app.md`.
+
+## Seed 65: permanently square output and rotation direction
+
+**Question.** Does legacy rectangular test geometry require a fit decision before
+the owner's installation can rotate, and which sample direction is clockwise?
+
+**Answer.** The owner fixes the installation at1:1 permanently; rectangular fitting
+is outside scope and never a delivery blocker. For bottom-left coordinates growing
+upward,90 clockwise samples source(N-1-y,x). Rotate the complete composition once
+before physical mapping and mini averaging. Diagnostics remain physical. Approving
+autonomous implementation authorizes the proposed rotation read/set command forms.
+
+**Resolution.** AGENTS.md, the hardened seed65, its spec, rotation.h/rotation.cpp and
+commands.md record this. Legacy rectangular playback stays unchanged/unsupported
+for this setting. The previous fit-question deferral is superseded.
+
+## WLED power-state callbacks and storage pacing
+
+**Question.** May WLED's synchronous state hooks wait for player storage pacing
+or perform the manual command's persistence while processing an initial/preset,
+unrelated or manual state event?
+
+**Answer.** No. Record explicit/observed power intent under an independent,
+memory-only guard and return. Apply the latest request in the usermod loop once
+pacing permits, through the existing core manual command. Initialization and
+scheduled feedback still create no manual override. This changes execution context,
+not the owner's power policy, command list, hardware settings or watchdog.
+
+**Resolution.** The production-body callback harness reproduced the previous wait
+with permanently busy storage before repair. The firmware adapter and its queued
+power helper now defer persistence. This confirmed code defect is separate from
+the still unconfirmed physical reset reason reported by the operator.
 
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 

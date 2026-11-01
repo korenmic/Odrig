@@ -31,6 +31,12 @@ namespace {
 
 odrig_core *core = nullptr;
 OdrigPower powerState;
+portMUX_TYPE powerGuard = portMUX_INITIALIZER_UNLOCKED;
+
+struct PowerLocked {
+  PowerLocked() { portENTER_CRITICAL(&powerGuard); }
+  ~PowerLocked() { portEXIT_CRITICAL(&powerGuard); }
+};
 
 // Held for every call to the core after its start, so that the calls follow one another
 // whichever task makes them.
@@ -171,9 +177,12 @@ bool legAt(uint32_t index, OdrigLeg *out) {
 // Called with the core lock held, including for a complete refresh copy.
 void syncLegs() {
   const bool on = odrig_core_power(core) != 0;
-  powerState.publish(on);
-  if (on && bri == 0) bri = briLast == 0 ? 128 : briLast;
-  else if (!on && bri != 0) { briLast = bri; bri = 0; }
+  {
+    PowerLocked held;
+    powerState.publish(on);
+    if (on && bri == 0) bri = briLast == 0 ? 128 : briLast;
+    else if (!on && bri != 0) { briLast = bri; bri = 0; }
+  }
   for (uint32_t i = 0; i < legsRead; i++) {
     odrig_leg leg;
     if (!OdrigRouting::onPin(core, legs[i].pin, &leg)) continue;
@@ -184,10 +193,20 @@ void syncLegs() {
 
 void manualPower(uint8_t mode) {
   if (core == nullptr || updating) return;
-  while (OdrigFiles::holding()) delay(1);
-  Locked held;
+  PowerLocked held;
+  powerState.stateChange(bri != 0, mode == CALL_MODE_INIT);
+}
+
+// WLED state callbacks only record intent. Storage work runs between loop passes,
+// after pacing allows it, without holding WLED's callback resources.
+void applyPower() {
+  if (core == nullptr || updating || OdrigFiles::holding()) return;
   bool on = false;
-  if (!powerState.take(bri != 0, mode == CALL_MODE_INIT, &on)) return;
+  {
+    PowerLocked held;
+    if (!powerState.takeQueued(&on)) return;
+  }
+  Locked held;
   const char *line = on ? "on" : "off";
   char reply[ODRIG_REPLY_MAX];
   odrig_core_command(core, OdrigFiles::nowMs(), line, on ? 2 : 3, reply, sizeof reply);
@@ -360,6 +379,7 @@ class OdrigUsermod : public Usermod {
 
   void loop() override {
     if (updating) return;
+    applyPower();
 #ifdef ODRIG_PROBE
     OdrigProbe::pass(OdrigFiles::nowMs());
 #endif
@@ -443,7 +463,7 @@ class OdrigUsermod : public Usermod {
     const bool boolean = root["on"].is<bool>();
     const char *text = root["on"].is<const char *>() ? root["on"].as<const char *>() : nullptr;
     if (!boolean && (text == nullptr || text[0] != 't')) return;
-    Locked held;
+    PowerLocked held;
     powerState.explicitRequest(boolean ? root["on"].as<bool>() : !powerState.on());
   }
 
