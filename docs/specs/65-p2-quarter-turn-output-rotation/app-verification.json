@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "scope": "Standalone rotation Settings/protocol controls only",
+  "run": "20261101-235716-164424",
+  "appCases": 452,
+  "outcomes": {
+    "ok": 452
+  },
+  "fullAppRun": {
+    "tests": "452 tests",
+    "seconds": 2106.8,
+    "outcome": "OK"
+  },
+  "originalFullAppRunClean": true,
+  "focusedChromeCases": 6,
+  "focusedChromePassed": true,
+  "onboardingCases": 88,
+  "onboardingPassed": true,
+  "staticScopeCases": 7,
+  "staticScopePassed": true,
+  "red": {
+    "cases": 6,
+    "failures": 1,
+    "errors": 5,
+    "cause": "Settings had no output rotation dropdown",
+    "log": "build/rotation-ui-red.log"
+  },
+  "coreFirmwareInputsUnchangedFrom": "1658636070403ca9328d9169a62eb6e99070e43e",
+  "masterGuardArgumentPosition": 4,
+  "physicalAcceptance": false,
+  "logHashes": {
+    "rotation-ui-red": "3888528057d5714619d230471a692dc0908c19cf5fcac8ccd19481c3e230271e",
+    "rotation-ui-green": "38dd32a180a22e34b3afd41ba6cec8741af0a24633dbd40dd9b405c5668fdcf5",
+    "rotation-app-full": "7e0e09497af4b6d814c08bb9b39c12bc7e824f34511aa46d5dd333935d0f41ee",
+    "rotation-onboarding": "29f0c580ea77cb7f12542a160ae2609eec99140c9e440ed20e2a54b87d8049fd",
+    "rotation-static-scope": "093facdca26ef7f8068b46e680d7570b742cc21a6ff05a698b633ee848fbd708"
+  }
+}

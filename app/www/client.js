@@ -1038,6 +1038,14 @@ export function debugMini(on) {
   return requestOperation("mini", () => commands.debugMini(on));
 }
 
+export function rotationRead(allowed) {
+  return requestOperation("rotation", () => commands.rotation(), undefined, allowed);
+}
+
+export function rotationSet(revision, degrees, allowed) {
+  return requestOperation("rotation", () => commands.rotationSet(revision, degrees), undefined, allowed);
+}
+
 // Names the function that is told of every refusal of what the operator asked for.
 export function onRefusal(handler) {
   refused = handler;

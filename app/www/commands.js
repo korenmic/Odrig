@@ -380,6 +380,24 @@ export async function debugMini(on) {
   await carriedOut(`debug mini ${on ? "on" : "off"}`);
 }
 
+function rotationOf(reply) {
+  if (reply.ok !== true || typeof reply.supported !== "boolean" ||
+      ![0, 90, 180, 270].includes(reply.degrees) || !whole(reply.revision, 0, MOST_ID) ||
+      !(reply.error === null || reply.error === "unreadable")) throw new Failure("bad-reply", address());
+  return {supported: reply.supported, degrees: reply.degrees, revision: reply.revision, error: reply.error};
+}
+
+export async function rotation() {
+  return rotationOf(await carriedOut("rotation"));
+}
+
+export async function rotationSet(revision, degrees) {
+  if (!whole(revision, 0, MOST_ID) || ![0, 90, 180, 270].includes(degrees)) throw new RangeError("invalid rotation");
+  const reply = rotationOf(await carriedOut(`rotation set ${revision} ${degrees}`));
+  if (!reply.supported || reply.degrees !== degrees || reply.error !== null) throw new Failure("bad-reply", address());
+  return reply;
+}
+
 // Switches the message after each clock on or off.
 export async function clockMessage(on) {
   await carriedOut(`clocks message ${on ? "on" : "off"}`);

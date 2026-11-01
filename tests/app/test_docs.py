@@ -81,7 +81,7 @@ class TheAppsPage(unittest.TestCase):
                                  "mapping test on",
                                  "mapping test off", "mapping test snake <n>", "order get", "order get <next>", "order move <revision> <id> <before>", "repeat <id> <n>",
                                  "repeat <id> <n> save", "repeat <id> default", "clocks off", "clocks on", "clocks only", "clocks message on", "clocks message off", "fault", "catalog",
-                                 "catalog page <storage> <page> <offset>", "catalog rebuild internal", "catalog rebuild external", "catalog cancel"])
+                                 "catalog page <storage> <page> <offset>", "catalog rebuild internal", "catalog rebuild external", "catalog cancel", "rotation", "rotation set <revision> <degrees>"])
         self.assertIn("The table maps its actions to command lines", self.said)
 
     def test_every_message_of_the_app_is_on_the_page(self):

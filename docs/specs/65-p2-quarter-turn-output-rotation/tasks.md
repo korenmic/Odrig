@@ -9,7 +9,7 @@ task and checkbox per proof commit. Standalone packaging/publication is a separa
   - Preserve diagnostics, show installs, source bytes and resource limits. Document the
     shared protocol/core behavior and resolved direction/legacy-fixture handling.
   - Run discovered core, emulator and mapping suites, record evidence and tick only1.
-- [ ] 2. Expose confirmed rotation controls in Settings and odrigctl
+- [x] 2. Expose confirmed rotation controls in Settings and odrigctl
   - Add failing browser/command coverage first. Implement strict shared reply parsing,
     guarded serialized read/set and the four-value Settings dropdown with clear state.
   - Verify targets, reconnect/lost replies, queue cancellation, unsupported firmware,
