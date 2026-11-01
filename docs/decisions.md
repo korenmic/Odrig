@@ -864,6 +864,15 @@ are in [format.md](format.md), "Measured sizes".
   The owner cancelled the standalone fallback firmware seed; its unfinished work
   is retained as history and is not scheduled for completion.
 
+### Seed69: retire dedicated cross-wiring controls
+
+The owner requested removal of the Snake10 cross-wire feature from master. This
+supersedes the dedicated product control approved for seed43: remove its checkbox,
+app API, `mapping cross` command and `cross` reply member. Generic mapping format
+support remains; editing pins preserves installed geometry without a wiring change.
+The owner also requested a confirmed mapping-edit lock in Settings; its app interaction
+guard uses the existing mapping protocol and adds no board command.
+
 - 2026-10-31: Seed64's owner authorized autonomous protocol choices and delivery.
   Add shared `time`, `time zone DATA` and `time set UTC REVISION` operations with
   verified phone-zone rules, boot-local epoch validity and no per-sync flash writes;

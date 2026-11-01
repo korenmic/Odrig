@@ -15,9 +15,6 @@ namespace {
 #include "diagonal_data.h"
 
 const uint32_t kSnakes = 20;
-// The snake that may be cross-wired: its chain runs up its first column, up its third and
-// down its second.
-const uint32_t kCrossedSnake = 10;
 // The test of a snake: a white block of 3 x 3 pixels that runs from the bottom of the snake's
 // three columns to their top and back, one row every kSnakeStepMs milliseconds.
 const uint32_t kSnakeBlock = 3;
@@ -86,30 +83,16 @@ struct MappingWriter {
     }
 };
 
-// The canvas place, from 0, of LED n, from 0, of snake `number` wired as the snakes are:
-// up its first column, down its second, up its third. Cross-wired: up its first column, up
-// its third, down its second.
-uint32_t place_of(uint32_t number, uint32_t n, bool crossed) {
-    const uint32_t strip = n / 60;
-    const uint32_t column = crossed ? (strip == 0 ? 0 : 3 - strip) : strip;
-    const bool down = crossed ? strip == 2 : strip == 1;
-    const uint32_t y = down ? 59 - n % 60 : n % 60;
-    return y * 60 + (number - 1) * 3 + column;
-}
-
-bool leg_is(const Core &core, const LegInfo &leg, uint32_t number, bool crossed) {
+// An editable snake stays within its assigned three columns. The mapping parser has
+// already checked the complete strips and their unique coordinates.
+bool leg_is(const Core &core, const LegInfo &leg, uint32_t number) {
     for (uint32_t n = 0; n < 180; ++n) {
-        if (core.led_pixel[leg.first + n] != place_of(number, n, crossed)) return false;
+        if (core.led_pixel[leg.first + n] % 60u / 3u + 1u != number) return false;
     }
     return true;
 }
 
-// Whether the mapping is editable with snake 10 cross-wired.
-bool mapping_crossed(const Core &core) {
-    return mapping_editable(core) && leg_is(core, *leg_number(core, kCrossedSnake), kCrossedSnake, true);
-}
-
-bool persist(Core &core, const uint8_t *pins, bool crossed) {
+bool persist(Core &core, const uint8_t *pins) {
     const odrig_host &host = core.host;
     if (!storage_changes(core) || core.chunk == nullptr || host.write_open(host.ctx, kMappingPart) != 1) return false;
     MappingWriter out = {core, 0, true};
@@ -119,16 +102,27 @@ bool persist(Core &core, const uint8_t *pins, bool crossed) {
         if (i != 0) out.text(",");
         out.text("{\"leg\":"); out.number(number);
         out.text(",\"pin\":"); out.number(pins[number - 1]);
-        out.text(",\"first_led\":\"bottom\",\"columns\":[");
-        if (crossed && number == kCrossedSnake) {
-            out.number((number - 1) * 3 + 1); out.text(",");
-            out.number((number - 1) * 3 + 3); out.text(",");
-            out.number((number - 1) * 3 + 2); out.text("],\"starts\":[\"bottom\",\"bottom\",\"top\"]}");
-        } else {
-            out.number((number - 1) * 3 + 1); out.text(",");
-            out.number((number - 1) * 3 + 2); out.text(",");
-            out.number((number - 1) * 3 + 3); out.text("]}");
+        const LegInfo &leg = core.legs[i];
+        const uint16_t *pixels = core.led_pixel + leg.first;
+        const bool top = pixels[0] / 60 != 0;
+        out.text(",\"first_led\":\""); out.text(top ? "top" : "bottom");
+        out.text("\",\"columns\":[");
+        bool alternating = true;
+        for (uint32_t strip = 0; strip < 3; ++strip) {
+            if (strip != 0) out.text(",");
+            out.number(pixels[strip * 60] % 60 + 1);
+            alternating = alternating && (pixels[strip * 60] / 60 != 0) == (top != (strip % 2 != 0));
         }
+        out.text("]");
+        if (!alternating) {
+            out.text(",\"starts\":[");
+            for (uint32_t strip = 0; strip < 3; ++strip) {
+                if (strip != 0) out.text(",");
+                out.text(pixels[strip * 60] / 60 == 0 ? "\"bottom\"" : "\"top\"");
+            }
+            out.text("]");
+        }
+        out.text("}");
     }
     out.text("]}\n");
     out.flush();
@@ -193,7 +187,7 @@ bool mapping_editable(const Core &core) {
     for (uint32_t number = 1; number <= kSnakes; ++number) {
         const LegInfo *leg = leg_number(core, number);
         if (leg == nullptr || leg->count != 180) return false;
-        if (!leg_is(core, *leg, number, false) && !(number == kCrossedSnake && leg_is(core, *leg, number, true))) return false;
+        if (!leg_is(core, *leg, number)) return false;
     }
     return true;
 }
@@ -209,7 +203,6 @@ uint32_t mapping_get(const Core &core, Reply &reply) {
         }
     }
     reply.text("],\"revision\":"); reply.number(editable ? revision_of(core) : 0);
-    reply.text(",\"cross\":"); reply.text(mapping_crossed(core) ? "true" : "false");
     reply.text(",\"test\":"); reply.text(core.mapping_test ? "true" : "false");
     reply.text(",\"snake\":");
     if (core.mapping_test && core.mapping_snake != 0) reply.number(core.mapping_snake); else reply.text("null");
@@ -235,22 +228,8 @@ uint32_t mapping_set(Core &core, uint32_t revision, const char *text, uint32_t l
     bool same = true;
     for (uint32_t i = 0; i < kSnakes; ++i) same = same && leg_number(core, i + 1)->pin == pins[i];
     if (same) return succeed(reply);
-    if (!persist(core, pins, mapping_crossed(core))) return refuse(reply, "storage-error");
+    if (!persist(core, pins)) return refuse(reply, "storage-error");
     for (uint32_t i = 0; i < core.leg_count; ++i) core.legs[i].pin = pins[core.legs[i].leg - 1];
-    return succeed(reply);
-}
-
-uint32_t mapping_cross(Core &core, bool crossed, Reply &reply) {
-    if (core.invalid) return refuse(reply, "show-invalid");
-    if (!mapping_editable(core)) return refuse(reply, "bad-argument");
-    if (!check_complete(core) || core.upload.state != kUploadNone) return refuse(reply, "busy");
-    if (mapping_crossed(core) == crossed) return succeed(reply);
-    uint8_t pins[kSnakes];
-    for (uint32_t i = 0; i < kSnakes; ++i) pins[i] = static_cast<uint8_t>(leg_number(core, i + 1)->pin);
-    if (!persist(core, pins, crossed)) return refuse(reply, "storage-error");
-    // The next refresh places the snake's LEDs by the new wiring.
-    const LegInfo &leg = *leg_number(core, kCrossedSnake);
-    for (uint32_t n = 0; n < 180; ++n) core.led_pixel[leg.first + n] = static_cast<uint16_t>(place_of(kCrossedSnake, n, crossed));
     return succeed(reply);
 }
 

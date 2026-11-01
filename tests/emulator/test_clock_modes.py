@@ -103,8 +103,24 @@ class DeliveredMessages(unittest.TestCase):
         clocks = state['clock_only']['folder']
         items = json.loads(emulator.command(f'list in {clocks}'))['items']
         messages, = [i['id'] for i in items if i.get('playlist') == 'clocks/message']
-        items = json.loads(emulator.command(f'list in {messages}'))['items']
-        countdown, = [i['id'] for i in items if i.get('file', '').endswith('v7-countdown.odrgx')]
+        end = time.monotonic() + 10
+        while True:
+            items = []
+            cursor = 0
+            while True:
+                page = json.loads(emulator.command(f'list in {messages} {cursor}'))
+                items.extend(page['items'])
+                following = page['next']
+                if following is None:
+                    break
+                self.assertGreater(following, cursor)
+                cursor = following
+            found = [i['id'] for i in items if i.get('file', '').endswith('v7-countdown.odrgx')]
+            if found:
+                countdown, = found
+                break
+            self.assertLess(time.monotonic(), end, items)
+            time.sleep(0.02)
         for line in (f'ignore {messages} 1', f'play {countdown}'):
             self.assertEqual(json.loads(emulator.command(line)), dict(ok=True))
         state = wait_for(lambda s: s['file'] == 'clocks/message/v7-countdown.odrgx')

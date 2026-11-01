@@ -3,6 +3,7 @@
 // and the photo dropped on leaving.
 import {shown} from "../reading.js";
 import {photoCanvas} from "./photo-analysis.js";
+import {unlockMapping} from '../mapping-lock.js';
 
 const displayed = (element) => element !== null && !element.hidden && element.getClientRects().length > 0;
 
@@ -30,6 +31,7 @@ export default async function(app) {
     seen.hidden = !displayed(app.byId("photo-take"));
     return seen;
   }
+  await unlockMapping(app);
   await app.until(() => displayed(app.byId("from-photo")) && !app.byId("from-photo").disabled, "From a photo");
   seen.advice = app.text("photo-advice");
   seen.diagonalOffered = displayed(app.byId("show-diagonal"));

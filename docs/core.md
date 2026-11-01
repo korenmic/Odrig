@@ -302,7 +302,7 @@ second decoder. The measured host allocation with a drive is 131045 bytes, below
 
 `debug mini on|off` requests a RAM-only transition. Only the host acknowledgement
 changes the confirmed mode; failure reports `on:null` until a successful retry.
-The normal leg API, pin permutations, cross-wiring and recording geometry remain
+The normal leg API, pin permutations, installed strip mapping and recording geometry remain
 intact. No animation, mapping, show, catalog or persistent setting is written.
 Miniature mode starts off on every boot. See [the command contract](commands.md#miniature-display-debug-mode).
 
@@ -1128,10 +1128,9 @@ It validates geometry against its LED-to-pixel table and keeps mapping entry ord
 The pin-list CRC revision prevents a stale client from replacing another edit.
 The bounded writer uses the existing storage chunk, and commits mapping.part with
 one atomic rename before changing in-memory pins. Startup discards a leftover
-mapping.part without touching the installed mapping. `mapping cross` writes the
-same file with snake 10's leg cross-wired or not, and then writes the 180 entries
-of that leg's LED-to-pixel table anew; the geometry check accepts snake 10 in
-either wiring and no other leg in another.
+mapping.part without touching the installed mapping. Each snake must occupy its
+assigned three columns. Saves preserve its loaded column order and starting ends
+through the generic mapping format; no numbered snake has a special wiring control.
 
 Diagnostic entry saves the current playlist or cycle selection, closes playback,
 and decodes the embedded converter-built ODRG through the ordinary decoder into

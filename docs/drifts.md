@@ -12846,3 +12846,27 @@ the current boundary. Status acceptance is shared with upload preflight. Upload 
 carry storage identity and can report a policy rejection while cancelling an opened
 transaction. Controlled races first observed outside commits; regressions now stop them.
 Native-emulator upload retains original bytes within Clocks. Physical checks stay open.
+## Seed69: generic mapping data during feature retirement
+
+**Question.** Should removing Snake10's control rewrite existing saved strip geometry?
+
+**Answer.** No. Remove the dedicated control/command and all numbered-snake special
+cases. Generic valid mapping data still describes the installed geometry; pin edits
+preserve it. This avoids silently changing an installation's physical layout.
+
+**Resolution.** `core/src/mapping_control.cpp`, `docs/commands.md`, `docs/mapping.md`.
+
+## Seed69: lock lifetime and queued mapping edits
+
+**Question.** How long does an unlock last, and what happens to a move waiting behind
+another command when the operator leaves Settings?
+
+**Answer.** Unlock belongs to the current app Settings session and target. Exit,
+visibility loss, a lost connection or target change relocks and invalidates unsent
+work. Check permission immediately before transport without fabricating a target
+reply. A command already sent cannot be recalled and uses normal reconciliation.
+Both directions of the toggle require confirmation. Reading and photo analysis are
+available while locked; applying either photo reading is an edit.
+
+**Resolution.** `app/www/screens/mapping.js`, `app/www/screens/photomap.js`,
+`app/www/client.js` and `docs/android-app.md`.

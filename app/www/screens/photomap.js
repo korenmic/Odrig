@@ -164,9 +164,9 @@ export function draw() {
   drawChoices();
   const saving = mapping.saving();
   setHidden(byId("photo-apply"), result.refused);
-  setDisabled(byId("photo-apply"), !editable || saving || shown.applied === shown.chosen);
+  setDisabled(byId("photo-apply"), !mapping.canEdit() || saving || shown.applied === shown.chosen);
   setHidden(byId("photo-other"), result.refused || result.readings.length < 2 || shown.applied === null);
-  setDisabled(byId("photo-other"), !editable || saving);
+  setDisabled(byId("photo-other"), !mapping.canEdit() || saving);
   setText(byId("photo-discard"), result.refused ? "Try another photo" : "Discard");
 }
 
@@ -200,7 +200,7 @@ async function read(file) {
 }
 
 function apply(at) {
-  if (shown === null || shown.result.refused) return;
+  if (shown === null || shown.result.refused || !mapping.canEdit()) return;
   const current = mapping.mapping();
   if (current === null || current.editable !== true) return;
   const reading = shown.result.readings[at];
@@ -223,6 +223,7 @@ export function showing(visible) {
 }
 
 export function start() {
+  mapping.watch(draw);
   byId("from-photo").addEventListener("click", () => {
     byId("photo").click();
   });
