@@ -70,3 +70,31 @@ application image also answered four `status` and four `fault` reads with zero
 resets in a 120-second bounded ESP-EMU run; the same playback/peripheral limits apply.
 
 Clean-source firmware publication is recorded separately with delivery.
+
+## Physical retest rejected the callback candidate
+
+The owner subsequently confirmed that the new `429d2ebe...` image retains the same
+boot/no-hotspot failure, while the historical working firmware still recovers the
+board. The locally reproduced callback defect was real, but repairing it **did not
+fix the reported regression**. The startup-repair task is reopened. Windows and
+Ubuntu CI passing for `bd71e9b` likewise does not establish physical boot success.
+
+The next control is **master's source built with the same Windows toolchain**, so
+the test can separate PR code from the host-build/boot-compatibility difference
+between current builds and the historical working binary. The existing clean
+control build's tracked `core/` and `firmware/` inputs were compared with freshly
+fetched `origin/master` and match exactly. `firmware/verify_build.py` passes.
+
+`Artifacts/odrig/odrig-master-control.bin` is a separately named diagnostic control,
+not another claimed fix: 1,879,840 bytes, SHA-256
+`df61d0b5828bac4f4bbd487839d5eb01734c4103c7f031a5cae93f0ccabc0c3f`.
+It uses the same application offset `0x10000` without Erase. Its checksum, build
+record, verification and readme are beside it. The original FW/APK/signing files
+were not changed by this delivery. `master-control-delivery.json` records evidence.
+
+Its physical result is pending. If it boots, bisect the PR firmware changes with
+controlled builds. If it also fails, investigate the host build/toolchain and boot
+compatibility against the operator's known-working binary. A phone USB capture of
+panic/reset output remains the quickest way to identify the actual failing path;
+an empty or disconnected capture is also useful evidence. Keep the known-working
+backup available for normal operation. No repeated speculative repair is warranted.
