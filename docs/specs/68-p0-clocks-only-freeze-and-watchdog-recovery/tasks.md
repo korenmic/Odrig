@@ -50,6 +50,14 @@ One numbered task per proof commit. Final task waits for65–67 software complet
   - Distinguish confirmed reset evidence from its unknown cause. Prepare/inspect the
     timing-plus-fairness source midpoint without publishing it as a repair or flashing.
   - Record which further physical trace or bisection result is required; task4 stays open.
+- [x] 8. Trace the retained bootloader and publish an application-byte diagnostic
+  - Match the exact historical loader checksum and ROM load layout; inspect its actual
+    reset callers rather than decode with an unrelated ELF. Record USB socket confirmation.
+  - Compare master and PR bytes behind that loader and exercise a structurally invalid
+    application as a negative control. Preserve simulator limitations and all outcomes.
+  - Publish a fresh-name, byte-identical PR application with checksum/provenance and
+    application-only flash-readback instructions. Preserve existing artifacts and keep
+    task4 open until the physical cause and repair are established. No runtime code changes.
 
 ## Owner acceptance (not executable queue tasks)
 
