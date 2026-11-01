@@ -12870,3 +12870,18 @@ available while locked; applying either photo reading is an edit.
 
 **Resolution.** `app/www/screens/mapping.js`, `app/www/screens/photomap.js`,
 `app/www/client.js` and `docs/android-app.md`.
+
+## Seed 65: permanently square output and rotation direction
+
+**Question.** Does legacy rectangular test geometry require a fit decision before
+the owner's installation can rotate, and which sample direction is clockwise?
+
+**Answer.** The owner fixes the installation at1:1 permanently; rectangular fitting
+is outside scope and never a delivery blocker. For bottom-left coordinates growing
+upward,90 clockwise samples source(N-1-y,x). Rotate the complete composition once
+before physical mapping and mini averaging. Diagnostics remain physical. Approving
+autonomous implementation authorizes the proposed rotation read/set command forms.
+
+**Resolution.** AGENTS.md, the hardened seed65, its spec, rotation.h/rotation.cpp and
+commands.md record this. Legacy rectangular playback stays unchanged/unsupported
+for this setting. The previous fit-question deferral is superseded.

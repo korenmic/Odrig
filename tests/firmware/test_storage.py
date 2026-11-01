@@ -136,7 +136,7 @@ class ShowFolders(Temporary):
 
     def test_timing_files_are_allowed_beside_show_content(self):
         from tests.core.test_civil_time import snapshot
-        kept = {'schedule.txt': b'odrig-schedule 1\n1 1080 360 2\n', 'timezone.bin': snapshot()}
+        kept = {'schedule.txt': b'odrig-schedule 1\n1 1080 360 2\n', 'timezone.bin': snapshot(), 'rotation.txt': b'1 90\n'}
         for name, data in kept.items():
             (self.show / name).write_bytes(data)
         loaded = storage.folder_files(self.show)
@@ -369,7 +369,7 @@ class Commands(Temporary):
 
     def test_show_install_preserves_replaces_and_reads_back_timing_files(self):
         from tests.core.test_civil_time import snapshot
-        kept = {'schedule.txt': b'odrig-schedule 1\n1 1080 360 2\n', 'timezone.bin': snapshot()}
+        kept = {'schedule.txt': b'odrig-schedule 1\n1 1080 360 2\n', 'timezone.bin': snapshot(), 'rotation.txt': b'1 90\n'}
         self.old = support.storage_image({**support.WLED_FILES, **{'/odrig/' + name: data for name, data in kept.items()}})
         esptool = self.esptool()
         result = self.install(esptool)
@@ -383,7 +383,7 @@ class Commands(Temporary):
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(support.files_of(self.folder / 'timing-copy'), expected)
         changed = {'schedule.txt': b'odrig-schedule 1\n0 540 1020 0\n',
-                   'timezone.bin': snapshot('Etc/Test', (3600,))}
+                   'timezone.bin': snapshot('Etc/Test', (3600,)), 'rotation.txt': b'1 270\n'}
         for name, data in changed.items():
             (self.show / name).write_bytes(data)
         self.old = installed

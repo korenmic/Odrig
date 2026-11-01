@@ -333,7 +333,7 @@ and `odrig_core_command` works as ever.
 A line that is no valid command is answered with the first code that applies, in the
 order of the table of [commands.md](commands.md): `line-too-long`, `unknown-command`,
 `bad-argument`, `show-invalid`, `unsupported`, `no-upload`, `incomplete`, `bad-checksum`, `busy`,
-`unknown-id`, `unavailable`, `in-use`, `read-only`, `mapping-conflict`, `zone-unset`, `stale`, `order-conflict`, `no-space`, `bad-offset`, `bad-file` and
+`unknown-id`, `unavailable`, `in-use`, `read-only`, `mapping-conflict`, `rotation-conflict`, `zone-unset`, `stale`, `order-conflict`, `no-space`, `bad-offset`, `bad-file` and
 `storage-error`. It
 changes nothing, except that `bad-checksum`, `stale`, `bad-file` and `storage-error` discard the
 upload they are about. Manual On/Off also retains its immediate LED control when
@@ -1371,3 +1371,13 @@ state and external manifest, mount, quarantine and inclusion state. Catalog-key
 fingerprints are separate so an Ignore toggle does not reload unchanged previews.
 Unmanaged external storage does not claim an authoritative revision. The added
 state is8 bytes total; all existing arena, Core and frame limits remain in force.
+
+## Square output orientation
+
+The shared core loads `rotation.txt` before playback starts. Two bits hold the
+quarter-turn and one reports an unreadable saved setting, inside the existing state
+byte. A square output index (x,y), with y upward, samples (x,y), (N-1-y,x),
+(N-1-x,N-1-y) or (y,N-1-x) for0/90/180/270 clockwise. The same inline index function
+feeds main RGB/palette/overlay samples and each miniature box-average sample.
+Diagnostics bypass it. No new frame buffer, allocation, frame-time IO or larger
+arena/Core/stack limits are introduced. See the rotation protocol in commands.md.

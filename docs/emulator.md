@@ -826,6 +826,7 @@ Board time and scheduling use the same command path as other controls:
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] time [OPERATION]
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] schedule [OPERATION]
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] guard TARGET-ID TIMING-COMMAND
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] rotation [OPERATION]
 python -m odrigctl --port NAME time
 python -m odrigctl --port NAME schedule
 python -m odrigctl --tcp localhost:8766 time
@@ -835,6 +836,9 @@ python -m odrigctl --http http://4.3.2.1 schedule
 python -m odrigctl --port NAME guard esp32-000000000000 time
 python -m odrigctl --tcp localhost:8766 guard emu-000000000000000000000000 time
 python -m odrigctl --http http://4.3.2.1 guard esp32-000000000000 schedule
+python -m odrigctl --port NAME rotation
+python -m odrigctl --tcp localhost:8766 rotation
+python -m odrigctl --http http://4.3.2.1 rotation
 ```
 
 Use `guard BOARD time` or `guard BOARD schedule` to bind a request to the ID from `time`; longer timing forms use the same prefix.

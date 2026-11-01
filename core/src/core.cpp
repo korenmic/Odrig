@@ -8,6 +8,7 @@
 #include "drive.h"
 #include "mapping.h"
 #include "mini.h"
+#include "rotation.h"
 #include "odrig_core.h"
 #include "order.h"
 #include "player.h"
@@ -839,6 +840,7 @@ odrig_core *odrig_core_begin(const odrig_host *host) {
     core->state.starting = 1;
     odrig::schedule_start(core->state);
     odrig::start(core->state);
+    odrig::rotation_start(core->state);
     odrig::player_start(core->state);
     odrig::civil_start(core->state);
     odrig::schedule_touch(core->state, 0);

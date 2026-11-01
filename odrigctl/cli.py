@@ -24,6 +24,7 @@ COMMANDS = {
     "schedule": ("[OPERATION]",),
     "time": ("[OPERATION]",),
     "guard": ("TARGET-ID", "TIMING-COMMAND"),
+    "rotation": ("[OPERATION]",),
     "fault": (),
     "space": (),
     "list": (),
@@ -114,13 +115,16 @@ def checked(made, arguments):
                 any("\n" in word or "\r" in word for word in words)):
             made.error("guard takes TARGET-ID followed by a time or schedule command")
         return ["guard", *words]
-    if arguments.command in ("time", "schedule"):
+    if arguments.command in ("time", "schedule", "rotation"):
         words = arguments.arguments
         if any("\n" in word or "\r" in word for word in words):
             made.error("a command is one line")
         if arguments.command == "time":
             valid = not words or (len(words) == 2 and words[0] == "zone") or (len(words) == 3 and words[0] == "set")
             message = "time takes no argument, zone BASE64, or set UTC ZONE-CRC32"
+        elif arguments.command == "rotation":
+            valid = not words or (len(words) == 3 and words[0] == "set")
+            message = "rotation takes no argument or set REV DEGREES"
         else:
             valid = not words or (len(words) == 2 and words[0] == "resume") or (len(words) == 5 and words[0] == "set")
             message = "schedule takes no argument, set REV ON OFF on|off, or resume REV"

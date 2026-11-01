@@ -3,7 +3,7 @@
 Self-reviewed against the hardened seed and square-only owner answer. One numbered
 task and checkbox per proof commit. Seed68 task3 owns final packaging/publication.
 
-- [ ] 1. Persist and render all four square output orientations in the shared core
+- [x] 1. Persist and render all four square output orientations in the shared core
   - Add failing native protocol/output regressions first, then bounded atomic saved
     control, startup loading and exact composed sample permutation for main/mini output.
   - Preserve diagnostics, show installs, source bytes and resource limits. Document the
