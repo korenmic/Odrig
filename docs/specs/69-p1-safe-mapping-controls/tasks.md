@@ -3,7 +3,7 @@
 Seed, requirements and design reviewed against the owner's request and current
 master. No new command, hardware change or owner question is needed.
 
-- [ ] 1. Retire dedicated Snake10 cross-wiring controls
+- [x] 1. Retire dedicated Snake10 cross-wiring controls
   - Observe retired-operation/UI regressions failing first. Remove app/core/CLI
     controls and special-case geometry code; preserve generic saved mapping geometry.
   - Update current docs and append the owner's superseding decision. Update obsolete

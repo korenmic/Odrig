@@ -12666,3 +12666,13 @@ PR after reporting Clocks jumping to Root. Five browser regressions showed Root
 before the app fix; eight focused recovery tests and the actual native-emulator
 Clocks collection now pass. This fixes UI recovery, without claiming that a
 physical SD/flash I/O fault was reproduced or repaired.
+
+## Seed69: generic mapping data during feature retirement
+
+**Question.** Should removing Snake10's control rewrite existing saved strip geometry?
+
+**Answer.** No. Remove the dedicated control/command and all numbered-snake special
+cases. Generic valid mapping data still describes the installed geometry; pin edits
+preserve it. This avoids silently changing an installation's physical layout.
+
+**Resolution.** `core/src/mapping_control.cpp`, `docs/commands.md`, `docs/mapping.md`.
