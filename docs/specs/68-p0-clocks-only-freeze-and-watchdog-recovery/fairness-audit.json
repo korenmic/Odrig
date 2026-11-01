@@ -1,0 +1,23 @@
+{
+  "kind": "compiled-production-body-scheduler-model",
+  "physical_esp32_wifi": false,
+  "candidate": "317eca0c23586038772f07936f3abddef6458a65",
+  "frames": 200,
+  "render_ms": 32,
+  "records": {
+    "before": {
+      "revision": "9b64f48b117f70febfe08f459064725f2a315a8b",
+      "cases": {
+        "immediate_consumer": {"polls": 200, "ticks": 0, "waits": 0, "longest": 6400},
+        "queued_notifications": {"polls": 200, "ticks": 0, "waits": 200, "longest": 6400}
+      }
+    },
+    "retained": {
+      "revision": "e8924ab4367bdb0086dd156f57ace9b1c9978c7e",
+      "cases": {
+        "immediate_consumer": {"polls": 200, "ticks": 200, "waits": 0, "longest": 32},
+        "queued_notifications": {"polls": 200, "ticks": 200, "waits": 200, "longest": 32}
+      }
+    }
+  }
+}

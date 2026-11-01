@@ -1,7 +1,7 @@
 {
   "number": 68,
   "slug": "68-p0-clocks-only-freeze-and-watchdog-recovery",
-  "state": "remaining",
+  "state": "in_progress",
   "title": "Clocks-only freeze and watchdog recovery",
   "priority": "P0",
   "addedAt": "2026-11-01",
