@@ -1318,6 +1318,7 @@ int player_poll(Core &core, uint64_t now_ms) {
     core.noise = clock_stir(core.noise, now_ms);
     const uint64_t now = clock_touch(core, now_ms);
     upload_touch(core, now);
+    breaks_poll(core, now);
     if (core.leg_count == 0 || now < core.next_due) {
         return 0;
     }

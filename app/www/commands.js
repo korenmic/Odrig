@@ -127,7 +127,8 @@ export async function status() {
     countOrNull(reply.saved, MOST_SAVED) &&
     (reply.clocks === undefined || typeof reply.clocks === "boolean") &&
     (reply.clock_message === undefined || typeof reply.clock_message === "boolean");
-  if (!sound || !miniSound || !dimmingSound || !modeSound) {
+  if (!sound || !miniSound || !dimmingSound || !modeSound ||
+      (reply.clock_error !== undefined && reply.clock_error !== null && reply.clock_error !== "unreadable")) {
     throw new Failure("bad-reply", address());
   }
   return {
@@ -154,6 +155,7 @@ export async function status() {
     clockMessage: reply.clock_message ?? null,
     hasClockMode,
     clockMode,
+    clockError: reply.clock_error ?? null,
     clockOnly: hasClockMode && only !== null ? {...only} : null,
     mini: mini === undefined ? null : {...mini},
   };

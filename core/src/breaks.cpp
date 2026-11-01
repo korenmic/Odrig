@@ -38,12 +38,12 @@ bool takes(const uint8_t *text, uint32_t length, uint32_t *at, const char *word)
     return true;
 }
 
-// Reads a complete bounded settings file; missing is zero and an incomplete read is -1.
+// Reads a complete bounded settings file; missing and failed reads are both errors.
 int read_file(Core &core, const char *name, uint8_t *text, uint32_t &length) {
     length = 0;
     while (length < kClocksRead) {
         const int32_t got = core.host.read_at(core.host.ctx, name, length, text + length, kClocksRead - length);
-        if (got < 0) return length == 0 ? 0 : -1;
+        if (got < 0) return -1;
         if (static_cast<uint32_t>(got) > kClocksRead - length) return -1;
         if (got == 0) return 1;
         length += static_cast<uint32_t>(got);
@@ -76,26 +76,10 @@ bool write_file(Core &core, uint8_t clocks, bool message) {
 
 }  // namespace
 
-void breaks_start(Core &core) {
-    core.clocks_on = 0;
-    core.clock_message_on = 0;
-    core.clocks_first = core.clocks_last = core.clocks_files = 0;
-    core.message_first = core.message_files = 0;
-    core.clocks_id = 0;
-    core.clocks_ordinal = kNoFolder;
-    core.order_key = core.order_next = core.order_count = 0;
-    core.message_order_key = core.message_order_next = core.message_order_count = 0;
-    core.only_dirty = 1;
-    if (!storage_changes(core) || core.host.read_at == nullptr) {
-        return;
-    }
+static bool load_settings(Core &core) {
     uint8_t text[kClocksRead];
-    if (core.host.read_at(core.host.ctx, kClocksPart, 0, text, 1) >= 0) {
-        core.host.remove(core.host.ctx, kClocksPart);
-    }
     uint32_t length = 0;
     const int read = read_file(core, kClocksFile, text, length);
-    if (read == 0) return;
     bool sound = read == 1;
     uint32_t at = 0;
     uint8_t clocks = kClocksOff;
@@ -116,13 +100,47 @@ void breaks_start(Core &core) {
         sound = false;
     }
     if (!sound || at != length) {
-        if (core.host.log != nullptr) {
-            core.host.log(core.host.ctx, "clocks unreadable");
-        }
-        return;
+        return false;
     }
     core.clocks_on = clocks;
     core.clock_message_on = message ? 1 : 0;
+    return true;
+}
+
+void breaks_start(Core &core) {
+    core.clocks_on = kClocksOff;
+    core.clock_message_on = 0;
+    core.clocks_error = 0;
+    core.clocks_retry = 0;
+    core.clocks_first = core.clocks_last = core.clocks_files = 0;
+    core.message_first = core.message_files = 0;
+    core.clocks_id = 0;
+    core.clocks_ordinal = kNoFolder;
+    core.order_key = core.order_next = core.order_count = 0;
+    core.message_order_key = core.message_order_next = core.message_order_count = 0;
+    core.only_dirty = 1;
+    if (!storage_changes(core) || core.host.read_at == nullptr) return;
+    uint8_t part;
+    if (core.host.read_at(core.host.ctx, kClocksPart, 0, &part, 1) >= 0) {
+        core.host.remove(core.host.ctx, kClocksPart);
+    }
+    const int opened = core.host.open(core.host.ctx, kClocksFile);
+    if (opened == 1) core.host.close(core.host.ctx);
+    if (opened == 0) return;
+    if (opened == 1 && load_settings(core)) return;
+    core.clocks_on = kClocksOnly;
+    core.clocks_error = 1;
+    core.clocks_retry = core.latest + 1000;
+    if (core.host.log != nullptr) core.host.log(core.host.ctx, "clocks unreadable");
+}
+
+void breaks_poll(Core &core, uint64_t now) {
+    if (!core.clocks_error || now < core.clocks_retry) return;
+    core.clocks_retry = now + 1000;
+    const uint8_t previous = core.clocks_on;
+    if (!load_settings(core)) return;
+    core.clocks_error = 0;
+    player_clock_mode_changed(core, previous);
 }
 
 uint32_t breaks_command(Core &core, bool message, uint8_t value, Reply &reply) {
@@ -137,7 +155,8 @@ uint32_t breaks_command(Core &core, bool message, uint8_t value, Reply &reply) {
     }
     const uint8_t clocks = message ? core.clocks_on : value;
     const bool after = message ? value != 0 : core.clock_message_on != 0;
-    if (clocks == core.clocks_on && after == (core.clock_message_on != 0)) {
+    if (message && core.clocks_error) return refuse(reply, "storage-error");
+    if (!core.clocks_error && clocks == core.clocks_on && after == (core.clock_message_on != 0)) {
         return succeed(reply);
     }
     if (!write_file(core, clocks, after)) {
@@ -154,7 +173,9 @@ uint32_t breaks_command(Core &core, bool message, uint8_t value, Reply &reply) {
     }
     core.clocks_on = clocks;
     core.clock_message_on = after ? 1 : 0;
-    if (previous != clocks) player_clock_mode_changed(core, previous);
+    const bool was_uncertain = core.clocks_error != 0;
+    core.clocks_error = 0;
+    if (was_uncertain || previous != clocks) player_clock_mode_changed(core, previous);
     return succeed(reply);
 }
 
@@ -212,8 +233,8 @@ uint32_t pick(Core &core, uint64_t at, bool message) {
 }
 }
 
-uint32_t breaks_pick(Core &core, uint64_t at) { return pick(core, at, false); }
-uint32_t breaks_message(Core &core, uint64_t at) { return pick(core, at, true); }
+uint32_t breaks_pick(Core &core, uint64_t at) { return core.clocks_error ? kNothing : pick(core, at, false); }
+uint32_t breaks_message(Core &core, uint64_t at) { return core.clocks_error ? kNothing : pick(core, at, true); }
 
 const char *breaks_mode(const Core &core) {
     return core.clocks_on == kClocksOnly ? "only" : core.clocks_on == kClocksBetween ? "between" : "off";
@@ -226,11 +247,13 @@ const char *breaks_only_state(const Core &core) {
 }
 
 bool breaks_position_allowed(const Core &core, uint32_t position) {
+    if (core.clocks_error) return false;
     if (core.clocks_on != kClocksOnly) return true;
     return core.clocks_id != 0 && is_drive(position) && position - kDriveBase >= core.clocks_first && position - kDriveBase < core.clocks_last;
 }
 
 bool breaks_folder_allowed(const Core &core, uint32_t ordinal) {
+    if (core.clocks_error) return false;
     if (core.clocks_on != kClocksOnly) return true;
     IndexFolder clocks;
     return core.clocks_id != 0 && drive_folder(core, core.clocks_ordinal, clocks) && ordinal >= clocks.ordinal && ordinal < clocks.end;

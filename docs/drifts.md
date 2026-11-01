@@ -12691,3 +12691,37 @@ available while locked; applying either photo reading is an edit.
 
 **Resolution.** `app/www/screens/mapping.js`, `app/www/screens/photomap.js`,
 `app/www/client.js` and `docs/android-app.md`.
+
+## Seed67: uncertain saved clock policy
+
+**Question.** The independent read callback combines missing and IO errors. How can
+startup distinguish a new installation from a saved policy that could not be read,
+without a new command or borrowing the player's open file during playback?
+
+**Answer.** Before playback, probe with sequential open's existing missing/error
+contract and close immediately. Only authoritative missing selects default Off.
+Other failures or malformed bytes select effective Only with dark output and an
+explicit unconfirmed-policy diagnostic. Independent bounded reads retry once a
+second; they do not write defaults. A valid read restores saved policy. An explicit
+mode save replaces corrupt state atomically, even if it selects effective Only;
+a message-only change cannot choose an unknown mode. Additive clock_error leaves
+old clients' mode/state enums compatible while new clients explain uncertainty.
+
+**Resolution.** breaks.cpp/h, player.cpp, commands.cpp, shared command parsing and
+the Settings clock panel implement this behavior; commands.md and actual-core IO
+fault regressions distinguish missing, read failure, malformed and operator recovery.
+
+## Seed67: automatic recovery independent of inventory caching
+
+**Question.** Does the standalone automatic Clocks recovery require the original
+seed's retained inventory snapshots or fingerprint protocol?
+
+**Answer.** No. Keep only the current confirmed Only context and desired Clocks
+path. Resolve missing/remapped IDs without publishing Root, and use an explicit
+unavailable Clocks location while storage cannot establish an ID. Restart stays
+disabled there; confirmed Off/Between and target changes release the context.
+Master's existing inventory/key refresh behavior and explicit navigation remain.
+The original global inventory redesign stays deferred in the aggregate PR.
+
+**Resolution.** `app/www/client.js`, `screens/show.js`, `android-app.md` and the
+standalone recovery specification carry the isolated behavior and its tests.

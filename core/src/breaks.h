@@ -28,8 +28,11 @@ const uint8_t kClocksOnly = 2;
 
 // The start, before the show is read: removes a `clocks.part` a cut left, and reads
 // `clocks.txt` whole and strictly. A missing file is both settings off; a file out of its
-// form is both off, and the log says `clocks unreadable`.
+// form or unreadable fails closed with `clocks unreadable` in the log.
 void breaks_start(Core &core);
+
+// Retries uncertain settings at most once a second without using the player's file.
+void breaks_poll(Core &core, uint64_t now);
 
 // The reply to the clock mode or message setting. The file is written, verified and renamed before the
 // setting takes effect; a setting already in force writes nothing.
