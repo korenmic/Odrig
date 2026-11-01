@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "ownerCaptureSocket": "USB",
+  "ownerPhysicalResults": {
+    "masterControl": "boots",
+    "pr": "fails"
+  },
+  "matchedRetainedLoader": {
+    "vendorSha256": "53f1e17c81e72cdd99ce362ad9a8181a229d3879b11561b2e76052e1afa17c45",
+    "vendorBytes": 13600,
+    "vendorSource": "https://github.com/icssw-org/MeshCom-Firmware/releases/download/v4.40a.10.28/bootloader-s3.bin",
+    "matchesTrackedChecksum": "firmware/stock.sha256",
+    "entry": "0x403c885c",
+    "segments": [
+      {
+        "address": "0x3fce2820",
+        "bytes": 404
+      },
+      {
+        "address": "0x403c8700",
+        "bytes": 2804
+      },
+      {
+        "address": "0x403cb700",
+        "bytes": 10308
+      }
+    ],
+    "emulatorHeaderAdjustment": "8 MB to documented 16 MB; image hash recomputed, code unchanged",
+    "fixtureLoaderSha256": "c9f1a7d30d5f81053b04bea05ddc1f45bbe8209eac1742c4275dbb55a1436f93"
+  },
+  "resetDisassembly": {
+    "routine": "0x403cc99c",
+    "romResetCall": "0x403cc9ae",
+    "returnLoop": "0x403cc9b1",
+    "earlyInitFailureCaller": "0x403c8871",
+    "noBootableCandidateCaller": "0x403cca29",
+    "applicationStartedAtThisSite": false,
+    "imageLoadMode": 3,
+    "imageLoadModeName": "ESP_IMAGE_LOAD_NO_VALIDATE",
+    "imageErrorLogging": false
+  },
+  "inputImages": {
+    "master": {
+      "source": "C:\\Users\\koren\\.codex\\worktrees\\mapping-safety\\Odrig\\build\\firmware\\out\\odrig-firmware.bin",
+      "app_sha256": "df61d0b5828bac4f4bbd487839d5eb01734c4103c7f031a5cae93f0ccabc0c3f",
+      "app_size": 1879840,
+      "flash_sha256": "127f69b78e06a5ccc4c6a8b5a5cff75b8e6b425699ec147854b84348227aa16f"
+    },
+    "pr": {
+      "source": "C:\\Users\\koren\\.codex\\worktrees\\seed-62-space-scan\\Odrig\\build\\firmware\\out\\odrig-firmware.bin",
+      "app_sha256": "429d2ebe8072923acbd11a40b1e764ac29e08f20cfb3830d5dfe00b8cdddf0bb",
+      "app_size": 1890944,
+      "flash_sha256": "623fdc4314e9c5db8d5951f8a5ef2287aeb1ed7f72be38ad5747abc984ccd436"
+    }
+  },
+  "espEmuVersion": "0.51.0 portable WASM",
+  "cases": {
+    "master": {
+      "hostLimitSeconds": 45,
+      "emulatedSeconds": 1.9028216333333334,
+      "restarts": 0,
+      "runtimeStatusReplies": 1,
+      "faultReplies": 1,
+      "allRepliesOk": true,
+      "uartBytes": 934,
+      "uartSha256": "d35d3095ccae9e3f27736ad19be504a9337dbbf2655a23d59d3dde906b83e8bb",
+      "stateSha256": "d9c3f868a1d8d073b8bbcb72683d8af82fb4e853c2c51cf9b103062222c3c415",
+      "pc": "4037b132"
+    },
+    "pr": {
+      "hostLimitSeconds": 45,
+      "emulatedSeconds": 1.8714729083333332,
+      "restarts": 0,
+      "runtimeStatusReplies": 1,
+      "faultReplies": 1,
+      "allRepliesOk": true,
+      "uartBytes": 948,
+      "uartSha256": "7b5dc154b5949cafe2484994f00774ca9ca5c3ed139098180ac42c378e0b2aec",
+      "stateSha256": "2df7bf3c59604cf83ad5835fb91a575829b961763c679db8333929cf5fce12b1",
+      "pc": "4037b132"
+    },
+    "corrupt": {
+      "hostLimitSeconds": 25,
+      "emulatedSeconds": 1.002337125,
+      "restarts": 0,
+      "runtimeStatusReplies": 1,
+      "faultReplies": 1,
+      "allRepliesOk": true,
+      "uartBytes": 948,
+      "uartSha256": "7b5dc154b5949cafe2484994f00774ca9ca5c3ed139098180ac42c378e0b2aec",
+      "stateSha256": "1230bfcf3ccf880f2536889e3abbd7fc1eb3c2d2d766cebafe39297e23348fc4",
+      "pc": "4037b132"
+    },
+    "unaligned": {
+      "hostLimitSeconds": 25,
+      "emulatedSeconds": 0.0009602791666666667,
+      "restarts": 1,
+      "runtimeStatusReplies": 0,
+      "faultReplies": 0,
+      "allRepliesOk": true,
+      "uartBytes": 230,
+      "uartSha256": "30c53a18597048c9a42e57fea5036f68eb31cfbc4ef744984322577fa3af0d89",
+      "stateSha256": "2da07a7123651fe73b5add81fcebf4ba771e0b9da670a9b772a4903798329fed",
+      "pc": "4004466c"
+    }
+  },
+  "negativeControl": {
+    "image": "pr",
+    "mutation": "XOR 1 at full-flash offset 0x1001c (first segment data length)",
+    "windowedReturnA8": "0x803cc9b1",
+    "correspondingReturnAddress": "0x403cc9b1",
+    "matchesResetPath": true,
+    "provesPhysicalOriginalMutation": false
+  },
+  "qualifications": [
+    "Exact PR bytes reach runtime in the model, so original physical failure was not reproduced with intact local bytes.",
+    "The descriptor-bit-flip case boots because the retained loader disables image validation; it is not used as rejection proof.",
+    "No real flash-read, radio, SD card, LEDs or phone was tested.",
+    "QEMU retained-loader attempts timed out before the reset breakpoint and remain inconclusive.",
+    "Mounted Drive bytes verified; independent cloud/phone/application-region flash readback still required."
+  ],
+  "physicalRootCauseConfirmed": false,
+  "newRuntimeRepair": false,
+  "nextEvidence": "Application-region readback from 0x10000 for 1890944 bytes, compared with the exact phone download."
+}
