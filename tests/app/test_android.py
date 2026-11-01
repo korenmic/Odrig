@@ -8,7 +8,7 @@ JAVA = MAIN / "java" / "app" / "odrig" / "operators"
 
 
 class TheSender(unittest.TestCase):
-    """What the app's Android code says. No test runs it: it needs a phone."""
+    """Source checks for the Wi-Fi sender and the native app shell."""
 
     @classmethod
     def setUpClass(cls):
@@ -16,8 +16,9 @@ class TheSender(unittest.TestCase):
         cls.activity = (JAVA / "MainActivity.java").read_text(encoding="utf-8")
         cls.manifest = (MAIN / "AndroidManifest.xml").read_text(encoding="utf-8")
 
-    def test_the_app_has_two_classes_of_its_own(self):
-        self.assertEqual(sorted(path.name for path in JAVA.iterdir()), ["MainActivity.java", "TargetPlugin.java"])
+    def test_native_classes_are_the_shell_wifi_sender_and_usb_capture(self):
+        self.assertEqual(sorted(path.name for path in JAVA.iterdir()),
+                         ["MainActivity.java", "TargetPlugin.java", "UsbCapture.java", "UsbDiagnosticsPlugin.java"])
 
     def test_the_web_code_calls_the_sender_by_the_names_it_has(self):
         self.assertIn('@CapacitorPlugin(name = "Target")', self.sender)

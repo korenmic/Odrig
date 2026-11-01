@@ -371,6 +371,29 @@
 <p>Join the Wi-Fi network odrig in the phone's Wi-Fi settings.</p>
 <p id="about" class="small"></p>
 </div>
+<div class="panel" id="usb-panel">
+<h2>USB diagnostics</h2>
+<p id="usb-availability">Checking USB support...</p>
+<div id="usb-controls" hidden>
+<p class="small">Works without Wi-Fi. Use the board's COM/UART USB port for the full startup log. Native USB may disconnect during a crash. Capture does not request a reset or flash the board; silence does not mean it is healthy.</p>
+<label for="usb-device">USB serial port</label>
+<select id="usb-device"></select>
+<div class="pair">
+<button id="usb-refresh" type="button">Refresh USB ports</button>
+<button id="usb-start" type="button" class="primary">Start capture</button>
+</div>
+<p id="usb-state" role="status"></p>
+<p id="usb-error" role="alert" hidden></p>
+<label for="usb-log">Board output (latest 32 KiB)</label>
+<textarea id="usb-log" rows="8" readonly spellcheck="false"></textarea>
+<p class="small">The complete capture keeps up to 1 MiB. Starting another capture replaces it.</p>
+<div class="pair">
+<button id="usb-stop" type="button" disabled>Stop capture</button>
+<button id="usb-diagnostics" type="button" disabled>Read status + fault</button>
+</div>
+<button id="usb-share" type="button" disabled>Share log</button>
+</div>
+</div>
 </section>
 </main>
 <dialog id="mapping-lock-dialog" aria-labelledby="mapping-lock-question">
