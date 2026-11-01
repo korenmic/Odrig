@@ -135,4 +135,8 @@ export function storage(app) {
 export async function shown(app, count) {
   await app.until(() => app.shown() === "animations", "Animations is shown");
   await app.until(() => app.text("power") !== "-" && rows(app).length === count, `a status and ${count} rows`, 8000);
+  if (count > 0) {
+    const client = await app.frame.contentWindow.eval('import("/client.js")');
+    await app.until(() => client.state.inventoryFresh && client.state.statusFresh, 'confirmed inventory for actions', 10000);
+  }
 }

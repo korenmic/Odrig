@@ -5,6 +5,8 @@
 #include "core_state.h"
 
 namespace odrig {
+
+uint32_t ignored_fingerprint(const Core &core);
 const char kIgnoredFile[] = "ignored.txt";
 const char kIgnoredPart[] = "ignored.part";
 void ignored_drive_found(Core &core);

@@ -567,15 +567,24 @@ export async function catalog() {
   const internal = catalogOf(reply.internal, true);
   const external = catalogOf(reply.external, false);
   const rebuild = reply.rebuild;
+  const inventory = reply.inventory;
+  const inventorySound = inventory === undefined || inventory !== null &&
+    typeof inventory === "object" && typeof inventory.board === "string" && TIMING_ID.test(inventory.board) &&
+    whole(inventory.internal, 0, MOST_BYTES) && whole(inventory.external, 0, MOST_BYTES) &&
+    whole(inventory.internal_keys, 0, MOST_BYTES) && whole(inventory.external_keys, 0, MOST_BYTES) &&
+    typeof inventory.authoritative === "boolean";
   const sound =
     internal !== null &&
     external !== null &&
     (rebuild === null ||
       (typeof rebuild === "object" && STORAGES.includes(rebuild.storage) && whole(rebuild.read, 0, 65535) && whole(rebuild.to_read, 0, 65535)));
-  if (!sound) {
+  if (!sound || !inventorySound) {
     throw new Failure("bad-reply", address());
   }
-  return {internal, external, rebuild: rebuild === null ? null : {storage: rebuild.storage, read: rebuild.read, toRead: rebuild.to_read}};
+  return {internal, external, rebuild: rebuild === null ? null : {storage: rebuild.storage, read: rebuild.read, toRead: rebuild.to_read},
+    ...(inventory === undefined ? {} : {inventory: {board: inventory.board, internal: inventory.internal,
+      external: inventory.external, internalKeys: inventory.internal_keys, externalKeys: inventory.external_keys,
+      authoritative: inventory.authoritative}})};
 }
 
 // Starts the rebuild of the catalog of a storage, "internal" or "external": the target

@@ -114,7 +114,7 @@ export async function move(id, before) {
   } finally {
     if (saving !== null && saving.version === version) {
       // The list and the order are asked for again: the move shows until they come.
-      saving.waits = client.state.orderVersion;
+      saving.waits = client.state.orderValidationVersion;
     }
     redraw();
   }
@@ -143,7 +143,7 @@ export function menu(animation) {
 
 // Draws what the list says of moving its rows, and lets a saved move go.
 export function draw(state) {
-  if (saving !== null && (saving.version !== client.targetVersion() || (saving.waits !== null && state.orderVersion > saving.waits))) {
+  if (saving !== null && (saving.version !== client.targetVersion() || (saving.waits !== null && state.orderValidationVersion > saving.waits))) {
     saving = null;
   }
   if (saving !== null && saving.version === client.targetVersion()) {

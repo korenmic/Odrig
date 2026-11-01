@@ -222,6 +222,16 @@ class Session(unittest.TestCase):
         self.check_session(support.demo_show, legs=20)
 
     def check_session(self, show, legs):
+        def comparable(reply):
+            value = support.without_fps(reply)
+            evidence = value.pop('inventory', None)
+            if evidence is not None:
+                self.assertIsInstance(evidence['board'], str)
+                self.assertIsInstance(evidence['authoritative'], bool)
+                for field in ('internal', 'external', 'internal_keys', 'external_keys'):
+                    self.assertIsInstance(evidence[field], int)
+            return value
+
         replies = {}
         for transport in (support.LINES, "http"):
             with self.subTest(transport=transport):
@@ -232,16 +242,18 @@ class Session(unittest.TestCase):
                 for words, result, wanted in zip(SESSION, results, expected):
                     if words == ("status",):
                         self.assertEqual(support.without_fps(result.out), support.without_fps(wanted), words)
+                    elif words == ("catalog",):
+                        self.assertEqual(comparable(result.out), json.loads(wanted), words)
                     else:
                         self.assertEqual(result.out, wanted.decode("ascii"), words)
                     self.assertEqual(result.status, 0 if json.loads(wanted)["ok"] else 1, words)
-                replies[transport] = [json.dumps(support.without_fps(result.out)) for result in results]
+                replies[transport] = [json.dumps(comparable(result.out)) for result in results]
                 self.assertEqual(len(logged), len(SESSION))
                 self.assertEqual({entry["transport"] for entry in logged}, {transport})
                 self.assertEqual([entry["line"] for entry in logged], [" ".join(words)[:200] for words in SESSION])
                 self.assertEqual([entry["length"] for entry in logged], [min(len(" ".join(words)), 2048) for words in SESSION])
                 self.assertEqual([entry["cut"] for entry in logged], [len(" ".join(words)) > 2048 for words in SESSION])
-                self.assertEqual([json.dumps(support.without_fps(entry["reply"])) for entry in logged], replies[transport])
+                self.assertEqual([json.dumps(comparable(entry["reply"])) for entry in logged], replies[transport])
         self.assertEqual(replies[support.LINES], replies["http"])
         codes = [json.loads(reply).get("error") for reply in replies["http"]]
         self.assertEqual(codes[-10:-1], ["unknown-id", "bad-argument", "bad-argument", "line-too-long", None, None, "unknown-id", "unknown-id", "unknown-id"])

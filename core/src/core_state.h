@@ -267,6 +267,7 @@ struct CatalogState {
     uint32_t entries;
     uint8_t state;
     uint8_t detail;
+    uint32_t fingerprint;
 };
 
 // Whether a position of the playlist is a file of the drive: kDriveBase and the file's

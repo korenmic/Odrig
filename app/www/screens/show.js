@@ -603,7 +603,7 @@ function drawRows(here) {
 
 // Whether the target can be asked to change something now.
 export function answers() {
-  return client.state.link === "answers";
+  return client.state.link === "answers" && client.state.statusFresh && client.state.inventoryFresh;
 }
 
 function rowsState(state, animations, here) {
@@ -654,18 +654,21 @@ function rowsState(state, animations, here) {
     made.querySelector(".more").disabled = !answers();
     const play = made.querySelector(".play");
     const allowed = client.canPlay(animation);
-    play.disabled = typeof animation.fault === "string" || !allowed;
-    play.title = allowed ? "" : "Leave Clocks only to play an animation outside the Clocks folder.";
+    play.disabled = !answers() || typeof animation.fault === "string" || !allowed;
+    play.title = !answers() ? "Waiting for playlist validation." : allowed ? "" : "Leave Clocks only to play an animation outside the Clocks folder.";
     if (!allowed) play.setAttribute("aria-describedby", "only-boundary");
     else play.removeAttribute("aria-describedby");
   }
   const only = state.status?.clockMode === "only";
   byId("play-all").textContent = only ? "Restart clocks" : "Play this folder";
-  byId("play-all").disabled = only && (state.status.clockOnly?.folder == null || !state.statusFresh);
+  byId("play-all").disabled = state.link !== "answers" || !state.statusFresh ||
+    !only && state.level.id !== null && !state.inventoryFresh || only && state.status.clockOnly?.folder == null;
   say("only-boundary", only ? "Clocks only: browsing is unrestricted. Play outside the Clocks folder is disabled; leave Clocks only in Settings to play it." : null);
 }
 
 function draw(state) {
+  say("inventory-state", state.animations !== null && (!state.inventoryFresh || !state.statusFresh) ?
+    "Known playlist: verifying the connection and any changes. Playback controls wait for confirmation." : null);
   const counted = capacity.counts(state);
   byId("show-space").textContent = `Internal storage: ${capacity.internal(state.space, counted.internal)}`;
   byId("show-external-space").textContent = capacity.external(state.space, counted.external);

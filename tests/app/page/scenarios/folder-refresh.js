@@ -9,9 +9,9 @@ export default async function (app) {
   const levels = [];
   client.watch(state => levels.push(state.level.path));
   for (let count = 0; count < 3; ++count) {
-    const version = client.state.listVersion;
+    const version = client.state.validationVersion;
     client.refreshContent();
-    await app.until(() => client.state.listVersion > version && !client.state.listBusy, "native folder refresh", 15000);
+    await app.until(() => client.state.validationVersion > version && !client.state.listBusy, "native folder refresh", 15000);
     await app.sleep(1100);
   }
   return {path: client.state.level.path, rows: rows(app).length,

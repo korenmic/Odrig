@@ -134,7 +134,9 @@ function keysOf(record) {
   if (!record.names.every((pair) => Array.isArray(pair) && pair.length === 2 && typeof pair[0] === "string" && typeof pair[1] === "string")) {
     return null;
   }
-  return {generation: record.generation, entries: record.entries, byName: new Map(record.names)};
+  if (record.fingerprint !== undefined && (!Number.isInteger(record.fingerprint) ||
+      record.fingerprint < 0 || record.fingerprint > 0xFFFFFFFF)) return null;
+  return {generation: record.generation, entries: record.entries, fingerprint: record.fingerprint, byName: new Map(record.names)};
 }
 
 function writeKeys(write) {
@@ -155,8 +157,9 @@ export const keeper = {
   },
   keep(address, storage, keys) {
     const name = keptName(address, storage);
-    kept.set(name, {generation: keys.generation, entries: keys.entries, byName: new Map(keys.byName)});
-    writeKeys((store) => store.put({generation: keys.generation, entries: keys.entries, names: [...keys.byName]}, name));
+    kept.set(name, {generation: keys.generation, entries: keys.entries, fingerprint: keys.fingerprint, byName: new Map(keys.byName)});
+    writeKeys((store) => store.put({generation: keys.generation, entries: keys.entries,
+      fingerprint: keys.fingerprint, names: [...keys.byName]}, name));
   },
   forget(address, storage) {
     const name = keptName(address, storage);

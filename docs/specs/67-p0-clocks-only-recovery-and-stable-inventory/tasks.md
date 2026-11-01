@@ -10,7 +10,7 @@ numbered task is one proof commit; state becomes in_progress with the first task
     dark effective Only, explicit uncertainty and atomic operator recovery. Check memory.
   - Run discovered core and emulator suites; update shared status parsing and run app
     suite if touched. Record the observed failures in the proof commit.
-- [ ] 2. Preserve and validate last-good inventory without redundant reloads
+- [x] 2. Preserve and validate last-good inventory without redundant reloads
   - First observe reconnect key loss, identical-list replacement and avoidable request
     counts. Keep bounded board/storage/path snapshots, gate unsafe stale-ID actions,
     validate authoritative revisions cheaply and retain arrays/keys/order on no change.

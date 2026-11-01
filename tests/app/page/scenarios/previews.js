@@ -66,6 +66,8 @@ export default async function (app) {
     await app.until(() => app.text("level-title") === "Root" && squares(app).length >= settings.rows, "the root");
   }
   if (settings.tap !== undefined) {
+    await app.until(() => app.doc.querySelector(`#animations-list > .row[data-id="${settings.tap}"] .play`)?.disabled === false,
+      'confirmed playback for the tapped row');
     const row = app.doc.querySelector(`#animations-list > .row[data-id="${settings.tap}"]`);
     row.querySelector(".thumb").click();
     await app.until(() => app.text("now") === `Now ${settings.tap} ${row.dataset.file}`, "the tapped animation on the LEDs");

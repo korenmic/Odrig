@@ -119,7 +119,7 @@ maps its actions to command lines, each sent as `POST /odrig` to the address tha
 | The operator | The line |
 |---|---|
 | Nothing: once a second while the app is on the screen | `status` |
-| Nothing: when the target first answers, every ten seconds, when the list is out of date, and every second while the target answers `busy` | `list 0`, and `list <next>` for a long show |
+| Nothing: initial or explicit validation and detected changes; legacy/unmanaged targets every ten seconds; retry at most once a second while busy | `list 0`, and `list <next>` for a long show |
 | Taps a row of the list, or presses `Play this folder` inside a folder | `play <id>` |
 | Presses `Play this folder` at the root | `play all` |
 | Presses the power icon while the LEDs are off, or while they are on | `on`, `off` |
@@ -759,16 +759,19 @@ It keeps each line's key by the file's name, a card file's by its path from `odr
 row takes the key of its storage and name only when the key's size is the row's size. The
 lines of each reply give their rows their keys at once, before the read has ended; until
 then a row keeps the key of the storage's last read. The keys of a read stand until the
-next read of that storage has ended; they go at once when `catalog` shows the storage in
-another state than `ok`, when the target answers again after a silence, and when the
-target changes. A page of another generation than the first page
+next read of that storage has ended. A brief silence preserves them and the last-good
+playlist as visibly stale while the connection and revisions are verified. A different
+board or confirmed manifest change invalidates the affected keys. A page of another generation than the first page
 of the read starts the read again; a page refused with `busy` is asked again two seconds
 later; a page whose generation is `null`, and any other refusal, end the read without keys.
 An installation that refuses `catalog page` is from before it: it is asked for no page
 again, and `catalog` only by Settings, until the target changes. The keys of each read
 that has ended whole are kept on the phone, in the web view's IndexedDB beside its own
-previews, by the target's address and the storage. When `catalog` shows a storage `ok`
-with the generation and number of entries of its kept keys, at a start, after a silence or
+previews, by target address, stable board identity, storage and manifest fingerprint.
+Legacy replies without identity cannot authorize persisted-key reuse; their pages are
+read, while keys already read in the current connection survive a short failure.
+When `catalog` shows a storage `ok` with the same identity/fingerprint, generation and
+number of entries of its kept keys, at a start, after a silence or
 after another address, those keys are the storage's at once and none of its pages is read;
 a read of it under way ends. No page is asked before the kept keys have been taken, and at
 most three seconds after the start. A storage shown `damaged`, `incompatible` or `none`

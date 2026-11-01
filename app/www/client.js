@@ -42,7 +42,8 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, level: {path: "", id: null}, rootNames: null,
   animations: null, cycles: [], folders: [], space: null,
   listVersion: 0, listBusy: false, order: null, orderVersion: 0, orderKnown: true, catalog: null, keys: {internal: null, external: null}, keysVersion: 0,
-  catalogNone: false, pagesRefused: false, statusCount: 0, statusFresh: false, connectionVersion: 0};
+  catalogNone: false, pagesRefused: false, statusCount: 0, statusFresh: false, connectionVersion: 0,
+  inventoryFresh: false, validationVersion: 0, orderValidationVersion: 0};
 
 const watchers = new Set();
 // What the operator asked for and was not sent yet, in its order: each a kind and the
@@ -99,6 +100,110 @@ let keptTaken = false;
 let target = 0;
 let connectionDue = true;
 let contentLocked = false;
+let inventory = null;
+let displayProof = null;
+let pendingList = null;
+const snapshots = new Map();
+const keyProof = {internal: null, external: null};
+let retryAt = 0;
+let retryTimer = null;
+
+function delayBackground() {
+  retryAt = Date.now() + LIST_WHEN_BUSY_MS;
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => { retryAt = 0; retryTimer = null; next(); }, LIST_WHEN_BUSY_MS);
+}
+
+function equal(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function sameEvidence(left, right, level = state.level) {
+  return left !== null && right !== null && left.board === right.board &&
+    left.external === right.external && (level.path !== "" || left.internal === right.internal);
+}
+
+function sameProof(left, right, level = state.level) {
+  return left?.authoritative === true && right?.authoritative === true && sameEvidence(left, right, level);
+}
+
+function keysUnder(storage, evidence = inventory) {
+  return evidence === null ? keptUnder : `${keptUnder}#${evidence.board}#${evidence[`${storage}Keys`]}`;
+}
+
+function keptBoard() {
+  return inventory === null ? keptUnder : `${keptUnder}#${inventory.board}`;
+}
+
+function rememberLevel() {
+  if (state.animations === null) return;
+  snapshots.delete(state.level.path);
+  snapshots.set(state.level.path, {level: state.level, animations: state.animations,
+    folders: state.folders, cycles: state.cycles, order: state.order, proof: displayProof});
+  while (snapshots.size > 8) snapshots.delete(snapshots.keys().next().value);
+}
+
+function publishList(items, proof) {
+  const animations = items.filter(item => typeof item.file === "string");
+  const folders = items.filter(item => typeof item.playlist === "string");
+  const cycles = items.filter(item => item.cycle === true).map(item => item.id);
+  if (!equal(animations, state.animations) || !equal(folders, state.folders) || !equal(cycles, state.cycles)) {
+    state.animations = animations;
+    state.folders = folders;
+    state.cycles = cycles;
+    state.listVersion += 1;
+  }
+  state.validationVersion += 1;
+  state.listBusy = false;
+  state.inventoryFresh = true;
+  displayProof = proof;
+  if (state.level.id === null) {
+    const names = namesOf(items);
+    if (!equal(names, state.rootNames)) state.rootNames = names;
+  }
+  orderDue = state.orderKnown;
+  ordering = null;
+  rememberLevel();
+  listAgainLater();
+}
+
+function noteInventory(evidence) {
+  const before = inventory;
+  if (before !== null && evidence !== null && before.board !== evidence.board) {
+    begin();
+  }
+  inventory = evidence;
+  if (before !== null && evidence === null) dropKeys();
+  if (before !== null && evidence !== null && before.board === evidence.board) {
+    for (const storage of STORAGES) {
+      if (before[`${storage}Keys`] !== evidence[`${storage}Keys`]) {
+        for (let i = reads.length - 1; i >= 0; --i) if (reads[i].storage === storage) reads.splice(i, 1);
+      }
+    }
+  }
+  if (pendingList !== null) {
+    const pending = pendingList;
+    pendingList = null;
+    if (pending.target === target && pending.level === state.level &&
+        (sameProof(pending.proof, evidence) || pending.proof === null && evidence?.authoritative !== true)) {
+      publishList(pending.items, evidence);
+    } else {
+      listing = null;
+      listDue = true;
+      state.inventoryFresh = false;
+    }
+  } else if (sameProof(displayProof, evidence)) {
+    state.inventoryFresh = true;
+    listAgainLater();
+  } else if (state.animations !== null && evidence !== null && (!sameEvidence(displayProof, evidence) ||
+      displayProof?.authoritative === true && evidence.authoritative !== true)) {
+    state.inventoryFresh = false;
+    listing = null;
+    listDue = true;
+  } else if (!state.inventoryFresh && evidence?.authoritative !== true) {
+    listDue = true;
+  }
+}
 
 // Calls a function now and whenever the state changes.
 export function watch(watcher) {
@@ -114,6 +219,7 @@ function changed() {
 
 // Forgets the keys of every storage and every read of a page.
 function dropKeys() {
+  keyProof.internal = keyProof.external = null;
   reads.length = 0;
   clearTimeout(pageWait);
   pageWait = null;
@@ -125,18 +231,17 @@ function dropKeys() {
 
 function heard() {
   if (state.link !== "answers") {
-    // The target answers, for the first time or again: what it has installed is asked, and
-    // its catalogs, whose keys may be of another storage now.
-    listDue = true;
-    listing = null;
+    if (!state.answered || state.catalogNone || state.pagesRefused) listDue = true;
     spaceDue = true;
-    dropKeys();
     catalogDue = !state.catalogNone && !state.pagesRefused;
   }
   state.link = "answers";
   state.failure = null;
   state.heardAt = Date.now();
   state.answered = true;
+  retryAt = 0;
+  clearTimeout(retryTimer);
+  retryTimer = null;
 }
 
 function failed(error) {
@@ -147,6 +252,10 @@ function failed(error) {
   state.failure = error;
   state.space = null;
   state.statusFresh = false;
+  state.inventoryFresh = false;
+  listing = null;
+  pendingList = null;
+  delayBackground();
 }
 
 async function askStatus() {
@@ -206,7 +315,8 @@ function listAgainLater(after = LIST_EVERY_MS) {
   listTimer = setTimeout(() => {
     listTimer = null;
     if (showScreen || storageScreen) {
-      listDue = true;
+      if (after === LIST_EVERY_MS && inventory?.authoritative && !state.catalogNone && !state.pagesRefused) catalogDue = true;
+      else listDue = true;
       next();
     }
   }, after);
@@ -321,7 +431,7 @@ async function recoverLevel(asked, level) {
 async function askListPart() {
   const asked = target;
   const level = state.level;
-  const part = listing === null ? {items: [], from: 0} : listing;
+  const part = listing === null ? {items: [], from: 0, proof: inventory} : listing;
   listing = null;
   try {
     const reply = await commands.list(part.from, level.id);
@@ -331,21 +441,13 @@ async function askListPart() {
     heard();
     const items = part.items.concat(reply.items);
     if (reply.next !== null) {
-      listing = {items, from: reply.next};
+      listing = {items, from: reply.next, proof: part.proof};
     } else {
-      state.listVersion += 1;
-      state.listBusy = false;
-      state.animations = items.filter((item) => typeof item.file === "string");
-      state.folders = items.filter((item) => typeof item.playlist === "string");
-      state.cycles = items.filter((item) => item.cycle === true).map((item) => item.id);
-      if (level.id === null) {
-        state.rootNames = namesOf(items);
+      if (part.proof?.authoritative || part.proof === null && !state.catalogNone && !state.pagesRefused) {
+        pendingList = {items, proof: part.proof, level, target: asked};
       }
-      orderDue = state.orderKnown;
-      ordering = null;
-      if (!state.orderKnown) state.order = null;
+      else publishList(items, part.proof);
       catalogDue = !state.catalogNone && !state.pagesRefused;
-      listAgainLater();
     }
   } catch (error) {
     if (asked !== target || level !== state.level) {
@@ -364,9 +466,7 @@ async function askListPart() {
       // The target answers and has no list to give: its show is invalid.
       heard();
       state.listBusy = false;
-      state.animations = null;
-      state.cycles = [];
-      state.folders = [];
+      state.inventoryFresh = false;
       listAgainLater();
     } else {
       failed(error);
@@ -399,8 +499,12 @@ async function askOrderPart() {
     } else {
       const listed = new Set((state.animations || []).map((item) => item.id));
       if (ids.length === listed.size && ids.every((id) => listed.has(id))) {
-        state.order = {ids, revision: reply.revision};
-        state.orderVersion += 1;
+        if (state.order?.revision !== reply.revision || !equal(state.order.ids, ids)) {
+          state.order = {ids, revision: reply.revision};
+          state.orderVersion += 1;
+        }
+        state.orderValidationVersion += 1;
+        rememberLevel();
       } else {
         state.order = null;
         listing = null;
@@ -413,11 +517,16 @@ async function askOrderPart() {
     }
     if (error instanceof commands.Refusal) {
       heard();
-      state.order = null;
       if (["unknown-command", "bad-argument"].includes(error.code)) {
         // A target whose software has no saved order: the list stays in its own order.
         state.orderKnown = false;
+        state.order = null;
         state.orderVersion += 1;
+        state.orderValidationVersion += 1;
+      } else if (error.code === "busy") {
+        ordering = null;
+        orderDue = true;
+        delayBackground();
       }
     } else {
       failed(error);
@@ -430,40 +539,44 @@ async function askOrderPart() {
 // any more; one that is `ok` is read again when its keys, or the read under way, are of
 // another generation or another number of entries. The keys stand meanwhile.
 export function noteCatalog(reply) {
+  noteInventory(reply.inventory ?? null);
   state.catalog = reply;
   for (const storage of STORAGES) {
     const part = reply[storage];
     const at = reads.findIndex((read) => read.storage === storage);
     if (part.state !== "ok") {
       if (["damaged", "incompatible", "none"].includes(part.state)) {
-        keeper.forget(keptUnder, storage);
+        keeper.forget(keptBoard(), storage);
       }
       if (at !== -1) {
         reads.splice(at, 1);
       }
-      if (state.keys[storage] !== null) {
+      if (part.state !== "loading" && state.keys[storage] !== null) {
         state.keys[storage] = null;
+        keyProof[storage] = null;
         state.keysVersion += 1;
       }
       continue;
     }
     const kept = state.keys[storage];
-    const same = (read) => read.generation === part.generation && read.entries === part.entries;
+    const shape = (read) => read.generation === part.generation && read.entries === part.entries;
+    const same = (read) => shape(read) && (read === kept ? keyProof[storage] : read.namespace) === keysUnder(storage);
     // Keys kept on the phone of this generation and number of entries are the storage's at
     // once, and its pages are not read.
-    const record = state.pagesRefused || (kept !== null && same(kept)) ? null : keeper.kept(keptUnder, storage);
-    if (record !== null && same(record)) {
+    const record = inventory === null || state.pagesRefused || (kept !== null && same(kept)) ? null : keeper.kept(keptBoard(), storage);
+    if (record !== null && shape(record) && record.fingerprint === inventory[`${storage}Keys`]) {
       if (at !== -1) {
         reads.splice(at, 1);
       }
       state.keys[storage] = {generation: record.generation, entries: record.entries, byName: record.byName};
+      keyProof[storage] = keysUnder(storage);
       state.keysVersion += 1;
       continue;
     }
     if (state.pagesRefused || (at !== -1 && same(reads[at])) || (at === -1 && kept !== null && same(kept))) {
       continue;
     }
-    const read = {storage, generation: part.generation, entries: part.entries, pageGeneration: null, page: 0, offset: 0, tail: "", byName: new Map()};
+    const read = {storage, namespace: keysUnder(storage), generation: part.generation, entries: part.entries, pageGeneration: null, page: 0, offset: 0, tail: "", byName: new Map()};
     if (at !== -1) {
       reads[at] = read;
     } else {
@@ -485,10 +598,12 @@ export function keptKeysReady() {
   keptTaken = true;
   let took = false;
   for (const read of [...reads]) {
-    const record = keeper.kept(keptUnder, read.storage);
-    if (record !== null && record.generation === read.generation && record.entries === read.entries) {
+    const record = inventory === null ? null : keeper.kept(keptBoard(), read.storage);
+    if (record !== null && record.generation === read.generation && record.entries === read.entries &&
+        record.fingerprint === inventory[`${read.storage}Keys`]) {
       reads.splice(reads.indexOf(read), 1);
       state.keys[read.storage] = {generation: record.generation, entries: record.entries, byName: record.byName};
+      keyProof[read.storage] = keysUnder(read.storage);
       state.keysVersion += 1;
       took = true;
     }
@@ -501,6 +616,7 @@ export function keptKeysReady() {
 
 // Says that the target keeps no catalogs: it is asked for none again until it changes.
 export function noCatalogs() {
+  noteInventory(null);
   state.catalogNone = true;
   catalogDue = false;
   dropKeys();
@@ -523,6 +639,9 @@ async function askCatalog() {
       heard();
       if (["unknown-command", "bad-argument"].includes(error.code)) {
         noCatalogs();
+      } else if (error.code === "busy") {
+        catalogDue = true;
+        delayBackground();
       }
     } else {
       failed(error);
@@ -577,8 +696,10 @@ async function askPage() {
       } else {
         reads.shift();
         state.keys[read.storage] = {generation: read.pageGeneration, entries: read.entries, byName: read.byName};
+        keyProof[read.storage] = read.namespace;
         state.keysVersion += 1;
-        keeper.keep(keptUnder, read.storage, state.keys[read.storage]);
+        keeper.keep(keptBoard(), read.storage, {...state.keys[read.storage],
+          fingerprint: inventory?.[`${read.storage}Keys`]});
       }
     }
   } catch (error) {
@@ -626,7 +747,10 @@ export function keyOf(animation) {
   }
   const read = reads.find((one) => one.storage === storage);
   const kept = state.keys[storage];
-  const key = (read === undefined ? undefined : read.byName.get(animation.file)) ?? (kept === null ? undefined : kept.byName.get(animation.file));
+  const usable = keyProof[storage] === keysUnder(storage) || !state.inventoryFresh && displayProof !== null &&
+    displayProof.board === inventory?.board && keyProof[storage] === keysUnder(storage, displayProof);
+  const key = (read === undefined ? undefined : read.byName.get(animation.file)) ??
+    (kept === null || !usable ? undefined : kept.byName.get(animation.file));
   return key !== undefined && key.endsWith(`-${animation.bytes}`) ? key : null;
 }
 
@@ -636,6 +760,14 @@ async function give(request) {
   const asked = target;
   if (request.guard && !request.guard()) {
     request.reject?.(new commands.Refusal("stale", "timing operation"));
+    return;
+  }
+  if (["remove", "ignore", "order", "repeat", "play", "read"].includes(request.kind) &&
+      (!state.inventoryFresh || !state.statusFresh)) {
+    const error = new commands.Refusal("stale", request.kind);
+    if (request.reject) request.reject(error);
+    else refused(error);
+    request.settle?.(false);
     return;
   }
   try {
@@ -724,6 +856,7 @@ function due() {
     const request = wanted.shift();
     return () => give(request);
   }
+  if (Date.now() < retryAt) return null;
   const listWaits = listing !== null || listDue;
   if (statusDue && !(listWaits && listWaited)) {
     statusDue = false;
@@ -792,6 +925,16 @@ export function begin() {
   keptUnder = address();
   contentLocked = false;
   state.listVersion = 0;
+  state.validationVersion = 0;
+  state.orderValidationVersion = 0;
+  state.inventoryFresh = false;
+  inventory = null;
+  displayProof = null;
+  pendingList = null;
+  snapshots.clear();
+  retryAt = 0;
+  clearTimeout(retryTimer);
+  retryTimer = null;
   if (job !== null) {
     job.failed(new Error("the address changed"));
     job = null;
@@ -846,7 +989,8 @@ export function showing(name) {
   showScreen = name === "animations";
   storageScreen = name === "upload";
   if ((showScreen || storageScreen) && !was && state.answered && listTimer === null) {
-    listDue = true;
+    if (inventory?.authoritative && !state.catalogNone && !state.pagesRefused) catalogDue = true;
+    else listDue = true;
   }
   if ((showScreen || storageScreen) && (!was || storageScreen !== wasStorage)) {
     spaceDue = true;
@@ -872,17 +1016,23 @@ export function back() {
 }
 
 function toLevel() {
+  rememberLevel();
   const top = trail[trail.length - 1];
   state.level = top === undefined ? {path: "", id: null} : {path: top.path, id: top.id};
-  state.animations = null;
-  state.folders = [];
-  state.cycles = [];
-  state.order = null;
+  const known = snapshots.get(state.level.path);
+  state.animations = known?.animations ?? null;
+  state.folders = known?.folders ?? [];
+  state.cycles = known?.cycles ?? [];
+  state.order = known?.order ?? null;
+  displayProof = known?.proof ?? null;
+  state.inventoryFresh = known?.level.id === state.level.id && sameProof(displayProof, inventory);
   state.orderVersion += 1;
   listing = null;
+  pendingList = null;
   ordering = null;
   orderDue = false;
-  listDue = true;
+  listDue = !state.inventoryFresh;
+  catalogDue = !state.catalogNone && !state.pagesRefused;
   askedFor = null;
   changed();
   next();
@@ -970,8 +1120,9 @@ export function play(id) {
 }
 
 export function playAll() {
-  want("play", () => {
+  want("play-all", () => {
     if (state.status?.clockMode !== "only") return commands.playAll();
+    if (!state.statusFresh) throw new commands.Refusal("stale", "play all");
     const folder = state.status.clockOnly?.folder;
     if (folder == null) throw new commands.Refusal("in-use", "play all");
     return commands.play(folder);

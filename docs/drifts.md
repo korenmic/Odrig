@@ -12788,3 +12788,21 @@ old clients' mode/state enums compatible while new clients explain uncertainty.
 **Resolution.** breaks.cpp/h, player.cpp, commands.cpp, shared command parsing and
 the Settings clock panel implement this behavior; commands.md and actual-core IO
 fault regressions distinguish missing, read failure, malformed and operator recovery.
+
+## Seed67: inventory identity and change evidence
+
+**Question.** Can catalog generation alone confirm that a reconnect has the same
+board, media and list, and can listVersion also count identical validations?
+
+**Answer.** No. Ignore is stored independently, and different media can have equal
+generation/count. Compatible catalog metadata combines stable host identity with
+separate storage revisions and validated manifest fingerprints. Hash only bounded
+canonical state already in memory; never scan media for a cheap validation. Keep
+preview-key identity distinct from list inclusion/order. Unmanaged/legacy targets
+retain stale data while bounded full validation proceeds. A complete consistent
+candidate replaces a snapshot only after target/path/revision validation; unchanged
+arrays/orders keep their identity. A separate validationVersion counts completed
+checks. Bound per-path snapshots to8 and namespace persisted keys by board/manifest.
+
+**Resolution.** inventory.cpp, catalog publication, shared client/catalog parsing and
+browser/native regressions implement these choices. No wire command was added.

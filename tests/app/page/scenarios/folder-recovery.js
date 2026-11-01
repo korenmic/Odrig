@@ -12,17 +12,17 @@ export default async function (app) {
   const client = await app.frame.contentWindow.eval('import("/client.js")');
   const levels = [];
   client.watch(state => levels.push(state.level.path));
-  const version = client.state.listVersion;
+  const version = client.state.validationVersion;
   await app.step();
   client.refreshContent();
   if (app.settings.navigation) {
     await app.sleep(30);
     app.press("Back");
-    await app.until(() => app.text("level-title") === "Root" && client.state.listVersion > version, "chosen Root");
+    await app.until(() => app.text("level-title") === "Root" && client.state.validationVersion > version, "chosen Root");
   } else if (app.settings.verificationFailure) {
     await app.sleep(650);
   } else {
-    await app.until(() => client.state.listVersion > version, "completed recovery listing", 8000);
+    await app.until(() => client.state.validationVersion > version, "completed recovery listing", 8000);
   }
   return {path: client.state.level.path, folder: client.state.level.id,
     ids: rows(app).map(row => row.id), visitedRoot: levels.includes("")};

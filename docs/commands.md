@@ -683,6 +683,16 @@ catalog
 - `writable`: whether the core may write the drive, when one is plugged in.
 - `rebuild`: `null` while no rebuild runs; during one, `{"storage":"internal","read":12,"to_read":72}`:
   the storage, the files it has read and those it has still to read.
+- `inventory` is optional when the host supplies stable board identity:
+  `{"board":"board-id","internal":123,"external":456,"internal_keys":789,"external_keys":101,"authoritative":true}`.
+  The internal/external revisions cover list and order/inclusion state. Key revisions
+  fingerprint the validated catalog manifests, so different cards with equal generation
+  and counts remain distinct. These are change tokens, not animation IDs. They are
+  computed from bounded state already in memory without scanning storage. Authority
+  is false during incomplete checking/rebuild or with unmanaged external storage.
+  Clients must then use bounded full validation, keeping known inventory visibly stale
+  until a complete current result succeeds. Missing metadata means legacy validation;
+  generation/count alone cannot establish board or media identity.
 
 At the start the core reads the internal catalog. Every file of the show that it has an
 entry for has its size and its type in `list` at once and is neither opened nor read by the
