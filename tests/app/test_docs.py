@@ -35,7 +35,7 @@ class TheAppsPage(unittest.TestCase):
 
     def test_its_sections_are_what_the_app_is_how_it_is_built_installed_and_used_and_what_was_checked(self):
         headings = re.findall(r"(?m)^## (.+)$", self.text)
-        self.assertEqual(headings, ["What it is", "What you need", "The tool", "Installing on a phone", "Using it", "Messages", "The phone and the installation's network",
+        self.assertEqual(headings, ["What it is", "USB diagnostics from a phone", "What you need", "The tool", "Installing on a phone", "Using it", "Messages", "The phone and the installation's network",
                                     "The check on a phone", "The suites", "What is verified", "What is open"])
 
     def test_every_command_of_the_tool_has_an_example(self):
@@ -162,6 +162,9 @@ class TheAppsPage(unittest.TestCase):
         links = re.findall(r"\]\(([^)]+)\)", self.said)
         self.assertGreaterEqual(len(links), 6)
         for link in links:
+            if link.startswith("https://"):
+                self.assertRegex(link, r"\Ahttps://[A-Za-z0-9.-]+/\S+\Z")
+                continue
             path, _, part = link.partition("#")
             if path == "":
                 self.assertIn(part, own, link)

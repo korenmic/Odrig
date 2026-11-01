@@ -179,6 +179,44 @@ they are. Capacitor wraps them into the Android app. One class of Java, the send
 carries each line to the target; see [The phone and the installation's
 network](#the-phone-and-the-installations-network).
 
+## USB diagnostics from a phone
+
+Target also offers **USB diagnostics** in the Android APK, independently of Wi-Fi.
+It uses Android USB host/OTG and the pinned
+[usb-serial-for-android 3.11.0](https://github.com/mik3y/usb-serial-for-android/tree/3.11.0)
+driver for CDC-ACM and supported USB/UART bridges. The browser shares the panel but
+explains that physical capture needs the Android app. USB host is an optional device
+feature, so phones without it can still use the Wi-Fi app.
+
+1. Close the flasher and other USB apps. Connect the board's **COM/UART** USB socket
+   to the phone through OTG. That socket carries the full player/startup log; the
+   chip's native USB interface may disappear during a crash and has different output.
+2. In Target, refresh the USB ports, select the port and tap **Start capture**.
+   Accept Android's permission prompt. Capture uses 115200, 8N1; opening does not send
+   commands or request a reset/bootloader sequence. RTS is cleared before DTR, as in
+   the existing command tools. Actual adapter/reset-line behavior needs physical checking.
+3. **Read status + fault** explicitly sends only the existing `status` and `fault`
+   commands. Their raw replies and arriving log text remain visible without JSON parsing.
+   There is no generic serial terminal, firmware flash, erase or automatic time sync.
+4. **Stop capture** preserves the text. Unplugging, leaving Target or backgrounding the
+   app also stops it; no automatic reconnect happens. **Share log** stops capture and
+   opens Android's share chooser for `odrig-usb-log.txt`. Choose where to send/save it.
+
+The displayed tail is at most 32 KiB; the full capture stops at 1 MiB and its beginning
+is retained. Starting another capture replaces that log. The private UTF-8 export
+contains device/driver, phone start time, settings, state, received byte count and the
+complete captured text; invalid UTF-8 bytes are replaced. Logs are not uploaded by the
+app. Share uses a temporary FileProvider read grant, with no broad storage permission.
+Permission denial, an absent/unsupported/busy device and disconnects are reported in
+the panel. Closing the app loses the in-memory log unless it was shared/saved.
+
+Capture cannot recover bytes printed before it was started. Collect `status`/`fault`
+before any reset when possible. A silent port does not prove a healthy board. Host
+tests cover bounded capture, fragmented text, cancellation, stale callbacks and UI;
+Android VM verifies the actual plugin and no-device behavior, not physical USB hardware.
+Phone/adapter permissions, reset lines, real boot/panic logs and sharing to an actual
+recipient remain the operator's checks.
+
 ## What you need
 
 - For the web code in a browser, and for its suite: what the rest of the repository needs,
