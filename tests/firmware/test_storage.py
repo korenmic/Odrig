@@ -134,6 +134,10 @@ class ShowFolders(Temporary):
         (self.show / "brightness.txt").write_bytes(saved)
         self.assertEqual(storage.folder_files(self.show), dict(before, **{"brightness.txt": saved}))
 
+    def test_rotation_is_allowed_beside_show_content(self):
+        (self.show / "rotation.txt").write_bytes(b"1 90\n")
+        self.assertEqual(storage.folder_files(self.show)["rotation.txt"], b"1 90\n")
+
     def test_a_folder_without_its_mapping_is_refused_with_the_converters_reason(self):
         (self.show / "mapping.json").unlink()
         self.assertEqual(self.reason(), "mapping-missing")
@@ -358,6 +362,26 @@ class Commands(Temporary):
         result = self.install(esptool)
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(expected, **{"brightness.txt": replacement}))
+
+    def test_rotation_is_preserved_replaced_and_read_back(self):
+        saved = b"1 90\n"
+        self.old = support.storage_image(dict(support.WLED_FILES, **{"/odrig/rotation.txt": saved}))
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        expected = dict(storage.folder_files(self.show), **{"rotation.txt": saved})
+        installed = self.on_the_board(esptool)
+        self.assertEqual(storage.show_of(installed), expected)
+        with support.no_board(self.esptool(installed, failing_verifies=1)):
+            result = support.run_main("read-show", self.folder / "copy")
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(support.files_of(self.folder / "copy"), expected)
+        (self.show / "rotation.txt").write_bytes(b"1 180\n")
+        self.old = installed
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(expected, **{"rotation.txt": b"1 180\n"}))
 
     def test_three_state_clocks_are_preserved_and_read_back_without_schema_conversion(self):
         saved = b"odrig-clocks 2\nmode only\nmessage on\n"

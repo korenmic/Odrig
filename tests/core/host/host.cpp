@@ -839,6 +839,7 @@ private:
                            given == "show.part" || given == "pending.txt" || given == "mapping.part" ||
                            given == "order.txt" || given == "order.part" || given == "repeats.txt" || given == "repeats.part" || given == "clocks.txt" || given == "clocks.part" || given == "playlist.txt" || given == "playlist.part" || given == "catalog.txt" ||
                            given == "brightness.txt" || given == "brightness.part" || given == "ignored.txt" || given == "ignored.part" ||
+                           given == "rotation.txt" || given == "rotation.part" ||
                            given == "catalog.new" || given == "catalog.do" || page;
         if (!sound || !(animation || fixed)) {
             stop("file misuse", kFileMisuse);
