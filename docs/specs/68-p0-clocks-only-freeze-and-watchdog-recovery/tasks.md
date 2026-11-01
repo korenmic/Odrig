@@ -9,7 +9,7 @@ One numbered task per proof commit. Final task waits for65–67 software complet
     watchdog/priority/stack/output gates. Reuse inherited before/after evidence, label
     model limits and unknown installed physical version/reset cause explicitly.
   - Run discovered firmware suite; record verified reuse and set seed in_progress.
-- [ ] 2. Verify integrated sustained Only playback and command responsiveness
+- [x] 2. Verify integrated sustained Only playback and command responsiveness
   - Exercise native clocks/messages, heavy/late rendering, delayed IO/replies and
     reconnects across existing command routes and shared app behavior. Reuse67 proofs
     where identical; add missing meaningful coverage. Only repair a residual fault
