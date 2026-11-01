@@ -1,0 +1,9 @@
+{
+  "number": 70,
+  "slug": "70-p1-phone-usb-diagnostic-logs",
+  "state": "remaining",
+  "title": "Capture and share board diagnostics over phone USB",
+  "priority": "P1",
+  "addedAt": "2026-11-01",
+  "summary": "Phone-only USB OTG serial diagnostics for a board with unavailable Wi-Fi; no open product questions."
+}
