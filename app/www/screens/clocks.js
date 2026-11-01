@@ -58,7 +58,7 @@ function draw() {
   words("clocks-support", known && !status.hasClockMode ?
     "This target supports Off and Between animations. Update its firmware for Clocks only." : "");
   const reasons = {
-    "playing": "Only the Clocks folder plays. You can browse anywhere.",
+    "playing": "Only the Clocks folder plays. Browsing stays inside Clocks; leave this mode to browse elsewhere.",
     "no-card": "Clocks only is waiting: no external storage is present.",
     "missing-folder": "Clocks only is waiting: the external clocks folder is missing.",
     "no-clocks": "Clocks only is waiting: no included, available clock face can play.",

@@ -12691,3 +12691,18 @@ available while locked; applying either photo reading is an edit.
 
 **Resolution.** `app/www/screens/mapping.js`, `app/www/screens/photomap.js`,
 `app/www/client.js` and `docs/android-app.md`.
+
+
+## Seed 66: standalone Android boundary on master
+
+**Question.** How can the browsing boundary stand alone without the separate clocks
+recovery or stable-inventory implementation?
+
+**Answer.** Retain only the last confirmed Only policy for the active target, gate shared
+enter/back and visible list publication, and guard destination capture/final preflight
+and shared upload steps. Unresolved Clocks stays visible without stale-ID spin. Keep
+master inventory refresh behavior and all firmware sources unchanged. Reuse the exact
+healthy master firmware for physical comparison, with separately built APK provenance.
+
+**Resolution.** docs/specs/66-p1-clocks-only-browsing-boundary/design.md and tasks.md
+record the independent scope; docs/android-app.md describes the operator behavior.

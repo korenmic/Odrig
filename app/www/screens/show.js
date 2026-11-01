@@ -613,7 +613,7 @@ function rowsState(state, animations, here) {
   // current; each folder row's count, and its mark when it leads to the current playlist.
   const marked = markedPath(state.status);
   byId("level-title").textContent = here.path === "" ? "Root" : here.path;
-  byId("level-back").hidden = here.path === "";
+  byId("level-back").hidden = !client.canGoBack();
   byId("level-head").setAttribute("aria-current", String(marked === here.path));
   for (const made of byId("animations-list").querySelectorAll(":scope > .folder-row")) {
     const entry = here.folders.find((item) => item.path === made.dataset.path);
@@ -629,6 +629,8 @@ function rowsState(state, animations, here) {
     note.hidden = note.textContent === "";
     const more = made.querySelector(".more");
     if (more) more.disabled = !answers() || saving;
+    const open = made.matches("button") ? made : made.querySelector(".folder-open");
+    if (open) open.disabled = !client.canEnter({id: entry.id, playlist: entry.path});
     made.setAttribute("aria-current", String(marked !== null && (marked === entry.path || marked.startsWith(`${entry.path}/`))));
   }
   for (const made of byId("animations-list").querySelectorAll(":scope > .row")) {
@@ -659,10 +661,10 @@ function rowsState(state, animations, here) {
     if (!allowed) play.setAttribute("aria-describedby", "only-boundary");
     else play.removeAttribute("aria-describedby");
   }
-  const only = state.status?.clockMode === "only";
+  const only = client.clocksOnly();
   byId("play-all").textContent = only ? "Restart clocks" : "Play this folder";
-  byId("play-all").disabled = only && (state.status.clockOnly?.folder == null || !state.statusFresh);
-  say("only-boundary", only ? "Clocks only: browsing is unrestricted. Play outside the Clocks folder is disabled; leave Clocks only in Settings to play it." : null);
+  byId("play-all").disabled = only && (state.status?.clockOnly?.folder == null || !state.statusFresh);
+  say("only-boundary", only ? `Clocks only. Browsing stays inside Clocks; leave this mode in Settings to browse elsewhere.${state.level.id === null ? " The Clocks folder is unavailable." : ""}` : null);
 }
 
 function draw(state) {
@@ -907,7 +909,7 @@ export function start(options) {
   // The level's button: the root's playlist at the root, the folder's inside one.
   byId("play-all").addEventListener("click", () => {
     const level = client.state.level;
-    if (client.state.status?.clockMode === "only" || level.id === null) client.playAll();
+    if (client.clocksOnly() || level.id === null) client.playAll();
     else client.play(level.id);
   });
   byId("level-back").addEventListener("click", () => enter(null));
