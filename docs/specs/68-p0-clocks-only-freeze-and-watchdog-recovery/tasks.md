@@ -24,7 +24,7 @@ One numbered task per proof commit. Final task waits for65–67 software complet
     signer backups, commit delivery evidence/task checkbox, push one new PR and gate
     exact final head CI. Attach PR, notify what finished/was uploaded and audit commits.
 
-- [x] 4. Reproduce and repair the firmware startup regression against stable master
+- [ ] 4. Reproduce and repair the firmware startup regression against stable master
   - Use the owner's confirmed old/new firmware comparison as evidence of a regression.
     Inspect the actual linked image and board-adapter startup paths; reproduce a concrete
     fault with executable firmware/host emulation or a production-code harness before repair.
@@ -32,11 +32,18 @@ One numbered task per proof commit. Final task waits for65–67 software complet
     power, command protocol, watchdog protection or unrelated feature behavior.
   - Run the affected discovered suites and compile/inspect the ESP32-S3 image through
     fw.py. Record the locally proven fault separately from the unresolved physical reset.
+  - Reopened: the owner retested the callback-repair image and confirmed the same boot
+    failure. That independent callback repair does not resolve the physical regression.
 - [x] 5. Publish the startup repair firmware from the committed runtime source
   - Rebuild/verify through fw.py from clean committed runtime source, run the actual image
     in the available ESP32-S3 emulator and report its peripheral/physical limits.
   - Replace the existing Drive firmware in place with checksum/source verification;
     retain the current APK, push this PR and notify the operator of the firmware update.
+- [x] 6. Prepare a matched master-source control after the rejected physical retest
+  - Confirm the control's core/firmware inputs match freshly fetched origin/master and
+    verify its existing clean Windows build through fw.py's offline inspector.
+  - Upload a separately named master control with checksum, provenance and phone-flasher
+    instructions. Preserve the usual artifacts; leave its physical outcome pending.
 
 ## Owner acceptance (not executable queue tasks)
 

@@ -1,0 +1,65 @@
+{
+  "purpose": "Matched master-source Windows-build control after owner rejected the callback candidate as a physical boot fix",
+  "verification": {
+    "version": 1,
+    "source": {
+      "commit": "94300bdc3e4f3b2eb4bf3445b39b6a31cc4ec485",
+      "trackedDirty": false
+    },
+    "host": {
+      "system": "win32",
+      "architecture": "x86_64",
+      "os": "Windows-11-10.0.26200-SP0"
+    },
+    "inputsSha256": "64f844d10b21fbf337d4dc49627277be3ad38e07b3b2d407483892cfa19523a4",
+    "image": {
+      "file": "odrig-firmware.bin",
+      "bytes": 1879840,
+      "sha256": "df61d0b5828bac4f4bbd487839d5eb01734c4103c7f031a5cae93f0ccabc0c3f"
+    },
+    "elf": {
+      "bytes": 32951100,
+      "sha256": "e5393b559b7e938c66a75c709e56125134dc4eb8cf1b02e7a3f3613272f212c8"
+    },
+    "chip": "ESP32-S3",
+    "environment": "odrig_microsd",
+    "symbolTool": "xtensa-esp-elf-gcc-nm.exe",
+    "symbols": [
+      "42023820 T odrig_core_begin",
+      "4202150c T odrig_core_feed",
+      "4202bb10 T odrig_core_poll"
+    ],
+    "physicalAcceptance": false
+  },
+  "firmwareAndCoreMatchOriginMaster": true,
+  "files": [
+    {
+      "file": "odrig-master-control.bin",
+      "bytes": 1879840,
+      "sha256": "df61d0b5828bac4f4bbd487839d5eb01734c4103c7f031a5cae93f0ccabc0c3f"
+    },
+    {
+      "file": "odrig-master-control.bin.sha256",
+      "bytes": 91,
+      "sha256": "3904069f16a2b889a8edef3a021e26ff00003714c78db03f7b304811518cc928"
+    },
+    {
+      "file": "odrig-master-control.bin.build.json",
+      "bytes": 15298,
+      "sha256": "07b6e7349c6f320fd8feda85abfa2040e58ed72e979fa75116a1d31c06d4fdc3"
+    },
+    {
+      "file": "odrig-master-control-verification.json",
+      "bytes": 845,
+      "sha256": "72de48fa3c5e7fc48e3c1d04259007ac26f7092d7e81b03ddbc073ed847c87c4"
+    },
+    {
+      "file": "odrig-master-control-README.txt",
+      "bytes": 1176,
+      "sha256": "7465b59ba6d86e499bbb4c0df570401674c19331708011502fd4990cdf850f7c"
+    }
+  ],
+  "originalFirmwareApkSigningFilesUnchanged": true,
+  "physicalAcceptance": false,
+  "nextStep": "Owner flashes only the separately named control at 0x10000 without Erase and reports whether hotspot appears before opening Odrig."
+}
