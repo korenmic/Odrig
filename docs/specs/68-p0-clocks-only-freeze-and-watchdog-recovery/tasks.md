@@ -32,7 +32,7 @@ One numbered task per proof commit. Final task waits for65–67 software complet
     power, command protocol, watchdog protection or unrelated feature behavior.
   - Run the affected discovered suites and compile/inspect the ESP32-S3 image through
     fw.py. Record the locally proven fault separately from the unresolved physical reset.
-- [ ] 5. Publish the startup repair firmware from the committed runtime source
+- [x] 5. Publish the startup repair firmware from the committed runtime source
   - Rebuild/verify through fw.py from clean committed runtime source, run the actual image
     in the available ESP32-S3 emulator and report its peripheral/physical limits.
   - Replace the existing Drive firmware in place with checksum/source verification;
