@@ -17,6 +17,7 @@ import * as uploadScreen from "./screens/storage.js";
 import * as settingsScreen from "./screens/mapping.js";
 import * as photomap from "./screens/photomap.js";
 import * as targetScreen from "./screens/target.js";
+import * as usbDiagnostics from "./screens/usb-diagnostics.js";
 
 const SCREENS = ["animations", "upload", "settings", "target"];
 const LINKS = {checking: "Checking", answers: "Connected", "no-answer": "No answer"};
@@ -48,6 +49,7 @@ function show(name) {
   rotationScreen.showing(name === "settings");
   animationsScreen.showing(name === "animations");
   targetScreen.showing(name === "target");
+  usbDiagnostics.showing(name === "target");
 }
 
 // Shows a text in the place for messages until it is dismissed or another takes its
@@ -138,6 +140,7 @@ for (const name of SCREENS) {
 window.history.replaceState({screen: "target", depth: 0}, "");
 show("target");
 targetScreen.start({message, shown: () => screen === "target"});
+usbDiagnostics.start();
 animationsScreen.start({message});
 // The phone's own previews and the keys kept on it are taken up while the app starts; the rows
 // show them when they come, and no page of a catalog is asked before, nor after a few seconds

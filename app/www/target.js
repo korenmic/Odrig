@@ -108,6 +108,21 @@ function sender() {
   return bridge !== undefined && typeof bridge.isNativePlatform === "function" && bridge.isNativePlatform() ? bridge : null;
 }
 
+// A separate diagnostic capture never changes the address or Wi-Fi command transport.
+export function usbDiagnostics() {
+  const bridge = sender();
+  if (bridge === null) return null;
+  const invoke = (method, options = {}) => within(bridge.nativePromise("UsbDiagnostics", method, options), 10000);
+  return {
+    devices: () => invoke("devices"),
+    status: () => invoke("status"),
+    open: (port) => invoke("open", port),
+    stop: () => invoke("stop"),
+    diagnostics: () => invoke("diagnostics"),
+    share: () => invoke("share"),
+  };
+}
+
 // A promise that is refused when the one given has not settled in time.
 function within(promise, ms) {
   return new Promise((resolve, reject) => {

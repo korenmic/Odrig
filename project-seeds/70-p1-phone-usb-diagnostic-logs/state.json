@@ -1,7 +1,7 @@
 {
   "number": 70,
   "slug": "70-p1-phone-usb-diagnostic-logs",
-  "state": "remaining",
+  "state": "in_progress",
   "title": "Capture and share board diagnostics over phone USB",
   "priority": "P1",
   "addedAt": "2026-11-01",

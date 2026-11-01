@@ -186,6 +186,13 @@ textarea {
   font-size: 17px;
 }
 
+#usb-log {
+  font-family: monospace;
+  font-size: 0.8rem;
+  white-space: pre;
+  overflow: auto;
+}
+
 button {
   color: var(--teal);
   text-align: center;
