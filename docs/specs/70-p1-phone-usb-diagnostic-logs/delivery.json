@@ -1,0 +1,202 @@
+{
+  "version": 1,
+  "seeds": [
+    65,
+    66,
+    67,
+    68,
+    70
+  ],
+  "includedMasterSeed": 69,
+  "deliveredUtc": "2026-11-01T13:56:53.127807+00:00",
+  "apkSourceCommit": "edf96d83e5cf93fe11b7e575ba837ea5d5baae4e",
+  "firmwareSourceCommit": "e7f09ee7e9bedb09f234ba84b3f32a8452175c96",
+  "sourceTrackedDirty": false,
+  "sourceCommitUrl": "https://github.com/korenmic/Odrig/commit/edf96d83e5cf93fe11b7e575ba837ea5d5baae4e",
+  "certificateSha256": "5a489ec294e53cdec085d71092cf4e7285ae08d4d43c19929d84130f3649f0f1",
+  "apk": {
+    "file": "odrig-debug.apk",
+    "bytes": 22385971,
+    "sha256": "7058f799edce216286a3cd8004eb48b9c418fa2209fbcdf95ae59a6f711bf8dd",
+    "packagingTests": 8,
+    "cleanInstallPassed": true,
+    "publishedApkUpgradePassed": true,
+    "launchPassed": true
+  },
+  "firmware": {
+    "file": "odrig-firmware.bin",
+    "bytes": 1890736,
+    "sha256": "2a5acf5027444a1f658c32289f8db922082da0585dd8f1158fc1a81486524eba",
+    "kind": "ESP32-S3 application image",
+    "offset": "0x10000",
+    "environment": "odrig_microsd",
+    "inputsSha256": "945d7cec0028f27d0d8865215853c21bb972fb4874bb4988ff2b83c40201ab12",
+    "offlineInspectionPassed": true
+  },
+  "signingBackupsVerifiedUnchanged": true,
+  "identityEvidence": {
+    "method": "In-place overwrite on mounted Drive; bytes/size/inodes verified",
+    "independentDriveApiFileIdLookup": false,
+    "files": [
+      {
+        "file": "odrig-debug.apk",
+        "bytes": 22385971,
+        "sha256": "7058f799edce216286a3cd8004eb48b9c418fa2209fbcdf95ae59a6f711bf8dd",
+        "inodeBefore": 11084,
+        "inodeAfter": 11084,
+        "inPlace": true
+      }
+    ]
+  },
+  "physicalAcceptance": {
+    "phone": false,
+    "board": false,
+    "electrical": false,
+    "powerLoss": false
+  },
+  "prCiGate": "Exact final pushed-head Windows/Ubuntu check results are reported separately.",
+  "previousAndroidVerification": {
+    "version": "16",
+    "avdReadOnly": true,
+    "originalAvdConfigUnchanged": true,
+    "timing": {
+      "androidNativeWifi": true,
+      "moduleWorkerTimeSync": true,
+      "defaultAutoAndHours": true,
+      "pairedHoursConfirmed": true,
+      "nativeBlackout": true,
+      "manualPrecedence": true,
+      "resumeConfirmed": true,
+      "initial": {
+        "auto": true,
+        "enabled": true,
+        "on": "18:00",
+        "off": "06:00",
+        "reading": "Board time: 2026-11-01 11:22:51 (Asia/Jerusalem). At last refresh.",
+        "zone": "Asia/Jerusalem"
+      },
+      "time": {
+        "ok": true,
+        "valid": true,
+        "utc": 1793524971,
+        "zone": "Asia/Jerusalem",
+        "offset": 7200,
+        "revision": "65ddbb81",
+        "from": 946684800,
+        "until": 4102444800,
+        "board": "emu-35fb278526184bdbfaf9685d",
+        "error": null
+      }
+    },
+    "integrated": {
+      "before": {
+        "fourAnglesConfirmed": true,
+        "onlyStartup": true,
+        "mappingDefaultLocked": true,
+        "before": {
+          "path": "clocks",
+          "mode": "only",
+          "link": "answers",
+          "fresh": true,
+          "statusFresh": true
+        }
+      },
+      "lost": {
+        "keptList": true,
+        "clocksBoundary": true,
+        "controlsDisabled": true
+      },
+      "after": {
+        "sameList": true,
+        "sameKeys": true,
+        "sameVersion": true,
+        "sameRow": true,
+        "noRoot": true,
+        "only": true
+      }
+    },
+    "physicalPhoneAcceptance": false
+  },
+  "previousPortableVerification": {
+    "cases": 5315,
+    "platformSkips": 28,
+    "allCasesHavePassingVerification": true,
+    "allFullSuiteRunsClean": false,
+    "qualifications": [
+      "The last full app run had538 successes and one initial8s connection timeout in an unchanged catalog case; that exact case then passed unchanged in isolation3.114s. Original full-run failures remain retained."
+    ],
+    "caseRechecks": [
+      {
+        "id": "tests.app.test_catalog.TheCatalogsOfSettings.test_not_now_sends_nothing",
+        "passed": true,
+        "log": "build/seed65-task2-catalog-recheck.log"
+      }
+    ]
+  },
+  "android": {
+    "androidVersion": "16",
+    "avd": "Odrig_Usb_Diagnostics_70",
+    "readOnly": true,
+    "ownedAvdOnly": true,
+    "cleanInstallPassed": true,
+    "previousPublishedUpgradePassed": true,
+    "launchPassed": true,
+    "apkSha256": "7058f799edce216286a3cd8004eb48b9c418fa2209fbcdf95ae59a6f711bf8dd",
+    "previousApkSha256": "7a9c171ee5793bcd8ecc9bcda2415c24ae1e6540e5290dc87039f2dbdebaabab",
+    "usb": {
+      "realCapacitorUsbPlugin": true,
+      "wifiNotRequired": true,
+      "noDeviceHandling": true,
+      "invalidOpenAndReadAndShareRefused": true,
+      "view": {
+        "availability": "This phone does not report USB host support.",
+        "controls": true,
+        "startDisabled": true,
+        "shareDisabled": true,
+        "readOnly": true
+      },
+      "devices": {
+        "supported": false,
+        "ports": [],
+        "attached": 0
+      },
+      "state": {
+        "state": "idle",
+        "detail": "",
+        "active": false,
+        "bytes": 0,
+        "text": ""
+      },
+      "physicalUsbTested": false,
+      "shareWithRealCaptureTested": false,
+      "nativeBackgroundOpenRefused": true
+    },
+    "originalAvdConfigUnchanged": null,
+    "originalAvdConfigComparison": "Not independently persisted for this run; only the newly created task AVD was started.",
+    "metadataReconstructedFromCompletedCommands": true,
+    "qualification": "All installation/native checks and cleanup completed successfully. The old report writer then referenced missing timing/integration proof files. This report is reconstructed from preserved successful commands and the USB proof; no device tests were rerun."
+  },
+  "appVerification": {
+    "run": "20261101-153513-152652",
+    "cases": 550,
+    "allCasesHavePassingVerification": true,
+    "allFullSuiteRunsClean": false,
+    "rechecks": {
+      "fullRun": "20261101-153513-152652",
+      "cases": 550,
+      "fullRunOutcome": "FAILED (failures=3)",
+      "allFullSuiteRunsClean": false,
+      "recheckedCases": [
+        "tests.app.test_docs.TheAppsPage.test_every_link_of_the_page_leads_somewhere",
+        "tests.app.test_docs.TheAppsPage.test_its_sections_are_what_the_app_is_how_it_is_built_installed_and_used_and_what_was_checked",
+        "tests.app.test_brightness.BrightnessControls.test_animation_identity_change_cancels_held_and_dirty_edits"
+      ],
+      "recheckedCount": 3,
+      "allRechecksPassed": true,
+      "qualification": "Two legacy documentation assertions updated for the new section/HTTPS reference; one unchanged brightness case timed out before initial app startup and was rechecked unchanged in isolation."
+    }
+  },
+  "firmwareUnchanged": true,
+  "firmwareRebuilt": false,
+  "diagnosticPurpose": "Phone USB evidence collection; reported physical boot/Wi-Fi incident remains undiagnosed."
+}
