@@ -570,8 +570,9 @@ function row(animation) {
 
 // What tells a row of the list from another, as the list holds it and as the rows would
 // be drawn now.
-function rowKey(animation) {
-  return [animation.id, animation.file, isExternal(animation), isEditable(animation), onWritableCard(animation), animation.fault ?? "", metaOf(animation)].join("|");
+function rowKey(animation, kept) {
+  const writable = client.state.space === null && kept?.dataset.file === animation.file ? kept.dataset.writable : onWritableCard(animation);
+  return [animation.id, animation.file, isExternal(animation), isEditable(animation), writable, animation.fault ?? "", metaOf(animation)].join("|");
 }
 
 function keyOfChild(child) {
@@ -590,7 +591,10 @@ function keyOfChild(child) {
 // sub-folders.
 function drawRows(here) {
   const place = byId("animations-list");
-  const wanted = [...here.shown.map(rowKey), ...here.folders.map((entry) => `#${entry.path}|${entry.id}|${canIgnore(entry)}`)];
+  // Unknown capacity keeps the last-rendered badge; action permissions still use current observations.
+  const kept = new Map(client.state.space === null ? [...place.children].filter(child => child.classList.contains("row"))
+    .map(child => [child.dataset.id, child]) : []);
+  const wanted = [...here.shown.map(animation => rowKey(animation, kept.get(String(animation.id)))), ...here.folders.map((entry) => `#${entry.path}|${entry.id}|${canIgnore(entry)}`)];
   const shown = [...place.children].map(keyOfChild);
   if (shown.length === wanted.length && shown.every((key, at) => key === wanted[at])) {
     return;
@@ -652,7 +656,7 @@ function rowsState(state, animations, here) {
     const check = made.querySelector(".pick input");
     if (check) {
       check.checked = selection.has(animation.id);
-      check.disabled = selection.locked();
+      check.disabled = selection.locked() || !(isEditable(animation) || onWritableCard(animation));
     }
     made.querySelector(".more").disabled = !answers();
     const play = made.querySelector(".play");
