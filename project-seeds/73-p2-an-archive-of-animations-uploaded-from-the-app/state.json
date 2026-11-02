@@ -1,0 +1,9 @@
+{
+  "number": 73,
+  "slug": "73-p2-an-archive-of-animations-uploaded-from-the-app",
+  "state": "remaining",
+  "title": "An archive of animations uploaded from the app",
+  "priority": "P2",
+  "addedAt": "2026-11-02",
+  "summary": "The app takes one zip of animation files, opens it on the phone with the converter's inflate, lists its animations, and uploads the ticked ones one by one to the board's own storage or its card through the existing upload; names shortened to what the destination takes; no new command."
+}
