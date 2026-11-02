@@ -23,14 +23,28 @@ function reset() {
   problem = '';
 }
 
+function configurationProblem() {
+  if (saved?.supported !== false) return '';
+  const status = client.state.status;
+  if (status?.error) {
+    return `The board's canvas configuration is unavailable: ${status.error}. Restore its configuration, then refresh rotation.`;
+  }
+  if (status?.progress?.readiness === 'recovery' || status?.width == null || status?.height == null) {
+    return 'The board has not confirmed a usable canvas configuration. Check its configuration, then refresh rotation.';
+  }
+  return '';
+}
+
 function draw() {
   const field = byId('output-rotation');
   field.value = saved === null ? '' : String(saved.degrees);
   field.disabled = !ready() || phase !== null || unsupported || saved?.supported !== true;
   byId('rotation-refresh').disabled = !ready() || phase !== null;
+  const configuration = configurationProblem();
   let text = !ready() ? 'Connect to the board to confirm its output rotation.' :
     phase === 'saving' ? 'Saving rotation... Waiting for the board to confirm.' :
     phase === 'reading' ? 'Reading output rotation...' :
+    configuration ? configuration :
     unsupported ? 'This target does not support square output rotation. Other controls remain available.' :
     saved?.error ? 'The saved rotation could not be read. Output uses 0 degrees; choose an angle to repair it.' :
     saved ? `Confirmed output: ${saved.degrees} degrees clockwise.` : 'Refresh to read the output rotation.';
@@ -66,6 +80,7 @@ async function read(keepProblem = false) {
   } catch (error) {
     if (at !== epoch) return;
     unsupported = error instanceof Refusal && ['unknown-command', 'unsupported'].includes(error.code);
+    if (unsupported) saved = null;
     if (!unsupported) problem = 'Could not confirm the rotation. Refresh to try again.';
   } finally {
     if (at === epoch) { phase = null; draw(); }

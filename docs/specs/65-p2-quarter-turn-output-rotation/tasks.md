@@ -32,7 +32,7 @@ task and checkbox per proof commit. Standalone packaging/publication is a separa
     the production bootstrap and shared core, with existing installs preserved.
   - Run discovered firmware/core suites, document the fresh-board behavior and
     retain failing-before/passing-after evidence in this proof commit.
-- [ ] 5. Distinguish installation faults from unsupported rotation in Settings
+- [x] 5. Distinguish installation faults from unsupported rotation in Settings
   - Add failing browser coverage for missing/malformed installation state before
     changing UI feedback. Keep valid-board angle controls and legacy compatibility.
   - Run the discovered app suite and tick this task in its own proof commit.

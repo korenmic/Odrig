@@ -1347,6 +1347,10 @@ last confirmed value while saving; only the full board acknowledgement changes i
 Refusals/lost replies are reconciled by reading, never automatic write replay.
 Leaving Settings, hiding the app, changing targets or losing the link cancels unsent
 changes and invalidates old callbacks. Old firmware disables only this control.
+Current firmware lets the orientation be saved even when animation files or the show
+are missing or invalid. An older target that reports rotation unavailable alongside
+a configuration fault shows that fault and refresh guidance, rather than claiming
+the feature is unsupported. Its control stays disabled until support is confirmed.
 
 Rotation is installation-wide and survives reset; source previews/files and mapping
 diagnostics keep their canonical/physical orientation. Miniature output rotates the

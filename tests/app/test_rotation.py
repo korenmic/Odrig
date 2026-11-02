@@ -15,6 +15,8 @@ class Target(ClocksTarget):
     def __init__(self, test, angle=0, legacy=False):
         self.angle = angle
         self.legacy = legacy
+        self.supported = True
+        self.status_values = {}
         self.lose = False
         self.changed = threading.Event()
         self.hold = threading.Event()
@@ -42,8 +44,12 @@ class Target(ClocksTarget):
             if self.lose:
                 self.answering = False
                 return 500, ''
-        return 200, json.dumps(dict(ok=True, supported=True, degrees=self.angle,
+        return 200, json.dumps(dict(ok=True, supported=self.supported, degrees=self.angle,
                                     revision=revision(self.angle), error=None))
+
+    def status(self):
+        status, body = super().status()
+        return status, json.dumps({**json.loads(body), **self.status_values})
 
     def mutations(self):
         return [line.decode() for _, line in self.stand_in.lines if line.startswith(b'rotation set ')]
@@ -55,6 +61,68 @@ def run(target, acts=(), **kwargs):
 
 
 class RotationControls(unittest.TestCase):
+    def test_native_configuration_can_be_saved_without_a_usable_installation(self):
+        square = files_for()
+        cases = {
+            'missing mapping and show': {},
+            'malformed show': {'mapping.json': square['mapping.json'], 'show.json': b'broken'},
+        }
+        for label, files in cases.items():
+            with self.subTest(label=label), native.installed(files) as folder, emulator.Emulator(folder, checked=False) as target:
+                status = json.loads(target.command('status'))
+                self.assertEqual(status['readiness'], 'recovery')
+                self.assertIsNotNone(status['error'])
+                acts = [dict(choose=90, until=dict(value='90', disabled=False), look='saved'),
+                        dict(reload=True, until=dict(value='90', disabled=False), look='again')]
+                seen = support.run('rotation', address=f'127.0.0.1:{target.port}',
+                                   settings=dict(rows=0, acts=acts)).seen
+                self.assertFalse(seen['first']['disabled'])
+                self.assertFalse(seen['again']['disabled'])
+                self.assertEqual(json.loads(target.command('rotation'))['degrees'], 90)
+                self.assertEqual(Path(folder, 'rotation.txt').read_bytes(), b'1 90\n')
+
+    def test_a_configuration_fault_is_not_reported_as_unsupported_rotation(self):
+        for reason in ('mapping-missing', 'show-invalid broken'):
+            with self.subTest(reason=reason):
+                target = Target(self)
+                target.supported = False
+                target.status_values = dict(error=reason, width=60, height=60)
+                seen = run(target)
+                self.assertTrue(seen['first']['disabled'])
+                self.assertIn('configuration', seen['first']['said'])
+                self.assertIn(reason, seen['first']['said'])
+                self.assertNotIn('does not support', seen['first']['said'])
+                self.assertEqual(target.mutations(), [])
+
+    def test_an_unconfirmed_canvas_is_not_reported_as_unsupported_rotation(self):
+        target = Target(self)
+        target.supported = False
+        seen = run(target)
+        self.assertTrue(seen['first']['disabled'])
+        self.assertIn('configuration', seen['first']['said'])
+        self.assertNotIn('does not support', seen['first']['said'])
+        self.assertEqual(target.mutations(), [])
+
+    def test_a_legacy_rectangular_canvas_remains_unsupported(self):
+        target = Target(self)
+        target.supported = False
+        target.status_values = dict(width=60, height=6)
+        seen = run(target)
+        self.assertTrue(seen['first']['disabled'])
+        self.assertIn('does not support', seen['first']['said'])
+        self.assertEqual(target.mutations(), [])
+
+    def test_a_fresh_legacy_refusal_replaces_an_older_configuration_diagnosis(self):
+        target = Target(self)
+        target.supported = False
+        target.status_values = dict(error='mapping-missing', width=None, height=None)
+        seen = run(target, [dict(step=True), dict(refresh=True, wait=500, look='legacy')],
+                   steps=[lambda: setattr(target, 'legacy', True)])
+        self.assertTrue(seen['legacy']['disabled'])
+        self.assertIn('does not support', seen['legacy']['said'])
+        self.assertNotIn('configuration', seen['legacy']['said'])
+        self.assertEqual(target.mutations(), [])
+
     def test_four_choices_apply_and_survive_reopening_on_the_native_core(self):
         with native.installed(files_for()) as folder, emulator.Emulator(folder) as target:
             acts = [dict(choose=90, look='pending'), dict(until=dict(value='90', disabled=False))]
