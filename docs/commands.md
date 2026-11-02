@@ -875,9 +875,13 @@ atomic publication. Missing settings mean0. Invalid/unreadable `rotation.txt` me
 with an error and a deliberate save can repair it. The bounded ASCII file is
 `1 DEGREES\n`; writes go through `rotation.part` and atomic rename. A valid no-op
 writes nothing. Refused/failed saves retain the last confirmed live and saved value.
-Uploads, startup validation, catalog rebuilding or pending miniature setup can return
-busy. Physical mapping diagnostics return in-use. Rectangular legacy canvases report
-unsupported; the installation is permanently1:1, with no rectangular fit selector.
+Uploads, catalog rebuilding or pending miniature setup can return busy. Content
+validation does not block this independent installation setting. Rotation remains
+readable, writable and persistent when mapping/show files are missing or invalid,
+or no animation is usable; those content faults still prevent playback. Unavailable
+storage reports storage-error. Physical mapping diagnostics return in-use. Valid
+rectangular legacy fixtures report unsupported; the installation is permanently
+60x60, with no rectangular fit selector.
 
 Rotation samples the complete RGB/palette/text/clock/message/picture composition
 before physical mapping and miniature averaging, exactly once. Source previews,

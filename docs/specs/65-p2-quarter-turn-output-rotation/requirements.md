@@ -15,6 +15,11 @@ shared command controls. There are no unanswered product questions.
    playable show. A subsequent deliberate successful save may repair the setting.
 4. Save across board resets, app reconnections and ordinary show replacement. Never
    write per frame. Unsupported old firmware remains usable for ordinary controls.
+5. The installation is permanently60x60. Rotation configuration stays readable,
+   writable and persistent regardless of missing/invalid mapping or show files,
+   unavailable animations or unfinished inventory validation. Retain honest storage
+   errors and playback validation. A fresh internal store starts with the canonical
+   square mapping and a valid dark empty show, without replacing any operator files.
 
 ## 2. Square composed output
 

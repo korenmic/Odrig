@@ -1326,4 +1326,7 @@ The existing spare state bits hold orientation, without another canvas allocatio
 Rendering permutes composed samples before physical mapping and miniature averaging.
 Physical mapping diagnostics remain unrotated and refuse orientation changes.
 Source files, previews, timing, brightness and current limits keep their behavior.
+Orientation is independent of installed content. Missing or invalid mapping/show
+files and unavailable animation files do not disable its read, save or startup
+restore; the installation is always60x60. Content validation still controls playback.
 See [the command contract](commands.md#square-output-rotation).

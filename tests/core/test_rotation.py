@@ -38,6 +38,63 @@ def picture(run, files):
 
 
 class Rotation(unittest.TestCase):
+    def test_fresh_production_bootstrap_accepts_an_upload_and_all_rotations(self):
+        from tests.firmware.test_fresh_board import initialize
+        from .test_upload import Script
+
+        fresh = initialize()['files']
+        payload = files_for()['picture.odrg']
+        with support.installed(fresh) as folder:
+            initial = support.session(folder, [support.line(0, 'status'), support.line(0, 'rotation')])
+            self.assertIsNone(initial.error)
+            self.assertTrue(replies(initial)[-1]['supported'])
+            uploaded = support.session(folder, Script().upload(1, 'probe.odrg', payload).lines)
+            self.assertTrue(all(value['ok'] for value in replies(uploaded)))
+            self.assertEqual(support.folder_files(folder)['probe.odrg'], payload)
+            files = {'mapping.json': fresh['mapping.json'].decode('utf-8')}
+            baseline = picture(support.session(folder, ['poll 0']), files)
+            before = 0
+            for degrees in (90, 180, 270, 0):
+                result = support.session(folder, [turn(degrees, before), 'poll 0'])
+                self.assertEqual(picture(result, files), rotated(baseline, degrees))
+                again = replies(support.session(folder, [support.line(0, 'rotation')]))[0]
+                self.assertEqual(again['degrees'], degrees)
+                before = degrees
+
+    def test_rotation_configuration_is_independent_of_missing_or_invalid_content(self):
+        square = files_for()
+        cases = {
+            'missing mapping and show': {},
+            'missing show': {'mapping.json': square['mapping.json']},
+            'missing mapping': {'show.json': square['show.json']},
+            'malformed mapping': {'mapping.json': b'broken', 'show.json': square['show.json']},
+            'malformed show': {'mapping.json': square['mapping.json'], 'show.json': b'broken'},
+            'unavailable animation': {name: value for name, value in square.items() if name != 'picture.odrg'},
+            'empty show': {'mapping.json': square['mapping.json'],
+                           'show.json': b'{"version":1,"brightness":32,"items":[]}'},
+        }
+        for label, files in cases.items():
+            with self.subTest(label=label), support.installed(files) as folder:
+                before = 0
+                for degrees in (90, 180, 270, 0):
+                    initial = replies(support.session(folder, [support.line(0, 'rotation')]))[0]
+                    self.assertTrue(initial['supported'])
+                    self.assertEqual(initial['degrees'], before)
+                    changed = replies(support.session(folder, [turn(degrees, before)]))[0]
+                    self.assertEqual(changed, dict(ok=True, supported=True, degrees=degrees,
+                                                   revision=revision(degrees), error=None))
+                    self.assertEqual(support.folder_files(folder)['rotation.txt'], f'1 {degrees}\n'.encode())
+                    before = degrees
+
+    def test_missing_installation_still_reports_real_storage_failure(self):
+        result = support.start({}, [turn(90)], ['--no-storage'])
+        self.assertEqual(replies(result)[0], dict(ok=False, error='storage-error'))
+
+    def test_inventory_validation_does_not_block_rotation_configuration(self):
+        with support.installed(files_for()) as folder:
+            result = support.session(folder, [turn(90)], check_first=False)
+            self.assertEqual(replies(result)[0]['degrees'], 90)
+
     def test_default_and_all_persistent_confirmed_values(self):
         with support.installed(files_for()) as folder:
             initial = replies(support.session(folder, [support.line(0, 'rotation')]))[0]

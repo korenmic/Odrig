@@ -5,7 +5,6 @@
 #include "catalog.h"
 #include "crc32.h"
 #include "mini.h"
-#include "player.h"
 #include "storage.h"
 
 namespace odrig {
@@ -15,7 +14,7 @@ const char kPart[] = "rotation.part";
 const char *const kSaved[] = {"1 0\n", "1 90\n", "1 180\n", "1 270\n"};
 
 bool supported(const Core &core) {
-    return !core.invalid && core.width != 0 && core.width == core.height;
+    return core.invalid || (core.width != 0 && core.width == core.height);
 }
 
 uint32_t revision_of(const Core &core) {
@@ -57,10 +56,9 @@ uint32_t rotation_reply(const Core &core, Reply &reply) {
 
 uint32_t rotation_set(Core &core, uint32_t revision, uint32_t degrees, Reply &reply) {
     if (degrees > 270 || degrees % 90 != 0) return refuse(reply, "bad-argument");
-    if (core.invalid) return refuse(reply, "show-invalid");
     if (!supported(core)) return refuse(reply, "unsupported");
     if (core.mapping_test) return refuse(reply, "in-use");
-    if (!check_complete(core) || core.upload.state != kUploadNone || catalog_rebuilding(core) ||
+    if (core.upload.state != kUploadNone || catalog_rebuilding(core) ||
         (core.mini != nullptr && core.mini->pending)) return refuse(reply, "busy");
     if (revision != revision_of(core)) return refuse(reply, "rotation-conflict");
     const uint8_t q = static_cast<uint8_t>(degrees / 90);

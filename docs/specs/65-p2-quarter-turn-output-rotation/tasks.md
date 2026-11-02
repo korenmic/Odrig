@@ -24,6 +24,24 @@ task and checkbox per proof commit. Standalone packaging/publication is a separa
     preserving usual artifacts and signing backups; push the standalone PR, record CI
     and notify delivery. Physical square-wall and phone/board acceptance stays open.
 
+- [x] 4. Initialize a fresh board safely before exposing rotation
+  - Reproduce the empty internal-storage failure before fixing production startup.
+  - Provision the existing canonical60x60 mapping and a valid empty dark show only
+    for a fresh Odrig store; recover interrupted initialization without replacing
+    operator files. Verify all four rotations and saved state after restart through
+    the production bootstrap and shared core, with existing installs preserved.
+  - Run discovered firmware/core suites, document the fresh-board behavior and
+    retain failing-before/passing-after evidence in this proof commit.
+- [ ] 5. Distinguish installation faults from unsupported rotation in Settings
+  - Add failing browser coverage for missing/malformed installation state before
+    changing UI feedback. Keep valid-board angle controls and legacy compatibility.
+  - Run the discovered app suite and tick this task in its own proof commit.
+- [ ] 6. Rebuild, verify and publish the fresh-board rotation artifacts
+  - Build clean committed sources using repository tools; test firmware startup and
+    rotation commands in the available ESP32S3 model plus installed Android VM.
+  - Replace the PR44 Drive artifacts in place, verify hashes, push, check remote CI,
+    and notify with the fixed firmware URL and precise physical-test limitations.
+
 ## Owner acceptance (not executable queue tasks)
 
 - [ ] Observe correct clockwise orientation on the actual square wall and miniature

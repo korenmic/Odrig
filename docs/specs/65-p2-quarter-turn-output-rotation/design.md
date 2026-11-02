@@ -4,21 +4,32 @@
 
 Use two quarter-turn bits and one saved-read-error bit in Core's existing byte of
 bitfields. Measure Core size and drive arena; limits do not change. No heap/frame buffer
-is added. Read `rotation.txt` at startup after canvas validation, before playback starts.
+is added. Read `rotation.txt` at startup before playback, even if content validation failed.
 Its bounded ASCII form is `1 DEGREES\n`, where DEGREES is exactly0,90,180 or270.
 Missing means0. Invalid version/length/trailing bytes or a read error means0 with
 `error:"unreadable"`. This metadata does not make a show invalid.
 
 `rotation` returns `{ok:true,supported:BOOL,degrees:N,revision:CRC,error:null|"unreadable"}`.
-The CRC32 of the single quarter-turn byte is the revision. Rectangular/invalid canvas
-reports unsupported and never rotates. `rotation set REVISION DEGREES` validates exact
-degrees/revision, square support, diagnostics, upload/rebuild and checker availability.
-Reject with existing bad-argument/show-invalid/unsupported/busy/in-use/storage-error
+The CRC32 of the single quarter-turn byte is the revision. A valid rectangular legacy
+fixture reports unsupported. Missing/invalid content cannot change the installation's
+permanent square capability. `rotation set REVISION DEGREES` validates exact
+degrees/revision, square support, diagnostics and upload/rebuild contention.
+Reject with existing bad-argument/unsupported/busy/in-use/storage-error
 codes plus `rotation-conflict` for a stale revision. A same valid value is a no-op;
 an errored setting is rewritten even for0. Write the complete bounded text to
 `rotation.part`, close, atomically rename to `rotation.txt`, then publish live bits.
 Clean failed temporary writes. Read/set returns the complete confirmed rotation object.
 Add metadata names to show-install preservation, never reset orientation during installs.
+
+The production firmware initializes an absent/empty `/odrig` store before creating
+the core host or caching capacity. A small platform-independent transaction owns an
+empty `fresh-init` directory, installs canonical mapping data and an empty show via
+verified `fresh.part` writes and destination-absent renames, then removes its marker.
+The embedded mapping must equal `mapping/legs-20.json` in host regression tests.
+Interrupted attempts can resume only while every existing transaction destination
+still equals its default and no unknown file/folder is present. Existing installations
+are never repaired by guessing or overwritten. WLED configuration is outside this
+transaction and keeps its bytes.
 
 ## Rendering
 
