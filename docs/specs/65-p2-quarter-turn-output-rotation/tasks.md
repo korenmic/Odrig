@@ -36,7 +36,7 @@ task and checkbox per proof commit. Standalone packaging/publication is a separa
   - Add failing browser coverage for missing/malformed installation state before
     changing UI feedback. Keep valid-board angle controls and legacy compatibility.
   - Run the discovered app suite and tick this task in its own proof commit.
-- [ ] 6. Rebuild, verify and publish the fresh-board rotation artifacts
+- [x] 6. Rebuild, verify and publish the fresh-board rotation artifacts
   - Build clean committed sources using repository tools; test firmware startup and
     rotation commands in the available ESP32S3 model plus installed Android VM.
   - Replace the PR44 Drive artifacts in place, verify hashes, push, check remote CI,

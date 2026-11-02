@@ -46,3 +46,53 @@ transaction and materializes its exact files into an empty folder for subsequent
 native integration checks. No firmware image was built or published in this task.
 Rebuilt-image/Android-VM checks and delivery belong to task6. Physical LED/radio and
 phone-on-board acceptance remain open.
+
+## Rebuilt image and installed APK
+
+The official Windows firmware pipeline built clean committed source
+`9d7aa6a453763eb270403ebb9345e465f8d94fd0` and passed offline ESP32-S3 header,
+source/provenance and linked-symbol inspection. The1885056-byte application has
+SHA256 `062de8d4723e9db8b3246f0984f8c0409483b5a67005b5d21ef27bc26b99929a`.
+
+The exact binary passed three ESP32-S3 instruction/peripheral-model fixtures:
+
+| Initial store | Player status | Rotation |
+|---|---|---|
+| Empty LittleFS | Ready,60x60, no animations | All four saves;270 restored after CPU reset |
+| Partial installation, no mapping | Mapping missing/recovery | All four saves;270 restored after CPU reset |
+| Canonical mapping, malformed show | Show malformed/recovery | All four saves;270 restored after CPU reset |
+
+Each case had zero spontaneous resets. Total emulated time across its intentional
+reset was1.343,1.301 and1.314 seconds, respectively; host time was42.539,38.281
+and46.352 seconds. These are bounded configuration/persistence checks, not sustained
+rendering, radio, SD, USB cable, flash readback or physical LED acceptance.
+
+APK source is clean integration commit
+`e08ba55e4c16cac91af5896a820ccbfd4690063f`; all core, firmware and canonical
+mapping inputs are byte-identical to the firmware source. The19088118-byte APK
+has SHA256 `fb2f13e5afb561c48dbd22316159f01b7f0100947205d2e2fc7d8d9b76c894c3`.
+It retains the existing dedicated signer. All8 discovered APK checks and88
+onboarding checks passed after integrating master.
+
+The installed APK passed upgrade from the previous PR44 APK, clean installation,
+launch and all four enabled rotation controls on the dedicated read-only Android16
+VM. Its unchanged native Android Target sender and Wi-Fi availability gate used an
+ADB reverse tunnel and transparent HTTP-to-UART adapter to this actual ESP32-S3
+binary, starting from empty LittleFS. No native-core stand-in or command/reply mocks
+were used in this APK integration. Captured native sends for90,180,270 and0 each
+returned HTTP200 with matching `ok:true`, `supported:true` and degrees. The model
+bridge recorded31 commands/31 firmware replies and zero resets over5.938 emulated
+seconds/188.403 host seconds. The VM, reverse/forward ports and bridge were closed;
+the owned AVD configuration was unchanged. Native tests separately prove exact
+rotated output pixels. Physical radio and LED acceptance remains open.
+
+Both existing payload files in `Artifacts/odrig/standalone-rotation` were overwritten
+in place, with no rename, and their mounted bytes and local file identities verified.
+The existing share URLs are retained. Usual root artifacts and all signing backups
+were hashed before and after and remained unchanged. Updated provenance, model,
+Android and checksum sidecars accompany the files. Independent cloud-server/phone
+byte readback was unavailable; an anonymous download returned HTML rather than an
+image. The complete delivery record is in `standalone-delivery.json`.
+
+GitHub Windows/Linux checks on the final pushed head are a separate ready-handoff
+gate; the delivery record does not claim those checks before they finish.
