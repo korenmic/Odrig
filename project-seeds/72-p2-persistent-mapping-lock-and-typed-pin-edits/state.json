@@ -1,0 +1,9 @@
+{
+  "number": 72,
+  "slug": "72-p2-persistent-mapping-lock-and-typed-pin-edits",
+  "state": "remaining",
+  "title": "Persistent mapping checkbox and typed pin edits",
+  "priority": "P2",
+  "addedAt": "2026-11-02",
+  "summary": "Expose a direct Settings mapping-lock checkbox, persist either confirmed state locally across app restarts, and add validated editable GPIO text fields using the existing mapping reorder/save path. Preserve confirmations and target safety; no firmware or hardware changes. Planning only; no open product questions."
+}

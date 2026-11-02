@@ -130,6 +130,8 @@ keeping the seed in progress.
 - **Current limits for the wall and each snake**, seed 45: implemented in open PR #15; not yet merged.
 - **Internal-storage clocks and messages**, seed 61: planned; recognize matching clock/message paths in internal storage and SD, with a later managed upload attempt of the seven approved messages. A persistent dropdown chooses SD card (default) or Internal storage for matching path/type duplicates; owner product questions are resolved.
 - **Board time and a daily on/off schedule**, seed 64: ready for S2S; read/set time over existing transports, default On 18:00/Off 06:00, and ignore scheduling while time is invalid. APK auto-sync defaults on and waits for the next connection at least 15 minutes after the last confirmed sync. Follow the phone's zone/DST; manual On/Off overrides until explicitly returned to scheduling. No open product questions remain.
+- **Complete Snake10 cross-wire retirement**, seed 71: finish removing dedicated emulator observers, counters and remaining product paths after seed69; preserve ordinary snake10, generic installed geometry and historical records. No open product questions remain.
+- **Persistent mapping checkbox and typed pin edits**, seed 72: expose the lock directly in Settings, retain its confirmed app-local value across restarts, and make GPIO assignments editable text fields through the existing validated mapping save path. No firmware or hardware change and no open product questions.
 
 The state of every seed is in the `state.json` of its folder.
 

@@ -1,0 +1,9 @@
+{
+  "number": 71,
+  "slug": "71-p2-complete-snake10-cross-wire-retirement",
+  "state": "remaining",
+  "title": "Complete Snake10 cross-wire retirement",
+  "priority": "P2",
+  "addedAt": "2026-11-02",
+  "summary": "Finish the completed seed69 retirement by removing remaining dedicated Snake10 cross-wire runtime observers, counters and product paths; preserve normal snake10, generic installed geometry and historical records. Planning only; no open product questions."
+}
