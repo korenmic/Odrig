@@ -21,6 +21,7 @@ condition changed or the owner requests it.
 | SD reader module | Owner has already replaced it. | This was the reader module, not the physical microSD card. |
 | Physical microSD card | Has not been replaced. Owner prefers to keep it. | Its condition and contents have not been independently checked. |
 | Clock assets | Claude prepared the final required clock animations with rotation baked into the files. Owner estimates roughly 3 MB. | Exact archive/version/size in this report; whether total or currently free internal storage is insufficient. |
+| Spare runtime diagnostics | Owner's uploaded `/json/info` reports `flash:8`, `psram:0`, `psrSz:0`, filesystem total/used0, `mapping-missing`, Odrig outputs0/0, and `SD not configured`; uptime409seconds/AP active. | Physical module variant, why PSRAM is unavailable, and actual partition table. Release label is16MB_opi, not hardware proof. |
 | Available operator tools | Phone only at the installation; owner is walking there, estimated 10–15 minutes from the report. | Windows is not physically available at the installation. |
 
 The spare's successful boot is evidence against a failure inevitable on every board
@@ -46,17 +47,20 @@ breadboard/contact problem affecting SD detection.
 | F08 | Replace physical microSD card | Not tried; owner prefers not to do this | Deferred; not a required immediate step |
 | F09 | Change hotspot name/password, Save, reconnect; then remove/restore power | New credentials work during that run; defaults return after power cycle | Reported persistence failure; stored file contents/reset cause not yet captured |
 | F10 | Android HTTP Shortcuts save API and stored-file readback | POST returned `success:true`; owner confirms restart was performed and AP name stayed/defaulted to WLED-AP. Correct GET `/cfg.json?check=4` returned WLED404. | Save acknowledgement is not durable storage; config file missing/unavailable on the responding target |
+| F11 | Android GET `/json/info`, owner-uploaded `bbb.json` | Running spare reports unavailable LittleFS,8MB flash capacity and no initialized PSRAM; SD worker cannot start under the current allocation policy | Done; module identification/partition evidence now needed before choosing recovery images |
 
 ## Next observations, following the owner's plan
 
-1. **F06 board swap is done; do not repeat it.** The spare boots while connected.
-   Resolve the reported loss of saved hotspot credentials after power cycles, then record app
-   connection and the exact external-storage state with the existing card/reader chain.
-   Boot completion, correct hotspot association and SD recognition are separate results.
+1. **F06/F11 are done; do not repeat them unchanged.** The spare boots while connected,
+   but its filesystem is unavailable and PSRAM is not initialized. Identify the exact
+   module marking and matching flash/PSRAM/partition profile before choosing recovery
+   files. Fix persistent storage/profile prerequisites before evaluating card wiring.
+   Boot completion, app association, usable storage and playback are separate results.
 2. **If SD appears:** browse a known clock folder and play a known file. Record whether
    playback works and what orientation is actually visible. A restored listing alone
    does not prove a file can be read and played.
-3. **If SD stays absent and the owner proceeds with F07:** disconnect power first;
+3. **F07 is now deferred while the SD worker cannot initialize.** If SD still fails
+   after the memory/profile issue is resolved and the owner proceeds: disconnect power first;
    keep the same spare, firmware, reader and card, and change only the breadboard
    connection path to the owner's planned direct-wire path. Record recognition and
    playback separately. Do not change pin assignments, voltage or power design here.
@@ -167,6 +171,28 @@ exact error text when available. Missing values stay "not reported".
   observation is `GET /json/info`, especially its `fs` total/used report. That request
   has not yet been reported as performed. No new firmware or destructive recovery
   has been applied.
+- **2026-11-03, uploaded runtime info (`bbb.json`):** the intended spare is running,
+  uptime409seconds/AP active. It reports WLED16.0.1/core5.5.5/release16MB_opi,
+  flash8MB, initialized PSRAM0, filesystem total/used0, missing mapping and0/0
+  Odrig outputs. These observations concern the spare, not the original board.
+- **Pinned source/ELF interpretation:** flash capacity is JEDEC-ID-derived, independent
+  of the release-name string. PSRAM0 means not initialized/available; absent hardware
+  versus incompatible mode is not yet distinguished. LittleFS reports total0 when
+  its info call fails; unavailable filesystem plus missing cfg explains why durable
+  settings cannot be assumed. A missing/incompatible partition layout is a candidate,
+  not a read-back-confirmed table diagnosis. App-only flashing does not create one.
+- **SD cause established in the delivered binary:** fixed SD pins are valid; the
+  worker's startup requests65,536 and26,624bytes specifically from PSRAM. With no
+  available PSRAM those allocations fail, returning before worker creation and before
+  replacing the initial `SD not configured` text. Thus that message is misleading
+  here: it is not evidence that the card, wires or reader module is defective. More
+  wiring replacements cannot repair this pre-probe allocation failure.
+- **Do not overinterpret other info fields:** a zero cached MAC has a verified early
+  STA-interface-initialization explanation; the different bootloader fingerprint is
+  not proof of corruption; no second OTA slot is allowed in the supported bigger
+  layout. None proves a damaged or counterfeit board. A matched phone-flash recovery
+  package requires module/partition identification; do not choose a16MB partition
+  image for a device reporting8MB. No recovery image has been built/flashed here.
 
 ## Artifact delivery preference
 
