@@ -132,7 +132,10 @@ keeping the seed in progress.
 - **Board time and a daily on/off schedule**, seed 64: ready for S2S; read/set time over existing transports, default On 18:00/Off 06:00, and ignore scheduling while time is invalid. APK auto-sync defaults on and waits for the next connection at least 15 minutes after the last confirmed sync. Follow the phone's zone/DST; manual On/Off overrides until explicitly returned to scheduling. No open product questions remain.
 - **Complete Snake10 cross-wire retirement**, seed 71: finish removing dedicated emulator observers, counters and remaining product paths after seed69; preserve ordinary snake10, generic installed geometry and historical records. No open product questions remain.
 - **Persistent mapping checkbox and typed pin edits**, seed 72: expose the lock directly in Settings, retain its confirmed app-local value across restarts, and make GPIO assignments editable text fields through the existing validated mapping save path. No firmware or hardware change and no open product questions.
-- **An archive of animations uploaded from the app**, seed 73: one zip picked on the phone, opened in the app, its animations ticked and uploaded one by one through the existing upload to the board's storage or its card; no new command.
+- **An archive of animations uploaded from the app**, seed 73: one ZIP picked on the phone, per-file or Select all choice, live destination-space projection, and byte-preserving sequential uploads through the existing upload flow. Internal/external destinations, conflicts and interruptions are explicit.
+- **Phone storage explorer and backups**, seed 74: planned; download selected animation bytes, create real folders/folder playlists, and cut/paste files or folders with guarded, recoverable path/catalog changes. Shared protocol extensions require owner approval before implementation.
+
+Field observations and checks: [rotation/SD journal](docs/field-notes/2026-11-03-rotation-and-sd-recovery.md).
 
 The state of every seed is in the `state.json` of its folder.
 
@@ -141,3 +144,6 @@ The state of every seed is in the `state.json` of its folder.
 The owner plans and runs the work with workflow skills for coding agents: seed to spec,
 enqueue, implement, a task runner and notify. They live outside this repository. You do
 not need them to make animations or to contribute: the working rules describe everything they produce.
+
+For artifacts, give a direct Google Drive file share URL or the full quoted local mount
+path. Do not substitute a Drive search URL.
