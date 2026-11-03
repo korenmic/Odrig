@@ -14,6 +14,7 @@ condition changed or the owner requests it.
 | Original outside installation | Same symptom when removed from the breadboard and all installation connections, powered only from the phone. | This does not identify a damaged component or distinguish software from stored state. |
 | Master control | Owner previously confirmed master firmware boots the original board. | Not a fresh controlled reflash in today's report. |
 | Spare ESP32S3 | Rotation firmware boots and the phone app connects. Owner reports zero internal animations. | Not necessarily an empty filesystem: mapping/settings/partition layout are not recorded. Actual wall rotation is not yet verified. |
+| Spare now installed | Owner has fitted the spare in the installation and reports it completes boot while connected. | App access is blocked by the default hotspot name colliding with other people's default networks; SD detection on this installed spare is not yet observed. |
 | Internal content | Original contains many animations; spare has none. | Exact bytes, inventory, settings and partition layout of each board. Board identity and stored state are confounded in this comparison. |
 | microSD | App reports external storage as "absent". | Card/reader/contact/board/configuration cause; "absent" alone is not proof of card damage. |
 | SD connecting wires | Owner has already replaced them. | Per-attempt timing/configuration not separately captured; SD is still absent in the overall report. |
@@ -40,16 +41,16 @@ breadboard/contact problem affecting SD detection.
 | F03 | Spare, no internal animations, rotation firmware | Boots; app connects | Done; physical wall orientation unverified |
 | F04 | Replaced SD connecting wires | Already tried; SD remains absent in overall report | Done |
 | F05 | Replaced SD reader module | Already tried; SD remains absent in overall report | Done |
-| F06 | Replace original board at installation with the already-flashed spare | No result reported yet | Planned |
+| F06 | Replace original board at installation with the already-flashed spare | Spare installed; completes boot while connected. Default hotspot identity conflicts prevent app access. | Board swap/boot done; app/SD/playback observations pending |
 | F07 | Bypass breadboard for SD reader using direct connecting wires | No result reported yet | Optional/planned if SD remains absent |
 | F08 | Replace physical microSD card | Not tried; owner prefers not to do this | Deferred; not a required immediate step |
 
 ## Next observations, following the owner's plan
 
-1. **F06: swap the board only.** Disconnect power before changing connections. Use the
-   already-flashed spare and retain the current physical microSD card, latest reader,
-   wires and connection path as far as practical. Record boot/hotspot, app connection
-   and the exact external-storage state. Do not silently mark these three as one result.
+1. **F06 board swap is done; do not repeat it.** The spare boots while connected.
+   Resolve the intended board's default-hotspot identity conflict, then record app
+   connection and the exact external-storage state with the existing card/reader chain.
+   Boot completion, correct hotspot association and SD recognition are separate results.
 2. **If SD appears:** browse a known clock folder and play a known file. Record whether
    playback works and what orientation is actually visible. A restored listing alone
    does not prove a file can be read and played.
@@ -125,6 +126,17 @@ exact error text when available. Missing values stay "not reported".
 
 - **2026-11-03, initial owner report:** F01–F05 reported as already performed; F06/F07
   planned, F08 deferred. No installation result for the spare has yet been reported.
+- **2026-11-03, next owner update:** F06 board replacement is complete and the spare
+  finishes boot in the connected installation. The owner cannot reliably associate
+  with its default-named hotspot because nearby people's boards use the same default.
+  App connection, SD state and actual rotation in this installed configuration remain
+  pending. Do not report this network-identity problem as another boot failure.
+- **Local route verification:** the rotation build defines `WLED_DISABLE_ADALIGHT`;
+  WLED serial JSON/Improv provisioning is not serviced, and Odrig's current command
+  list has no Wi-Fi configuration command. A generic USB terminal is therefore not
+  a verified Wi-Fi settings route. The existing WLED web page at
+  `http://4.3.2.1/settings/wifi` can change AP SSID after associating with the intended
+  board. Never edit another person's board merely because its SSID matches.
 
 ## Artifact delivery preference
 
