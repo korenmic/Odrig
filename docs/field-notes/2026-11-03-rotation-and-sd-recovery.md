@@ -14,7 +14,7 @@ condition changed or the owner requests it.
 | Original outside installation | Same symptom when removed from the breadboard and all installation connections, powered only from the phone. | This does not identify a damaged component or distinguish software from stored state. |
 | Master control | Owner previously confirmed master firmware boots the original board. | Not a fresh controlled reflash in today's report. |
 | Spare ESP32S3 | Rotation firmware boots and the phone app connects. Owner reports zero internal animations. | Not necessarily an empty filesystem: mapping/settings/partition layout are not recorded. Actual wall rotation is not yet verified. |
-| Spare now installed | Owner has fitted the spare in the installation and reports it completes boot while connected. | App access is blocked by the default hotspot name colliding with other people's default networks; SD detection on this installed spare is not yet observed. |
+| Spare now installed | Owner has fitted the spare and reports it completes boot while connected. Changing hotspot name/password in WLED and Save works at runtime; the phone successfully joins the new network. | Owner reports defaults return after removing/restoring power. Persistent configuration, installed app control, SD detection and wall rotation remain unverified. |
 | Internal content | Original contains many animations; spare has none. | Exact bytes, inventory, settings and partition layout of each board. Board identity and stored state are confounded in this comparison. |
 | microSD | App reports external storage as "absent". | Card/reader/contact/board/configuration cause; "absent" alone is not proof of card damage. |
 | SD connecting wires | Owner has already replaced them. | Per-attempt timing/configuration not separately captured; SD is still absent in the overall report. |
@@ -41,14 +41,15 @@ breadboard/contact problem affecting SD detection.
 | F03 | Spare, no internal animations, rotation firmware | Boots; app connects | Done; physical wall orientation unverified |
 | F04 | Replaced SD connecting wires | Already tried; SD remains absent in overall report | Done |
 | F05 | Replaced SD reader module | Already tried; SD remains absent in overall report | Done |
-| F06 | Replace original board at installation with the already-flashed spare | Spare installed; completes boot while connected. Default hotspot identity conflicts prevent app access. | Board swap/boot done; app/SD/playback observations pending |
+| F06 | Replace original board at installation with the already-flashed spare | Spare installed; completes boot while connected. Custom hotspot can be joined after Save. | Board swap/boot done; persistent Wi-Fi/app/SD/playback observations pending |
 | F07 | Bypass breadboard for SD reader using direct connecting wires | No result reported yet | Optional/planned if SD remains absent |
 | F08 | Replace physical microSD card | Not tried; owner prefers not to do this | Deferred; not a required immediate step |
+| F09 | Change hotspot name/password, Save, reconnect; then remove/restore power | New credentials work during that run; defaults return after power cycle | Reported persistence failure; stored file contents/reset cause not yet captured |
 
 ## Next observations, following the owner's plan
 
 1. **F06 board swap is done; do not repeat it.** The spare boots while connected.
-   Resolve the intended board's default-hotspot identity conflict, then record app
+   Resolve the reported loss of saved hotspot credentials after power cycles, then record app
    connection and the exact external-storage state with the existing card/reader chain.
    Boot completion, correct hotspot association and SD recognition are separate results.
 2. **If SD appears:** browse a known clock folder and play a known file. Record whether
@@ -137,6 +138,23 @@ exact error text when available. Missing values stay "not reported".
   a verified Wi-Fi settings route. The existing WLED web page at
   `http://4.3.2.1/settings/wifi` can change AP SSID after associating with the intended
   board. Never edit another person's board merely because its SSID matches.
+- **2026-11-03, persistence update:** the owner successfully changed AP name/password,
+  pressed Save and joined the renamed network. After power removal/reconnection the
+  default values return. This is a newly reported persistence symptom, not a failure
+  to apply the live settings. Same-board identity and saved-file contents have not
+  yet been independently compared before/after restart; do not diagnose flash damage.
+- **Verified existing Wi-Fi API:** `POST /json/cfg` with Content-Type
+  `application/json` and body `{"ap":{"ssid":"NAME","psk":"PASSWORD"},"sv":true}`.
+  The key is `sv`, not `save`. This and the form schedule the same filesystem write;
+  acknowledgement is not proof of durable storage. After allowing the loop time to
+  save, `/cfg.json?check=1` exposes the stored `ap.ssid`, unlike a live `/json/cfg`
+  snapshot. Actual password storage is private `/wsec.json`; do not overwrite whole
+  config files or expose passwords for this check. A regular web reboot followed by
+  a power-cycle comparison can separate failure to write from failure to reload or
+  configuration recovery. These checks are proposed, not reported as performed.
+- **Historical provisioning:** the previous board used the repository's computer
+  `firmware/fw.py set-wifi` storage read/edit/verify workflow. This is not an Android
+  serial command and does not establish an existing phone-only USB provisioning API.
 
 ## Artifact delivery preference
 
