@@ -45,6 +45,7 @@ breadboard/contact problem affecting SD detection.
 | F07 | Bypass breadboard for SD reader using direct connecting wires | No result reported yet | Optional/planned if SD remains absent |
 | F08 | Replace physical microSD card | Not tried; owner prefers not to do this | Deferred; not a required immediate step |
 | F09 | Change hotspot name/password, Save, reconnect; then remove/restore power | New credentials work during that run; defaults return after power cycle | Reported persistence failure; stored file contents/reset cause not yet captured |
+| F10 | Android HTTP Shortcuts save API and stored-file readback | POST returned `success:true`; owner confirms restart was performed and AP name stayed/defaulted to WLED-AP. Correct GET `/cfg.json?check=4` returned WLED404. | Save acknowledgement is not durable storage; config file missing/unavailable on the responding target |
 
 ## Next observations, following the owner's plan
 
@@ -155,6 +156,17 @@ exact error text when available. Missing values stay "not reported".
 - **Historical provisioning:** the previous board used the repository's computer
   `firmware/fw.py set-wifi` storage read/edit/verify workflow. This is not an Android
   serial command and does not establish an existing phone-only USB provisioning API.
+- **2026-11-03, HTTP readback evidence:** screenshots confirm the Android shortcut's
+  method and URL are correct for `GET http://4.3.2.1/cfg.json?check=4`; the responding
+  WLED server returned404. An earlier POST returned `success:true`, and the owner
+  explicitly confirms restart had already been tried. Do not ask for an identical
+  restart again or call acknowledgement persistence. Local source confirms static
+  file reads normally serve `/cfg.json`; only names containing `sec` are excluded.
+  This404 is consistent with the config file missing or its filesystem being
+  unavailable, not proof of a physically damaged flash chip. Next proposed read-only
+  observation is `GET /json/info`, especially its `fs` total/used report. That request
+  has not yet been reported as performed. No new firmware or destructive recovery
+  has been applied.
 
 ## Artifact delivery preference
 
