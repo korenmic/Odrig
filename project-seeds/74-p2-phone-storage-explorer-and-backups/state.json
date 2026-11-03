@@ -1,0 +1,9 @@
+{
+  "number": 74,
+  "slug": "74-p2-phone-storage-explorer-and-backups",
+  "state": "remaining",
+  "title": "Phone storage explorer and animation backups",
+  "priority": "P2",
+  "addedAt": "2026-11-03",
+  "summary": "Plan a shared phone storage explorer for byte-preserving downloads and single-storage/base-relative bulk ZIP backups with a provenance manifest, durable real folders/playlist folders, and guarded actual path moves within and between Internal and External storage. Include compatible Internal hierarchy, identity/settings migration, bounded transactions and reconciliation, targeted inventory updates and Clocks-only boundaries. ZIP import stays in seed73 without a restoration promise. Planning only; concrete shared protocol additions need owner approval before implementation."
+}
