@@ -5,5 +5,5 @@
   "title": "An archive of animations uploaded from the app",
   "priority": "P2",
   "addedAt": "2026-11-02",
-  "summary": "The app takes one zip of animation files, opens it on the phone with the converter's inflate, lists its animations, and uploads the ticked ones one by one to the board's own storage or its card through the existing upload; names shortened to what the destination takes; no new command."
+  "summary": "Open one ZIP on the phone, list all entries, select all eligible ODRG/ODRGX animations or a subset, and upload their original bytes sequentially to an explicit Internal or External destination captured from the explored folder. Show selection-dependent projected use/free/capacity with staging and metadata headroom, resolve collisions without default overwrite, bound archive handling, and reconcile partial or uncertain outcomes. Reuse managed upload protections; missing folders depend on the separate storage explorer work and unsupported guarded replacements remain blocked. Planning only; no new command is authorized."
 }
