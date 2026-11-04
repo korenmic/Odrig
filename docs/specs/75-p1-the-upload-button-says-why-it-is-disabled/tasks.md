@@ -18,7 +18,7 @@ change, and the failure seen goes into the commit message. Code carries no histo
   - Set the seed's state to `in_progress`. Run the app's suite.
   - Requirements: 2.1–2.3, 3.1–3.3, 4.2.
 
-- [ ] 2. The reason under the button
+- [x] 2. The reason under the button
   - `app/www/client.js`: the holder of the content lock, `setContentBusy(holder)`,
     `contentHolder()`; `app/www/screens/selection.js` and `storage.js` naming
     themselves.

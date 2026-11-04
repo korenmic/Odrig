@@ -99,7 +99,10 @@ let keptUnder = null;
 let keptTaken = false;
 // Counts the targets: a reply that belongs to an earlier address is dropped.
 let target = 0;
-let contentLocked = false;
+// Who holds the content lock, which keeps an upload, a check of its destination and a
+// deletion apart: "preflight" while the Upload screen checks a destination, "deletion"
+// while the selection removes animations, or null.
+let holder = null;
 
 // Calls a function now and whenever the state changes.
 export function watch(watcher) {
@@ -787,7 +790,7 @@ async function next() {
 export function begin() {
   target += 1;
   keptUnder = address();
-  contentLocked = false;
+  holder = null;
   state.listVersion = 0;
   if (job !== null) {
     job.failed(new Error("the address changed"));
@@ -1154,12 +1157,20 @@ export function lastFault() {
   });
 }
 
-export function contentBusy() {
-  return contentLocked || job !== null;
+// Who keeps the content from changing now: "upload" while an upload job of any screen is
+// under way, else the holder of the lock, else null.
+export function contentHolder() {
+  return job !== null ? "upload" : holder;
 }
 
+export function contentBusy() {
+  return contentHolder() !== null;
+}
+
+// Takes the content lock for its holder, "preflight" or "deletion", or lets it go with
+// false.
 export function setContentBusy(value) {
-  contentLocked = value;
+  holder = value ? value : null;
   changed();
 }
 
