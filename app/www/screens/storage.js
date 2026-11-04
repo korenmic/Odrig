@@ -57,6 +57,19 @@ function locked() {
   return preparing || sending !== null || client.contentBusy() || client.state.link !== "answers";
 }
 
+// Why the button is disabled now, the first of these reasons that holds: the installation
+// does not answer, this screen checks the destination, an upload of any screen is under
+// way, or a deletion runs on Animations. Null while none holds.
+function lockReason(state) {
+  if (state.link === "checking") return "The installation has not answered yet.";
+  if (state.link !== "answers") return `The installation does not answer.${state.failure === null ? "" : ` ${messages.ofFailure(state.failure)}`}`;
+  const holder = client.contentHolder();
+  if (preparing || holder === "preflight") return "Checking the destination with the installation.";
+  if (sending !== null || holder === "upload") return "An upload is under way.";
+  if (holder === "deletion") return "A deletion is under way on Animations.";
+  return null;
+}
+
 function draw(state) {
   byId("upload-space").textContent = `Internal storage: ${capacity.internal(state.space, undefined)}`;
   say("upload-card-space", capacity.external(state.space, undefined));
@@ -76,7 +89,10 @@ function draw(state) {
       : destinations.reason(form, state.space);
   }
   for (const id of ["upload-name", "media", "ready-file", "make"]) byId(id).disabled = frozen;
-  byId("upload-made").disabled = locked();
+  const button = byId("upload-made");
+  button.disabled = locked();
+  // The line under the button says why it is disabled, while it is on the screen.
+  say("upload-locked-reason", button.hidden || !button.disabled ? null : lockReason(state));
   byId("upload-space").classList.toggle("stale", state.link === "no-answer");
   byId("upload-card-space").classList.toggle("stale", state.link === "no-answer");
 }
@@ -186,7 +202,7 @@ async function upload(message) {
   const captured = form;
   const bytes = prepared.bytes;
   preparing = true;
-  client.setContentBusy(true);
+  client.setContentBusy("preflight");
   draw(client.state);
   try {
   const fresh = await client.uploadSnapshot(captured.storage === "external" ? captured.level : {path: "", id: null});

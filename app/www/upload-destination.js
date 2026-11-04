@@ -1,8 +1,16 @@
 // A new upload keeps the browsing context it was prepared from.
 import {fits} from "./upload.js";
 
+// Whether a `space` reply said a card is present.
 export function present(space) {
   return space?.external?.present === true;
+}
+
+// Whether a `space` reply came and named no present card: one that says the card is
+// absent, or one of an older target that names no external storage at all. Without a
+// reply neither this nor `present` holds.
+export function absent(space) {
+  return space != null && !present(space);
 }
 
 export function capture(state, target) {
@@ -10,8 +18,11 @@ export function capture(state, target) {
     generations: {internal: state.catalog?.internal?.generation ?? null, external: state.catalog?.external?.generation ?? null}};
 }
 
+// Moves the form to the storage a reply allows: Internal when it was chosen, or when the
+// reply names no card; External when the reply says a card is present. Without a reply
+// the form stays where it is. Gives whether the storage changed.
 export function synchronize(form, space) {
-  const storage = form.explicitInternal || !present(space) ? "internal" : "external";
+  const storage = form.explicitInternal ? "internal" : present(space) ? "external" : absent(space) ? "internal" : form.storage;
   const changed = storage !== form.storage;
   form.storage = storage;
   return changed;
@@ -35,7 +46,8 @@ export function label(form, name) {
 }
 
 export function reason(form, space) {
-  if (!present(space)) return `External storage is disconnected or not detected. Using Internal /${form.level.path ? "; internal storage has no matching subfolders" : ""}.`;
+  if (!present(space) && !absent(space)) return "Storage not known yet: the installation has not answered.";
+  if (absent(space)) return `External storage is disconnected or not detected. Using Internal /${form.level.path ? "; internal storage has no matching subfolders" : ""}.`;
   if (form.storage === "external" && space.external.read_only !== false) return "External storage is detected but read-only. It will not be redirected to Internal.";
   if (form.storage === "internal" && form.level.path) return "Internal storage has a flat root. This upload uses Internal / instead of the explored SD folder.";
   return "The destination stays here even if you browse elsewhere.";
