@@ -39,7 +39,7 @@ change, and the failure seen goes into the commit message. Code carries no histo
   - Run the app's suite, the converter's, the emulator's and the onboarding suite.
   - Requirements: 5.2, 5.3.
 
-- [ ] 4. The pull request and the APK
+- [x] 4. The pull request and the APK
   - Push the branch and open the pull request from `master`, its description naming
     the seed, the verdict and the owner's open check. Build the APK from the pushed
     head with the persistent key as the design says, verify signer, alignment and
