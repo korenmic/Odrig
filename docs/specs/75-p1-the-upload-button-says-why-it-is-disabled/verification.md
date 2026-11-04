@@ -86,3 +86,6 @@ without a window, without audio and without saving its snapshot:
   with the installation off, the line under the button naming the failure.
 - The pull request's checks, the firmware hosts on Ubuntu and on Windows, were pending
   when this record was written and are read after the push of this commit.
+- The seed's state stays `in_progress` until the merge: `AGENTS.md` counts a seed as
+  completed when its implementation is merged, and the onboarding suite keeps a
+  completed seed out of `What is coming`, where seed 75's line names this pull request.
