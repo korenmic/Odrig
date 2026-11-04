@@ -4,7 +4,7 @@ Each task is one commit on the branch `seed-75-upload-button-reason` from `maste
 with only its own checkbox ticked. Every test of a fault is seen failing before the
 change, and the failure seen goes into the commit message. Code carries no history.
 
-- [ ] 1. The destination line speaks of the destination, and a failed request moves nothing
+- [x] 1. The destination line speaks of the destination, and a failed request moves nothing
   - `app/www/upload-destination.js`: `absent()`, `synchronize()` moving nowhere on no
     reply, `reason()` with `Storage not known yet: the installation has not answered.`
     for no reply and the card sentence only for an absent card.

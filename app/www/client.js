@@ -28,7 +28,9 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 // its path and the number of its own files, in the order they play. `rootNames` holds what
 // the root's newest list named, `{ids, files}`, the ids and the file names of the show's
 // items and of the root's files, which an upload chooses its id and its name against, or
-// null while none is known. `space` holds internal and external capacity from the newest reply, or null.
+// null while none is known. `space` holds internal and external capacity from the newest reply, or
+// null while none came from this address or the newest said the capacity is unknown; a request
+// that fails leaves it.
 // `listBusy` says whether the newest `list` request was answered `busy`. `order` is the
 // saved playlist order that goes with the newest list, `{ids, revision}`, or null while
 // there is none; `orderKnown` is false when the target has no saved order, an older one.
@@ -138,13 +140,14 @@ function heard() {
   state.answered = true;
 }
 
+// A request got no reply, or none of the installation. What the last replies said stays,
+// the capacity among it, shown stale while the link is down.
 function failed(error) {
   if (!(error instanceof Failure)) {
     throw error;
   }
   state.link = "no-answer";
   state.failure = error;
-  state.space = null;
   state.statusFresh = false;
 }
 
