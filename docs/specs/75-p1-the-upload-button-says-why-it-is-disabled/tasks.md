@@ -31,7 +31,7 @@ change, and the failure seen goes into the commit message. Code carries no histo
     Internal fallback test unchanged. Run the app's suite.
   - Requirements: 1.1–1.4, 4.1, 4.3, 5.1.
 
-- [ ] 3. The documentation
+- [x] 3. The documentation
   - `docs/android-app.md`: the paragraph of `Ready-made files and upload
     destinations`, step 24 of the check on a phone, the bullets of `What is verified`
     and `What is open`; `tests/app/test_docs.py` counting 25 steps and 27 `*Seen:*`,
