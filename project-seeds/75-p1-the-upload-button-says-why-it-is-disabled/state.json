@@ -1,0 +1,9 @@
+{
+  "number": 75,
+  "slug": "75-p1-the-upload-button-says-why-it-is-disabled",
+  "state": "remaining",
+  "title": "The Upload button says why it is disabled",
+  "priority": "P1",
+  "addedAt": "2026-11-04",
+  "summary": "The Upload screen names, beside a disabled Upload to the installation, the lock that disables it: the installation not answering, the destination being checked, an upload or a deletion under way; the destination line blames the card only after a reply said it is absent, a failed request keeps the last capacity and moves the form nowhere, and Internal is never disabled for the card. App only: no command and no firmware change."
+}
