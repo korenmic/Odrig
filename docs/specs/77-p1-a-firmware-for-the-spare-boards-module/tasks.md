@@ -51,7 +51,7 @@ history.
   - Run the firmware's suites.
   - Requirements: 3.1-3.5, 1.4 in part, the size, and 6.2 in part, the synopsis.
 
-- [ ] 4. `verify_build.py --module`
+- [x] 4. `verify_build.py --module`
   - `firmware/verify_build.py`: `MODULES`, `checked()` with the flash size of the
     header and the release name in the bytes, `inspect()` by module, the files
     `image-info-n8r2.txt` and `verification-n8r2.json`, and `--module`.
