@@ -153,7 +153,7 @@ as for a file that is not there.
 |---|---|
 | `odrig_core *odrig_core_begin(const odrig_host *host)` | Starts the core: reads and checks the whole installed file set, see [Startup](#startup). Returns the core, or `NULL` when the host could not supply the first block of memory. |
 | `int odrig_core_poll(odrig_core *core, uint64_t now_ms)` | Asks for a refresh. Returns 1 when it produced new LED data and 0 when none was due. |
-| `uint32_t odrig_core_leg_count(const odrig_core *core)` | The number of legs: those of the mapping file, or 0 without a valid mapping. |
+| `uint32_t odrig_core_leg_count(const odrig_core *core)` | The number of legs: those of the mapping file, or of the installation's mapping when the host has no mapping file, or 0 when the mapping file cannot be used. |
 | `int odrig_core_leg(const odrig_core *core, uint32_t index, odrig_leg *out)` | Fills in leg `index`, counted from 0 in the order of the mapping file. Returns 1, or 0 for an index that is not a leg. |
 | `size_t odrig_core_command(odrig_core *core, uint64_t now_ms, const char *line, size_t length, char *reply, size_t capacity)` | Takes one command line and writes its reply. Returns the length of the reply. `capacity` must be at least `ODRIG_REPLY_MAX`; with less the core does nothing and returns 0. |
 | `void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, size_t length, odrig_reply_fn on_reply, void *reply_ctx)` | Takes bytes of a transport, cuts them into lines, answers each line, and calls `on_reply` once for each. |
@@ -353,6 +353,16 @@ last, and nothing is left to check.
 
 A show may have no items. It is valid, and nothing plays.
 
+A host without `mapping.json` plays on the installation's mapping, `mapping/legs-20.json`,
+which the core holds: twenty legs of 180 LEDs on the pins 1 to 18, 21 and 47, a canvas
+of 60 x 60. The host is asked for the file once. A host without `show.json` has the empty
+show: no item, brightness 128, as a show file with no item. Nothing is written for either
+at the start. The first change that writes `show.json` writes `mapping.json` first, the
+bytes of the target file, so that the folder is a whole installed file set from then on;
+a mapping file that cannot be written refuses the change with `storage-error` and leaves
+no part. A mapping file or a show file that is there and cannot be used refuses the show,
+as below.
+
 With a catalog of the board's storage that is `ok`, [catalog.md](catalog.md), a file it has
 an entry for is neither opened nor read: its size, its length and its type come from the
 entry, and the check after the start passes it over. The start reads the marker once and
@@ -379,9 +389,11 @@ change left:
    items, and then `repeats.txt`, for their saved repeats; see [the saved
    order](#the-saved-order) and [the saved repeats](#the-saved-repeats).
 
-A folder with none of the three files is asked to remove two names that are not there and
-to open three that are not there, `catalog.do`, `pending.txt` and `catalog.txt`, and for
-nothing else.
+A folder with none of the files is asked to remove two names that are not there,
+`upload.part` and `show.part`, and to open five that are not there, `catalog.do`,
+`mapping.json`, `show.json`, `pending.txt` and `catalog.txt`, and for nothing else; the
+reads with `read_at` of the saved order, the repeats and the settings find nothing, as
+for a show with no item. It then plays on the installation's mapping with the empty show.
 
 A show whose mapping file or show file cannot be used, whose ids are wrong, or for which
 the host has too little memory is refused as a whole: the LEDs stay dark, `play` is

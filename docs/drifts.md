@@ -12691,3 +12691,48 @@ available while locked; applying either photo reading is an edit.
 
 **Resolution.** `app/www/screens/mapping.js`, `app/www/screens/photomap.js`,
 `app/www/client.js` and `docs/android-app.md`.
+
+## Seed 76: the brightness of the empty show
+
+**Question.** What brightness has the show of a board that has no show file?
+
+**Answer.** 128, the value of `shows/example/show.json` and of every example of
+`show.md`: the brightness a show gets when nothing says otherwise. The first change
+writes it into `show.json`, and the operator changes it as any brightness.
+
+**Resolution.** `core/src/show.cpp`, `tests/core/support.py`.
+
+## Seed 76: what is written for the missing files, and when
+
+**Question.** Does the core write the mapping file and the show file it plays without?
+
+**Answer.** Nothing at the start, so that a host whose storage cannot be changed, and a
+board whose storage cannot be written, still report the canvas and refuse a change in
+words. The first change that writes `show.json` writes `mapping.json` first, the bytes of
+`mapping/legs-20.json`, so that the folder is a whole installed file set from then on,
+which `fw.py read-show` copies and `install-show` accepts; a write that fails is the
+change's `storage-error`. A saved pin assignment writes the file as before.
+
+**Resolution.** `core/src/mapping_control.cpp`, `core/src/content.cpp`, `docs/core.md`.
+
+## Seed 76: whose reasons `mapping-missing` and `show-missing` are
+
+**Question.** Do the two reasons leave the project with the core's refusal?
+
+**Answer.** They stay the tools' reasons: the converter's `pack`, the Python library's
+readers and `fw.py install-show` refuse a folder without the files as before, since a
+folder to install is a complete file set. The core reports neither, and the table of the
+core's texts in `reasons.md` begins at `mapping-malformed`.
+
+**Resolution.** `docs/reasons.md`, `tests/core/test_docs.py`.
+
+## Seed 76: the emulator's page without a mapping file
+
+**Question.** What does the page's mapping view draw when the folder has no mapping file?
+
+**Answer.** The installation's mapping: `GET /show/mapping.json` answers the
+repository's `mapping/legs-20.json`, the bytes the core holds, and the folder's own file,
+as it is, when it has one. The page needs no change: the legs come from the core and the
+file from that route.
+
+**Resolution.** `emulator/httpd.py`, `docs/emulator.md`.

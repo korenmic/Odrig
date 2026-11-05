@@ -140,7 +140,7 @@ file's override or latest default without restarting its timing. Missing/null
 | `animation` | The id of the animation item, or of the drive's animation, on the LEDs right now, or `null`. |
 | `fps` | LED refreshes in the last full second. |
 | `error` | `null`, or the reason the show is invalid. |
-| `width`, `height` | The canvas of the installed mapping, in pixels: what an animation for this target is made for. Both `null` while there is no mapping the player can use; reported also while the show is invalid for another reason. |
+| `width`, `height` | The canvas of the installed mapping, in pixels: what an animation for this target is made for. Both `null` while the mapping file cannot be used; reported also while the show is invalid for another reason. A target without a mapping file plays on the installation's mapping and reports 60 and 60. |
 | `readiness` | `checking` while the player still reads files after a start, while a rebuild reads them and while a drive's catalog is read, `degraded` when it has read them all and one or more animations are unavailable, `ready` when it has read them all and none is, and `recovery` while the show is invalid. What plays is said by `playing` and `animation`, whatever the readiness. |
 | `checked` | The files the player has read to their end, or found a fault in, since its start: those of the show, each once however many items name it, and those of a drive. While a rebuild runs, the files it has read. |
 | `to_check` | The files it has still to read, or that a rebuild has still to read. No time is given for them. |
@@ -493,7 +493,9 @@ Pins are in snake order, 1 through20. Unsupported or invalid mappings report
 `editable:false`, an empty `pins` array and revision0. The test flag is target-wide.
 The target's existing twenty-pin permutation is editable when each180-LED snake
 occupies its own three columns on the60x60 canvas. Pin saves preserve the installed
-strip order and starting ends.
+strip order and starting ends. A target without a mapping file reports the
+installation's default pins, editable, with their revision; its first save writes the
+file.
 
 `mapping set <revision> <pins>` accepts exactly twenty comma-separated GPIO numbers.
 The revision is the decimal CRC-32 of the current twenty pin bytes in snake order.

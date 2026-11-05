@@ -41,7 +41,7 @@ history.
   - Run the emulator's suite and the app's suite.
   - Requirements: 5.1, 5.2, 7.2.
 
-- [ ] 4. The documentation
+- [x] 4. The documentation
   - `docs/core.md`, `docs/reasons.md` with `tests/core/test_docs.py`, `docs/commands.md`,
     `docs/mapping.md`, `docs/emulator.md` with step 22 of its check list,
     `docs/android-app.md`, `agent/getting-started.md`, the change log of

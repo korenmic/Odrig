@@ -872,3 +872,14 @@ app API, `mapping cross` command and `cross` reply member. Generic mapping forma
 support remains; editing pins preserves installed geometry without a wiring change.
 The owner also requested a confirmed mapping-edit lock in Settings; its app interaction
 guard uses the existing mapping protocol and adds no board command.
+
+### Seed 76: an empty board takes its first animation
+
+The owner ruled on 2026-11-05 that the canvas is always 60 x 60, and that whether a first
+animation already exists must not keep a board from taking its first animation. The core
+therefore plays a board without `mapping.json` on the installation's mapping, which it
+holds, and a board without `show.json` as an empty show; `status` reports the canvas, and
+the first upload is accepted. This narrows the decision of seed 32 of 2026-10-24: a mapping
+file or a show file that is there and cannot be used still makes the show invalid, and a
+missing one no longer does. The firmware is rebuilt from the core; no command is added;
+the app is not changed.
