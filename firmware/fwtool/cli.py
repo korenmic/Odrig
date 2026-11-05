@@ -43,6 +43,7 @@ def parser():
     builder.add_argument("--standalone", action="store_true", help="build the standalone firmware, which holds nothing of WLED; with --probe, its probe build")
     builder.add_argument("--stick", action="store_true", help="build the firmware for a USB stick on the software known good; with --probe, its probe build")
     builder.add_argument("--microsd", action="store_true", help="build the firmware, which reads a microSD card, and keep it as odrig-microsd.bin")
+    builder.add_argument("--module", choices=build.MODULES, default=build.DEFAULT_MODULE, help="the module the firmware is built for: n16r8, the installation's board (default), or n8r2, the spare board's, kept as odrig-firmware-n8r2.bin")
     builder.add_argument("--verbose", action="store_true", help="show every command of the build")
     flash = commands.add_parser("flash", help="write a built image to the board over USB")
     flash.add_argument("--port", metavar="P", help="the board's USB serial port")
@@ -109,7 +110,9 @@ def _setup(arguments):
 
 
 def _build(arguments):
-    if arguments.microsd:
+    if arguments.module == "n8r2":
+        kind = "n8r2"
+    elif arguments.microsd:
         kind = "microsd"
     elif arguments.standalone:
         kind = {"firmware": "standalone", "probe": "standalone-probe"}[arguments.kind]
@@ -658,6 +661,9 @@ def parsed(argv):
     """The arguments of a command line. What does not go together is a usage error."""
     made = parser()
     arguments = made.parse_args(argv)
+    if arguments.command == "build" and arguments.module != build.DEFAULT_MODULE:
+        if arguments.kind != "firmware" or arguments.stick or arguments.standalone or arguments.microsd:
+            made.error(f"--module {arguments.module} does not go with --stock, --probe, --stick, --standalone or --microsd")
     if arguments.command == "build" and arguments.microsd:
         if arguments.kind != "firmware" or arguments.stick or arguments.standalone:
             made.error("--microsd does not go with --stock, --probe, --stick or --standalone")

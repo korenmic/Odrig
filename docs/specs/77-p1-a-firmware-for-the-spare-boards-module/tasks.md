@@ -33,7 +33,7 @@ history.
   - Run the firmware's suites.
   - Requirements: 2.5, 5.4, and 2.4 in part, the commands unchanged.
 
-- [ ] 3. The kind `n8r2` and `--module` on `build`
+- [x] 3. The kind `n8r2` and `--module` on `build`
   - `firmware/fwtool/build.py`: `KINDS["n8r2"]`, `ON_NEWER`, `MODULES`,
     `DEFAULT_MODULE` and `module_of()`; `firmware/fwtool/provenance.py`: `module` in
     `record()` and `write()`; `firmware/fwtool/cli.py`: `--module` in `parser()`, the

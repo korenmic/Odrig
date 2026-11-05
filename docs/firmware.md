@@ -207,7 +207,7 @@ Run from the repository root.
 
 ```
 python3 firmware/fw.py setup
-python3 firmware/fw.py build [--stock | --probe] [--standalone | --stick | --microsd] [--verbose]
+python3 firmware/fw.py build [--stock | --probe] [--standalone | --stick | --microsd] [--module n16r8|n8r2] [--verbose]
 python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py big-storage [--port P] [--wait SECONDS]

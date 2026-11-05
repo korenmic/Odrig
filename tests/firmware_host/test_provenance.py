@@ -48,16 +48,23 @@ class SourceIdentity(unittest.TestCase):
             self.assertEqual(record['image'],dict(file='firmware.bin',bytes=14,sha256=hashlib.sha256(b'compiled image').hexdigest()))
             self.assertEqual(record['source'],dict(commit='a'*40,trackedDirty=False))
             self.assertEqual(record['environment'],'odrig_microsd')
+            self.assertEqual(record['module'],'n16r8')
+            self.assertEqual(list(record)[list(record).index('environment')+1],'module')
             self.assertEqual(record['packages'][0]['version'],'14.2.0')
             self.assertIn('architecture',record['host'])
             self.assertIn('timestamps',record['comparison'])
+            with mock.patch.object(provenance,'git_identity',return_value=dict(commit='a'*40,trackedDirty=False)), \
+                 mock.patch.object(provenance,'versions',return_value=dict(platformio='6.2.0',node='20.18.0')):
+                spare=provenance.record('n8r2','odrig_microsd_n8r2',image,True,root,pio_root=root/'pio',module='n8r2')
+            self.assertEqual((spare['kind'],spare['environment'],spare['module']),('n8r2','odrig_microsd_n8r2','n8r2'))
 
     def test_provenance_is_published_as_utf8_lf_without_a_partial_file(self):
         with tempfile.TemporaryDirectory(prefix='odrig-fw-publication-') as directory:
             image=pathlib.Path(directory,'image.bin');image.write_bytes(b'image')
             record=dict(source=dict(commit='b'*40),note='caf\u00e9')
-            with mock.patch.object(provenance,'record',return_value=record):
-                target=provenance.write('firmware','odrig_microsd',image,True)
+            with mock.patch.object(provenance,'record',return_value=record) as made:
+                target=provenance.write('n8r2','odrig_microsd_n8r2',image,True,module='n8r2')
+            made.assert_called_once_with('n8r2','odrig_microsd_n8r2',image,True,module='n8r2')
             data=target.read_bytes()
             self.assertNotIn(b'\r',data)
             self.assertEqual(json.loads(data),record)

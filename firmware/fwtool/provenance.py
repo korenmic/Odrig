@@ -69,11 +69,11 @@ def versions(newer):
                 npm=first('npm',[host.program(venv,'npm'),'--version']))
 
 
-def record(kind, environment, image, newer, root=paths.ROOT, pio_root=None):
+def record(kind, environment, image, newer, root=paths.ROOT, pio_root=None, module='n16r8'):
     image = pathlib.Path(image)
     system, machine = host.supported()
     return dict(version=1,source=git_identity(root),host=dict(system=system,architecture=machine,os=platform.platform()),
-                kind=kind,environment=environment,wled=dict(tag=wled.TAG,commit=wled.COMMIT),
+                kind=kind,environment=environment,module=module,wled=dict(tag=wled.TAG,commit=wled.COMMIT),
                 tools=versions(newer),packages=package_identities(pio_root or (paths.NEWER_PIO_CORE if newer else paths.PIO_CORE)),
                 inputs=source_inputs(root),image=dict(file=image.name,bytes=image.stat().st_size,sha256=digest(image)),
                 comparison='Source/configuration identity and image properties are compared; compiler paths, timestamps and ELF/application metadata can change binary bytes across hosts.')
@@ -84,9 +84,9 @@ def beside(image):
     return image.with_name(image.name+'.build.json')
 
 
-def write(kind, environment, image, newer):
+def write(kind, environment, image, newer, module='n16r8'):
     target = paths.output(beside(image))
-    data = record(kind,environment,image,newer)
+    data = record(kind,environment,image,newer,module=module)
     partial = paths.output(target.with_name(target.name+'.part'))
     try:
         partial.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n',encoding='utf-8',newline='\n')
