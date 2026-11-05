@@ -1,0 +1,9 @@
+{
+  "number": 76,
+  "slug": "76-p1-an-empty-board-takes-its-first-animation",
+  "state": "remaining",
+  "title": "An empty board takes its first animation",
+  "priority": "P1",
+  "addedAt": "2026-11-05",
+  "summary": "The core plays a board without mapping.json on the installation's built-in 60 x 60 mapping of twenty legs and a board without show.json as an empty show, so status reports the canvas and the first upload from the phone is accepted; the first change that writes the show file writes the mapping file beside it. Firmware rebuilt from the core, no new command, the app unchanged."
+}
