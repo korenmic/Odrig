@@ -8,6 +8,7 @@
 #include "drive.h"
 #include "mapping.h"
 #include "mini.h"
+#include "rotation.h"
 #include "odrig_core.h"
 #include "order.h"
 #include "player.h"
@@ -838,6 +839,7 @@ odrig_core *odrig_core_begin(const odrig_host *host) {
     core->state.host = *host;
     core->state.starting = 1;
     odrig::start(core->state);
+    odrig::rotation_start(core->state);
     odrig::player_start(core->state);
     if (core->state.width == 60 && core->state.height == 60) {
         core->state.mini = static_cast<odrig::Mini *>(odrig::host_memory(*host, sizeof(odrig::Mini)));

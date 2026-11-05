@@ -66,6 +66,12 @@ in [firmware.md](firmware.md#set-wifi).
 A board keeps the name and the password it was given until `set-wifi` is run on it again:
 changing the file changes no board.
 
+Flashing an application `.bin` at0x10000 with a phone flasher updates only the
+program. It does not perform `install-firmware` or `set-wifi`, so a new board can
+retain WLED's hotspot name and password. Fresh Odrig player initialization does not
+alter those saved Wi-Fi settings. They can also be changed in WLED's Wi-Fi settings
+page, as described below.
+
 ## What else changes them
 
 - **WLED's Wi-Fi settings page.** Whoever has joined the network can open WLED's

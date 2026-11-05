@@ -859,12 +859,26 @@ holds a whole file. The core's memory comes from the chip's internal memory, and
 external memory only when the internal memory has none. The time the core is given is the
 milliseconds since the chip started, from a 64-bit clock.
 
+On a board whose `/odrig` folder is absent or empty, startup first installs the
+canonical60x60 mapping and a valid empty show at brightness32. It stays dark until
+content is uploaded or found on external storage. This makes an application-only
+flash usable on a fresh board without a separate show installation.
+
+The initialization transaction creates an empty `fresh-init` directory before
+writing defaults through verified `fresh.part` files and renames. A reset retries
+unfinished initialization. Existing files, incomplete operator installations,
+unknown folders and changed defaults are preserved; no storage is formatted.
+Initialization happens before free space is cached. It does not change WLED's
+saved Wi-Fi, current limiter or other settings. Application-only flashing preserves
+the existing hotspot credentials; `install-firmware`/`set-wifi` remain separate
+provisioning operations, as [wifi.md](wifi.md) explains.
+
 **Storage.** The usermod gives the core the seven storage functions of
 [core.md](core.md), on WLED's file system. Every path is `/odrig/<name>`, and a name is
 checked before it is used: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, and
-not dots alone. The firmware writes, renames and deletes a file only there, and only
-inside one of these functions: nothing of the firmware decides to write. What is written
-is the core's matter: an uploaded animation, first as `upload.part`, the show file,
+not dots alone. The firmware writes, renames and deletes a file only there. Apart
+from fresh installation initialization, these changes happen only through the
+core's storage functions: an uploaded animation, first as `upload.part`, the show file,
 first as `show.part`, and `pending.txt`; see [show.md](show.md) and [core.md](core.md),
 "The files the core writes".
 

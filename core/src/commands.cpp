@@ -10,6 +10,7 @@
 #include "order.h"
 #include "player.h"
 #include "mini.h"
+#include "rotation.h"
 #include "playlist.h"
 #include "repeats.h"
 #include "brightness.h"
@@ -576,6 +577,14 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
 
     Words words;
     words.split(line, length);
+
+    if (words.is(0, "rotation")) {
+        if (words.count == 1) return rotation_reply(core, reply);
+        uint32_t revision = 0, degrees = 0;
+        if (words.count == 4 && words.is(1, "set") && number_word(words, 2, 0, 0xFFFFFFFFu, &revision) &&
+            number_word(words, 3, 0, 270, &degrees)) return rotation_set(core, revision, degrees, reply);
+        return refuse(reply, "bad-argument");
+    }
 
     if (words.is(0, "mapping")) {
         if (words.count == 2 && words.is(1, "get")) return mapping_get(core, reply);

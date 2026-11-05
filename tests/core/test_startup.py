@@ -327,9 +327,9 @@ class OrderOfTheChecks(unittest.TestCase):
         self.assertIn(("hello.odrg", 0), run.opened)
         self.assertIn(("dvd.odrg", 1), run.opened)
         run = support.start(example(show_json=None), options=["--trace-files"])
-        self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 0)))
+        self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 0), ("rotation.txt", 0)))
         run = support.start(example(mapping_json=None), options=["--trace-files"])
-        self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 0)))
+        self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 0), ("rotation.txt", 0)))
 
     def test_a_show_with_wrong_ids_asks_for_no_file(self):
         run = support.start(example(show_json=show(start=9)), options=["--trace-files"])

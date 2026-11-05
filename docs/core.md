@@ -331,7 +331,7 @@ and `odrig_core_command` works as ever.
 A line that is no valid command is answered with the first code that applies, in the
 order of the table of [commands.md](commands.md): `line-too-long`, `unknown-command`,
 `bad-argument`, `show-invalid`, `unsupported`, `no-upload`, `incomplete`, `bad-checksum`, `busy`,
-`unknown-id`, `unavailable`, `in-use`, `read-only`, `mapping-conflict`, `stale`, `order-conflict`, `no-space`, `bad-offset`, `bad-file` and
+`unknown-id`, `unavailable`, `in-use`, `read-only`, `mapping-conflict`, `rotation-conflict`, `stale`, `order-conflict`, `no-space`, `bad-offset`, `bad-file` and
 `storage-error`. It
 changes nothing, except that `bad-checksum`, `stale`, `bad-file` and `storage-error` discard the
 upload they are about.
@@ -1316,3 +1316,17 @@ selection only after relevant changes. No per-frame allocation or additional blo
 is introduced. `status` adds explicit mode/reason metadata within its unchanged
 1,024-byte bound; escaped host descriptions use at most160 bytes, while ordinary
 95-byte ASCII descriptions and supported full file/folder paths remain intact.
+
+## Output rotation
+
+`rotation` reads installation-wide square output orientation; `rotation set REV DEGREES`
+atomically saves 0/90/180/270 clockwise degrees to `rotation.txt`. Missing data means0;
+malformed/unreadable data reports an error and uses0 without invalidating a show.
+The existing spare state bits hold orientation, without another canvas allocation.
+Rendering permutes composed samples before physical mapping and miniature averaging.
+Physical mapping diagnostics remain unrotated and refuse orientation changes.
+Source files, previews, timing, brightness and current limits keep their behavior.
+Orientation is independent of installed content. Missing or invalid mapping/show
+files and unavailable animation files do not disable its read, save or startup
+restore; the installation is always60x60. Content validation still controls playback.
+See [the command contract](commands.md#square-output-rotation).

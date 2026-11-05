@@ -8,6 +8,7 @@ import * as authoring from "./screens/author.js";
 import * as catalogs from "./screens/catalogs.js";
 import * as clocksScreen from "./screens/clocks.js";
 import * as miniScreen from "./screens/mini.js";
+import * as rotationScreen from "./screens/rotation.js";
 import * as animationsScreen from "./screens/show.js";
 import * as uploadScreen from "./screens/storage.js";
 import * as settingsScreen from "./screens/mapping.js";
@@ -40,6 +41,7 @@ function show(name) {
   settingsScreen.showing(name === "settings");
   photomap.showing(name === "settings");
   catalogs.showing(name === "settings");
+  rotationScreen.showing(name === "settings");
   animationsScreen.showing(name === "animations");
   targetScreen.showing(name === "target");
 }
@@ -144,6 +146,7 @@ authoring.start({message, go});
 settingsScreen.start();
 clocksScreen.start({go});
 miniScreen.start();
+rotationScreen.start();
 photomap.start();
 catalogs.start({message});
 client.onRefusal((refusal) => message(messages.ofRefusal(refusal, client.state.status === null ? null : client.state.status.error)));

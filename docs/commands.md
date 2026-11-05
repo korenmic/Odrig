@@ -25,6 +25,8 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `brightness <id> <n> save` | Saves brightness for the listed animation's file, including zero, without changing the default. |
 | `brightness <id> default` | Removes that file's saved brightness, using the latest default immediately if it is playing. |
 | `status` | Reports the current state. |
+| `rotation` | Reports saved square output orientation and its revision. |
+| `rotation set <revision> <degrees>` | Atomically saves 0, 90, 180 or 270 clockwise degrees. |
 | `fault` | Reports the latest fault of a file since the start. |
 | `space` | Reports the free and the total storage and the number of animations. |
 | `list`, `list <from>` | Lists the items of the show and the root's level of a USB drive or a card: the playlists of its folders and its own animations. |
@@ -456,6 +458,7 @@ character boundary, so expanded status remains within the fixed reply limit.
 | `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file. |
 | `read-only` | `upload begin external`, `catalog rebuild`, or `order move` of a file of the drive, while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
+| `rotation-conflict` | Output orientation changed since the client read it; reload before saving. |
 | `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. `repeat <id> <n>`: no turn of that animation is reported. |
 | `order-conflict` | `order move`: the saved order or the listed animations changed since the client read the order's revision; read it again before moving. |
 | `no-space` | `repeat <id> <n> save`: no room is left for another saved repeat; `upload begin`: the file would not fit, or the show has no room for another item; `upload begin external`: the file would not fit on the drive. |
@@ -862,3 +865,27 @@ restores its valid path, else root, with its window held and no paused break res
   animation after a start, and while an upload is open.
 - `storage-error`: the file could not be written or verified, or the board's storage cannot be
   changed. Nothing changes.
+
+## Square output rotation
+
+`rotation` returns `ok`, `supported`, `degrees` (0,90,180,270 clockwise), decimal
+`revision` (CRC32 of the quarter-turn byte) and `error` (null or `unreadable`).
+`rotation set REVISION DEGREES` replies with the complete confirmed object after
+atomic publication. Missing settings mean0. Invalid/unreadable `rotation.txt` means0
+with an error and a deliberate save can repair it. The bounded ASCII file is
+`1 DEGREES\n`; writes go through `rotation.part` and atomic rename. A valid no-op
+writes nothing. Refused/failed saves retain the last confirmed live and saved value.
+Uploads, catalog rebuilding or pending miniature setup can return busy. Content
+validation does not block this independent installation setting. Rotation remains
+readable, writable and persistent when mapping/show files are missing or invalid,
+or no animation is usable; those content faults still prevent playback. Unavailable
+storage reports storage-error. Physical mapping diagnostics return in-use. Valid
+rectangular legacy fixtures report unsupported; the installation is permanently
+60x60, with no rectangular fit selector.
+
+Rotation samples the complete RGB/palette/text/clock/message/picture composition
+before physical mapping and miniature averaging, exactly once. Source previews,
+animation bytes, timing, power/current limits and pins stay unchanged. Main and
+miniature diagnostic output retain physical coordinates. Ordinary show installation
+preserves the saved orientation. Existing HTTP and line transports and odrigctl carry
+these same operations; a lost reply must be resolved with a read, not blind replay.

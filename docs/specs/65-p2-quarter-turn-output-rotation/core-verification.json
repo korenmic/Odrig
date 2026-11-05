@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "base": "origin/master",
+  "scope": "Output rotation only; firmware adapter/host ABI unchanged",
+  "run": "20261101-225635-86472",
+  "cases": 2412,
+  "outcomes": {
+    "ok": 2382,
+    "skip": 28,
+    "fail": 1,
+    "error": 1
+  },
+  "suites": {
+    "mapping": {
+      "tests": "42 tests",
+      "seconds": 159.8,
+      "outcome": "OK"
+    },
+    "firmware": {
+      "tests": "649 tests",
+      "seconds": 827.9,
+      "outcome": "OK (skipped=1)"
+    },
+    "core": {
+      "tests": "1062 tests",
+      "seconds": 1556.8,
+      "outcome": "OK (skipped=7)"
+    },
+    "emulator": {
+      "tests": "659 tests",
+      "seconds": 983.2,
+      "outcome": "FAILED (failures=1, errors=1)"
+    }
+  },
+  "originalFullRunClean": false,
+  "originalFailures": [
+    {
+      "suite": "emulator",
+      "id": "tests.emulator.test_docs.EmulatorDocument.test_it_names_every_command_of_the_tool_by_each_transport",
+      "seconds": 0.007,
+      "outcome": "fail"
+    },
+    {
+      "suite": "emulator",
+      "id": "tests.emulator.test_page_files.Served.test_every_file_of_the_folder_is_served_with_its_content_type",
+      "seconds": 0.035,
+      "outcome": "error"
+    }
+  ],
+  "rechecks": [
+    {
+      "discoveredPattern": "*docs*",
+      "suite": "emulator",
+      "cases": 21,
+      "passed": true,
+      "log": "build/rotation-core-docs-recheck.log"
+    },
+    {
+      "discoveredPattern": "*page_files*",
+      "suite": "emulator",
+      "cases": 25,
+      "passed": true,
+      "log": "build/rotation-page-files-recheck.log"
+    }
+  ],
+  "allCasesHavePassingVerification": true,
+  "red": {
+    "discoveredPattern": "*rotation*",
+    "suite": "core",
+    "cases": 12,
+    "failures": 34,
+    "errors": 7,
+    "cause": "Missing rotation commands/fields and unchanged rendered output",
+    "log": "build/rotation-core-red-focused.log",
+    "earlierBroadBaseline": "Stopped before rotation cases; partial output retained and not counted as passing"
+  },
+  "fixtureMemory": {
+    "bytes": 124515,
+    "blocks": 18,
+    "newCanvasAllocation": false
+  },
+  "physicalAcceptance": false,
+  "logHashes": {
+    "rotation-core-red-focused": "ce0a875fd1b563d41de7a2b1a57edde900cfc8361091c4734ba62f3a7139d56c",
+    "rotation-core-green": "ed4133e668deb199885d069f6af9b4494c26503162d4da0eed3c09c654d66a59",
+    "rotation-core-docs-recheck": "9c082a3e015d1b0f4d92da2aca963e981aebaed51f4f8178e502ed15b287dbaa",
+    "rotation-page-files-recheck": "c5e939aa10377fe96f80865efb796bada91fbdf6365b13243e5cb784bc38e70f"
+  }
+}

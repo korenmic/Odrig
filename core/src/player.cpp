@@ -1,5 +1,6 @@
 #include "player.h"
 #include "mini.h"
+#include "rotation.h"
 
 #include <string.h>
 
@@ -776,7 +777,7 @@ void fill_leds(Core &core) {
         const uint8_t *palette = core.decoder.palette;
         const uint8_t *layer = core.window + kLayerAt;
         for (uint32_t led = 0; led < core.led_total; ++led) {
-            const uint32_t at = pixel[led];
+            const uint32_t at = rotation_pixel(core, pixel[led]);
             const uint8_t index = layer[at] != 0 ? static_cast<uint8_t>(layer[at] - 1) : core.pixels[at];
             const uint8_t *colour = palette + 3u * index;
             *out++ = scale[colour[0]];
@@ -786,14 +787,14 @@ void fill_leds(Core &core) {
     } else if (core.decoder.colours != 0) {
         const uint8_t *palette = core.decoder.palette;
         for (uint32_t led = 0; led < core.led_total; ++led) {
-            const uint8_t *colour = palette + 3u * core.pixels[pixel[led]];
+            const uint8_t *colour = palette + 3u * core.pixels[rotation_pixel(core, pixel[led])];
             *out++ = scale[colour[0]];
             *out++ = scale[colour[1]];
             *out++ = scale[colour[2]];
         }
     } else {
         for (uint32_t led = 0; led < core.led_total; ++led) {
-            const uint8_t *colour = core.pixels + 3u * pixel[led];
+            const uint8_t *colour = core.pixels + 3u * rotation_pixel(core, pixel[led]);
             *out++ = scale[colour[0]];
             *out++ = scale[colour[1]];
             *out++ = scale[colour[2]];
