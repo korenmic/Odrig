@@ -8,9 +8,10 @@ import tempfile
 import unittest
 from unittest import mock
 
-from fwtool import build, limit, partitions, paths
+from fwtool import build, limit, partitions, paths, stock
 
 from . import FIRMWARE, support
+from .test_flasher import STOCK_NAMES, Temporary
 
 STOCK_TABLE = FIRMWARE / "wled-16.0.1" / "partitions_s3_16m.bin"
 TRACKED_TABLE = FIRMWARE / "partitions" / "odrig-8mb.csv"
@@ -151,6 +152,51 @@ class OnEachLayout(unittest.TestCase):
                 result, esptool = self.run_on(layout, address, "flash", "--image", image)
                 self.assertEqual((result.status, result.out), (0, f"{self.line(name)}\n{REPLY}\n"))
                 self.assertEqual(esptool.written(), [("0x10000", "odrig-firmware.bin")])
+
+
+class RefusedOnTheSpare(Temporary):
+    """`restore-stock` and `install-firmware` on a stand-in board of the spare's table: the
+    stock files and the installation's image are the 16 MB module's, and neither belongs on
+    the 8 MB layout."""
+
+    def setUp(self):
+        super().setUp()
+        patched = mock.patch.object(paths, "STORAGE", self.folder / "storage")
+        patched.start()
+        self.addCleanup(patched.stop)
+        self.stock = self.stock_folder()
+        self.settings = self.folder / "wifi.json"
+        self.settings.write_text('{"name": "odrig-on-the-spare", "password": "made-for-this-test"}')
+
+    def run_on(self, table, *arguments):
+        esptool = support.RecordedEsptool(table)
+        with mock.patch.object(stock, "LIST", self.folder / "stock.sha256"), mock.patch.object(build, "checked_image", side_effect=lambda image: self.image()):
+            with support.no_board(esptool, answer=REPLY):
+                return support.run_main(*arguments), esptool
+
+    def test_restore_stock_is_refused_before_anything_is_written(self):
+        for extra in ((), ("--full",)):
+            with self.subTest(extra=extra):
+                result, esptool = self.run_on(support.partition_table(support.EIGHT_MB_LAYOUT), "restore-stock", "--stock-dir", self.stock, *extra)
+                self.assertEqual((result.status, result.out), (1, ""))
+                self.assertRegex(result.err, r"\Aerror: layout-mismatch: .*8 MB.*16 MB module.*0x1000000[^\n]*\n\Z")
+                self.assertEqual(esptool.wrote, [])
+                self.assertNotIn("write-flash", esptool.commands())
+                self.assertEqual(esptool.commands(), ["read-flash"])
+
+    def test_install_firmware_is_refused_before_anything_is_written(self):
+        result, esptool = self.run_on(support.partition_table(support.EIGHT_MB_LAYOUT), "install-firmware", "--settings", self.settings)
+        self.assertEqual((result.status, result.out), (1, ""))
+        self.assertRegex(result.err, r"\Aerror: layout-mismatch: .*8 MB.*flash --image[^\n]*\n\Z")
+        self.assertEqual(esptool.wrote, [])
+        self.assertNotIn("write-flash", esptool.commands())
+        self.assertEqual(esptool.commands(), ["read-flash"])
+
+    def test_a_full_restore_still_brings_back_a_board_whose_table_cannot_be_read(self):
+        result, esptool = self.run_on(b"\xff" * support.TABLE_SIZE, "restore-stock", "--stock-dir", self.stock, "--full")
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "erase-region", "write-flash"])
+        self.assertEqual(esptool.written(), [("0x0", STOCK_NAMES[1]), ("0x8000", STOCK_NAMES[2]), ("0x10000", STOCK_NAMES[0])])
 
 
 if __name__ == "__main__":

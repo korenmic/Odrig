@@ -177,10 +177,26 @@ def wleds_storage(port, table):
     return storage.pending(storage.with_settings(before.read_bytes(), target.size)), target
 
 
+def installations_layout(port, written):
+    """Reads the board's table and refuses the 8 MB layout, the spare board's, before
+    anything is written on it: `written` says what was about to be, which belongs to the
+    installation's module alone. A table that cannot be read is let through, so that a
+    full restore still brings back a board whose table is half-written."""
+    try:
+        found = partitions.parse(flasher.Flasher(port).read_table())
+    except Failure as failure:
+        if failure.reason != "layout-mismatch":
+            raise
+        return
+    if partitions.layout_of(found) == partitions.EIGHT_MB_NAME:
+        raise Failure("layout-mismatch", f"the board has the {partitions.EIGHT_MB_NAME} layout, the spare board's; {written}")
+
+
 def _restore_stock(arguments):
     from . import storage
     files = stock.checked(arguments.stock_dir, arguments.full)
     port = board.find(arguments.port)
+    installations_layout(port, f"the stock files are the 16 MB module's, and their table ends at {partitions.SIXTEEN_MB_END:#x}")
     extra, table, regions, made = (), None, (), None
     if arguments.full:
         extra = ((flasher.BOOTLOADER.address, files.bootloader), (flasher.TABLE.address, files.table))
@@ -568,6 +584,7 @@ def _install_firmware(arguments):
     image = build.checked_image(build.image_path("firmware"))
     build.check_size(image)
     port = board.find(arguments.port)
+    installations_layout(port, "the installation's image is not the spare's; flash --image writes the spare's")
     write_application(port, image, expect="status", wait=arguments.wait)
     return store_settings(port, arguments.wait, network=network, milliamps=milliamps, settled=True, say=False)
 

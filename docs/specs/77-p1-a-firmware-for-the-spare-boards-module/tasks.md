@@ -22,7 +22,7 @@ history.
   - Set the seed's state to `in_progress`. Run the firmware's suites.
   - Requirements: 1.1-1.3, 2.1-2.3, 2.6, and 2.4 in part, the line and `flash`.
 
-- [ ] 2. The commands on the 8 MB layout
+- [x] 2. The commands on the 8 MB layout
   - `firmware/fwtool/cli.py`: `installations_layout()`, called by `_restore_stock()`
     and `_install_firmware()` before any write; `_flash()`, `storage_of()` and
     `write_application()` unchanged.

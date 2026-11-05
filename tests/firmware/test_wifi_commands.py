@@ -251,7 +251,7 @@ class InstallFirmware(OnASmallLayout):
         result = self.install(esptool)
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(result.out, f"{LAYOUT_LINE}\nname: {NAME}\npassword: set\nlimit: 850 mA\n{REPLY}\noutcome: healthy\n")
-        self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash", "read-flash", "read-flash", "write-flash", "verify-flash", "chip-id"])
+        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "erase-region", "write-flash", "read-flash", "read-flash", "write-flash", "verify-flash", "chip-id"])
         self.checked.assert_called_once_with(build.image_path("firmware"))
         program, data = [call for call in esptool.calls if "write-flash" in call]
         self.assertEqual([(address, pathlib.Path(name).name) for address, name in esptool.pairs(program[program.index("write-flash") + 1:])], [("0x10000", "odrig-firmware.bin")])
@@ -271,9 +271,9 @@ class InstallFirmware(OnASmallLayout):
             answered.append(len(esptool.calls))
             return REPLY
         self.install(esptool, status=status)
-        self.assertEqual(answered, [3, 8])
+        self.assertEqual(answered, [4, 9])
         reads_of_storage = [number for number, call in enumerate(esptool.calls) if "read-flash" in call and "0x610000" in call]
-        self.assertEqual(reads_of_storage, [4])
+        self.assertEqual(reads_of_storage, [5])
 
     def test_the_reply_is_waited_for_after_each_of_the_two_restarts(self):
         esptool = self.esptool()
@@ -310,7 +310,7 @@ class InstallFirmware(OnASmallLayout):
         result = self.install(esptool, status=silent)
         self.assertEqual(result.status, 1)
         self.assertRegex(result.err, r"\Aerror: no-reply: ")
-        self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash"])
+        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "erase-region", "write-flash"])
 
     def test_it_has_no_option_that_carries_a_name_or_a_password(self):
         self.assertEqual(options_of("install-firmware"), {"-h", "--help", "--port", "--settings", "--limit", "--wait"})

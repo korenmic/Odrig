@@ -151,7 +151,7 @@ class InstallFirmware(WithALimitFile):
         result = self.install(esptool, 0)
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(result.out, f"{LAYOUT_LINE}\nname: {NAME}\npassword: set\nlimit: off\n{REPLY}\noutcome: healthy\n")
-        self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash", "read-flash", "read-flash", "write-flash", "verify-flash", "chip-id"])
+        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "erase-region", "write-flash", "read-flash", "read-flash", "write-flash", "verify-flash", "chip-id"])
         in_storage = [(address, content) for address, content in esptool.wrote if address >= STORAGE_AT]
         board_now = applied(self.old, in_storage)
         self.assertEqual(limit.stored(board_now), 0)
