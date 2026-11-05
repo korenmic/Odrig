@@ -6,7 +6,7 @@ request #50, after seed 77's task 7, the merge of `master` and this spec's commi
 seen failing before the change, and the failure seen goes into the commit message. Code
 carries no history.
 
-- [ ] 1. The folder made by `write_open`
+- [x] 1. The folder made by `write_open`
   - `tests/firmware/test_usermod_files_host.py`, new, `TheStorageFolder`: the stand-in
     `odrig_platform.h` with its file system of folders and files, its `mkdir` and
     write-open counters and its two refusals, `unmakeable` and `writesRefused`; the
