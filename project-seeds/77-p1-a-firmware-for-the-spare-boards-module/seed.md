@@ -17,8 +17,8 @@ builds and verifies as a second image, `odrig-firmware-n8r2.bin`, beside today's
 which stays as it is for the installation's board; and the firmware says in `status` what
 memory the board it runs on has, the external memory it found and the internal memory
 that was free when the core started, which the app shows on its Target page. The 192 KB
-reserve stays. No new command; the app is not changed. The branch is made on top of seed
-76's, and one pull request carries both.
+reserve stays. No new command; the app is not changed. The branch is made from master, as
+a pull request of its own.
 
 ## Priority
 
@@ -29,7 +29,9 @@ reserve stays. No new command; the app is not changed. The branch is made on top
 - Seed 76, pull request #49, branch `seed-76-empty-board-first-animation` at `abc75ea`,
   not merged: the core plays a board without `mapping.json` and without `show.json`,
   which the empty spare needs; its image `odrig-seed76-7c397c5.bin` is the one the owner
-  flashed on 2026-11-05. This seed's branch starts from that branch.
+  flashed on 2026-11-05. This seed's branch starts from master and its pull request
+  stands alone, by the owner's word of 2026-11-05; the spare's first upload needs that
+  change on the board beside this one.
 - Seed 22, commit `bddc2ce`: `allocate()` of `firmware/usermod/odrig_files.cpp`, which on
   ESP-IDF 5 gives the core internal memory only while `INTERNAL_RESERVE`, 192 KB, stays
   free, and external memory otherwise; `host_memory()` and `arena_take()` of
@@ -264,8 +266,10 @@ the flash, not the memory, and the spare's image is then flashed with the same c
   not until now; WLED's information then reads `looking for SD`, `not readable` or the
   count of files, as [microsd.md](../../docs/microsd.md) says.
 - **What the spare can show.** With the image for its module the Target page reads an
-  `external` that is not 0, 2097152 when the whole of the 2 MB is in the heap, `error`
-  null, and the canvas of 60 x 60; the show is empty until the first upload. The
+  `external` that is not 0, 2097152 when the whole of the 2 MB is in the heap, and, with
+  seed 76's change on the board, `error` null and the canvas of 60 x 60, the show empty
+  until the first upload; without that change, `mapping-missing` beside the memory line
+  and no canvas, as the core refuses a board without `mapping.json` today. The
   `Installation:` line names the image that runs by its release name and its build date
   and time, so the first thing read is the name: `odrig_ESP32-S3_8MB_qspi` with an
   `external` that is not 0 on the spare is the fix at work; `odrig_ESP32-S3_16MB_opi`
@@ -343,8 +347,8 @@ the flash, not the memory, and the spare's image is then flashed with the same c
   the change log of `docs/decisions.md` with the owner's ruling, and `docs/drifts.md`.
   `tests/air/test_wled.py` keeps `odrig_ESP32-S3_16MB_opi`: the board suites are the
   installation's module's.
-- **Where it lands.** On a branch from `seed-76-empty-board-first-animation`, as a pull
-  request that carries seed 76's change and this one and supersedes pull request #49.
+- **Where it lands.** On a branch from `master`, as a pull request of its own; pull
+  request #49 stays seed 76's.
   Both images are built from the pull request's head on Windows with the shared
   toolchains, `python firmware/fw.py build --module n8r2` and
   `python firmware/fw.py build`, verified with `python firmware/verify_build.py --module
@@ -427,8 +431,9 @@ the flash, not the memory, and the spare's image is then flashed with the same c
    flashed with the spare's image from the phone: the Target page shows `Installation:
    odrig_ESP32-S3_8MB_qspi ... external <bytes> internal <bytes> reset <reason>`, the
    release name the spare's and the external bytes not 0, 2097152 expected, the reason
-   `other` or `power-on`, neither a finding; then `Choose a ready-made animation`,
-   `Internal storage`, `Upload to the installation`, and
+   `other` or `power-on`, neither a finding, and the invalid-show line `mapping-missing`
+   until seed 76's change is on the board too; then, with a firmware that has both,
+   `Choose a ready-made animation`, `Internal storage`, `Upload to the installation`, and
    `Uploaded as animation 1 <file>. It plays in the playlist.`; the animation on the
    LEDs. `external 0` beside `odrig_ESP32-S3_16MB_opi` means the installation's image
    was flashed, and the spare's is flashed again; `external 0` beside
@@ -452,8 +457,10 @@ staying the installation's, and that `partitions.py` names the spare's table `8 
 which `restore-stock` and `install-firmware` refuse and `flash --image` writes; that the
 host text names the external memory and the
 internal memory free at the core's start in the form given, with the core's room for it
-grown to 128 bytes; that the branch starts from seed 76's and one pull request carries
-both; that the delivery is two images on the Drive under `odrig archive/seed-77/`, each
+grown to 128 bytes; that the branch starts from master and the pull request stands
+alone, by the owner's word of 2026-11-05, the first upload on the spare needing seed 76's
+change beside this one; that the delivery is two images on the Drive under
+`odrig archive/seed-77/`, each
 named by the seed, the commit, the module and its offset, with the spare build's
 bootloader and table in a subfolder of their own, named by their offsets, for a spare
 whose flash was erased or written at 0x0 or 0x8000 by mistake and for nothing else; that
