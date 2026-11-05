@@ -1,0 +1,9 @@
+{
+  "number": 78,
+  "slug": "78-p1-the-first-write-makes-the-storage-folder",
+  "state": "remaining",
+  "title": "The first write makes the storage folder",
+  "priority": "P1",
+  "addedAt": "2026-11-05",
+  "summary": "The firmware's files host makes the folder /odrig of the board's storage once, inside write_open, when a write finds it missing: one mkdir after a failed open, then the open again. A board that was only ever flashed, never given a show by install-show, has no such folder, since WLED formats a fresh root without it and the file system makes no folder for a file, so its first upload from the phone was refused with storage-error at upload begin. A storage with the folder pays nothing, a refused mkdir ends in -1 as today, the start still writes nothing, and every file the core writes gets the folder. Firmware only, no new command, the core and the app unchanged; on pull request #50's branch, seed 77's, as further task commits, with the two pull-request images and the spare's combined image with seed 76's branch delivered on the Drive."
+}
