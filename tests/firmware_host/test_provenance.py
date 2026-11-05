@@ -23,14 +23,18 @@ class SourceIdentity(unittest.TestCase):
             root=pathlib.Path(directory)
             core=root/'core';core.mkdir()
             source=core/'player.cpp';source.write_bytes(b'int current=1;\n')
+            table=root/'firmware'/'partitions'/'odrig-8mb.csv';table.parent.mkdir(parents=True)
+            table.write_bytes(b'app0,app,factory,0x10000,0x300000\n')
             first=provenance.source_inputs(root)
             (core/'build').mkdir();(core/'build'/'toolchain.json').write_bytes(b'host-specific')
-            (root/'firmware').mkdir();(root/'firmware'/'wifi.json').write_bytes(b'private operator settings')
+            (root/'firmware'/'wifi.json').write_bytes(b'private operator settings')
             self.assertEqual(first,provenance.source_inputs(root))
             source.write_bytes(b'int current=2;\n')
             second=provenance.source_inputs(root)
             self.assertNotEqual(first['sha256'],second['sha256'])
-            self.assertEqual(list(second['files']),['core/player.cpp'])
+            self.assertEqual(list(second['files']),['core/player.cpp','firmware/partitions/odrig-8mb.csv'])
+            table.write_bytes(b'app0,app,factory,0x10000,0x200000\n')
+            self.assertNotEqual(second['sha256'],provenance.source_inputs(root)['sha256'])
 
     def test_record_identifies_source_host_toolchain_and_exact_image_bytes(self):
         with tempfile.TemporaryDirectory(prefix='odrig-fw-record-') as directory:

@@ -7,8 +7,8 @@ import platform
 
 from . import Failure, env, host, paths, process, toolchain, wled
 
-GROUPS = ('core', 'firmware/usermod', 'firmware/usb_host_msc', 'firmware/newer', 'firmware/standalone', 'firmware/patches')
-SOURCE_ENDINGS = {'.c', '.cpp', '.h', '.json', '.in', '.patch'}
+GROUPS = ('core', 'firmware/usermod', 'firmware/usb_host_msc', 'firmware/newer', 'firmware/standalone', 'firmware/patches', 'firmware/partitions')
+SOURCE_ENDINGS = {'.c', '.cpp', '.h', '.json', '.in', '.patch', '.csv'}
 IGNORED = {'build', '.pio', 'node_modules', '__pycache__', '.git'}
 
 

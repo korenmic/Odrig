@@ -22,6 +22,12 @@ class Parse(unittest.TestCase):
     def test_an_image_as_large_as_the_partition_fits(self):
         partitions.check(support.partition_table(), 0x300000)
 
+    def test_the_table_of_the_8_mb_layout_gives_its_five_partitions(self):
+        found = partitions.parse(partitions.table(partitions.EIGHT_MB))
+        self.assertEqual(found, list(partitions.EIGHT_MB))
+        self.assertEqual([p.name for p in found], ["nvs", "otadata", "app0", "spiffs", "coredump"])
+        self.assertEqual(partitions.layout_of(found), "8 MB")
+
 
 class Mismatch(unittest.TestCase):
     def mismatch(self, table, image_size=1232640):

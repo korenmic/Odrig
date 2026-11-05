@@ -5,7 +5,7 @@ Each task is one commit on the branch `seed-77-firmware-for-the-spare-module` fr
 before the change, and the failure seen goes into the commit message. Code carries no
 history.
 
-- [ ] 1. The second environment and the spare's table
+- [x] 1. The second environment and the spare's table
   - `firmware/platformio_override.ini.in`: `[env:odrig_microsd_n8r2]` with its settings
     and its release name; `firmware/partitions/odrig-8mb.csv`, new;
     `firmware/fwtool/partitions.py`: `EIGHT_MB`, `EIGHT_MB_NAME` and `layout_of()` by
