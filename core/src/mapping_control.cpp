@@ -5,6 +5,7 @@
 
 #include <string.h>
 
+#include "asset.h"
 #include "crc32.h"
 #include "player.h"
 #include "storage.h"
@@ -130,37 +131,14 @@ bool persist(Core &core, const uint8_t *pins) {
         host.remove(host.ctx, kMappingPart);
         return false;
     }
+    core.mapping_builtin = 0;
     return true;
 }
-
-// An ODRG file the core holds, read as a host reads a file.
-struct Asset {
-    const uint8_t *bytes;
-    uint32_t size;
-    uint32_t offset;
-};
-int asset_open(void *ctx, const char *) {
-    static_cast<Asset *>(ctx)->offset = 0;
-    return 1;
-}
-int32_t asset_read(void *ctx, uint8_t *out, size_t capacity) {
-    Asset &asset = *static_cast<Asset *>(ctx);
-    size_t count = asset.size - asset.offset;
-    if (count > capacity) count = capacity;
-    memcpy(out, asset.bytes + asset.offset, count);
-    asset.offset += static_cast<uint32_t>(count);
-    return static_cast<int32_t>(count);
-}
-void asset_close(void *) {}
 
 // Decodes the diagonal's one frame into the pixel buffer.
 bool decode_diagonal(Core &core) {
     Asset asset = {kDiagonal, static_cast<uint32_t>(sizeof kDiagonal), 0};
-    odrig_host host = {};
-    host.ctx = &asset;
-    host.open = asset_open;
-    host.read = asset_read;
-    host.close = asset_close;
+    const odrig_host host = asset_host(asset);
     Reason reason = core.file.open(host, "test");
     if (reason == kNone) reason = core.decoder.open(&core.file, &core.inflate, core.window);
     if (reason == kNone) {

@@ -437,9 +437,14 @@ def example_show():
     return dict(_example_show())
 
 
+# The target's mapping file: the installation's twenty legs, which the core holds and uses
+# when a file set has no mapping file.
+TARGET_MAPPING = ROOT / "mapping" / "legs-20.json"
+
+
 @functools.lru_cache(maxsize=None)
 def _demo_show():
-    target = ROOT / "mapping" / "legs-20.json"
+    target = TARGET_MAPPING
     canvas = mapping.read(target)
     files = [("mapping.json", target.read_bytes()), ("show.json", (ROOT / "shows" / "demo-20" / "show.json").read_bytes())]
     for name, generator in (("hello.odrg", hello_world), ("dvd.odrg", dvd_bounce)):
@@ -914,10 +919,11 @@ class ReferencePlayer:
 
     def _check(self, files):
         """Reads the installed file set in the order of the checks. Returns the `start` id."""
-        if "mapping.json" not in files:
-            raise _Invalid("mapping-missing")
+        # A file set without a mapping file has the installation's mapping, which the core
+        # holds: the target file.
+        self.mapping_builtin = "mapping.json" not in files
         try:
-            canvas = mapping.loads(files["mapping.json"])
+            canvas = mapping.loads(TARGET_MAPPING.read_bytes() if self.mapping_builtin else files["mapping.json"])
         except errors.Rejection:
             raise _Invalid("mapping-malformed") from None
         self.legs = [(leg.leg, leg.pin, led_pixels(canvas, leg)) for leg in canvas.legs]

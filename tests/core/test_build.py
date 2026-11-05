@@ -172,6 +172,13 @@ class Sources(unittest.TestCase):
         for name in expected:
             self.assertIn(name, names)
 
+    def test_the_built_in_mapping_is_the_target_file(self):
+        subprocess.run([sys.executable, str(support.CORE / "mapping_data.py"), "--check"], check=True, capture_output=True)
+        header = (SOURCES / "mapping_data.h").read_text(encoding="utf-8")
+        self.assertIn("static const uint8_t kBuiltInMapping[]", header)
+        held = bytes(int(byte, 16) for byte in re.findall(r"0x([0-9a-f]{2})", header))
+        self.assertEqual(held, support.TARGET_MAPPING.read_bytes())
+
     def test_they_include_only_three_system_headers_and_their_own(self):
         own = {path.name for path in core_sources()}
         for path in core_sources():

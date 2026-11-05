@@ -151,8 +151,12 @@ class EachReason(unittest.TestCase):
         self.assertEqual(last, {"ok": True, "on": True, "brightness": 200, "playing": None, "animation": None, "fps": 0, "error": text, "width": width, "height": height, "seed": None})
         self.assertEqual(lines, [])
 
-    def test_mapping_missing(self):
-        self.check(example(mapping_json=None), "mapping-missing", legs=())
+    def test_a_missing_mapping_file_is_the_installations_mapping_and_no_fault(self):
+        # The example's animations are of another canvas than the installation's, so they
+        # are quarantined, and the show stays valid on the built-in mapping's twenty legs.
+        run = self.quarantined(example(mapping_json=None), "hello.odrg", "size-mismatch")
+        self.assertEqual(len(run.legs), 20)
+        self.assertEqual({count for _, _, count in run.legs}, {180})
 
     def test_mapping_malformed(self):
         self.check(example(mapping_json='{"version": 1}'), "mapping-malformed", legs=())
@@ -277,7 +281,7 @@ class OrderOfTheChecks(unittest.TestCase):
         bad_show = '{"version": 2}'
         bad_file = b"ODRG\x02" + bytes(11)
         cases = (
-            ("mapping-missing", example(mapping_json=None, show_json=None)),
+            ("show-missing", example(mapping_json=None, show_json=None)),
             ("mapping-malformed", example(mapping_json="[]", show_json=None)),
             ("mapping-malformed", example(mapping_json="[]", show_json=bad_show)),
             ("show-missing", example(show_json=None, hello_odrg=None)),
@@ -328,8 +332,10 @@ class OrderOfTheChecks(unittest.TestCase):
         self.assertIn(("dvd.odrg", 1), run.opened)
         run = support.start(example(show_json=None), options=["--trace-files"])
         self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 0)))
+        # Without a mapping file the start goes on with the built-in mapping: the file is
+        # asked for once, and the show's files are opened and found of another canvas.
         run = support.start(example(mapping_json=None), options=["--trace-files"])
-        self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 0)))
+        self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 0), ("show.json", 1), ("show.json", 1), ("pending.txt", 0), ("catalog.txt", 0), ("hello.odrg", 1), ("dvd.odrg", 1)))
 
     def test_a_show_with_wrong_ids_asks_for_no_file(self):
         run = support.start(example(show_json=show(start=9)), options=["--trace-files"])
@@ -440,7 +446,6 @@ class Leftovers(unittest.TestCase):
             "duplicate-id 1": {"show_json": support.show_text([animation(1, "hello.odrg"), animation(1, "dvd.odrg")])},
             "undefined-id 7": {"show_json": show(start=7)},
             "nested-cycle 4": {"show_json": show(cycle(3, [1]), cycle(4, [3]))},
-            "mapping-missing": {"mapping_json": None},
             "mapping-malformed": {"mapping_json": "{"},
         }
         for reason, changes in unusable.items():

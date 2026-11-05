@@ -61,10 +61,10 @@ class TheCanvas(Playback):
         files["show.json"] = support.show_text([], 128)
         self.assertEqual(self.canvas(files), (5, 3))
 
-    def test_it_is_null_without_a_mapping_and_with_one_the_core_refuses(self):
+    def test_it_is_the_installations_without_a_mapping_file_and_null_with_one_the_core_refuses(self):
         files = support.example_show()
         del files["mapping.json"]
-        self.assertEqual(self.canvas(files), (None, None))
+        self.assertEqual(self.canvas(files), (60, 60))
         files["mapping.json"] = "{"
         self.assertEqual(self.canvas(files), (None, None))
 
@@ -122,9 +122,15 @@ class RefreshRate(Playback):
         del dark["show.json"]
         printed = self.assert_as_the_reference(dark, every_20_ms(50) + [at(500, "off"), status_at(1000)])
         self.assertEqual(state(printed[-1])["fps"], 50)
+        # Without a mapping file the installation's mapping refreshes, dark: the example's
+        # animations are of another canvas.
         no_mapping = support.example_show()
         del no_mapping["mapping.json"]
         printed = self.assert_as_the_reference(no_mapping, every_20_ms(50) + [status_at(1000)])
+        self.assertEqual(state(printed[-1])["fps"], 50)
+        refused = support.example_show()
+        refused["mapping.json"] = "{"
+        printed = self.assert_as_the_reference(refused, every_20_ms(50) + [status_at(1000)])
         self.assertEqual(state(printed[-1])["fps"], 0)
 
 
@@ -211,7 +217,6 @@ class StateAfterStartup(Playback):
         # The brightness is the show's once its ids are checked, and 0 before that. The
         # canvas is the mapping's once the mapping is read.
         cases = (
-            (without("mapping.json"), (), "mapping-missing", 0, None),
             (with_show("{}") | {"mapping.json": "{}"}, (), "mapping-malformed", 0, None),
             (without("show.json"), (), "show-missing", 0, 60),
             (with_show('{"version": 1, "brightness": 99, "items": {}}'), (), "show-malformed", 0, 60),

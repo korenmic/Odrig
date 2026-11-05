@@ -5,7 +5,7 @@ Each task is one commit on the branch `seed-76-empty-board-first-animation` from
 before the change, and the failure seen goes into the commit message. Code carries no
 history.
 
-- [ ] 1. The built-in mapping
+- [x] 1. The built-in mapping
   - `core/mapping_data.py` and `core/src/mapping_data.h`, the bytes of
     `mapping/legs-20.json`; `core/src/asset.h`, the in-memory host, used by
     `decode_diagonal()` as before; `core/src/mapping.cpp` reading the built-in bytes
