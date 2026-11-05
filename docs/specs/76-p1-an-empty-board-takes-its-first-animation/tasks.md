@@ -31,12 +31,13 @@ history.
   - Run the core's suite.
   - Requirements: 2.1–2.5, 3.1–3.4, 4.3, 7.1.
 
-- [ ] 3. The emulator and the app's suite
+- [x] 3. The emulator and the app's suite
   - `emulator/httpd.py`: the built-in mapping served when the folder has no mapping
-    file. `tests/emulator/test_binding.py` and `test_events.py`: the empty folder's
-    legs, no reason, the served mapping, seen failing first; `tests/emulator/test_docs.py`
-    with the check list's new reason. `tests/app/test_upload.py`: the first upload into
-    an empty installation, seen failing first.
+    file. `tests/emulator/test_binding.py`, `test_events.py` and `test_start.py`: the
+    empty folder's legs, no reason, the served mapping, seen failing first;
+    `tests/emulator/test_docs.py` keeps the check list's reason until task 4 changes
+    the page. `tests/app/test_ready_upload.py`: the first upload into an empty
+    installation, seen failing first.
   - Run the emulator's suite and the app's suite.
   - Requirements: 5.1, 5.2, 7.2.
 

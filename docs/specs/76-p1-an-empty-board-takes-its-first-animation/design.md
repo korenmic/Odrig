@@ -145,11 +145,15 @@ command, reply member or error code is added.
   twenty legs and `error` null, a status event with `error` null, and
   `GET /show/mapping.json` with status 200 and the bytes of `mapping/legs-20.json`; a
   mapping the core refuses is still served as it is.
-- `tests/app/test_upload.py`: `test_the_first_upload_into_an_empty_installation`:
-  the emulator started on an empty folder, the `uploads` scenario with `clip.gif`,
-  the message `Uploaded as animation 1 clip.odrg. It plays in the playlist.`, the file
-  converted for 60 x 60 as the command line converts it on `mapping/legs-20.json`, the
-  item listed, and the folder's `mapping.json` byte for byte the target file.
+- `tests/app/test_ready_upload.py`: `test_the_first_upload_into_an_empty_installation`:
+  the emulator started on an empty folder, the `ready-upload` scenario with a
+  ready-made file of 60 x 60, the demo show's `hello.odrg`, the destination
+  `Internal /first.odrg`, the message `Uploaded as animation 1 first.odrg. It plays in
+  the playlist.`, the item listed, and the folder holding the file, `show.json` and
+  `mapping.json` byte for byte the target file.
+- `tests/emulator/test_start.py`: an empty folder starts valid with the canvas of 60 x
+  60, `play 1` is `unknown-id`, and nothing is written; the verbose test reads the
+  core's line for a malformed mapping file.
 
 ## The documentation
 

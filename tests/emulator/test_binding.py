@@ -233,23 +233,25 @@ class ExampleShow(unittest.TestCase):
 
 
 class OtherFolders(unittest.TestCase):
-    def test_an_empty_folder_is_mapping_missing_and_has_no_legs(self):
+    def test_an_empty_folder_has_the_installations_twenty_legs_and_dark_refreshes(self):
         with tempfile.TemporaryDirectory() as folder:
             files = host.FolderHost(folder)
             core = binding.Core(support.LIBRARY, files)
-            self.assertEqual(core.error(), "mapping-missing")
-            self.assertEqual(core.legs, ())
-            self.assertEqual(core.led_bytes, 0)
-            self.assertIs(core.poll(0), False)
-            self.assertEqual(core.frame(), b"")
-            self.assertEqual(json.loads(core.command(0, b"status"))["error"], "mapping-missing")
-            self.assertEqual(list(files.logged), ["mapping-missing"])
+            self.assertIsNone(core.error())
+            self.assertEqual(len(core.legs), 20)
+            self.assertEqual(core.led_bytes, 10800)
+            self.assertIs(core.poll(0), True)
+            self.assertEqual(core.frame(), bytes(10800))
+            status = json.loads(core.command(0, b"status"))
+            self.assertEqual((status["error"], status["width"], status["height"], status["playing"]), (None, 60, 60, None))
+            self.assertEqual(list(files.logged), [])
+            self.assertEqual(os.listdir(folder), [])
 
     def test_a_folder_with_a_mapping_and_no_show_has_legs_and_dark_refreshes(self):
         with tempfile.TemporaryDirectory() as folder:
             pathlib.Path(folder, "mapping.json").write_bytes(support.TWO_LEGS.read_bytes())
             core = binding.Core(support.LIBRARY, host.FolderHost(folder))
-            self.assertEqual(core.error(), "show-missing")
+            self.assertIsNone(core.error())
             self.assertEqual(len(core.legs), 2)
             self.assertIs(core.poll(0), True)
             self.assertEqual(core.frame(), bytes(1080))

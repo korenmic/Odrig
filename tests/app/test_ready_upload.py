@@ -1,11 +1,13 @@
 """Ready-made animations use their original bytes through the shared app."""
 
+import json
 import pathlib
 import tempfile
 import unittest
 
 from odrig import catalog, odrg, odrgx
 
+from tests.core import support as core_support
 from tests.emulator import support as emulator_support
 from . import support
 from .test_target import entered
@@ -13,6 +15,25 @@ from .test_upload import target, taken
 
 
 class ReadyUploads(unittest.TestCase):
+    def test_the_first_upload_into_an_empty_installation(self):
+        # An installation that has nothing: no mapping file, no show file. The app takes
+        # the ready-made file for its canvas of 60 x 60, the upload is the installation's
+        # first, and the folder is a whole installed file set afterwards.
+        folder = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        emulator = entered(self, emulator_support.Emulator(folder))
+        media = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        data = core_support.demo_show()['hello.odrg']
+        (media / 'first.odrg').write_bytes(data)
+        found = support.run('ready-upload', address=f'127.0.0.1:{emulator.port}',
+                            settings={'rows': 0, 'file': 'first.odrg'}, media=media).seen
+        self.assertEqual(found['default'], 'internal')
+        self.assertEqual(found['destination'], 'Internal /first.odrg')
+        self.assertEqual(found['message'], 'Uploaded as animation 1 first.odrg. It plays in the playlist.')
+        self.assertEqual(sorted(path.name for path in folder.iterdir()), ['first.odrg', 'mapping.json', 'show.json'])
+        self.assertEqual((folder / 'first.odrg').read_bytes(), data)
+        self.assertEqual((folder / 'mapping.json').read_bytes(), core_support.TARGET_MAPPING.read_bytes())
+        self.assertEqual([item['file'] for item in json.loads(emulator.command('list'))['items']], ['first.odrg'])
+
     def test_a_ready_container_is_sent_without_reencoding(self):
         folder = entered(self, emulator_support.example_show())
         emulator = entered(self, emulator_support.Emulator(folder))
