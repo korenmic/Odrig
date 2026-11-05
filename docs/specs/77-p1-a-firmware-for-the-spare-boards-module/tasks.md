@@ -59,7 +59,7 @@ history.
   - Run the firmware's suites.
   - Requirements: 3.6, 3.7, 1.4 in part, the header and the name.
 
-- [ ] 5. The host text
+- [x] 5. The host text
   - `firmware/usermod/odrig_usermod.cpp`: `internalFreeAtStart` read in `setup()` before
     `odrig_core_begin()`, and `aboutHost()` with `external` and `internal`;
     `core/src/commands.cpp`: `kAboutSize` 128.

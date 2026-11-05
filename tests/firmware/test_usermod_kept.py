@@ -61,6 +61,18 @@ class TheAbout(unittest.TestCase):
                      "WLED_RELEASE_NAME", "__DATE__", "__TIME__", '"internal+microsd"', '"internal+usb"', "esp_reset_reason()"):
             self.assertIn(word, usermod, word)
 
+    def test_it_names_the_external_memory_in_the_heap_and_the_internal_memory_free_at_the_start(self):
+        usermod = (USERMOD / "odrig_usermod.cpp").read_text(encoding="utf-8")
+        for word in ("heap_caps_get_total_size(MALLOC_CAP_SPIRAM)", "heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)",
+                     '"%s %s %s %s external %u internal %u reset %s"', "internalFreeAtStart"):
+            self.assertIn(word, usermod, word)
+        # The internal memory is read right before the core starts, after the host is complete.
+        setup = [line.strip() for line in usermod[usermod.index("void setup() override {"):].splitlines()]
+        at = setup.index("host.about = aboutHost;")
+        self.assertEqual(setup[at:at + 3], ["host.about = aboutHost;",
+                                            "internalFreeAtStart = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);",
+                                            "core = odrig_core_begin(&host);"])
+
 
 if __name__ == "__main__":
     unittest.main()
