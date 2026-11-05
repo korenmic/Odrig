@@ -39,7 +39,7 @@ carries no history.
     and the onboarding suite, `python -B -m unittest discover -s tests/onboarding -t .`.
   - Requirements: 1.1-1.8, 2.1-2.4, 3.1-3.4, 4.1-4.3, 6.1, 6.2.
 
-- [ ] 2. The pages
+- [x] 2. The pages
   - `tests/firmware/test_docs.py`, `Firmware`,
     `test_it_says_what_the_firmware_writes_how_it_paces_and_what_an_upload_measured`: "The
     folder itself is made by `write_open`, once, when a write finds it missing" among its

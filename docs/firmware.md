@@ -908,24 +908,27 @@ The firmware is WLED with one usermod, `firmware/usermod/`, that hosts the core 
 carries.
 
 **At start** the usermod starts the core on the files of the folder `/odrig` of storage:
-`mapping.json`, `show.json` and the `.odrg` and `.odrgx` files, as `install-show` put them there. It
-gives the core a file in the pieces the core asks for, of at most 512 bytes, and never
-holds a whole file. The core's memory comes from the chip's internal memory, and from the
-external memory only when the internal memory has none. The time the core is given is the
-milliseconds since the chip started, from a 64-bit clock.
+`mapping.json`, `show.json` and the `.odrg` and `.odrgx` files, as `install-show` put
+them there or as the core's changes wrote them. It gives the core a file in the pieces
+the core asks for, of at most 512 bytes, and never holds a whole file. The core's memory
+comes from the chip's internal memory, and from the external memory only when the
+internal memory has none. The time the core is given is the milliseconds since the chip
+started, from a 64-bit clock.
 
-**Storage.** The usermod gives the core the seven storage functions of
-[core.md](core.md), on WLED's file system. Every path is `/odrig/<name>`, and a name is
-checked before it is used: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, and
-not dots alone. The firmware writes, renames and deletes a file only there, and only
-inside one of these functions: nothing of the firmware decides to write. What is written
-is the core's matter: an uploaded animation, first as `upload.part`, the show file,
-first as `show.part`, and `pending.txt`; see [show.md](show.md) and [core.md](core.md),
-"The files the core writes".
+**Storage.** The usermod gives the core the seven storage functions of [core.md](core.md),
+on WLED's file system. Every path is `/odrig/<name>`, and a name is checked before it is
+used: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, and not dots alone. The
+firmware writes, renames and deletes a file only there, and only inside one of these
+functions: nothing of the firmware decides to write. The folder itself is made by
+`write_open`, once, when a write finds it missing: a storage that WLED formatted holds
+WLED's own files and no `/odrig` until the first write into it, and the file system makes
+no folder for a file. What is written is the core's matter: an uploaded animation, first
+as `upload.part`, the show file, first as `show.part`, and `pending.txt`; see
+[show.md](show.md) and [core.md](core.md), "The files the core writes".
 
 | Function | On the board |
 |---|---|
-| `write_open` | A file that was being written is closed and removed. The named file is opened for writing, which empties one that has the name. One file is written at a time. |
+| `write_open` | A file that was being written is closed and removed. The named file is opened for writing, which empties one that has the name; when the open fails, the folder is asked for once, made if it is missing, and the open tried once more. One file is written at a time. |
 | `write` | The bytes go to the open file in one write. |
 | `write_close` | The file is closed, and it is whole when storage then holds as many bytes as were given. |
 | `rename` | The file system's rename. A file that has the new name is replaced by it. |

@@ -251,6 +251,7 @@ class Firmware(unittest.TestCase):
     def test_it_says_what_the_firmware_writes_how_it_paces_and_what_an_upload_measured(self):
         does = " ".join(section(self.text, "What the firmware does").split())
         for expected in ("**Storage.**", "Every path is `/odrig/<name>`", "The firmware writes, renames and deletes a file only there", "`upload.part`", "`show.part`", "`pending.txt`",
+                         "The folder itself is made by `write_open`, once, when a write finds it missing",
                          "**Storage calls are paced.**", "the longer of 20 ms and twice d", "The port's queue for what arrives has 4,096 bytes",
                          "Of a body longer than 4,096 bytes the first 4,096 are passed on"):
             self.assertIn(expected, does)

@@ -12726,3 +12726,24 @@ and a flash size of its own. The four environments of WLED's board still name no
 them, which `tests/firmware/test_wled.py` checks.
 
 **Resolution.** `docs/firmware.md`, "build".
+
+## Seed 78: who makes the folder
+
+**Question.** The host contract of `docs/core.md` names no folder and no call to make one:
+`write_open` begins a new, empty file of the name, and nothing more. `docs/firmware.md`
+said that the files of `/odrig` are there "as `install-show` put them there", as if
+`install-show` were the folder's only maker. A storage that WLED formatted holds WLED's
+own files and no `/odrig`, and the file system makes no folder for a file, so a board that
+was only ever flashed refused its first upload with `storage-error`. Who makes the folder,
+and when? This is a gap in a governing document: the host contract says nothing of where
+the files live or who makes the place.
+
+**Answer.** The host, inside `write_open`, once, after a failed open: one `mkdir` of
+`/odrig` and the open again. A storage with the folder pays nothing, and a `mkdir` the
+file system refuses fails the write as before. Not the core, which knows no paths and
+whose contract would then grow for every host for one platform's rule; not the start,
+which seed 76 decided writes nothing; not the usermod's `setup()`, which would make the
+firmware decide to write. No decision of `docs/decisions.md` changes, so its change log
+gets no entry, and `docs/core.md` and `docs/commands.md` stay as they are.
+
+**Resolution.** `firmware/usermod/odrig_files.cpp` and `docs/firmware.md`.
