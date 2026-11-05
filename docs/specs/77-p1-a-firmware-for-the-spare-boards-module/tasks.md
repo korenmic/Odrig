@@ -84,7 +84,7 @@ history.
     documentation test and the onboarding suite.
   - Requirements: 5.1-5.3, 5.5, 6.1-6.4.
 
-- [ ] 7. The pull request and the two images
+- [x] 7. The pull request and the two images
   - Push the branch and open the pull request from `master`, of its own and beside
     #49, its description naming the seed, the verdict and the owner's open checks.
     Build both images from the pushed head on this computer with the shared toolchains
