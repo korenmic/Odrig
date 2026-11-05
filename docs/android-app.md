@@ -449,9 +449,10 @@ refreshes are counted as refreshes a second as at any other time.
 
 The target screen names the installation as its software names itself, from `host` of
 `status`, as `Installation: odrig emulator on Darwin arm64`: the board gives its release,
-the date and the time of its build, its storage and the reason of its last start. Each
-time the screen is opened while the installation answers, the app asks for `fault` and
-says the last fault the installation met in a file since its start, as
+the date and the time of its build, its storage, its external memory and the internal
+memory free at its start, and the reason of its last start. Each time the screen is
+opened while the installation answers, the app asks for `fault` and says the last fault
+the installation met in a file since its start, as
 `Last fault: b.odrg, while it was played, at frame record 3 after 1234 bytes of its
 frames: the file is damaged (truncated).` The work is `checked after the start`,
 `played`, `checked after its upload` or `read from the external storage`, and the words

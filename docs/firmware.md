@@ -87,12 +87,13 @@ offers it for a Mac with Apple's processor.
 Arduino's `SD` library, which reads the card, is part of Arduino-ESP32, and nothing of
 ESP-IDF's own source is fetched.
 
-WLED's libraries can be copied from `.pio/libdeps/odrig` to `.pio/libdeps/odrig_microsd`
-and `.pio/libdeps/odrig_microsd_probe` in WLED's folder before the first build; what is
-missing there PlatformIO fetches at the versions WLED names, which on 2026-10-16 were those
-of the build known good. The platform takes the other compiler, `toolchain-riscv32-esp`,
-only for a project with a folder `ulp`, and CMake, Ninja and ESP-IDF itself only to compile
-ESP-IDF's libraries again, which the firmware's build does not do.
+WLED's libraries can be copied from `.pio/libdeps/odrig` to `.pio/libdeps/odrig_microsd`,
+`.pio/libdeps/odrig_microsd_probe` and `.pio/libdeps/odrig_microsd_n8r2` in WLED's folder
+before the first build; what is missing there PlatformIO fetches at the versions WLED
+names, which on 2026-10-16 were those of the build known good. The platform takes the
+other compiler, `toolchain-riscv32-esp`, only for a project with a folder `ulp`, and
+CMake, Ninja and ESP-IDF itself only to compile ESP-IDF's libraries again, which the
+firmware's build does not do.
 
 ## Host builds and verification
 
@@ -102,13 +103,17 @@ From the repository root on Windows, including a path containing spaces:
 python firmware/fw.py setup
 python firmware/fw.py build
 python firmware/verify_build.py
+python firmware/fw.py build --module n8r2
+python firmware/verify_build.py --module n8r2
 python tests/run.py --suites firmware,firmware-host,runner --workers 2
 ```
 
 Use `python3` on macOS/Linux. No board is needed or reached by these commands.
 The build retains the default `odrig_microsd`, vendor pins, hardware definitions
-and size limit. The platform selects native vendor archives and checks integrity;
-an unavailable archive fails, with no implicit upgrade or foreign executable reuse.
+and size limit; `build --module n8r2` builds the spare board's image beside it, from
+the environment `odrig_microsd_n8r2`, as [build](#build) says. The platform selects
+native vendor archives and checks integrity; an unavailable archive fails, with no
+implicit upgrade or foreign executable reuse.
 
 macOS retains the legacy folders shown below. Windows uses
 `build/firmware/hosts/win32-x86_64/` for `venv/`, `pio/`, `pio-cache/` and `newer/`;
@@ -129,25 +134,35 @@ Each image retains its `.sha256` and adds `.bin.build.json`: committed/dirty tra
 source, host/environment/tools, vendor manifest identities, input hashes and image
 bytes/hash. `verify_build.py` inspects the default output offline, checking the
 ESP32-S3 header, checksum/current-source provenance and linked player entry points.
-It writes `image-info.txt` and `verification.json` beside the image. It does not
+It writes `image-info.txt` and `verification.json` beside the image. With
+`--module n8r2` it inspects the spare's image, `odrig-firmware-n8r2.bin`, against the
+environment `odrig_microsd_n8r2` and the ELF of `.pio/build/odrig_microsd_n8r2/`, and
+writes `image-info-n8r2.txt` and `verification-n8r2.json` beside it. Each module's
+check reads the flash size of the header, 16 MB for the installation's image and 8 MB
+for the spare's, and finds the module's release name among the image's bytes,
+`odrig_ESP32-S3_16MB_opi` or `odrig_ESP32-S3_8MB_qspi`, and not the other's; a
+provenance of the other environment is refused. It does not
 flash or claim physical acceptance. Compiler paths, timestamps and ELF/application
 metadata may change bytes across hosts; compare source/configuration identity and
 image properties rather than requiring identical binary hashes.
 
 The read-only [firmware host workflow](../.github/workflows/firmware-hosts.yml)
-builds one PR head on Windows and Linux from a spaced checkout path, then
-retains images, provenance, inspection and discovered test results. It uses no board
-or deployment secrets. A manual run can opt into macOS with `include_macos`; that
-job also runs the newcomer walkthrough. The
+builds one PR head on Windows and Linux from a spaced checkout path, both images,
+the installation's and then the spare's with `build --module n8r2`, verifies each
+with `verify_build.py`, and then retains the images, their provenance, both
+inspections, the ELF of each environment and discovered test results. It uses no
+board or deployment secrets. A manual run can opt into macOS with `include_macos`;
+that job also runs the newcomer walkthrough. The
 [verification record](specs/60-p2-cross-platform-firmware-builds/verification.md)
 distinguishes actual OS/architecture results, reuse/interruption and optional variant
 coverage. A configured job alone is not successful build evidence; Intel/arm64 and
 optional variants are not inferred from another host.
 
-All eight kinds retain their selection: default, microSD alias, probe, stock, stick,
-stick-probe, standalone and standalone-probe. Selection tests and actual compilation
-coverage are separate. Standalone remains an incomplete fallback player. Board and
-phone acceptance of runtime features remains open under the unchanged board rules.
+All nine kinds retain their selection: default, microSD alias, probe, stock, stick,
+stick-probe, standalone, standalone-probe and the spare's module. Selection tests and
+actual compilation coverage are separate. Standalone remains an incomplete fallback
+player. Board and phone acceptance of runtime features remains open under the
+unchanged board rules.
 
 ## The work folder
 
@@ -244,7 +259,7 @@ with that environment's Python.
 | `checksum-mismatch` | An image differs from the SHA-256 beside it, or a stock file from `firmware/stock.sha256`. |
 | `stock-missing` | A stock file that is about to be written is not there. |
 | `no-board` | There is no `/dev/cu.usbmodem*` device, or more than one and none was named. |
-| `layout-mismatch` | The board's partition table has no application partition at `0x10000` that the image fits in, or no data partition named `spiffs`. |
+| `layout-mismatch` | The board's partition table has no application partition at `0x10000` that the image fits in, or no data partition named `spiffs`; or it has one firmware slot and ends neither at `0x800000` nor at `0x1000000`; or, under `restore-stock` and `install-firmware`, it is the `8 MB` layout, the spare board's, whose files are not theirs. |
 | `esptool-failed` | esptool ended with an error, or was asked for an address outside the regions below. |
 | `no-reply` | The board did not answer within 20 seconds after its restart. |
 | `check-not-done` | The board answered, but was still reading its installed animations when the time of `--wait` was over. Nothing is wrong with what was written: the command gave up waiting. |
@@ -268,10 +283,13 @@ with that environment's Python.
 
 **The layout.** A command that reads the board's partition table, `flash`,
 `install-firmware`, `install-show`, `set-wifi`, `set-limit`, `read-limit` and `read-show`,
-prints first which of the two layouts of [The regions of the flash](#the-regions-of-the-flash)
-it found, and the size of the storage there: `layout: WLED's, storage 10354688 bytes` or
-`layout: bigger, storage 13500416 bytes`. It works on either, and writes the storage where
-the table puts it.
+prints first which of the three layouts of
+[The regions of the flash](#the-regions-of-the-flash) it found, and the size of the
+storage there: `layout: WLED's, storage 10354688 bytes`,
+`layout: bigger, storage 13500416 bytes` or `layout: 8 MB, storage 5111808 bytes`, the
+spare board's. It works on each of them, and writes the storage where the table puts it;
+`restore-stock` and `install-firmware` alone refuse the `8 MB` layout with
+`layout-mismatch` before they print the line or write anything, as their sections say.
 
 **The port.** A command that talks to the board uses the port given with `--port`, else the
 one in the variable `ODRIG_BOARD_PORT`, else the only `/dev/cu.usbmodem*` device. With no
@@ -308,11 +326,13 @@ python3 firmware/fw.py build --probe
 python3 firmware/fw.py build --stick
 python3 firmware/fw.py build --stick --probe
 python3 firmware/fw.py build --stock
+python3 firmware/fw.py build --module n8r2
 ```
 
 Builds an image with PlatformIO in `build/firmware/WLED` and keeps it in
 `build/firmware/out/` with its SHA-256 in a file beside it, `<image>.sha256`. An image
-larger than the application partition, 3,145,728 bytes, is not kept: `image-too-large`.
+larger than the application partition, 3,145,728 bytes, the size of `app0` on every
+layout, is not kept: `image-too-large`.
 
 | Command | Environment | Image | What it is |
 |---|---|---|---|
@@ -321,6 +341,7 @@ larger than the application partition, 3,145,728 bytes, is not kept: `image-too-
 | `build --stick` | `odrig` | `odrig-stick.bin` | The USB stick's firmware: the same on the software known good, with the USB host for a stick on the chip's own socket in place of the card. |
 | `build --stick --probe` | `odrig_probe` | `odrig-stick-probe.bin` | Its probe build. |
 | `build --stock` | `esp32s3dev_16MB_opi` | `stock-built.bin` | WLED's own environment from WLED's files as they are at the pinned commit, with no patch applied. |
+| `build --module n8r2` | `odrig_microsd_n8r2` | `odrig-firmware-n8r2.bin` | The spare board's firmware: the firmware built for the module with 8 MB of flash and 2 MB of quad PSRAM, the memory type `qio_qspi`, the tracked table `firmware/partitions/odrig-8mb.csv` and the release name `odrig_ESP32-S3_8MB_qspi`. |
 
 The firmware and its probe build are built on [the newer software](#the-newer-software):
 the tool makes the newer software's Python environment first, when
@@ -342,19 +363,43 @@ python3 firmware/fw.py build --microsd
 
 `build --microsd` builds the same firmware as `build` and keeps it as `odrig-microsd.bin`,
 the name the board sessions of 2026-10-22 and 2026-10-23 used; it does not go with
-`--stock`, `--probe`, `--stick` or `--standalone`. The image of 2026-10-22, which the board
-runs, has 1,765,808 bytes and the SHA-256
+`--stock`, `--probe`, `--stick`, `--standalone` or `--module n8r2`. The image of
+2026-10-22, which the board runs, has 1,765,808 bytes and the SHA-256
 `fd089753d86c92d9cbfbb2e4823d49428e4b037213b656736636b9dd9a1950a5`.
+
+`--module` names the module the image is built for. `n16r8` is the installation's board,
+an ESP32-S3 with 16 MB of flash and 8 MB of octal PSRAM, and the default: `build` without
+the option builds it, as it always did. `n8r2` is the spare board's module, with 8 MB of
+flash and 2 MB of quad PSRAM: `build --module n8r2` builds the environment
+`odrig_microsd_n8r2`, which extends `odrig_microsd` and changes only what the module
+differs in, the memory type `qio_qspi`, the flash size of 8 MB, the tracked table
+`firmware/partitions/odrig-8mb.csv`, the 8 MB layout of
+[The regions of the flash](#the-regions-of-the-flash), and the release name
+`odrig_ESP32-S3_8MB_qspi`, and keeps the image as `odrig-firmware-n8r2.bin` with its
+`.sha256` and its `.build.json`, whose field `module` names the module, `n16r8` in the
+record of every other kind. The image's header says 8 MB of flash, which `flash` and the
+phone write as it is. `--module n8r2` does not go with `--stock`, `--probe`, `--stick`,
+`--standalone` or `--microsd`: the probe builds stay the installation's module's. The
+memory type and the release name change the compiler flags, so the framework is compiled
+again for this environment, about 12 minutes on the Windows computer; before the first
+build `.pio/libdeps/odrig_microsd` can be copied by hand to
+`.pio/libdeps/odrig_microsd_n8r2` in WLED's folder, and what is missing there PlatformIO
+fetches; the tool copies nothing.
+`flash --image build/firmware/out/odrig-firmware-n8r2.bin` writes the spare's image to the
+spare board; `install-firmware` stays the installation's image and refuses the spare's
+layout.
 
 Before building, the tool brings WLED's tracked files back to the pinned commit, applies
 every patch of `firmware/patches/`, and writes `platformio_override.ini` into WLED's folder
 from `firmware/platformio_override.ini.in`, with the repository's path in place of
-`@REPO@`. That file adds the two environments and changes nothing of WLED's own; everything
-it does not name, the board, the platform, the partition table and the flash settings, is
-inherited from WLED's environment. The usermod and the core are used where they are, as
-libraries outside WLED's folder: the build compiles `core/src/*.cpp` from `core/`, with the
-compiler flags of the environment, and nothing is copied. `core/library.json` is what lets
-PlatformIO take `core/` as a library. A repository path with a space in it is refused.
+`@REPO@`. That file adds the project's environments and changes nothing of WLED's own;
+everything an environment does not name, the board, the platform, the partition table and
+the flash settings, is inherited from WLED's environment, and only the spare's environment
+names a partition table and a flash size of its own. The usermod and the core are used
+where they are, as libraries outside WLED's folder: the build compiles `core/src/*.cpp`
+from `core/`, with the compiler flags of the environment, and nothing is copied.
+`core/library.json` is what lets PlatformIO take `core/` as a library. A repository path
+with a space in it is refused.
 
 `build --standalone` builds the standalone firmware, a program without WLED, as a
 project of its own in `build/firmware/standalone/`, and keeps `odrig-standalone.bin`;
@@ -457,6 +502,12 @@ With `--full` the tool also writes `bootloader_s3.bin` at `0x0` and `partitions_
 at `0x8000`, in the same esptool call, and checks the layout in the stock partition table
 and not in the board's. The bootloader is written with the flash size esptool finds on the
 chip in its header, 16 MB on this board; every other file goes to the flash as it is.
+
+The stock files are the 16 MB module's, and their table ends at `0x1000000`: on the
+`8 MB` layout of [The regions of the flash](#the-regions-of-the-flash), the spare board's,
+the command reads the board's table first and refuses with `layout-mismatch` before
+anything is written, with or without `--full`. A table that cannot be read does not stop
+`--full`, which still brings back a board whose table is half-written.
 
 Storage is not written, so WLED's settings and the show it played before are still there.
 On a board of the bigger layout, `--full` puts WLED's layout back, and a storage of WLED's
@@ -714,8 +765,12 @@ scratch has no show yet.
 
 The settings file and the limit file are read and checked first, and then the image
 `build/firmware/out/odrig-firmware.bin` and the SHA-256 beside it. When one of them is
-refused, the board has not been touched. `--settings FILE` reads another settings file,
-`--limit FILE` another limit file,
+refused, the board has not been touched. The image is the installation's: on the `8 MB`
+layout of [The regions of the flash](#the-regions-of-the-flash), the spare board's, the
+command reads the board's table first and refuses with `layout-mismatch` before anything
+is written, and the spare's image goes on with
+`flash --image build/firmware/out/odrig-firmware-n8r2.bin`. `--settings FILE` reads
+another settings file, `--limit FILE` another limit file,
 and `--wait SECONDS` is the time the command waits after each of its two restarts, 300
 seconds without it; it goes on as soon as the board has answered, and after the second
 restart as soon as the board has read its animations. The command takes 50 seconds on
@@ -1020,10 +1075,19 @@ and holds nothing up.
 
 **The name in `status`.** The firmware gives the core a text that names it, which
 `status` reports as `host`: WLED's release name, the date and the time of the build, its
-storage, `internal+microsd` for the microSD build and `internal+usb` otherwise, and
-`reset` with the reason of the chip's last reset as ESP-IDF tells it: `power-on`,
-`software`, `panic`, `task-watchdog`, `interrupt-watchdog`, `brownout`, `deep-sleep` or
-`other`.
+storage, `internal+microsd` for the microSD build and `internal+usb` otherwise,
+`external` with the external memory in the heap in bytes, the PSRAM the board found at
+its start and 0 when none was, `internal` with the internal memory that was free when
+the core started, both plain decimals, and `reset` with the reason of the chip's last
+reset as ESP-IDF tells it: `power-on`, `software`, `panic`, `task-watchdog`,
+`interrupt-watchdog`, `brownout`, `deep-sleep` or `other`. The form is
+`<release> <date> <time> <storage> external <bytes> internal <bytes> reset <reason>`, for
+example `odrig_ESP32-S3_8MB_qspi Nov  5 2026 07:44:48 internal+microsd external 2097152
+internal 201000 reset power-on`, at most 127 characters, which the app shows as it is on
+its Target page as `Installation: <host>`. The release name says which image runs,
+`odrig_ESP32-S3_16MB_opi` the installation's and `odrig_ESP32-S3_8MB_qspi` the spare's,
+and `external 0` beside the spare's name on the spare board means its PSRAM was not
+found or its test failed.
 
 The lines of the kind `usb`, which only the USB stick's build writes:
 
@@ -1554,8 +1618,9 @@ image at each of its steps, at both layouts.
 
 ## The regions of the flash
 
-The board has WLED's 16 MB layout. The tool reads the partition table before it writes and
-touches these regions only:
+The installation's board has WLED's 16 MB layout, and the spare board the 8 MB layout
+given below it. The tool reads the partition table before it writes and touches these
+regions only:
 
 | Region | Address | Size | Written by |
 |---|---|---|---|
@@ -1573,7 +1638,9 @@ after the tool has checked it against this table.
 The tool knows a second layout, the bigger one, which gives the room of the second firmware
 slot to the storage. Its one firmware slot is a factory slot, for which an update over
 Wi-Fi finds no slot to write; the tool names a table by its firmware slots: with a second
-one it is WLED's layout, with one alone the bigger one.
+one it is WLED's layout, and with one alone it is named by the end of its last partition,
+the bigger layout at `0x1000000` and the 8 MB one at `0x800000`; a one-slot table that
+ends elsewhere is `layout-mismatch` to every command.
 
 | Partition | Address | Size |
 |---|---|---|
@@ -1585,6 +1652,27 @@ one it is WLED's layout, with one alone the bigger one.
 On a board of WLED's layout `restore-stock --full` writes no storage. On one of the bigger
 layout it writes WLED's storage whole, holding the board's settings, as it puts WLED's
 layout back.
+
+The third layout, the 8 MB one, is the spare board's: the bigger layout scaled to the
+spare's module, which has 8 MB of flash. The tracked file
+`firmware/partitions/odrig-8mb.csv` is that table row for row, and the spare's build,
+`build --module n8r2`, takes it as its partition table.
+
+| Partition | Address | Size |
+|---|---|---|
+| `nvs`, `otadata` | `0x9000`, `0xE000` | `0x5000`, `0x2000`, as in WLED's |
+| `app0`, a factory slot | `0x10000` | `0x300000` |
+| `spiffs` | `0x310000` | `0x4E0000`, 5,111,808 bytes; changed blocks written by the commands that write storage |
+| `coredump` | `0x7F0000` | `0x10000` |
+
+`flash --image build/firmware/out/odrig-firmware-n8r2.bin` writes the spare's image on it
+as it writes any image, and `install-show`, `set-wifi`, `set-limit`, `read-limit`,
+`read-show` and `recover-storage` work on it as on the bigger layout, with the storage at
+`0x310000`. `restore-stock`, with or without `--full`, and `install-firmware` refuse it
+with `layout-mismatch` before anything is written: the stock files are the 16 MB
+module's, their table ending at `0x1000000`, and the installation's image is not the
+spare's. `big-storage` refuses it as it refuses any table that is not WLED's own. No
+command writes its bootloader or its table: an application flash never touches them.
 
 **Why the bigger layout.** On 2026-10-15 the owner's show of 113 animations for the 60 x 60
 canvas, 10.1 MB of files, did not fit WLED's storage: the file system keeps every file in

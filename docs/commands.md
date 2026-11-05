@@ -146,7 +146,7 @@ file's override or latest default without restarting its timing. Missing/null
 | `to_check` | The files it has still to read, or that a rebuild has still to read. No time is given for them. |
 | `unavailable` | The animations unavailable now: the show's whose file had a fault, and the drive's files left out. |
 | `checking` | The name of the file the player reads now, or that a rebuild reads; `catalog` while a drive's catalog is read; or `null`. |
-| `host` | The name the board or the emulator gives itself: on the board its build, its storage and the reason of its last start, at most 95 characters; `null` when it gives none. |
+| `host` | The name the board or the emulator gives itself: on the board its build, its storage, the external memory it found and the internal memory free when the core started, and the reason of its last start, at most 127 characters; `null` when it gives none. |
 | `seed` | The seed of the clock on the LEDs, 1 to 4,294,967,295: the number its turn chose when it began, from which [format.md](format.md), "The widget payload", draws every picture of the turn. `null` while the animation whose turn it is is no clock, while nothing plays, and from a `play` until the next refresh. A reply without `seed` comes from a player before it. |
 | `repeat` | The loops of the playlist's turn in progress, while it is reported: the `n` of `repeat <id> <n>`, else the count the show gives the animation, a loop cut by its `max_seconds` counting as one; at most 65,535,000. `null` while no turn is reported, and while the length of its loop is not known yet and no `repeat` gave it a count. A turn is reported while the show is valid, no test of the mapping shows, the playlist plays, `animation` names the animation whose turn it is, and the turn's first refresh was made. |
 | `loop` | The loop in progress of that turn, from 1, at most `repeat`; 1 while the length of its loop is not known yet; `null` while no turn is reported. A loop is a file's frames once, a text's pass, or a clock's `seconds`. |
@@ -435,7 +435,7 @@ Every existing serial, TCP and HTTP route carries these same command lines;
 `odrigctl debug mini on` and `odrigctl debug mini off` validate the two forms.
 Read [the wiring and reboot boundaries](../README.md#miniature-display-debug-mode)
 before a physical check. Firmware compilation and physical acceptance are open.
-The host description is at most95input bytes and256escaped bytes, ending at a
+The host description is at most 127 input bytes and 256 escaped bytes, ending at a
 character boundary, so expanded status remains within the fixed reply limit.
 
 ## Error codes

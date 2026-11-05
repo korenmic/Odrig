@@ -3,7 +3,7 @@ import re
 import shlex
 import unittest
 
-from fwtool import cli, flasher
+from fwtool import build, cli, flasher
 from odrig import jsonframes, mapping, odrg
 from odrig.generators import hello_world
 
@@ -129,6 +129,17 @@ class Firmware(unittest.TestCase):
         self.assertRegex(regions, r"(?m)^\| Storage \(`spiffs`\) \| `0x610000` \| `0x9E0000` \| `install-show`")
         for never in ("never erased", "fuse"):
             self.assertIn(never, regions)
+        # The 8 MB layout, the spare board's, row for row, and the line a command prints on it.
+        for row in (r"^\| `spiffs` \| `0x310000` \| `0x4E0000`, 5,111,808 bytes", r"^\| `coredump` \| `0x7F0000` \| `0x10000` \|$",
+                    r"^\| `app0`, a factory slot \| `0x10000` \| `0x300000` \|$", r"^\| `nvs`, `otadata` \| `0x9000`, `0xE000` \| `0x5000`, `0x2000`, as in WLED's \|$"):
+            self.assertRegex(regions, "(?m)" + row)
+        self.assertIn("layout: 8 MB, storage 5111808 bytes", section(self.text, "Commands"))
+
+    def test_it_names_the_spares_image_in_the_table_of_kinds(self):
+        told = section(self.text, "Commands").split("\n### build\n")[1].split("\n### ")[0]
+        kind = build.KINDS["n8r2"]
+        self.assertRegex(told, rf"(?m)^\| `build --module n8r2` \| `{re.escape(kind.environment)}` \| `{re.escape(kind.image)}` \| .*`qio_qspi`.*`firmware/partitions/odrig-8mb\.csv`.*`odrig_ESP32-S3_8MB_qspi`.* \|$")
+        self.assertIn("python3 firmware/fw.py build --module n8r2", told)
 
     def test_it_says_how_to_roll_back(self):
         back = section(self.text, "Rolling back")

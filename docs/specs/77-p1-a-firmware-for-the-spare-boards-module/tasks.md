@@ -69,7 +69,7 @@ history.
   - Run the core's suite and the firmware's suites.
   - Requirements: 4.1-4.4.
 
-- [ ] 6. The workflow and the documentation
+- [x] 6. The workflow and the documentation
   - `.github/workflows/firmware-hosts.yml`: the spare's build and inspection, and its
     ELF in the artifact. `docs/firmware.md` with `tests/firmware/test_docs.py`, the
     table of kinds, the `--module` paragraph, the nine kinds, the host builds, the

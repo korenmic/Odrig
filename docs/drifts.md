@@ -12691,3 +12691,38 @@ available while locked; applying either photo reading is an edit.
 
 **Resolution.** `app/www/screens/mapping.js`, `app/www/screens/photomap.js`,
 `app/www/client.js` and `docs/android-app.md`.
+
+## Seed 77: the core's page and the room for the host text
+
+**Question.** The seed grows the room the core keeps for the host text, `kAboutSize` of
+`core/src/commands.cpp`, from 96 to 128 bytes, and names the pages it changes:
+`docs/firmware.md`, `docs/commands.md`, `docs/android-app.md`,
+`docs/firmware-additions.md`, `docs/firmware-prerequisites.md`, `docs/decisions.md` and
+this file. `docs/core.md`, which the seed does not name, says in the row of `about` that
+the core asks for the text with room for 96 bytes, and twice that the host description is
+bounded to 95 input bytes. Is the core's page changed with the core?
+
+**Answer.** Yes. `docs/core.md` is the page of the core, and the room is the core's one
+change in this seed: a page that says 96 where the code says 128 is wrong, not out of
+scope. The row of `about` says 128 bytes, and the two sentences of the status metadata
+say 127 input bytes where they said 95. Nothing else of the page changes.
+
+**Resolution.** `docs/core.md`, beside `docs/commands.md`, which says at most 127
+characters and 127 input bytes where it said 95.
+
+## Seed 77: the override's sentence of what an environment inherits
+
+**Question.** `docs/firmware.md`, under `build`, said that the override file adds the two
+environments and that everything it does not name, the board, the platform, the partition
+table and the flash settings, is inherited from WLED's environment. The spare's
+environment names a partition table and a flash size of its own, and the file holds five
+environments. The seed names the page's synopsis, its table of kinds, the `--module`
+paragraph, the layouts and the regions, not this sentence. Is it changed?
+
+**Answer.** Yes, since the seed makes it false: the sentence now says that the file adds
+the project's environments, that everything an environment does not name is inherited
+from WLED's environment, and that only the spare's environment names a partition table
+and a flash size of its own. The four environments of WLED's board still name none of
+them, which `tests/firmware/test_wled.py` checks.
+
+**Resolution.** `docs/firmware.md`, "build".

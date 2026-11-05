@@ -93,7 +93,7 @@ Every function receives `ctx` as its first argument.
 | `drive` | `uint32_t drive(void *ctx)`: the number of the drive of animations that is plugged in now: a number other than 0 that changes each time a drive is plugged in, or 0 while none is. The core calls it at each refresh, before the LED data is made. `NULL` for a host without a drive; see [a drive](#a-drive). |
 | `drive_name` | `int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity)`: the name of the file at this place, counted from 0, of the list of that drive, as the drive has it, into `buffer` with a zero after it, cut to `capacity - 1` bytes; for a file in a sub-folder of the drive's folder, its path from that folder, the parts joined by `/`. Returns 1, or 0 when that drive has no file at that place or is not plugged in any more. `NULL` when `drive` is. |
 | `drive_space` | `int drive_space(void *ctx, uint32_t drive, uint64_t *free_bytes, uint64_t *total_bytes)`: optional mounted-volume capacity; returns 1, or -1 if unavailable or its generation changed. The shared core reports null counters on failure. It performs no writes. |
-| `about` | `int about(void *ctx, char *buffer, size_t capacity)`: optional; a text that names the host, its build, its storage and the reason of its last start, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when it has none. The core asks it at each `status`, with room for 96 bytes, and reports it as `host`. `NULL` for a host without it. |
+| `about` | `int about(void *ctx, char *buffer, size_t capacity)`: optional; a text that names the host, its build, its storage and the reason of its last start, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when it has none. The core asks it at each `status`, with room for 128 bytes, and reports it as `host`. `NULL` for a host without it. |
 | `drive_list` | `int32_t drive_list(void *ctx, uint32_t drive)`: optional; lists the drive's folder `odrig` and its sub-folders to three levels now, depth first, a folder's animation files by the bytes of their names and then its sub-folders by the bytes of their names, every file or, as the firmware does, up to the 256th file and the 32nd sub-folder, and returns the number of files listed, or -1 when that drive is not plugged in any more. A host that has it lists the folder only when it is called: the core calls it for a drive without a catalog and for a rebuild of a drive's catalog. |
 | `drive_bind` | `int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name)`: optional; gives the place to the file of the drive's folder with this name, so that `drive_name` gives the name and `drive/<place>` opens it. Returns 1, or 0 when that drive is not plugged in any more or the name is not one of the drive. Without it every drive is listed. |
 | `drive_writable` | `int drive_writable(void *ctx, uint32_t drive)`: optional; 1 when the core may change the files of that drive with the storage functions, by the names `drive/<name>`, 0 otherwise. Without it the drive is read only. |
@@ -184,7 +184,7 @@ as for a file that is not there.
 Its `rgb` pointer holds180bytes, with physical index `x*6+y`, x0–9 and y0–5.
 `status.mini` reports support and acknowledged state. Its extra fields retain the
 1024-byte reply limit by bounding the host description to256escaped bytes as well
-as95input bytes; ordinary printable descriptions keep their existing length.
+as 127 input bytes; ordinary printable descriptions keep their existing length.
 The host serializes these helpers with every other core call and acknowledges only
 after the outgoing bus is cleared and the new outputs are checked.
 
@@ -1315,4 +1315,4 @@ and holds its window, guards shared play and diagnostic entries, and retries dar
 selection only after relevant changes. No per-frame allocation or additional block
 is introduced. `status` adds explicit mode/reason metadata within its unchanged
 1,024-byte bound; escaped host descriptions use at most160 bytes, while ordinary
-95-byte ASCII descriptions and supported full file/folder paths remain intact.
+127-byte ASCII descriptions and supported full file/folder paths remain intact.
