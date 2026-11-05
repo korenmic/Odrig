@@ -440,6 +440,8 @@ def example_show():
 # The target's mapping file: the installation's twenty legs, which the core holds and uses
 # when a file set has no mapping file.
 TARGET_MAPPING = ROOT / "mapping" / "legs-20.json"
+# The show of a file set without a show file: no item, brightness 128.
+EMPTY_SHOW = b'{"version":1,"brightness":128,"items":[]}\n'
 
 
 @functools.lru_cache(maxsize=None)
@@ -929,15 +931,15 @@ class ReferencePlayer:
         self.legs = [(leg.leg, leg.pin, led_pixels(canvas, leg)) for leg in canvas.legs]
         self.canvas = (canvas.width, canvas.height)
 
-        if "show.json" not in files:
-            raise _Invalid("show-missing")
+        # A file set without a show file has the empty show.
+        show_text = files.get("show.json", EMPTY_SHOW)
         try:
-            listed = show.loads(files["show.json"])
+            listed = show.loads(show_text)
         except errors.Rejection as rejection:
             raise _Invalid(show_refusal(rejection)) from None
         self.brightness = self.show_brightness = listed.brightness
         self.min_seconds = listed.min_seconds
-        self.says_min_seconds = "min_seconds" in json.loads(files["show.json"])
+        self.says_min_seconds = "min_seconds" in json.loads(show_text)
         self.items = {item.id: item for item in listed.items}
         self.capacity = max(128, min(len(self.items) + 32, 65535), len(self.items))
         self.start = listed.start
@@ -1628,7 +1630,7 @@ class ReferencePlayer:
             # The show had no animation, and nothing played: the playlist starts.
             self._play_all()
         if old is None or old.file != name:
-            self.files["show.json"] = self.show_text()
+            self._write_show()
 
     def _listed(self, item, with_entries=True):
         """One item as `list` writes it."""
@@ -1664,6 +1666,14 @@ class ReferencePlayer:
             text += comma + entry
             position += 1
         return (text + tail(position)).encode("ascii")
+
+    def _write_show(self):
+        """Writes the show file as the core does, and the mapping file first when the legs
+        are the built-in mapping's: the target file, byte for byte."""
+        if self.mapping_builtin:
+            self.files["mapping.json"] = TARGET_MAPPING.read_bytes()
+            self.mapping_builtin = False
+        self.files["show.json"] = self.show_text()
 
     def show_text(self):
         """The show file as the core writes it."""
@@ -1706,7 +1716,7 @@ class ReferencePlayer:
             self.clips.pop(item.file, None)
             self.faults.pop(item.file, None)
             self.checks = [check for check in self.checks if check[0] != item.file]
-        self.files["show.json"] = self.show_text()
+        self._write_show()
 
     def _space(self):
         animations = 0 if self.error is not None else sum(1 for item in self.items.values() if item.cycle is None)

@@ -209,16 +209,10 @@ class StateAfterStartup(Playback):
             files["show.json"] = text
             return files
 
-        def without(name):
-            files = support.example_show()
-            del files[name]
-            return files
-
         # The brightness is the show's once its ids are checked, and 0 before that. The
         # canvas is the mapping's once the mapping is read.
         cases = (
             (with_show("{}") | {"mapping.json": "{}"}, (), "mapping-malformed", 0, None),
-            (without("show.json"), (), "show-missing", 0, 60),
             (with_show('{"version": 1, "brightness": 99, "items": {}}'), (), "show-malformed", 0, 60),
             (with_show(support.show_text(items + [items[0]], 99, 3)), (), "duplicate-id 1", 0, 60),
             (with_show(support.show_text(items, 99, 8)), (), "undefined-id 8", 0, 60),

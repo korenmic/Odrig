@@ -334,7 +334,7 @@ class LegList(unittest.TestCase):
     def test_the_target_file_has_twenty_legs_of_180_leds_on_the_pins_1_to_18_21_and_47(self):
         run = support.start({"mapping.json": support.mapping_texts()["legs-20"]})
         self.assertEqual(run.core, "ok")
-        self.assertEqual(run.error, "show-missing")
+        self.assertIsNone(run.error)
         pins = (*range(1, 19), 21, 47)
         self.assertEqual(len(pins), 20)
         self.assertEqual(run.legs, tuple((number, pin, 180) for number, pin in enumerate(pins, start=1)))
@@ -393,7 +393,7 @@ class LegList(unittest.TestCase):
         for name, run in zip(texts, runs):
             with self.subTest(mapping=name):
                 self.assertEqual(run.core, "ok")
-                self.assertEqual(run.error, "show-missing")
+                self.assertIsNone(run.error)
                 self.assertEqual(run.legs, LEGS_OF_THE_COLUMN_MAPPINGS[name])
 
     def test_column_leg_mappings_at_the_edges_of_the_rules_are_accepted(self):
@@ -612,9 +612,9 @@ class ChangedBetweenTheReadings(unittest.TestCase):
         first = column_file(height=4, legs=[column_leg(1, 1, columns=(1, 2)), column_leg(2, 2, "top", columns=(3,))])
         second = column_file(height=4, legs=[column_leg(8, 5, "top", columns=(3,)), column_leg(9, 6, columns=(2, 1))])
         run = self.read_twice(first, second)
-        self.assertEqual(run.error, "show-missing")
+        self.assertIsNone(run.error)
         self.assertEqual(run.legs, ((8, 5, 4), (9, 6, 8)))
-        self.assertEqual(run.lines, ["error show-missing", "refresh 0", "data 8 " + "00" * 12, "data 9 " + "00" * 24])
+        self.assertEqual(run.lines, ["error none", "refresh 0", "data 8 " + "00" * 12, "data 9 " + "00" * 24])
 
 
 if __name__ == "__main__":

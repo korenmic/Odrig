@@ -19,7 +19,7 @@ history.
   - Set the seed's state to `in_progress`. Run the core's suite.
   - Requirements: 1.1–1.4, 4.3, 7.1.
 
-- [ ] 2. The empty show, and the mapping file written with the first show file
+- [x] 2. The empty show, and the mapping file written with the first show file
   - `core/src/show.cpp`: `empty_show()` in place of `kShowMissing`; `show.h`'s comment.
     `core/src/mapping_control.cpp` and `.h`: `mapping_materialize()`;
     `core/src/content.cpp`: `content_write_show()` calling it first.

@@ -347,7 +347,7 @@ class MappingTexts(unittest.TestCase):
             if expected is None:
                 self.assertEqual((run.error, run.legs), ("mapping-malformed", ()), text)
             else:
-                self.assertEqual((run.error, run.legs), ("show-missing", expected), text)
+                self.assertEqual((run.error, run.legs), (None, expected), text)
 
     def test_copies_of_column_leg_files_with_one_piece_changed_are_judged_as_the_converter_judges_them(self):
         rng = random.Random(5)

@@ -161,8 +161,28 @@ class EachReason(unittest.TestCase):
     def test_mapping_malformed(self):
         self.check(example(mapping_json='{"version": 1}'), "mapping-malformed", legs=())
 
-    def test_show_missing(self):
-        self.check(example(show_json=None), "show-missing")
+    def test_a_missing_show_file_is_the_empty_show_and_no_fault(self):
+        run = support.start(example(show_json=None), ["error", support.line(T0, "status"), support.line(T0, "list")], ["--trace-files"])
+        self.assertEqual(run.core, "ok")
+        self.assertIsNone(run.error)
+        self.assertEqual(run.logs, ())
+        self.assertEqual(run.legs, EXAMPLE_LEGS)
+        self.assertEqual(run.lines[0], "error none")
+        status = support.without_readiness(json.loads(run.lines[1][len("reply "):]))
+        self.assertEqual(status, {"ok": True, "on": True, "brightness": 128, "playing": None, "animation": None, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None})
+        self.assertEqual(json.loads(run.lines[2][len("reply "):]), {"ok": True, "items": [], "next": None})
+        self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 0), ("pending.txt", 0), ("catalog.txt", 0)))
+
+    def test_a_file_set_with_no_file_opens_these_and_writes_nothing(self):
+        run, left = support.start_and_keep({}, [support.line(T0, "status")], ["--trace-files", "--trace-store"])
+        self.assertIsNone(run.error)
+        self.assertEqual(len(run.legs), 20)
+        self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 0), ("show.json", 0), ("pending.txt", 0), ("catalog.txt", 0)))
+        self.assertEqual(run.stored, ("remove upload.part 0", "remove show.part 0"))
+        self.assertFalse(any(line.startswith("store ") for line in run.lines))
+        self.assertEqual(left, {})
+        status = json.loads(run.lines[0][len("reply "):])
+        self.assertEqual((status["error"], status["width"], status["height"], status["brightness"], status["readiness"]), (None, 60, 60, 128, "ready"))
 
     def test_show_malformed(self):
         self.check(example(show_json='{"version": 1, "brightness": 300, "items": []}'), "show-malformed")
@@ -281,10 +301,9 @@ class OrderOfTheChecks(unittest.TestCase):
         bad_show = '{"version": 2}'
         bad_file = b"ODRG\x02" + bytes(11)
         cases = (
-            ("show-missing", example(mapping_json=None, show_json=None)),
             ("mapping-malformed", example(mapping_json="[]", show_json=None)),
             ("mapping-malformed", example(mapping_json="[]", show_json=bad_show)),
-            ("show-missing", example(show_json=None, hello_odrg=None)),
+            ("show-malformed", example(mapping_json=None, show_json=bad_show)),
             ("show-malformed", example(show_json='{"version": 1, "brightness": 1, "items": [{"id": 1, "file": "a.odrg"}, {"id": 1, "file": "b"}]}')),
             ("duplicate-id 1", example(show_json=show(animation(1, "a.odrg"), cycle(3, [9]), cycle(4, [3]), start=8))),
             ("undefined-id 9", example(show_json=show(cycle(3, [9]), cycle(4, [3]), animation(5, "a.odrg")))),
@@ -330,8 +349,10 @@ class OrderOfTheChecks(unittest.TestCase):
         self.assertIsNone(run.error)
         self.assertIn(("hello.odrg", 0), run.opened)
         self.assertIn(("dvd.odrg", 1), run.opened)
+        # Without a show file the start goes on with the empty show: the file is asked for
+        # once, and there is no file of the show to open.
         run = support.start(example(show_json=None), options=["--trace-files"])
-        self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 0)))
+        self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 0), ("pending.txt", 0), ("catalog.txt", 0)))
         # Without a mapping file the start goes on with the built-in mapping: the file is
         # asked for once, and the show's files are opened and found of another canvas.
         run = support.start(example(mapping_json=None), options=["--trace-files"])
@@ -441,7 +462,6 @@ class Leftovers(unittest.TestCase):
 
     def test_beside_a_show_file_that_cannot_be_used_pending_is_left_alone(self):
         unusable = {
-            "show-missing": {"show_json": None},
             "show-malformed": {"show_json": "{"},
             "duplicate-id 1": {"show_json": support.show_text([animation(1, "hello.odrg"), animation(1, "dvd.odrg")])},
             "undefined-id 7": {"show_json": show(start=7)},

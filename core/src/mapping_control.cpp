@@ -14,6 +14,7 @@ namespace odrig {
 namespace {
 
 #include "diagonal_data.h"
+#include "mapping_data.h"
 
 const uint32_t kSnakes = 20;
 // The test of a snake: a white block of 3 x 3 pixels that runs from the bottom of the snake's
@@ -159,6 +160,23 @@ bool available(const Core &core, uint32_t item) {
 }
 
 }  // namespace
+
+bool mapping_materialize(Core &core) {
+    if (!core.mapping_builtin) return true;
+    const odrig_host &host = core.host;
+    if (!storage_changes(core) || host.write_open(host.ctx, kMappingPart) != 1) return false;
+    bool ok = true;
+    for (uint32_t at = 0; at < sizeof kBuiltInMapping && ok; at += kChunkSize) {
+        const uint32_t count = sizeof kBuiltInMapping - at < kChunkSize ? static_cast<uint32_t>(sizeof kBuiltInMapping) - at : kChunkSize;
+        ok = host.write(host.ctx, kBuiltInMapping + at, count) == 1;
+    }
+    if (!ok || host.write_close(host.ctx) != 1 || host.rename(host.ctx, kMappingPart, kMappingFile) != 1) {
+        host.remove(host.ctx, kMappingPart);
+        return false;
+    }
+    core.mapping_builtin = 0;
+    return true;
+}
 
 bool mapping_editable(const Core &core) {
     if (core.invalid || core.width != 60 || core.height != 60 || core.leg_count != kSnakes) return false;
