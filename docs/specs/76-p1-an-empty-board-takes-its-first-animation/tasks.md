@@ -50,7 +50,7 @@ history.
     the onboarding suite.
   - Requirements: 4.1, 4.2, 5.3, 6.1–6.3.
 
-- [ ] 5. The pull request and the firmware
+- [x] 5. The pull request and the firmware
   - Push the branch and open the pull request from `master`, its description naming
     the seed, the verdict and the owner's open check. Build the firmware from the
     pushed head on this computer, verify it, run the firmware's host suites, place the
