@@ -84,7 +84,7 @@ known tests of this computer's shared-toolchain junction, and the app suite with
   - Run the core suite.
   - Requirements: 6.1, 6.2, 7.1, 13.3-13.5.
 
-- [ ] 4. The core's pages
+- [x] 4. The core's pages
   - `docs/core.md`: "Uploads and the check", the bullets "The check", "An unchanged file"
     and "Discarding"; "Bounded work", "The steps of the checks" and the row of "The
     budgets"; as the design gives them, with no F + 2 refreshes left.

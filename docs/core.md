@@ -527,8 +527,12 @@ core only. No reply, log line or reason text ever holds it.
 **The steps of the checks.** A step of the check after the start, of the check of an
 uploaded file and of the check of a drive's file decodes one frame record, or takes one
 slice of a settling. A step that ends `pending` counts no record and is taken again at
-the next step. The check at the start of a host whose storage cannot be changed reads
-every file whole inside `odrig_core_begin`, through every slice: nothing waits on it.
+the next step. The check after the start and the check of a drive's file pace their steps
+by refreshes in step. The check of an uploaded file takes its steps at every refresh,
+several of them within its budget, at most 64, and the one that passes the budget; a
+slice of settling ends the steps of its refresh ("Uploads and the check"). The check at
+the start of a host whose storage cannot be changed reads every file whole inside
+`odrig_core_begin`, through every slice: nothing waits on it.
 
 **Playback in slices.** At one refresh the player decodes at most 131,072 bytes of a body,
 a record's boundary after it, and always one whole record; a slice of settling counts
@@ -543,6 +547,7 @@ of. When settling ends with a reason, the player acts on it as on any reason.
 |---|---|---|
 | Settling in one call | 32,768 bytes | The decoder inflates about 30 MB a second on the board's chip; 32 KiB is about a millisecond, far below a refresh of 20 ms. |
 | Decoding at one refresh | 131,072 bytes | Twelve dense 60 x 60 records: a pause of a quarter of a second is caught up at once, and a longer one over a few refreshes. |
+| The check of an upload at one refresh | 256 to 2,048 bytes of charge, by the pace; at most 64 steps | The work of a refresh follows the budget whatever the file holds, and the pace follows the refresh rate. |
 | One call on the board | 50 ms at most | A command waits for one call; 50 ms keeps a session of commands quick. |
 | One read of the host | 250 ms at most | The microSD card's and the USB drive's own drivers time out sooner; a read that fails is `read-error`. |
 
@@ -921,7 +926,7 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
   `bytes + bytes / 256 + 16,384` is more than the free bytes; then it begins the file
   `upload.part`.
 - **An unchanged file.** After `upload end` installed a file, the upload's record keeps
-  its id, its name, its size and its CRC-32, and a byte of its padding says that it is
+  its id, its name, its size and its CRC-32, and a bit of the record says that it is
   installed, until the next upload begins or the core starts again. `upload begin` with a
   CRC-32 compares them, and the item's file, and answers `unchanged` without a call to the
   host when all agree and the file is usable. The core keeps no CRC-32 of the other files:
@@ -931,16 +936,42 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
 - **The check.** A file must be decoded whole before it joins the show. That is done
   beside playback, with a second source, second decoders, a pixel buffer and a window of
   their own, which read `upload.part` back with `read_at`, 256 bytes at a time. It runs
-  in steps inside `odrig_core_poll`, one step after the LED data of a refresh is
-  complete, and none after a refresh before which a grid time was skipped: when the host
-  is late, the check waits. The first step reads the header and compares the canvas with
-  the mapping's; each further step decodes one frame record, which is what playback does
-  for a refresh; the step after the last record asks for the end of the file and
-  compares the size and the CRC-32 of what was read back with what was received. A file
-  of F frame records is checked in F + 2 refreshes, a text or a clock in three. No upload is open while the check
-  after the start reads the installed files. The check of a drive's files gives the
-  second decoders up when an upload begins and takes them again once it is closed, so
-  the two never need them at the same time.
+  in steps inside `odrig_core_poll`, after the LED data of every refresh is complete, in
+  step or late; a poll that produces no refresh takes none, nor does a command. The first
+  step reads the header and compares the canvas with the mapping's; each further step
+  decodes one frame record, or takes one slice of a settling, and a text or a clock reads
+  its payload whole in one step; the step after the last record asks for the end of the
+  file and compares the size and the CRC-32 of what was read back with what was received.
+  - *The charge.* Each step is charged by its work: the bytes of the body it took,
+    inflated bytes of a compressed body, the palette with the first record; and a whole
+    coded record with the run bit and predictor 1 or 2, which walks every position of the
+    picture whatever its bytes, n / 32 more, n being the decoder's pixel buffer: 337 for a
+    picture of 60 x 60 of three bytes a pixel, 112 with a palette. The header, a text's or
+    a clock's payload and the end of a text or a clock are charged 0.
+  - *The budget and the debt.* A refresh takes steps while their charge is below its
+    allowance, at most 64 and the first always. The allowance is the budget, 256 shifted
+    left by the pace (256, 512, 1,024 or 2,048), less 256 times the debt. What the steps
+    passed the allowance by is the debt, in whole 256s rounded down, at most 15; a refresh
+    whose debt is a whole budget or more takes no step and pays the budget's 256s. A
+    refresh whose last step was a slice of settling leaves no debt. So a record larger
+    than the budget is spread over the refreshes after it, the work of a refresh is about
+    its budget, and a file of small records never rests.
+  - *The pace.* It is 1 when the last byte arrives. At the first refresh of each whole
+    second it changes by the refreshes of the second before, as `status` reports them as
+    `fps`: below 21 it goes down by one, and the pace has fallen; otherwise at 40 or more it
+    goes up by one; otherwise at 27 or more it goes up by one while it has not fallen. At a
+    refresh 500 ms or more into its second, while the pace has not fallen, a second that
+    has had 11 refreshes or fewer, this one included, takes it down by one: a rise that
+    cost the board its rate is taken back. It stays between 0 and 3.
+  - *The time.* On a host that refreshes 50 times a second the tracked clock of 14,399
+    small frames, `collection/card/clocks/time-original-5-every-row-another-time.odrg`,
+    is checked in 380 refreshes, 7.6 s, where one record a refresh in step took 14,401
+    refreshes, 288 s; at 22 a second in 1,221 refreshes, where the check never ended. A
+    text or a clock is checked at the first refresh after its last byte.
+
+  No upload is open while the check after the start reads the installed files. The check
+  of a drive's files gives the second decoders up when an upload begins and takes them
+  again once it is closed, so the two never need them at the same time.
 - **`upload expect`** reads the file of the upload's item through `read_at`, 512 bytes
   at a time into the chunk buffer, and compares its CRC-32; it takes no step of the check.
 - **`upload end`** is answered with `busy` while the check runs. Afterwards it puts the
@@ -951,8 +982,8 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
 - **Discarding.** `upload cancel`, a wrong checksum, a failed check and a failed storage
   call discard the upload: `upload.part` is removed. So
   does every call that carries a timestamp 60,000 ms or more after the last progress:
-  `upload begin`, an `upload data` that was taken, or a step of the check. The core
-  reads no clock for it.
+  `upload begin`, an `upload data` that was taken, or a refresh of the check, one that
+  only pays a debt too. The core reads no clock for it.
 
 ## Memory
 
