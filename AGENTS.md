@@ -134,6 +134,7 @@ keeping the seed in progress.
 - **Persistent mapping checkbox and typed pin edits**, seed 72: expose the lock directly in Settings, retain its confirmed app-local value across restarts, and make GPIO assignments editable text fields through the existing validated mapping save path. No firmware or hardware change and no open product questions.
 - **An archive of animations uploaded from the app**, seed 73: one zip picked on the phone, opened in the app, its animations ticked and uploaded one by one through the existing upload to the board's storage or its card; no new command.
 - **The Upload button says why it is disabled**, seed 75: the Upload screen names the lock that disables `Upload to the installation` beside it; the destination line blames the card only after a reply said it is absent; a failed request keeps the last capacity and moves the form nowhere; Internal is never disabled for the card. App only, no new command.
+- **The preview of an upload, made on the phone as it starts**, seed 79: planned; the app starts the preview of the bytes it sends with the upload, writes it to the phone's own catalog only on success, and keeps the upload's place (target, storage, name) so the row shows it at once, on a storage without a catalog too; ready-made files of any size are previewed through a DEFLATE stream with bounded memory. Phone only, no command or firmware change.
 
 The state of every seed is in the `state.json` of its folder.
 

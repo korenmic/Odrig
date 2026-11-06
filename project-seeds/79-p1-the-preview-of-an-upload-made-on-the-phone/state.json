@@ -1,0 +1,9 @@
+{
+  "number": 79,
+  "slug": "79-p1-the-preview-of-an-upload-made-on-the-phone",
+  "state": "remaining",
+  "title": "The preview of an upload, made on the phone as it starts",
+  "priority": "P1",
+  "addedAt": "2026-11-06",
+  "summary": "When the operators' app starts an upload it starts making the preview of the bytes it sends, beside the upload, and keeps it on the phone alone: by the key of those bytes, written only when the upload has ended with success, and by the place the upload put them, the target's address, the storage and the file's name as the list names it, in a new IndexedDB store. A row, and the panel of what plays, find it by that place after the board's key and before the default catalog's name and size, so an upload shows its preview as soon as it is made, on a storage without a catalog too. A ready-made file of any size or compression gets a preview, read through a DEFLATE stream with bounded memory. Nothing is sent to the board; no command, reply or firmware change."
+}
