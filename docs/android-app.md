@@ -683,10 +683,14 @@ pulled out, when the app asks for the list again. Besides Upload's choice and a 
 `Delete` while the installation can write the card, the app has no code of its own for
 them.
 
-To point the app at an emulator, write the emulator's address on the target screen and
-press `Use`; `Board` puts `4.3.2.1` back. An address is a host name or an IPv4 address,
+The target screen has a switch of two links, `Wi-Fi` and `USB serial`, which the phone
+keeps, `Wi-Fi` until the operator chooses otherwise; choosing the other is a change of
+target. On `Wi-Fi`, write the address and press `Connect over Wi-Fi`; a field left empty
+connects to `4.3.2.1`, the board. To point the app at an emulator, write the emulator's
+address there. An address is a host name or an IPv4 address,
 alone or with a port, as in `192.168.1.23:8600`. For a phone to reach an emulator, start
-it with `--lan`; see [emulator.md](emulator.md#from-a-phone).
+it with `--lan`; see [emulator.md](emulator.md#from-a-phone). In a browser, the emulator's
+Controller among them, `USB serial` is disabled: only the Android app has the port.
 
 A long press marks text, and opens the phone's menu of copying and pasting, only in a
 field one types into: the brightness on Animations, the address on the target screen, and
@@ -994,6 +998,7 @@ The target screen says how requests travel:
 | `The phone offers to sign in to it. That is not needed.` | Added when the phone takes the network for one with a sign-in page. |
 | `This phone is not on a Wi-Fi network.` | Join `odrig` in the phone's Wi-Fi settings. |
 | `Sent from this browser.` | The web code runs in a browser and not in the app. |
+| `Sent over USB serial.` | The link is `USB serial`: the lines go over the cable to the board's USB port. |
 
 The app allows plain HTTP, because the installation speaks nothing else, and it sends to
 no address but the one that is set. Anyone on the network can send the same commands with
@@ -1031,7 +1036,8 @@ installed; the phone with mobile data on.
    nothing answers, in words. Start it again: the app recovers by itself.
 6. **The installation's network.** Power the board. In the phone's Wi-Fi settings join
    `odrig` with the password. Leave mobile data on. Note what the phone says about the
-   network and what you answered. In the app press `Board`. *Seen:* `Answers`, and a line
+   network and what you answered. In the app empty the address and press
+   `Connect over Wi-Fi`. *Seen:* `Answers`, and a line
    that says the Wi-Fi network has no internet.
 7. **Mobile data at the same time.** Open a web page in the phone's browser. *Seen:* it
    loads, and the app still shows the board's status.

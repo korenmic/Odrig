@@ -69,7 +69,7 @@ export default async function(app) {
     await ask(app);
     app.press('Target');
     app.fill('address', app.settings.other);
-    app.press('Use');
+    app.press("Connect over Wi-Fi");
     await app.until(() => app.shown() === 'animations', 'other target');
     app.byId('mapping-lock-yes').click();
     app.press('Settings');

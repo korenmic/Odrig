@@ -3,7 +3,7 @@
 Each task is one proof commit with only its own checkbox ticked. A test for a fault is
 seen failing first.
 
-- [ ] 1. Give the Target screen one Wi-Fi control and the link switch
+- [x] 1. Give the Target screen one Wi-Fi control and the link switch
   - The switch kept on the phone, `Connect over Wi-Fi` in place of `Use` and `Board`, the
     USB block, `USB serial` disabled in a browser; app tests and `docs/android-app.md`.
   - Requirements: 1.1–1.6.

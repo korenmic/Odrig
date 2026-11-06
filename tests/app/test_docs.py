@@ -125,7 +125,7 @@ class TheAppsPage(unittest.TestCase):
         screen = (support.WWW / "screens" / "target.js").read_text(encoding="utf-8")
         function = screen.split("function routeLine(found) {")[1].split("\n}\n")[0]
         sentences = [flat(sentence) for sentence in re.findall(r'"\s?([A-Z][^"]+)"', function)]
-        self.assertEqual(len(sentences), 6)
+        self.assertEqual(len(sentences), 7)
         network = flat(section(self.text, "The phone and the installation's network"))
         for sentence in sentences:
             if sentence.startswith("This Wi-Fi network has no internet"):
@@ -139,7 +139,7 @@ class TheAppsPage(unittest.TestCase):
         self.assertEqual([int(number) for number, _ in steps], list(range(1, 25)))
         self.assertEqual(check.count("*Seen:*"), 26)
         for expected in ("This is the owner's. No program can do it.", "python3 app/app.py install", "python -m emulator build/demo-20/show --lan", "`lan:` line",
-                         "press `Board`", "Leave mobile data on", "Switch mobile data off", "**A long press.**", "in the address a word is marked",
+                         "press `Connect over Wi-Fi`", "Leave mobile data on", "Switch mobile data off", "**A long press.**", "in the address a word is marked",
                          "**The phone's bars.**", "wholly above Android's buttons or the line of gesture navigation", "the tabs go away and the address stays in view",
                          "**The numbers of animations.**", "the external line says `absent (read-only).` with no number"):
             self.assertIn(expected, flat(check))

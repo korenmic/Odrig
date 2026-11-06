@@ -87,7 +87,7 @@ export default async function (app) {
     } else if (step.address !== undefined) {
       app.press("Target");
       app.fill("address", step.address);
-      app.press("Use");
+      app.press("Connect over Wi-Fi");
       await app.until(() => app.kept() === step.address, "the new address kept");
       app.press("Animations");
     } else if (step.snap !== undefined) {

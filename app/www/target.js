@@ -4,6 +4,7 @@
 export const BOARD = "4.3.2.1";
 
 const KEY = "odrig.target";
+const LINK = "odrig.link";
 const LABEL = "[a-z0-9](?:[a-z0-9-]*[a-z0-9])?";
 const ADDRESS = new RegExp(`^(${LABEL}(?:\\.${LABEL})*)(?::([0-9]{1,5}))?$`);
 
@@ -73,6 +74,33 @@ export function setAddress(text) {
   const kept = parse(text);
   window.localStorage.setItem(KEY, kept);
   return kept;
+}
+
+// The link the lines travel by: "wifi", or "usb" for the board's USB serial port, which
+// only the app's sender has.
+export function link() {
+  let kept = null;
+  try {
+    kept = window.localStorage.getItem(LINK);
+  } catch (error) {
+    kept = null;
+  }
+  return kept === "usb" && usbPossible() ? "usb" : "wifi";
+}
+
+// Keeps the link to use.
+export function setLink(kind) {
+  try {
+    window.localStorage.setItem(LINK, kind === "usb" ? "usb" : "wifi");
+  } catch (error) {
+    // A phone that keeps nothing uses Wi-Fi after a restart.
+  }
+  return link();
+}
+
+// Whether lines can travel by USB serial here: only the app's sender has the port.
+export function usbPossible() {
+  return sender() !== null;
 }
 
 function sender() {
