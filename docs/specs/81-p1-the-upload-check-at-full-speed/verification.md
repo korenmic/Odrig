@@ -33,8 +33,35 @@ physical check is the owner's, and nothing below claims one.
   entry of 2026-11-06 at the end of the change log of `docs/decisions.md`.
 - 2be7742e, the merge of `origin/master` at 4762dffa, which brought seed 82; the one
   conflict, the lines of seeds 81 and 82 in `AGENTS.md`, kept with both lines.
-- This commit, task 8: this record, the drift entries, the seed's line in `AGENTS.md`
-  naming the pull request, and the checkbox.
+- d12a6a63, task 8, "The record, the deliveries and the pull request": this record, the
+  drift entries, the seed's line in `AGENTS.md` naming the pull request, and the checkbox.
+
+Two reviewers read the pull request and made nine findings. Each that held was mended in
+a commit of its own, named for the task it amends; the checkboxes were ticked already:
+
+- 824f8a81, task 1, "A comment of the decoder's test says what it does now": no
+  comment of `tests/core/test_decoder.py` names an earlier version.
+- 11c1414d, task 1, "The charge counts the bytes of the file a call takes":
+  `OdrgDecoder::charge_since(before, given_before)` charges the bytes of the body or the
+  bytes of the file a call took, whichever are more, and `FileSource::given`; a stream of
+  empty DEFLATE blocks no longer has a refresh read far more than its budget. The drift
+  "Seed 81: the bytes of a compressed stream that inflate to nothing".
+- 14def814, task 2, "The board suite's dense upload no longer pins the old pacing":
+  `DenseUpload` of `tests/board/test_upload.py`, and its drift.
+- a9507414, task 6, "A reply that comes after the upload ended writes nothing on the
+  line": `uploading` of `app/www/upload.js` ignores a reply that comes after its job
+  ended.
+- db4388e1, task 4, "The pages say what the budget bounds, and how the emulator's check
+  is paced": `docs/core.md`, `docs/commands.md`, `docs/android-app.md`, `docs/emulator.md`,
+  `AGENTS.md`, and the drift "Seed 81: the average work of the check for records larger
+  than the budget".
+- This commit, task 8, "The record of the review": this record's counts, measurements,
+  checks and what stays open.
+
+Mended outside the repository: the description of the pull request called the emulator's
+failure under the parallel load a timeout, where the run log shows `KeyError: 'tcp'`, as
+this record has it; the description is corrected. The two findings about this record, the
+count of the old rule's refreshes and the pull request's checks, are mended below.
 
 ## The suites, by task, with the failures seen first
 
@@ -77,14 +104,39 @@ shared-toolchain junction (`test_env` twice, `test_paths` once).
   `KeyError: 'tcp'`, and the timing test above), each passing alone twice and both suites
   then passing whole, emulator 658 OK (19 skipped) and firmware-host 37 OK (1 skipped);
   firmware with `ODRIG_TOOLS` 665 tests, the three known failures and no other.
+- The review. The comment: `tests.core.test_decoder` 13 OK. The charge: core 1079 OK (1
+  skipped), emulator 658 OK (19 skipped), app 451 OK, mapping 42 OK, onboarding 88 OK;
+  seen failing first against the core as it was, the new bound of the reads of a refresh,
+  `8815 not less than or equal to 2472`, the new test of empty blocks, `Taken(bytes=167,
+  charge=167, pending=False) != (167, 2179, False)`, and the tracked clock's,
+  `Taken(bytes=139, charge=139, pending=False) != (139, 199, False)`. The board suite's
+  test: not run, the board suite needs the board; by the rule's model the clip of 60 s is
+  checked in 9.8 s at 50 a second, so its old `>= 59 s` could not hold. The app's reply
+  after the job ended: app 452 OK, onboarding 88 OK; seen failing first against the app as
+  it was, the hidden line read `Checking the animation on the installation: 0:00` and
+  `0:01` after the address was used again, and the next upload's line had two counts at
+  once, 0:00, 0:02, 0:01, 0:03, 0:02, 0:04. The pages: `tests.core.test_docs`,
+  `tests.app.test_docs`, `tests.emulator.test_docs` 51 OK, onboarding 88 OK. On the head
+  of the review, db4388e1, `python tests/run.py --workers 8`: core 1079 OK (1 skipped),
+  converter 552 OK, converter-npm 1602 OK, emulator 658 OK (19 skipped), mapping 42 OK,
+  onboarding 88 OK, runner 26 OK; app 452 and firmware-host 37 each with one test that
+  failed under the parallel load and passed alone and with its module,
+  `tests.app.test_catalog.TheCatalogsOfSettings.test_every_state_of_a_catalog_is_said_in_words`,
+  whose scenario waited 8,000 ms for a status, and the timing test of firmware-host above;
+  firmware-host then passed whole, 37 OK (1 skipped), and the app suite had passed whole
+  on a9507414, 452 OK; firmware with `ODRIG_TOOLS` 665 tests, the three known failures and
+  no other.
 
 ## The counts of the tests
 
 - `AtEveryRefresh`: `{"ok":true}` at the 76th refresh after the last byte, as the rule
   gives.
-- `TheOwnersClock`, the tracked clock (471,095 bytes, 14,401 steps, charge 657,686): at
-  the 380th refresh every 20 ms, the 359th every 30 ms, the 1,221st every 45 ms and the
-  2,322nd every 50 ms; 14,401 refreshes every 20 ms before.
+- `TheOwnersClock`, the tracked clock (471,095 bytes, 14,401 steps, charge 660,004; 657,686
+  before the review, when the bytes of the file were not charged): at the 381st refresh
+  every 20 ms, the 361st every 30 ms, the 1,223rd every 45 ms and the 2,327th every 50 ms,
+  counted from the first refresh after the last byte; the old rule took 14,402 refreshes
+  every 20 ms counted the same way, 14,401 of them with a step. Before the review the new
+  rule took 380, 359, 1,221 and 2,322.
 
 ## The measurements
 
@@ -93,16 +145,20 @@ byte to `{"ok":true}`, the core as it was and as it is:
 
 | Host refreshes | Rotated clock, 498,211 bytes: before | after | Tracked clock: before | after |
 |---|---:|---:|---:|---:|
-| every 20 ms | 14,402 refreshes, 288.0 s | 374, 7.5 s | 14,402, 288.0 s | 380, 7.6 s |
-| every 25 ms | | 361, 9.0 s | | 367, 9.2 s |
-| every 30 ms | 28,802, 864.0 s | 353, 10.6 s | 28,802, 864.0 s | 359, 10.7 s |
-| every 40 ms | | 1,201, 48.0 s | | 1,221, 48.8 s |
-| every 45 ms | discarded after 60 s | 1,201, 54.0 s | discarded after 60 s | 1,221, 54.9 s |
-| every 50 ms | discarded after 60 s | 2,289, 114.4 s | discarded after 60 s | 2,322, 116.1 s |
+| every 20 ms | 14,402 refreshes, 288.0 s | 375, 7.5 s | 14,402, 288.0 s | 381, 7.6 s |
+| every 25 ms | | 363, 9.1 s | | 368, 9.2 s |
+| every 30 ms | 28,802, 864.0 s | 355, 10.6 s | 28,802, 864.0 s | 361, 10.8 s |
+| every 40 ms | | 1,205, 48.2 s | | 1,223, 48.9 s |
+| every 45 ms | discarded after 60 s | 1,205, 54.2 s | discarded after 60 s | 1,223, 55.0 s |
+| every 50 ms | discarded after 60 s | 2,294, 114.7 s | discarded after 60 s | 2,327, 116.3 s |
+
+The columns "after" are those of the head of the review, where the bytes of a compressed
+stream's block headers are charged. Before it they were 374, 361, 353, 1,201, 1,201 and
+2,289 for the rotated clock, and 380, 367, 359, 1,221, 1,221 and 2,322 for the tracked one.
 
 The emulator, the tracked clock over HTTP to an emulator on an empty folder: checked in
 7.5 s, `status` reporting 47 to 50 refreshes a second during the check (two runs, 7.5 s
-and 7.6 s).
+and 7.6 s); on the head of the review, checked in 7.5 s, `status` reporting 47 to 50 refreshes a second during the check, two runs.
 
 The processor time of the check here, the core's sources at `-O2` in a scratch host that
 polls every 20 ms, three runs on an idle computer: the rotated clock's whole check 23.6 to
@@ -117,7 +173,10 @@ show that is not dense plays, the rate kept at 20 or more from 22 before, and ab
 
 ## The builds
 
-Both from the pushed head 2be7742e, with a clean tree.
+Both from the pushed head 2be7742e, with a clean tree, before the review. Neither has the
+mends of the review: the APK still lets a late reply write on a hidden line after the
+address was used again, and the image charges a compressed stream's block headers nothing,
+which makes the clock's check one refresh shorter. Neither changes a check of the owner's.
 
 - The APK, built as this computer builds it (the staged web code, Capacitor's sync,
   Gradle without its daemon, the persistent key): `odrig-debug.apk`, 19,083,943 bytes,
@@ -154,11 +213,23 @@ the folder was touched:
 
 ## The pull request's checks
 
-Read once on the head 2be7742e, before this commit: `Default firmware (ubuntu-latest)`
-passed in 7 min 6 s; `Default firmware (windows-latest)` was still running.
+Read once on the head 2be7742e, before d12a6a63: `Default firmware (ubuntu-latest)`
+passed in 7 min 6 s; `Default firmware (windows-latest)` was still running. That run,
+42243913125, ended with the Windows job cancelled by the push of d12a6a63. Read once on
+d12a6a63, run 42246249718: `Default firmware (ubuntu-latest)` passed in 11 min 0 s and
+`Default firmware (windows-latest)` in 19 min 57 s. The run on the head of the review
+starts with its push.
 
 ## What stays open
 
+- The pull request's checks on the head of the review, which run after its push.
+- The board suite's `DenseUpload`, changed by the review and not run: it needs the board,
+  at the owner's next board session.
+- The APK and the image on the Drive are those of 2be7742e, before the review; a new
+  build of the head is made when the owner asks for one.
+- The input of one step of a compressed stream is not bounded: a record behind a long run
+  of empty DEFLATE blocks is read whole at one refresh, by the check and by playback.
+  Proposed to the owner as a seed of its own.
 - The owner's check on the spare board with that image and that APK (requirement 14.6):
   (1) what plays and the Show screen's `N refreshes a second`; (2) the rotated clock
   uploaded to `Internal storage`; (3) the Checking line counting from `0:00`; (4) the
