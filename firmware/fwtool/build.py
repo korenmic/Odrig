@@ -21,25 +21,39 @@ KINDS = {
     "stick": Kind("odrig", "odrig-stick.bin"),
     "stick-probe": Kind("odrig_probe", "odrig-stick-probe.bin"),
     "microsd": Kind("odrig_microsd", "odrig-microsd.bin"),
+    "n8r2": Kind("odrig_microsd_n8r2", "odrig-firmware-n8r2.bin"),
 }
 
 # The kinds that are built without WLED, as a project of their own.
 WITHOUT_WLED = ("standalone", "standalone-probe")
 
 # The kinds that are built on the newer software, with its own PlatformIO: the firmware
-# with the microSD card, its probe build, and the same firmware under the card's own name.
-ON_NEWER = ("firmware", "probe", "microsd")
+# with the microSD card, its probe build, the same firmware under the card's own name, and
+# the firmware for the spare board's module.
+ON_NEWER = ("firmware", "probe", "microsd", "n8r2")
 
 # The USB stick's kind that takes the place of the firmware and of the probe build.
 STICK_OF = {"firmware": "stick", "probe": "stick-probe"}
 
-# The size of the first application partition of WLED's 16 MB layout.
+# The modules the firmware is built for: the installation's board, with 16 MB of flash and
+# 8 MB of octal PSRAM, and the spare board's, with 8 MB of flash and 2 MB of quad PSRAM.
+MODULES = ("n16r8", "n8r2")
+DEFAULT_MODULE = "n16r8"
+
+# The size of the first application partition, `app0`, on WLED's 16 MB layout and on the
+# 8 MB one.
 APPLICATION_SIZE = 0x300000
 BUILD_JOBS = 2
 
 
 def image_path(kind):
     return paths.OUT / KINDS[kind].image
+
+
+def module_of(kind):
+    """The module an image of a kind is built for: the spare board's for its own kind, and
+    the installation's for every other, the probe builds among them."""
+    return "n8r2" if kind == "n8r2" else DEFAULT_MODULE
 
 
 def checksum_path(image):
@@ -123,5 +137,5 @@ def _build(kind, made, newer, verbose):
         raise Failure("build-failed", f"PlatformIO ended with status {done.returncode} for the environment {made.environment}")
     image = image_path(kind)
     size = keep(folder / ".pio" / "build" / made.environment / "firmware.bin", image)
-    provenance.write(kind,made.environment,image,newer)
+    provenance.write(kind, made.environment, image, newer, module_of(kind))
     return image, size

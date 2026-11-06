@@ -186,9 +186,7 @@ class ReasonsDocument(unittest.TestCase):
         self.assertEqual(
             texts,
             [
-                "mapping-missing",
                 "mapping-malformed",
-                "show-missing",
                 "show-malformed",
                 "duplicate-id <id>",
                 "undefined-id <id>",
@@ -209,7 +207,7 @@ class ReasonsDocument(unittest.TestCase):
     def test_every_text_begins_with_a_name_the_core_can_report(self):
         names = set(support.host_lines("reasons"))
         texts = re.findall(r"(?m)^\| `([a-z-]+)(?: <[a-z]+>)*` \|", self.section)
-        self.assertGreaterEqual(len(texts), 11)
+        self.assertGreaterEqual(len(texts), 9)
         for text in texts:
             self.assertIn(text, names)
 

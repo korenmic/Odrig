@@ -187,7 +187,7 @@ reply 1000 {"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"
 `"error":null` says the show is valid, `"playing":"all"` that the playlist is playing,
 `"animation":1` that Hello world is on the LEDs, `"readiness":"ready"` that both files were
 read without a fault, and `host` names the emulator and its computer, here a Mac. With a
-show that is not valid, `error` holds the reason, such as `show-missing`; [reasons.md](../docs/reasons.md)
+show that is not valid, `error` holds the reason, such as `show-malformed`; [reasons.md](../docs/reasons.md)
 lists them. The record file holds the colour of every LED at every refresh; [emulator.md](../docs/emulator.md#record-mode) describes it.
 
 ## What to read next

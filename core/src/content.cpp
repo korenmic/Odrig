@@ -6,6 +6,7 @@
 
 #include "drive.h"
 #include "ignored.h"
+#include "mapping_control.h"
 #include "order.h"
 #include "player.h"
 #include "storage.h"
@@ -502,7 +503,9 @@ uint32_t content_remove_many(Core &core, const uint16_t *ids, uint32_t count, Re
 
 bool content_write_show(Core &core, const ShowChange &change) {
     const odrig_host &host = core.host;
-    if (host.write_open(host.ctx, kShowPart) != 1) {
+    // The first change that writes the show file writes the mapping file first, when the
+    // mapping is the built-in one: the folder is a whole installed file set from then on.
+    if (!mapping_materialize(core) || host.write_open(host.ctx, kShowPart) != 1) {
         return false;
     }
     Writer out;

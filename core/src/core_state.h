@@ -772,6 +772,11 @@ struct Core {
 
     uint8_t mapping_snake;
 
+    // The legs are the installation's mapping, which the core holds, because the host has
+    // no mapping file: the first change that writes the show file writes the mapping file
+    // first, and a saved pin assignment writes it too.
+    uint8_t mapping_builtin;
+
     // Playback.
     uint8_t on;
 

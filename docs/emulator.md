@@ -382,9 +382,11 @@ From top to bottom the page has:
   reports: its refreshes in the last full second. `page` is the page's own count: the
   refreshes it drew in the last full second.
 - **The reason band.** When the core reports that the show is invalid, a red band shows the
-  reason text exactly as the core gives it, for example `show-missing`. With a
+  reason text exactly as the core gives it, for example `show-malformed`. With a
   valid mapping the LEDs are still drawn, all dark. With an invalid mapping there are no
-  LEDs to draw, and the page says so.
+  LEDs to draw, and the page says so. A folder without a mapping file or a show file is
+  not invalid: the LEDs are the installation's twenty legs, dark until an animation is
+  uploaded.
 - **The drawing**, in the views chosen by the tabs `LEDs`, `Mapping` and `Controller`,
   each described below, with a readout at its top right that names what the pointer is
   on: `leg 2, pin 2, LED 61 (1,2)`.
@@ -771,7 +773,9 @@ the moment of the resume, not from the loop's true start, until the next loop be
 
 The page learns everything it shows from one stream of server-sent events, `GET /events`,
 and from the mapping file of the show, `GET /show/mapping.json`, which is served byte for
-byte (404 when the folder has none). Another program may read both in the same way.
+byte, whatever the core made of it; when the folder has none, the installation's
+`mapping/legs-20.json` is served, the mapping the core plays on then. Another program may
+read both in the same way.
 
 The stream is a response of type `text/event-stream` that stays open. Its regular
 playback and miniature-preview events are:
@@ -1413,9 +1417,9 @@ in a narrower window the mapping view of every other step has the arrangement of
     the emulator, start `python -m emulator build/dense/show`, and watch for ten seconds
     in the mapping view. *Seen:* `page` shows 49 or more in every second, each time.
 22. **An invalid show says why (10.1).** Stop the emulator. Copy `build/example-show` to
-    `build/example-broken`, remove `show.json` from the copy and start
+    `build/example-broken`, write `{` over `show.json` of the copy and start
     `python -m emulator build/example-broken`. *Seen:* a band under the header shows
-    `show-missing`, in the LEDs view and in the mapping view, and every LED is
+    `show-malformed`, in the LEDs view and in the mapping view, and every LED is
     dark.
 
 ### What has been checked

@@ -197,9 +197,10 @@ class TheImages(unittest.TestCase):
         self.assertNotIn("trial", build.KINDS)
         self.assertNotIn("trial-probe", build.KINDS)
 
-    def test_the_firmware_its_probe_build_and_the_cards_image_of_its_own_name_are_built_on_the_newer_software(self):
-        self.assertEqual(build.ON_NEWER, ("firmware", "probe", "microsd"))
+    def test_the_firmware_its_probe_build_the_cards_image_of_its_own_name_and_the_spares_image_are_built_on_the_newer_software(self):
+        self.assertEqual(build.ON_NEWER, ("firmware", "probe", "microsd", "n8r2"))
         self.assertEqual(build.KINDS["microsd"].environment, build.KINDS["firmware"].environment)
+        self.assertEqual(build.KINDS["n8r2"].environment, "odrig_microsd_n8r2")
 
     def test_the_stick_takes_the_place_of_the_firmware_and_of_the_probe_build(self):
         self.assertEqual(build.STICK_OF, {"firmware": "stick", "probe": "stick-probe"})

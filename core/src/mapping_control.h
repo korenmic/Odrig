@@ -6,6 +6,11 @@
 namespace odrig {
 
 bool mapping_editable(const Core &core);
+// Writes the built-in mapping as `mapping.json` when the legs are the built-in mapping's
+// and no file holds them, so that a change of the show leaves a whole installed file set.
+// True when the file is there afterwards; false when it could not be written, with no part
+// left behind.
+bool mapping_materialize(Core &core);
 uint32_t mapping_get(const Core &core, Reply &reply);
 uint32_t mapping_set(Core &core, uint32_t revision, const char *pins, uint32_t length, Reply &reply);
 // Shows the diagonal, with `snake` 0, or snake n's test, or stops the test that shows.

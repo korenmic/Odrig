@@ -68,6 +68,7 @@ class VariantBuilds(unittest.TestCase):
         expected={'firmware':('odrig_microsd','odrig-firmware.bin',True),
                   'microsd':('odrig_microsd','odrig-microsd.bin',True),
                   'probe':('odrig_microsd_probe','odrig-probe.bin',True),
+                  'n8r2':('odrig_microsd_n8r2','odrig-firmware-n8r2.bin',True),
                   'stock':('esp32s3dev_16MB_opi','stock-built.bin',False),
                   'stick':('odrig','odrig-stick.bin',False),
                   'stick-probe':('odrig_probe','odrig-stick-probe.bin',False),
@@ -97,7 +98,7 @@ class VariantBuilds(unittest.TestCase):
                     self.assertEqual(newer_setup.call_count,int(newer))
                     if kind.startswith('standalone'):restore.assert_not_called()
                     else:restore.assert_called_once_with(patches=None if kind=='stock' else paths.PATCHES)
-                    recorded.assert_called_once_with(kind,environment,image,newer)
+                    recorded.assert_called_once_with(kind,environment,image,newer,'n8r2' if kind=='n8r2' else 'n16r8')
 
     def test_pinned_package_manager_links_spaced_current_sources_without_os_symlinks(self):
         if not paths.PYTHON.is_file():self.skipTest('pinned PlatformIO is not installed; run firmware setup for package integration')

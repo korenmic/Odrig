@@ -165,14 +165,15 @@ class Start(unittest.TestCase):
         self.assertIn(f"`{binding.BUILD_COMMAND}`", result.err)
         self.assertEqual(list(self.work.iterdir()), [])
 
-    def test_a_folder_without_a_show_starts_and_reports_mapping_missing(self):
+    def test_an_empty_folder_starts_valid_on_the_installations_mapping_with_the_empty_show(self):
         emulator = self.started(self.work)
         status = emulator.status()
-        self.assertEqual((status["ok"], status["error"], status["playing"]), (True, "mapping-missing", None))
-        self.assertEqual(emulator.command("play 1"), b'{"ok":false,"error":"show-invalid"}\n')
+        self.assertEqual((status["ok"], status["error"], status["playing"], status["width"], status["height"]), (True, None, None, 60, 60))
+        self.assertEqual(emulator.command("play 1"), b'{"ok":false,"error":"unknown-id"}\n')
         self.assertEqual(emulator.command("brightness 5"), b'{"ok":true}\n')
         self.assertEqual(emulator.status()["brightness"], 5)
         self.assertEqual(emulator.stop().status, 0)
+        self.assertEqual(list(self.work.iterdir()), [])
 
     def test_a_show_with_a_missing_animation_plays_the_others_and_names_it_in_its_list(self):
         files = core_support.example_show()
@@ -185,12 +186,13 @@ class Start(unittest.TestCase):
         self.assertEqual(items[0], {"id": 1, "file": "hello.odrg", "bytes": None, "ignored": False, "external": False, "type": "frames", "fault": "file-missing"})
 
     def test_verbose_prints_the_diagnostic_lines_of_the_core_to_standard_error(self):
-        quiet = support.Emulator(self.work)
+        folder = support.installed(self.work / "show", {"mapping.json": "{"})
+        quiet = support.Emulator(folder)
         self.assertEqual(quiet.stop().err, "")
-        emulator = support.Emulator(self.work, "--verbose")
+        emulator = support.Emulator(folder, "--verbose")
         result = emulator.stop()
         self.assertEqual(result.status, 0)
-        self.assertEqual(result.err, "core: mapping-missing\n")
+        self.assertEqual(result.err, "core: mapping-malformed\n")
 
     def test_a_usage_error_is_status_2(self):
         folder = self.example()

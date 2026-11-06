@@ -1,12 +1,15 @@
 #include "mapping.h"
 
 #include "arena.h"
+#include "asset.h"
 #include "json_reader.h"
 #include "odrg_decoder.h"
 
 namespace odrig {
 
 namespace {
+
+#include "mapping_data.h"
 
 const uint32_t kMostLegs = 255;
 const uint32_t kNameSize = 12;
@@ -308,15 +311,15 @@ bool read_file(Core &core, JsonReader &json, uint8_t *strip_check, uint8_t *star
     return !json.failed && members == 7 && top_kind == seen.kind && json.end();
 }
 
-// Opens the file and reads it once. With `strip_check` and `starts_far` it is the second
-// reading, and `kind` is the kind the first reading found.
-Reason read_once(Core &core, uint8_t *strip_check, uint8_t *starts_far, uint8_t kind, Seen &seen) {
+// Opens the file on this host and reads it once. With `strip_check` and `starts_far` it is
+// the second reading, and `kind` is the kind the first reading found.
+Reason read_once(Core &core, const odrig_host &from, uint8_t *strip_check, uint8_t *starts_far, uint8_t kind, Seen &seen) {
     seen.kind = kind;
     seen.length = 0;
     seen.legs = 0;
     seen.strips = 0;
     seen.starts = false;
-    Reason opened = core.file.open(core.host, "mapping.json");
+    Reason opened = core.file.open(from, "mapping.json");
     if (opened == kFileMissing) {
         return kMappingMissing;
     }
@@ -336,11 +339,21 @@ Reason read_once(Core &core, uint8_t *strip_check, uint8_t *starts_far, uint8_t 
 }  // namespace
 
 Reason read_mapping(Core &core) {
+    // A host without a mapping file has the installation's mapping, which the core holds:
+    // the file is then read from the core's own bytes, in the same two readings.
+    core.mapping_builtin = 0;
+    Asset asset = {kBuiltInMapping, static_cast<uint32_t>(sizeof kBuiltInMapping), 0};
+    const odrig_host built_in = asset_host(asset);
+
     // The first reading checks the form of the file, finds its kind and counts the legs and
     // the strips. The strips are the rows of a row-leg file and the columns of a column-leg
     // file, so the other side of the canvas is the length of a strip.
     Seen first;
-    Reason reason = read_once(core, nullptr, nullptr, kUnknown, first);
+    Reason reason = read_once(core, core.host, nullptr, nullptr, kUnknown, first);
+    if (reason == kMappingMissing) {
+        core.mapping_builtin = 1;
+        reason = read_once(core, built_in, nullptr, nullptr, kUnknown, first);
+    }
     if (reason != kNone) {
         return reason;
     }
@@ -373,7 +386,7 @@ Reason read_mapping(Core &core) {
     core.height = static_cast<uint16_t>(height);
     core.leg_count = first.legs;
     Seen second;
-    reason = read_once(core, strip_check, starts_far, first.kind, second);
+    reason = read_once(core, core.mapping_builtin ? built_in : core.host, strip_check, starts_far, first.kind, second);
     if (reason == kNone && (second.legs != first.legs || second.strips != first.strips)) {
         reason = kMappingMalformed;
     }

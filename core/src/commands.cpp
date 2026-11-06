@@ -124,8 +124,8 @@ void checking_of(const Core &core, Reply &reply) {
     reply.text("null");
 }
 
-// Room for the text `about` gives: 95 bytes and the closing zero.
-const uint32_t kAboutSize = 96;
+// Room for the text `about` gives: 127 bytes and the closing zero.
+const uint32_t kAboutSize = 128;
 
 // The names of the works a fault can come in, by their numbers.
 const char *const kWorkNames[] = {"start", "start", "play", "upload", "drive"};

@@ -97,6 +97,27 @@ class WithShow(unittest.TestCase):
         self.assertEqual(support.reason_of(self, lambda: storage.show_of(self.old[:4096 * 32])), "layout-mismatch")
 
 
+class FreshStorage(unittest.TestCase):
+    """The rule of the file system the board's files host rests on: a file is refused in a
+    folder that is not there."""
+
+    def test_a_fresh_storage_refuses_a_file_in_the_folder_until_the_folder_is_made(self):
+        fresh = storage.with_settings(support.storage_image(), 0x4E0000)
+        self.assertEqual(storage.show_of(fresh), {})
+        data = bytes(range(100))
+        system = storage.mount(fresh)
+        self.assertFalse(storage.has_folder(system, storage.FOLDER))
+        with self.assertRaises(FileNotFoundError):
+            system.open("/odrig/upload.part", "wb")
+        system.mkdir("/odrig")
+        with system.open("/odrig/upload.part", "wb") as file:
+            file.write(data)
+        self.assertTrue(storage.has_folder(system, storage.FOLDER))
+        with self.assertRaises(FileExistsError):
+            system.mkdir("/odrig")
+        self.assertEqual(storage.show_of(storage.with_show(fresh, {"upload.part": data})), {"upload.part": data})
+
+
 class ShowFolders(Temporary):
     def setUp(self):
         super().setUp()

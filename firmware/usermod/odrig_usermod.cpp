@@ -41,8 +41,14 @@ struct Locked {
 
 void syncLegs();
 
+// The internal memory that was free when the core started, measured as `allocate()` of
+// the files measures it, read right before the core starts.
+size_t internalFreeAtStart = 0;
+
 // The name the firmware gives itself in `status`: WLED's release name, the date and time of
-// its build, its storage and the reason of the chip's last reset.
+// its build, its storage, the external memory in the heap, 0 when none was found, the
+// internal memory that was free when the core started, and the reason of the chip's last
+// reset. The two numbers are plain decimals.
 int aboutHost(void *, char *buffer, size_t capacity) {
   const char *reset;
   switch (esp_reset_reason()) {
@@ -60,7 +66,8 @@ int aboutHost(void *, char *buffer, size_t capacity) {
 #else
   const char *storage = "internal+usb";
 #endif
-  snprintf(buffer, capacity, "%s %s %s %s reset %s", WLED_RELEASE_NAME, __DATE__, __TIME__, storage, reset);
+  snprintf(buffer, capacity, "%s %s %s %s external %u internal %u reset %s", WLED_RELEASE_NAME, __DATE__, __TIME__, storage,
+           (unsigned)heap_caps_get_total_size(MALLOC_CAP_SPIRAM), (unsigned)internalFreeAtStart, reset);
   return 1;
 }
 
@@ -303,6 +310,7 @@ class OdrigUsermod : public Usermod {
     OdrigLog::retained();
     odrig_host host = OdrigLog::withLog(OdrigDrive::withDrive(OdrigFiles::host()));
     host.about = aboutHost;
+    internalFreeAtStart = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     core = odrig_core_begin(&host);
     startMs = (uint32_t)(OdrigFiles::nowMs() - before);
 #ifdef ODRIG_PROBE

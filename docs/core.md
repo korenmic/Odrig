@@ -93,7 +93,7 @@ Every function receives `ctx` as its first argument.
 | `drive` | `uint32_t drive(void *ctx)`: the number of the drive of animations that is plugged in now: a number other than 0 that changes each time a drive is plugged in, or 0 while none is. The core calls it at each refresh, before the LED data is made. `NULL` for a host without a drive; see [a drive](#a-drive). |
 | `drive_name` | `int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity)`: the name of the file at this place, counted from 0, of the list of that drive, as the drive has it, into `buffer` with a zero after it, cut to `capacity - 1` bytes; for a file in a sub-folder of the drive's folder, its path from that folder, the parts joined by `/`. Returns 1, or 0 when that drive has no file at that place or is not plugged in any more. `NULL` when `drive` is. |
 | `drive_space` | `int drive_space(void *ctx, uint32_t drive, uint64_t *free_bytes, uint64_t *total_bytes)`: optional mounted-volume capacity; returns 1, or -1 if unavailable or its generation changed. The shared core reports null counters on failure. It performs no writes. |
-| `about` | `int about(void *ctx, char *buffer, size_t capacity)`: optional; a text that names the host, its build, its storage and the reason of its last start, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when it has none. The core asks it at each `status`, with room for 96 bytes, and reports it as `host`. `NULL` for a host without it. |
+| `about` | `int about(void *ctx, char *buffer, size_t capacity)`: optional; a text that names the host, its build, its storage and the reason of its last start, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when it has none. The core asks it at each `status`, with room for 128 bytes, and reports it as `host`. `NULL` for a host without it. |
 | `drive_list` | `int32_t drive_list(void *ctx, uint32_t drive)`: optional; lists the drive's folder `odrig` and its sub-folders to three levels now, depth first, a folder's animation files by the bytes of their names and then its sub-folders by the bytes of their names, every file or, as the firmware does, up to the 256th file and the 32nd sub-folder, and returns the number of files listed, or -1 when that drive is not plugged in any more. A host that has it lists the folder only when it is called: the core calls it for a drive without a catalog and for a rebuild of a drive's catalog. |
 | `drive_bind` | `int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name)`: optional; gives the place to the file of the drive's folder with this name, so that `drive_name` gives the name and `drive/<place>` opens it. Returns 1, or 0 when that drive is not plugged in any more or the name is not one of the drive. Without it every drive is listed. |
 | `drive_writable` | `int drive_writable(void *ctx, uint32_t drive)`: optional; 1 when the core may change the files of that drive with the storage functions, by the names `drive/<name>`, 0 otherwise. Without it the drive is read only. |
@@ -153,7 +153,7 @@ as for a file that is not there.
 |---|---|
 | `odrig_core *odrig_core_begin(const odrig_host *host)` | Starts the core: reads and checks the whole installed file set, see [Startup](#startup). Returns the core, or `NULL` when the host could not supply the first block of memory. |
 | `int odrig_core_poll(odrig_core *core, uint64_t now_ms)` | Asks for a refresh. Returns 1 when it produced new LED data and 0 when none was due. |
-| `uint32_t odrig_core_leg_count(const odrig_core *core)` | The number of legs: those of the mapping file, or 0 without a valid mapping. |
+| `uint32_t odrig_core_leg_count(const odrig_core *core)` | The number of legs: those of the mapping file, or of the installation's mapping when the host has no mapping file, or 0 when the mapping file cannot be used. |
 | `int odrig_core_leg(const odrig_core *core, uint32_t index, odrig_leg *out)` | Fills in leg `index`, counted from 0 in the order of the mapping file. Returns 1, or 0 for an index that is not a leg. |
 | `size_t odrig_core_command(odrig_core *core, uint64_t now_ms, const char *line, size_t length, char *reply, size_t capacity)` | Takes one command line and writes its reply. Returns the length of the reply. `capacity` must be at least `ODRIG_REPLY_MAX`; with less the core does nothing and returns 0. |
 | `void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, size_t length, odrig_reply_fn on_reply, void *reply_ctx)` | Takes bytes of a transport, cuts them into lines, answers each line, and calls `on_reply` once for each. |
@@ -184,7 +184,7 @@ as for a file that is not there.
 Its `rgb` pointer holds180bytes, with physical index `x*6+y`, x0–9 and y0–5.
 `status.mini` reports support and acknowledged state. Its extra fields retain the
 1024-byte reply limit by bounding the host description to256escaped bytes as well
-as95input bytes; ordinary printable descriptions keep their existing length.
+as 127 input bytes; ordinary printable descriptions keep their existing length.
 The host serializes these helpers with every other core call and acknowledges only
 after the outgoing bus is cleared and the new outputs are checked.
 
@@ -353,6 +353,16 @@ last, and nothing is left to check.
 
 A show may have no items. It is valid, and nothing plays.
 
+A host without `mapping.json` plays on the installation's mapping, `mapping/legs-20.json`,
+which the core holds: twenty legs of 180 LEDs on the pins 1 to 18, 21 and 47, a canvas
+of 60 x 60. The host is asked for the file once. A host without `show.json` has the empty
+show: no item, brightness 128, as a show file with no item. Nothing is written for either
+at the start. The first change that writes `show.json` writes `mapping.json` first, the
+bytes of the target file, so that the folder is a whole installed file set from then on;
+a mapping file that cannot be written refuses the change with `storage-error` and leaves
+no part. A mapping file or a show file that is there and cannot be used refuses the show,
+as below.
+
 With a catalog of the board's storage that is `ok`, [catalog.md](catalog.md), a file it has
 an entry for is neither opened nor read: its size, its length and its type come from the
 entry, and the check after the start passes it over. The start reads the marker once and
@@ -379,9 +389,11 @@ change left:
    items, and then `repeats.txt`, for their saved repeats; see [the saved
    order](#the-saved-order) and [the saved repeats](#the-saved-repeats).
 
-A folder with none of the three files is asked to remove two names that are not there and
-to open three that are not there, `catalog.do`, `pending.txt` and `catalog.txt`, and for
-nothing else.
+A folder with none of the files is asked to remove two names that are not there,
+`upload.part` and `show.part`, and to open five that are not there, `catalog.do`,
+`mapping.json`, `show.json`, `pending.txt` and `catalog.txt`, and for nothing else; the
+reads with `read_at` of the saved order, the repeats and the settings find nothing, as
+for a show with no item. It then plays on the installation's mapping with the empty show.
 
 A show whose mapping file or show file cannot be used, whose ids are wrong, or for which
 the host has too little memory is refused as a whole: the LEDs stay dark, `play` is
@@ -1315,4 +1327,4 @@ and holds its window, guards shared play and diagnostic entries, and retries dar
 selection only after relevant changes. No per-frame allocation or additional block
 is introduced. `status` adds explicit mode/reason metadata within its unchanged
 1,024-byte bound; escaped host descriptions use at most160 bytes, while ordinary
-95-byte ASCII descriptions and supported full file/folder paths remain intact.
+127-byte ASCII descriptions and supported full file/folder paths remain intact.

@@ -12691,3 +12691,103 @@ available while locked; applying either photo reading is an edit.
 
 **Resolution.** `app/www/screens/mapping.js`, `app/www/screens/photomap.js`,
 `app/www/client.js` and `docs/android-app.md`.
+
+## Seed 77: the core's page and the room for the host text
+
+**Question.** The seed grows the room the core keeps for the host text, `kAboutSize` of
+`core/src/commands.cpp`, from 96 to 128 bytes, and names the pages it changes:
+`docs/firmware.md`, `docs/commands.md`, `docs/android-app.md`,
+`docs/firmware-additions.md`, `docs/firmware-prerequisites.md`, `docs/decisions.md` and
+this file. `docs/core.md`, which the seed does not name, says in the row of `about` that
+the core asks for the text with room for 96 bytes, and twice that the host description is
+bounded to 95 input bytes. Is the core's page changed with the core?
+
+**Answer.** Yes. `docs/core.md` is the page of the core, and the room is the core's one
+change in this seed: a page that says 96 where the code says 128 is wrong, not out of
+scope. The row of `about` says 128 bytes, and the two sentences of the status metadata
+say 127 input bytes where they said 95. Nothing else of the page changes.
+
+**Resolution.** `docs/core.md`, beside `docs/commands.md`, which says at most 127
+characters and 127 input bytes where it said 95.
+
+## Seed 77: the override's sentence of what an environment inherits
+
+**Question.** `docs/firmware.md`, under `build`, said that the override file adds the two
+environments and that everything it does not name, the board, the platform, the partition
+table and the flash settings, is inherited from WLED's environment. The spare's
+environment names a partition table and a flash size of its own, and the file holds five
+environments. The seed names the page's synopsis, its table of kinds, the `--module`
+paragraph, the layouts and the regions, not this sentence. Is it changed?
+
+**Answer.** Yes, since the seed makes it false: the sentence now says that the file adds
+the project's environments, that everything an environment does not name is inherited
+from WLED's environment, and that only the spare's environment names a partition table
+and a flash size of its own. The four environments of WLED's board still name none of
+them, which `tests/firmware/test_wled.py` checks.
+
+**Resolution.** `docs/firmware.md`, "build".
+
+## Seed 78: who makes the folder
+
+**Question.** The host contract of `docs/core.md` names no folder and no call to make one:
+`write_open` begins a new, empty file of the name, and nothing more. `docs/firmware.md`
+said that the files of `/odrig` are there "as `install-show` put them there", as if
+`install-show` were the folder's only maker. A storage that WLED formatted holds WLED's
+own files and no `/odrig`, and the file system makes no folder for a file, so a board that
+was only ever flashed refused its first upload with `storage-error`. Who makes the folder,
+and when? This is a gap in a governing document: the host contract says nothing of where
+the files live or who makes the place.
+
+**Answer.** The host, inside `write_open`, once, after a failed open: one `mkdir` of
+`/odrig` and the open again. A storage with the folder pays nothing, and a `mkdir` the
+file system refuses fails the write as before. Not the core, which knows no paths and
+whose contract would then grow for every host for one platform's rule; not the start,
+which seed 76 decided writes nothing; not the usermod's `setup()`, which would make the
+firmware decide to write. No decision of `docs/decisions.md` changes, so its change log
+gets no entry, and `docs/core.md` and `docs/commands.md` stay as they are.
+
+**Resolution.** `firmware/usermod/odrig_files.cpp` and `docs/firmware.md`.
+## Seed 76: the brightness of the empty show
+
+**Question.** What brightness has the show of a board that has no show file?
+
+**Answer.** 128, the value of `shows/example/show.json` and of every example of
+`show.md`: the brightness a show gets when nothing says otherwise. The first change
+writes it into `show.json`, and the operator changes it as any brightness.
+
+**Resolution.** `core/src/show.cpp`, `tests/core/support.py`.
+
+## Seed 76: what is written for the missing files, and when
+
+**Question.** Does the core write the mapping file and the show file it plays without?
+
+**Answer.** Nothing at the start, so that a host whose storage cannot be changed, and a
+board whose storage cannot be written, still report the canvas and refuse a change in
+words. The first change that writes `show.json` writes `mapping.json` first, the bytes of
+`mapping/legs-20.json`, so that the folder is a whole installed file set from then on,
+which `fw.py read-show` copies and `install-show` accepts; a write that fails is the
+change's `storage-error`. A saved pin assignment writes the file as before.
+
+**Resolution.** `core/src/mapping_control.cpp`, `core/src/content.cpp`, `docs/core.md`.
+
+## Seed 76: whose reasons `mapping-missing` and `show-missing` are
+
+**Question.** Do the two reasons leave the project with the core's refusal?
+
+**Answer.** They stay the tools' reasons: the converter's `pack`, the Python library's
+readers and `fw.py install-show` refuse a folder without the files as before, since a
+folder to install is a complete file set. The core reports neither, and the table of the
+core's texts in `reasons.md` begins at `mapping-malformed`.
+
+**Resolution.** `docs/reasons.md`, `tests/core/test_docs.py`.
+
+## Seed 76: the emulator's page without a mapping file
+
+**Question.** What does the page's mapping view draw when the folder has no mapping file?
+
+**Answer.** The installation's mapping: `GET /show/mapping.json` answers the
+repository's `mapping/legs-20.json`, the bytes the core holds, and the folder's own file,
+as it is, when it has one. The page needs no change: the legs come from the core and the
+file from that route.
+
+**Resolution.** `emulator/httpd.py`, `docs/emulator.md`.
