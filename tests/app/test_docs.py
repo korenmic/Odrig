@@ -90,7 +90,7 @@ class TheAppsPage(unittest.TestCase):
                     ["in-use", "upload begin 1 a.odrg 1", None], ["no-upload", "upload data 0 AA", None], ["bad-offset", "upload data 0 AA", None],
                     ["read-only", "remove `<id>`", None], ["read-only", "upload begin external a.odrg 1", None], ["read-only", "catalog rebuild external", None],
                     ["in-use", "repeat 9 5 save", None], ["no-space", "repeat 1 5 save", None], ["stale", "repeat 1 5", None]]
-        failures = [["bad-address", ""], ["no-wifi", ""], ["no-answer", "`<address>`"], ["bad-reply", "`<address>`"]]
+        failures = [["bad-address", ""], ["no-wifi", ""], ["no-answer", "`<address>`"], ["no-usb", ""], ["usb-refused", ""], ["bad-reply", "`<address>`"]]
         found = support.run("texts", settings={"refusals": refusals, "failures": failures}).seen
         messages = section(self.text, "Messages")
         said = flat(messages)
@@ -99,8 +99,9 @@ class TheAppsPage(unittest.TestCase):
             self.assertIn(f"| {sentence} |", said)
         self.assertIn(found["silence"][3].replace("75", "12"), said)
         self.assertIn("The installed show is invalid: <reason>.", said)
+        self.assertIn("| No answer over USB serial. Check the cable to the board's USB port and that the installation has power. |", said)
         rows = [row.split("`")[1] for row in messages.splitlines() if row.startswith("| `")]
-        self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "unavailable", "busy", "in-use", "in-use", "in-use", "in-use",
+        self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "no-answer", "no-usb", "usb-refused", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "unavailable", "busy", "in-use", "in-use", "in-use", "in-use",
                                 "read-only", "read-only", "read-only", "storage-error", "in-use", "in-use", "no-space", "no-space", "no-space", "no-upload", "bad-checksum",
                                 "bad-file", "mapping-conflict", "order-conflict", "stale", "stale", "unsupported-character", "does-not-fit", "no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"])
         self.assertIn("`Removed animation <id> <file>.`", said)

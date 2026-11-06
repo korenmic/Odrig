@@ -142,10 +142,89 @@ function replyOf(status, body, to) {
   return reply;
 }
 
-// Sends one command line to the address in use and gives the reply as an object. The
-// line is sent once. It throws a Failure when no reply comes within the limit, in
-// milliseconds, or when what comes is not a reply.
+// The name of the USB link in the messages of its failures.
+const USB = "USB serial";
+// The longest the phone may take to ask the operator for the USB device, in milliseconds.
+const ASKING_MS = 60000;
+// The longest wait of one read of the serial port, in milliseconds.
+const READ_MS = 250;
+let usbOpen = false;
+
+// The reply among what came over the serial port: the first whole line that is a JSON
+// object with a boolean `ok`, and what came after it. Every other line, the board's log
+// among them, is passed over. `reply` is null while no such line is whole yet, and `rest`
+// holds the part of a line still to come.
+export function replyIn(text) {
+  let rest = text;
+  for (;;) {
+    const end = rest.indexOf("\n");
+    if (end < 0) {
+      return {reply: null, rest};
+    }
+    const line = rest.slice(0, end).replace(/\r$/, "");
+    rest = rest.slice(end + 1);
+    if (!line.startsWith("{")) {
+      continue;
+    }
+    try {
+      const value = JSON.parse(line);
+      if (value !== null && typeof value === "object" && !Array.isArray(value) && typeof value.ok === "boolean") {
+        return {reply: value, rest};
+      }
+    } catch (error) {
+      // A line that is no JSON is no reply.
+    }
+  }
+}
+
+// Sends one line over the board's USB serial port and gives its reply: what the port held
+// before is dropped, the line is written with a line feed, and what arrives is read until
+// a reply is whole or the limit passes.
+async function sendSerial(line, limit) {
+  const bridge = sender();
+  if (bridge === null) {
+    throw new Failure("no-usb", USB);
+  }
+  const call = (method, options, ms) => within(bridge.nativePromise("Target", method, options), ms);
+  try {
+    if (!usbOpen) {
+      await call("connect", {}, ASKING_MS);
+      usbOpen = true;
+    }
+    for (let drained = 0; drained < 64; drained += 1) {
+      const held = await call("read", {timeoutMs: 0}, limit);
+      if (!held.text) {
+        break;
+      }
+    }
+    await call("write", {text: `${line}\n`}, limit);
+    let text = "";
+    const end = performance.now() + limit;
+    while (performance.now() < end) {
+      const wait = Math.max(1, Math.min(READ_MS, Math.round(end - performance.now())));
+      const piece = await call("read", {timeoutMs: wait}, wait + limit);
+      const found = replyIn(text + (piece.text || ""));
+      if (found.reply !== null) {
+        return found.reply;
+      }
+      text = found.rest;
+    }
+  } catch (error) {
+    usbOpen = false;
+    const code = error !== null && typeof error === "object" ? error.code : null;
+    throw new Failure(code === "no-usb" || code === "usb-refused" ? code : "no-answer", USB);
+  }
+  throw new Failure("no-answer", USB);
+}
+
+// Sends one command line over the link in use and gives the reply as an object: to the
+// address in use over Wi-Fi, or over the board's USB serial port. The line is sent once.
+// It throws a Failure when no reply comes within the limit, in milliseconds, or when what
+// comes is not a reply.
 export async function send(line, limit = 5000) {
+  if (link() === "usb") {
+    return sendSerial(line, limit);
+  }
   const to = address();
   const bridge = sender();
   if (bridge !== null) {
@@ -173,12 +252,16 @@ export async function send(line, limit = 5000) {
   return replyOf(status, body, to);
 }
 
-// How requests travel: `{sender: false}` in a browser, and in the app what the sender
-// says of the phone's networks.
+// How requests travel: `{sender: false}` in a browser, `{sender: true, usb: true}` over
+// the USB serial port, and over Wi-Fi in the app what the sender says of the phone's
+// networks.
 export async function route() {
   const bridge = sender();
   if (bridge === null) {
     return {sender: false};
+  }
+  if (link() === "usb") {
+    return {sender: true, usb: true};
   }
   try {
     const found = await within(bridge.nativePromise("Target", "route", {}), 2000);

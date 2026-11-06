@@ -8,7 +8,7 @@ seen failing first.
     USB block, `USB serial` disabled in a browser; app tests and `docs/android-app.md`.
   - Requirements: 1.1–1.6.
 
-- [ ] 2. Send the app's lines over USB serial
+- [x] 2. Send the app's lines over USB serial
   - `target.js`: the link, `replyIn`, the serial sending with draining and the limit, the
     new failure kinds and their messages; the stand-in sender scenario and its tests.
   - Requirements: 2.1–2.5.

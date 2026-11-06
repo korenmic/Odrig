@@ -911,6 +911,9 @@ it is dismissed with `OK` or another takes its place.
 | `bad-address` | The text written as the address is none. | That is not an address. Write it like 4.3.2.1 or 192.168.1.23:8600. |
 | `no-wifi` | The phone is on no Wi-Fi network. | This phone is not on a Wi-Fi network. Join the network odrig in the phone's Wi-Fi settings. |
 | `no-answer` | No reply came within five seconds. | No answer from `<address>`. Check that the phone is on the installation's Wi-Fi network and that the installation has power. |
+| `no-answer`, over USB serial | No reply came over the cable within five seconds. | No answer over USB serial. Check the cable to the board's USB port and that the installation has power. |
+| `no-usb` | The link is USB serial and no board is connected by USB, or it was unplugged. | No board is connected by USB. Connect the phone to the board's USB port with a cable, then press Connect over USB. |
+| `usb-refused` | Android did not give the app the USB device. | Android did not let the app use the board's USB port. Press Connect over USB and allow it. |
 | `bad-reply` | Something answered that is not an installation. | Something answered at `<address>`, but it is not an odrig installation. |
 | `line-too-long`, `unknown-command`, `bad-argument` | The installation's software is older or newer than the app. | The installation did not understand the app. Its software and this app do not match. |
 | `show-invalid` | The installed show cannot be played. | The installed show is invalid: `<reason>`. Nothing can be played until a show is installed over USB. |
