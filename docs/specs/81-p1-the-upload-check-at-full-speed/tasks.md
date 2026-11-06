@@ -131,7 +131,7 @@ known tests of this computer's shared-toolchain junction, and the app suite with
     `test_tests` that times out under load is run again alone.
   - Requirements: 10.1-10.5, 12.3, 13.10-13.13.
 
-- [ ] 7. The firmware's page and the change log
+- [x] 7. The firmware's page and the change log
   - `docs/firmware.md`: after "While a dense clip plays" of the upload measured on
     2026-10-12, the paragraph of the check paced by the budget since seed 81, with the
     estimate of the seed's point 5, the dated figures left as they are; step 7 of the

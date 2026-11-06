@@ -1513,6 +1513,18 @@ the port and asked for `status` once a second through the same session.
   In the second in which a file was put in place, `status` reported 6 or 7. Hello world
   for that canvas, 1,210 bytes, took 11 seconds in all. Every upload succeeded.
 
+The figures above are those of 2026-10-12, when the check took one record at a refresh in
+step. Since seed 81 it takes its steps at every refresh, within a budget of 256 to 2,048
+bytes of charge paced by the refresh rate ([core.md](core.md), "Uploads and the check"),
+and none of them has been measured on the board yet. An estimate, from the core's work on
+a computer scaled by the board's speed at the check of 2026-10-12 and the time of a send
+to twenty outputs: the owner's clock of 14,399 small frames, 498,211 bytes, is checked in
+about 8 s on a board at 50 refreshes a second with room to spare, within 30 s on a board
+at 30 or more while a show that is not dense plays, within a minute at 25 to 29, and
+within two and a half minutes below 25; a board at 22 a second or more before the check
+stays at 20 or more during it, and one at 20 or 21 shows about 19. The owner's check of
+seed 81 measures it.
+
 Not measured, because the hardware is not wired: light on any leg but the one strip on
 pin 1, and the current the LEDs really draw. Not measured either: an upload over Wi-Fi,
 which needs a person to join the board's network; see step 7 of [The owner's
@@ -1845,8 +1857,8 @@ refreshes a second, and the owner accepts any rate from 20 to 50. See
    ```
 
    *Seen:* `upload` writes a line with the percentage and the speed, then
-   `upload: checking`, and after about five seconds `{"ok":true}`, while the show plays
-   on; `list` shows `{"id":9,"file":"hello-bench.odrg","bytes":1138}` as the last item;
+   `upload: checking`, and a second or less after the last piece `{"ok":true}`, while the
+   show plays on; `list` shows `{"id":9,"file":"hello-bench.odrg","bytes":1138}` as the last item;
    after `play 9` the words HELLO WORLD begin again and stay for half a minute, which is
    the turn of the new item in the playlist; `remove 9`, sent within that half minute,
    answers `{"ok":true}` and the playlist goes on with its first animation, the same
