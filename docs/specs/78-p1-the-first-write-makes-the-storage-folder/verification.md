@@ -118,19 +118,29 @@ their `.sha256` and its `README.txt`. No file is named `odrig-firmware.bin` or
 the owner's order being the files and not the folder:
 
 - `odrig archive/seed-78/odrig-seed78-96a65d9-plus-seed76-n8r2-at-0x10000.bin`, the one
-  for the upload check;
-- `odrig archive/seed-78/odrig-seed78-478912d-n8r2-at-0x10000.bin`;
-- `odrig archive/seed-78/odrig-seed78-478912d-n16r8-at-0x10000.bin`;
+  for the upload check:
+  https://drive.google.com/file/d/1lI7jBBoi4enJ0KVjVDhC7FjV9HWr8EMX/view
+- `odrig archive/seed-78/odrig-seed78-478912d-n8r2-at-0x10000.bin`:
+  https://drive.google.com/file/d/1hBekrkzAe765FwoycDBEjmgjC8YzeyGf/view
+- `odrig archive/seed-78/odrig-seed78-478912d-n16r8-at-0x10000.bin`:
+  https://drive.google.com/file/d/1_u2RQoBC8MXlUBS4Am-VkZixRkBsM8kh/view
 - in `odrig archive/seed-78/only-if-the-flash-was-erased/`:
-  `odrig-seed78-478912d-n8r2-bootloader-at-0x0.bin` and
-  `odrig-seed78-478912d-n8r2-partitions-at-0x8000.bin`.
+  `odrig-seed78-478912d-n8r2-bootloader-at-0x0.bin`,
+  https://drive.google.com/file/d/1V3Ucr_mqzSmABWpsaZmO6VxW99R0c3Oz/view, and
+  `odrig-seed78-478912d-n8r2-partitions-at-0x8000.bin`,
+  https://drive.google.com/file/d/1Q547bajeps94Da4JSh8Kqka7ZtOHsnod/view
 
-When this record was written, Google Drive for desktop on this computer had taken the
-files into its folder and not yet uploaded them, nearly two hours after they were placed,
-with the same files copied a second time into `odrig archive/seed-78-files/`; a request
-to close the client normally was ignored, and it was not stopped by force. So the file
-links are not here: they are sent to the owner in words once the client has uploaded the
-files. The combined image was handed to the owner directly as well.
+Google Drive for desktop on this computer, version 133.0.2.0 since its own update at
+22:45 UTC on 2026-11-05, uploaded the files but never wrote their Drive ids into its
+database: there every one stayed a `local-` id of size 0, with its create operation kept
+and an operation queue the client reported empty. The ids above come from the client's
+own structured log, from the records in which Drive answered each create: each names the
+file, its folder (`seed-78`, or its subfolder for the last two) and a size equal to the
+file's on this computer, 1,881,056, 1,877,504, 1,880,048, 19,968 and 3,072 bytes. Each
+link answers 401, sign-in required, to a request without an account, where an id that
+does not exist answers 400. A second copy of the files, in
+`odrig archive/seed-78-files/`, has ids of its own and is not linked. The combined image
+was handed to the owner directly as well.
 
 ## The workflow
 
