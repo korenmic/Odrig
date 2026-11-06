@@ -47,8 +47,21 @@ export default async function (app) {
     await app.step();
   }
   app.press("Save");
-  await app.until(() => app.text("message-text") !== null, "a message after saving", 20000);
+  // Every text of the line, and for each Checking text whether Cancel is shown with it.
+  seen.sending = [];
+  seen.cancelShown = [];
+  await app.until(() => {
+    const now = app.text("author-uploading");
+    if (now !== null && seen.sending[seen.sending.length - 1] !== now) {
+      seen.sending.push(now);
+      if (now.startsWith("Checking")) {
+        seen.cancelShown.push(app.text("author-cancel") !== null);
+      }
+    }
+    return app.text("message-text") !== null;
+  }, "a message after saving", 20000);
   seen.message = app.text("message-text");
+  seen.lineHidden = app.text("author-uploading") === null;
   seen.after = form(app);
   app.press("OK");
   app.press("Animations");
