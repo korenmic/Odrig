@@ -255,7 +255,7 @@ The core is the library that plays an installed show, on the board and in the em
 [core.md](core.md). It writes no error line. When it refuses a show it holds the reason as a
 text that begins with a reason name, and the `status` command reports that text.
 
-It names an invalid show as "Shows" does, from `mapping-missing` to `nested-cycle`, and a
+It names an invalid show as "Shows" does, from `mapping-malformed` to `nested-cycle`, and a
 rejected `.odrg` file as "ODRG files" does, and a rejected container as "ODRGX files"
 does. A fault of one `.odrg` or `.odrgx` file, `file-missing`, `size-mismatch`, `read-error`
 or a reason of "ODRG files" or "ODRGX files", does not make the show invalid:
@@ -269,13 +269,16 @@ player can meet:
 | `out-of-memory` | The host cannot supply the memory the core asks for when it starts. |
 | `too-many-folders` | A file of a drive's catalog lies in a folder that would be the 33rd sub-folder of the drive's folder, which only a catalog can name: the file is left out, the log says `drive file <path> left out: too-many-folders`, and the show plays on. |
 
+A `mapping.json` that does not exist is no fault of the core: it plays on the
+installation's mapping, which it holds, and a `show.json` that does not exist is the empty
+show, as [core.md](core.md), "Startup", says. `mapping-missing` and `show-missing` are the
+tools' reasons, under "Shows" above: a folder to install is a complete file set.
+
 The text is the reason name, followed for most reasons by what it is about:
 
 | Text | Condition |
 |---|---|
-| `mapping-missing` | `mapping.json` does not exist. |
 | `mapping-malformed` | `mapping.json` breaks a rule. |
-| `show-missing` | `show.json` does not exist. |
 | `show-malformed` | `show.json` breaks its format. |
 | `duplicate-id <id>` | Two items have that id. |
 | `undefined-id <id>` | A cycle, or `start`, names that id and no item has it. |

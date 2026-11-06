@@ -327,9 +327,13 @@ class List(Content):
         self.assertEqual(json.loads(replies(printed)[5])["error"], None)
 
     def test_with_an_invalid_show_list_is_refused(self):
-        for files in (invalid_show(), {}, {"mapping.json": support.mapping_texts()["legs-2"]}):
+        printed = self.run_both(invalid_show(), [support.line(T0, line) for line in ("list", "list 0", "list 2", "list 65535")])
+        self.assertEqual(replies(printed), [refused("show-invalid")] * 4)
+
+    def test_a_file_set_without_its_files_has_the_empty_show_and_lists_nothing(self):
+        for files in ({}, {"mapping.json": support.mapping_texts()["legs-2"]}):
             printed = self.run_both(files, [support.line(T0, line) for line in ("list", "list 0", "list 2", "list 65535")])
-            self.assertEqual(replies(printed), [refused("show-invalid")] * 4)
+            self.assertEqual(replies(printed), ['{"ok":true,"items":[],"next":null}'] * 4)
 
     def test_a_from_that_is_no_number_from_0_to_4294967295_is_a_bad_argument(self):
         lines = ["list ", "list  1", "list 1 ", "list -1", "list +1", "list 4294967296", "list 99999999999", "list a", "list 1a", "list 0x1", "list 1.0", "list 1 2", "list 0 0 0 0 0 0"]

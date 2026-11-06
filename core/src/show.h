@@ -22,9 +22,11 @@ const uint32_t kMostItems = 65535;
 bool is_file_name(const char *name);
 
 // Reads `show.json` under the rules of docs/show.md, sets up the item, entry and file tables
-// of the core, with room to spare in the item and the file table, and checks the ids. Returns kNone, kShowMissing, kShowMalformed,
-// kDuplicateId, kUndefinedId, kNestedCycle, kReadError or kOutOfMemory. For the three
-// reasons about an id, `id_text` receives that id as text; it holds kIdTextSize characters.
+// of the core, with room to spare in the item and the file table, and checks the ids. A
+// host without a show file has the empty show: no item, brightness 128. Returns kNone,
+// kShowMalformed, kDuplicateId, kUndefinedId, kNestedCycle, kReadError or kOutOfMemory. For
+// the three reasons about an id, `id_text` receives that id as text; it holds kIdTextSize
+// characters.
 Reason read_show(Core &core, char *id_text);
 
 }  // namespace odrig

@@ -1,5 +1,6 @@
 import http.client
 import json
+import pathlib
 import tempfile
 import time
 import unittest
@@ -224,16 +225,20 @@ class OtherShows(unittest.TestCase):
     def setUp(self):
         self.work = support.entered(self, tempfile.TemporaryDirectory())
 
-    def test_a_folder_without_a_show_gives_no_legs_the_reason_and_no_mapping_file(self):
+    def test_an_empty_folder_gives_the_installations_legs_no_reason_and_the_built_in_mapping_file(self):
         with support.Emulator(self.work) as emulator, support.EventStream(emulator.port) as stream:
             events = stream.read_until(has("status"), 5)
             hello = json.loads(events[0].data)
-            self.assertEqual((hello["legs"], hello["error"]), ([], "mapping-missing"))
-            self.assertEqual(support.of_kind(events, "status")[0]["error"], "mapping-missing")
-            self.assertEqual(emulator.request("GET", "/show/mapping.json").status, 404)
+            self.assertEqual((len(hello["legs"]), hello["error"]), (20, None))
+            self.assertIsNone(support.of_kind(events, "status")[0]["error"])
+            served = emulator.request("GET", "/show/mapping.json")
+            self.assertEqual(served.status, 200)
+            self.assertEqual(served.body, (support.ROOT / "mapping" / "legs-20.json").read_bytes())
             more = stream.read_for(1.5)
-            self.assertEqual(support.frames(events + more), [])
+            self.assertGreaterEqual(len(support.frames(events + more)), 1)
+            self.assertTrue(all(not any(data) for _, data in support.frames(events + more)))
             self.assertGreaterEqual(len(support.of_kind(more, "status")), 1)
+            self.assertEqual(sorted(pathlib.Path(self.work).iterdir()), [])
 
     def test_a_mapping_the_core_refuses_is_still_served_as_it_is(self):
         folder = support.installed(self.work, {"mapping.json": b'{"version": 1, "width": 60, "legs": []}\n'})

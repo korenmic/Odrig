@@ -25,6 +25,9 @@ SEEK_PATH = "/seek"
 EVENTS_PATH = "/events"
 MAPPING_PATH = "/show/mapping.json"
 MAPPING_NAME = "mapping.json"
+# The installation's mapping file, which the core holds and plays on when the show folder
+# has no mapping file: served to the page in its place.
+BUILT_IN_MAPPING = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "mapping", "legs-20.json")
 BODY_KEPT = 4096
 CHUNK = 65536
 KEEP_ALIVE_SECONDS = 15
@@ -226,14 +229,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.content(content_type, data)
 
     def mapping(self):
-        """The mapping file of the show folder, byte for byte."""
-        try:
-            with open(os.path.join(self.server.show_dir, MAPPING_NAME), "rb") as file:
-                data = file.read()
-        except OSError:
-            self.empty(404)
+        """The mapping file of the show folder, byte for byte, whatever the core made of
+        it; the built-in mapping when the folder has none."""
+        for path in (os.path.join(self.server.show_dir, MAPPING_NAME), BUILT_IN_MAPPING):
+            try:
+                with open(path, "rb") as file:
+                    data = file.read()
+            except OSError:
+                continue
+            self.content("application/json", data)
             return
-        self.content("application/json", data)
+        self.empty(404)
 
     def events(self):
         """The event stream: a response without a length that stays open."""
