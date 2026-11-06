@@ -1,0 +1,9 @@
+{
+  "number": 81,
+  "slug": "81-p1-the-upload-check-at-full-speed",
+  "state": "remaining",
+  "title": "The upload check at full speed",
+  "priority": "P1",
+  "addedAt": "2026-11-06",
+  "summary": "After an upload's last byte the core checks the whole file at every refresh, in step or late, within a budget of 256 to 2,048 bytes of body (at most 64 steps, at least one), raised at 25 refreshes a second or more and lowered below 21 once a second so the rate stays at 20 or more; verdicts and reasons unchanged. The owner's 14,399-frame clock, 288 s at 50 a second today, is estimated at 7 to 11 s on a board at 30 a second or more. The app says 'Checking the animation on the installation: m:ss' by its own clock until upload end answers, on Upload and in the text and clock forms; the pages give the new times; odrigctl waits 1,800 s. No command, reply, memory or firmware source change."
+}
