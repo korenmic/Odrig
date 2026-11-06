@@ -11,6 +11,7 @@ import os
 import signal
 import sys
 import time
+import urllib.parse
 
 from . import client, content
 
@@ -33,6 +34,7 @@ COMMANDS = {
     "repeat": ("ID", "N", "[save]"),
     "clocks": ("OPERATION",),
     "debug": ("mini", "on|off"),
+    "folder": ("make", "external", "PATH"),
     "upload": ("ID", "FILE"),
 }
 # What an upload came to, beside its reply: a reply that does not report success leaves the
@@ -68,7 +70,7 @@ def parser():
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it. "
                     "With --log and no command it prints the lines of the target's log as they arrive, until it is stopped.",
-        epilog="Commands: play ID, play all, on, off, brightness N, brightness ID N save, brightness ID default, status, fault, space, list, list in ID [FROM], read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, mapping test snake N, order get [FROM], order get in ID [FROM], order move REV ID BEFORE, repeat ID N, repeat ID N save, repeat ID default, clocks on|off|only, clocks message on|off, upload ID FILE, upload --external FILE, debug mini on|off. ID and N are sent as they are typed; list and order get without FROM print a reply for each part.",
+        epilog="Commands: play ID, play all, on, off, brightness N, brightness ID N save, brightness ID default, status, fault, space, list, list in ID [FROM], read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, mapping test snake N, order get [FROM], order get in ID [FROM], order move REV ID BEFORE, repeat ID N, repeat ID N save, repeat ID default, clocks on|off|only, clocks message on|off, upload ID FILE, upload --external FILE, debug mini on|off, folder make external PATH. ID and N are sent as they are typed; list and order get without FROM print a reply for each part.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
@@ -148,6 +150,13 @@ def checked(made, arguments):
         if arguments.arguments not in (["mini", "on"], ["mini", "off"]):
             made.error("debug takes mini on or mini off")
         return [arguments.command, *arguments.arguments]
+    if arguments.command == "folder":
+        words = arguments.arguments
+        if len(words) != 3 or words[:2] != ["make", "external"] or not words[2]:
+            made.error("folder takes make external PATH")
+        if any(character in words[2] for character in "\r\n"):
+            made.error("a command is one line")
+        return [arguments.command, *words[:2], "/".join(urllib.parse.quote(part, safe="") for part in words[2].split("/"))]
     if arguments.command == "clocks":
         words = arguments.arguments
         if words not in (["on"], ["off"], ["only"], ["message", "on"], ["message", "off"]):

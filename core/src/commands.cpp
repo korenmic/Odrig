@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "commands.h"
 
 #include "breaks.h"
@@ -449,8 +451,10 @@ bool level_words(const Core &core, const Words &words, uint32_t first, uint32_t 
     return words.count == at + 1 && number_word(words, at, 0, 0xFFFFFFFFu, from);
 }
 
-// Decodes a URI path argument; spaces and percent signs cannot be raw command words.
-bool external_path(const char *word, uint32_t size, char *name) {
+// Decodes a URI path argument once into `name`, with its length; spaces and percent signs
+// cannot be raw command words. False for a bad escape, a byte outside printable ASCII or a
+// path too long.
+bool decoded_path(const char *word, uint32_t size, char *name, uint32_t *decoded) {
     uint32_t length = 0;
     for (uint32_t at = 0; at < size; ++at) {
         uint32_t value = static_cast<uint8_t>(word[at]);
@@ -470,9 +474,44 @@ bool external_path(const char *word, uint32_t size, char *name) {
         name[length++] = static_cast<char>(value);
     }
     name[length] = '\0';
+    *decoded = length;
+    return true;
+}
+
+// The path of a file of the drive, decoded once and checked whole.
+bool external_path(const char *word, uint32_t size, char *name) {
+    uint32_t length = 0;
+    if (!decoded_path(word, size, name, &length)) return false;
     const char *base = name;
     for (uint32_t at = 0; at < length; ++at) if (name[at] == '/') base = name + at + 1;
     return catalog_name_allowed(name, length) && is_file_name(base);
+}
+
+// The path of a folder of the drive, decoded once: one to kCatalogDeepest names that leave
+// room for a file in it under the catalog's rule, the last not ending in `.odrg` or `.odrgx`.
+bool folder_path(const char *word, uint32_t size, char *name) {
+    uint32_t length = 0;
+    if (!decoded_path(word, size, name, &length) || length == 0 || length + 7 > kCatalogNameMost) return false;
+    char probe[kCatalogNameMost + 1];
+    memcpy(probe, name, length);
+    memcpy(probe + length, "/a.odrg", 8);
+    if (!catalog_name_allowed(probe, length + 7)) return false;
+    uint32_t parts = 1;
+    const char *base = name;
+    for (uint32_t at = 0; at < length; ++at) {
+        if (name[at] == '/') {
+            ++parts;
+            base = name + at + 1;
+        }
+    }
+    const uint32_t base_length = static_cast<uint32_t>(name + length - base);
+    const uint32_t ending = base_length > 0 && (base[base_length - 1] == 'x' || base[base_length - 1] == 'X') ? 6 : 5;
+    bool animation = base_length >= ending;
+    for (uint32_t at = 0; animation && at < ending; ++at) {
+        const char c = base[base_length - ending + at];
+        animation = (c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c) == ".odrgx"[at];
+    }
+    return parts <= kCatalogDeepest && !animation;
 }
 
 // Upload's words are read first, then the show is asked for.
@@ -848,6 +887,20 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             return refuse(reply, "busy");
         }
         return save ? repeats_save(core, id, loops, now, reply) : repeats_restore(core, id, now, reply);
+    }
+    if (words.is(0, "folder")) {
+        char path[kDrivePathRoom];
+        if (words.count != 4 || !words.is(1, "make") || (!words.is(2, "external") && !words.is(2, "internal")) ||
+            !folder_path(words.text[3], words.size[3], path)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        if (words.is(2, "internal") || core.host.make_folder == nullptr) {
+            return refuse(reply, "unsupported");
+        }
+        return catalog_folder_make(core, path, reply);
     }
     if (words.is(0, "upload")) {
         if (core.mapping_test || (catalog_rebuilding(core) && words.count >= 2 && words.is(1, "begin"))) return refuse(reply, "busy");

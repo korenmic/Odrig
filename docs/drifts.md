@@ -12791,3 +12791,31 @@ as it is, when it has one. The page needs no change: the legs come from the core
 file from that route.
 
 **Resolution.** `emulator/httpd.py`, `docs/emulator.md`.
+
+## Seed 74: how a folder of the card is made
+
+**Question.** Does `folder make` make the folders of a path that are missing, how long may
+a folder's path be, and where does the new folder stand?
+
+**Answer.** One level at a time: the parent is the root or a folder of the index, as an
+upload's folder is, and a client makes `clocks` before `clocks/message`. The path leaves room
+for a file, `<path>/a.odrg` being a name the catalog takes, and its last name does not end in
+`.odrg` or `.odrgx`, which the card would list as a file. The folder takes its place among its
+parent's sub-folders by the bytes of their names, the order a rebuild gives, and the lowest
+free id. A name the parent has in another case is `in-use`, since FAT tells no case apart. A
+folder the index has already answers `made:false`, so that a resent line after a lost reply
+changes nothing.
+
+**Resolution.** `core/src/catalog.cpp`, `core/src/commands.cpp`, `docs/commands.md`.
+
+## Seed 74: an empty folder removed from the card
+
+**Question.** What happens when an operator removes an empty folder of the index from the
+card on a computer, and then uploads into it?
+
+**Answer.** Before an upload into a folder the core asks the host to make each folder of its
+path, which is nothing for one that is there; a missing one is made again, so that the
+commit's `move upload.part` finds its folder and no commit record is left behind. A rebuild
+lists files only, so it keeps no empty folder; that is said where the rebuild is described.
+
+**Resolution.** `core/src/upload.cpp`, `docs/core.md`, `docs/commands.md`.

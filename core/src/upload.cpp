@@ -219,6 +219,34 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
     return reply.length;
 }
 
+namespace {
+
+// Makes each folder of a path of the drive that is not there, from the top down, on a host
+// that makes folders: a folder of the index whose folder an operator removed while it was
+// empty is there again before a file is written into it. False on a failed call.
+ODRIG_NOINLINE bool folders_there(const Core &core, const char *path) {
+    const odrig_host &host = core.host;
+    if (host.make_folder == nullptr || path[0] == '\0') {
+        return true;
+    }
+    char name[kDriveOpenRoom] = "drive/";
+    uint32_t length = 6;
+    for (const char *at = path;; ++at) {
+        if (*at == '/' || *at == '\0') {
+            name[length] = '\0';
+            if (host.make_folder(host.ctx, name) != 1) {
+                return false;
+            }
+            if (*at == '\0') {
+                return true;
+            }
+        }
+        name[length++] = *at;
+    }
+}
+
+}  // namespace
+
 uint32_t upload_begin_external(Core &core, uint64_t now, const char *name, uint32_t bytes, Reply &reply) {
     Upload &upload = core.upload;
     if (upload.state != kUploadNone || catalog_drive_loading(core)) {
@@ -248,7 +276,7 @@ uint32_t upload_begin_external(Core &core, uint64_t now, const char *name, uint3
         return refuse(reply, "no-space");
     }
     upload.id = 0;
-    if (core.checker == nullptr || !catalog_settle(core, kExternal) || host.write_open(host.ctx, upload_part(core)) != 1) {
+    if (core.checker == nullptr || !catalog_settle(core, kExternal) || !folders_there(core, parent) || host.write_open(host.ctx, upload_part(core)) != 1) {
         return refuse(reply, "storage-error");
     }
     drive_check_yields(core);

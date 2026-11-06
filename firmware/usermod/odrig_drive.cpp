@@ -707,6 +707,21 @@ int renameDriveFile(const char *from, const char *to) {
   return -1;
 }
 
+// A folder of the card: made under the guard, a folder that is there already being one.
+int makeDriveFolder(void *, const char *name) {
+  OdrigFiles::StorageCall call;
+  Guarded held;
+  char path[PATH_ROOM];
+  if (!changedPath(name, path)) return -1;
+  invalidateCapacity();
+  changing(path);
+  struct stat found;
+  if (mkdir(path, 0777) == 0) return 1;
+  if (stat(path, &found) == 0 && S_ISDIR(found.st_mode)) return 1;
+  capacityWriteFailed();
+  return -1;
+}
+
 int removeDriveFile(const char *name) {
   OdrigFiles::StorageCall call;
   Guarded held;
@@ -1118,6 +1133,9 @@ odrig_host OdrigDrive::withDrive(const odrig_host &given) {
   made.drive_list = driveList;
   made.drive_bind = driveBind;
   made.drive_writable = driveWritable;
+#ifdef ODRIG_DRIVE_SD_SPI
+  made.make_folder = makeDriveFolder;
+#endif
   if (given.write_open != nullptr) {
     made.write_open = beginFile;
     made.write = addBytes;

@@ -5,7 +5,7 @@ seen failing first. Part A is delivered on its own before part B begins.
 
 ## Part A
 
-- [ ] 1. Make folders on the card with `folder make external`
+- [x] 1. Make folders on the card with `folder make external`
   - The host's `make_folder`, the index's empty folders and the insertion of a folder
     in one catalog commit; the command and its refusals; the walk, `list`, `play` and an
     upload into an empty folder.
