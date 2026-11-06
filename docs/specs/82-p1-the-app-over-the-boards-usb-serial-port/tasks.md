@@ -18,6 +18,6 @@ seen failing first.
     feature and filter and `usb_device.xml`; the Android checks; `docs/commands.md`.
   - Requirements: 3.1–3.4, 4.1–4.2.
 
-- [ ] 4. Build and deliver the APK
+- [x] 4. Build and deliver the APK
   - Built from the pushed head and signed; the Drive; `verification.md`.
   - Requirements: 4.3.
