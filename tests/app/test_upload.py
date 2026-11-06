@@ -163,6 +163,30 @@ class Uploading(unittest.TestCase):
         self.assertEqual((found["uploading"], found["later"]), ("Cancelled.", "Cancelled."))
         self.assertIsNone(found["message"])
 
+    def test_a_reply_to_the_last_piece_after_the_address_changed_writes_nothing_on_the_line(self):
+        # The reply to the last piece of the first upload comes two seconds late.
+        size = []
+        held = []
+
+        def begin(line):
+            size[:] = [int(line.split(b" ")[4])]
+            return begun(line)
+
+        def held_once(line):
+            reply = taken(line)
+            if not held and json.loads(reply[1])["received"] == size[0]:
+                held.append(line)
+                time.sleep(2.0)
+            return reply
+
+        with support.StandIn(target(begin=begin, data=held_once, end=checked_after(2.5))) as stand_in:
+            found = self.uploaded(stand_in.address, file="clip.gif", readdress=True)
+        self.assertEqual(len(held), 1)
+        self.assertTrue(found["ended"].startswith("Sending: "), found["ended"])
+        self.assertEqual(found["afterwards"], [found["ended"]] * 6)
+        assert_counted(self, checking_texts(self, found["sending"]))
+        self.assertEqual(found["message"], "Uploaded as animation 3 clip.odrg. It plays in the playlist.")
+
     def test_a_file_that_does_not_fit_is_not_sent(self):
         tight = dict(target(begin=begun, data=taken), space=(200, '{"ok":true,"free":16000,"total":10354688,"animations":2}\n'))
         with support.StandIn(tight) as stand_in:

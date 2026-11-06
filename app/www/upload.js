@@ -97,7 +97,8 @@ function base64(bytes) {
 // gave or null, `{cancelled: true}`, or `{error}` with the Refusal or the Failure that
 // ended it. `wake` asks the client to look for the next line again. `checking`, when it is
 // given, is told once, when the reply to the last piece has come, the `performance.now()`
-// of that moment: the target checks the file from then until the job ends.
+// of that moment: the target checks the file from then until the job ends. A reply that
+// comes after the job has ended tells nothing and changes nothing.
 export function uploading({id, file, bytes, expect = null, external = false, create = false}, {report, end, wake, checking = null}) {
   const crc = crc32(bytes);
   let stage = "begin";
@@ -164,6 +165,9 @@ export function uploading({id, file, bytes, expect = null, external = false, cre
       if (stage === "begin") {
         return async () => {
           chunk = external ? await commands.uploadBeginExternal(file, bytes.length) : await commands.uploadBegin(id, file, bytes.length, create ? crc : null);
+          if (stage === "over") {
+            return;
+          }
           stage = expect === null ? "data" : "expect";
           samples.push({at: performance.now(), received: 0});
           report(0, 0);
@@ -179,12 +183,19 @@ export function uploading({id, file, bytes, expect = null, external = false, cre
             }
             throw error;
           }
+          if (stage === "over") {
+            return;
+          }
           stage = "data";
         };
       }
       if (stage === "data") {
         return async () => {
-          received = await commands.uploadData(received, base64(bytes.subarray(received, Math.min(bytes.length, received + chunk))));
+          const given = await commands.uploadData(received, base64(bytes.subarray(received, Math.min(bytes.length, received + chunk))));
+          if (stage === "over") {
+            return;
+          }
+          received = given;
           const at = performance.now();
           samples.push({at, received});
           report(received / bytes.length, speed());
