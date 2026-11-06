@@ -318,14 +318,16 @@ class DenseUpload(unittest.TestCase):
         }, indent=2) + "\n")
         self.assertEqual(reply, {"ok": True}, "the reply that ended the upload")
         self.assertGreaterEqual(len(rates["data"]), 20, "the upload was over before its rate could be read")
-        self.assertGreaterEqual(len(rates["check"]), 20, "the check was over before its rate could be read")
+        self.assertGreaterEqual(len(rates["check"]), 5, "the check was over before its rate could be read")
         self.assertGreaterEqual(min(rates["data"]), LOWEST, rates["data"])
         self.assertGreaterEqual(min(rates["check"]), LOWEST, rates["check"])
         self.assertGreaterEqual(min(after), LOWEST, after)
         self.assertEqual(listed["items"][-1], {"id": NEW_ITEM, "file": DENSE_NAME, "bytes": len(self.clip)})
-        # The check decodes one frame of the file for each refresh, so it takes as long as
-        # the animation lasts, and it reads the file back from storage meanwhile.
-        self.assertGreaterEqual(times["check"], DENSE_SECONDS - 1)
+        # The check takes its steps at every refresh within a budget that the board's rate
+        # paces, and reads the file back from storage meanwhile: at 30 refreshes a second or
+        # more it ends in less than half the time the animation lasts.
+        if min(rates["check"]) >= 30:
+            self.assertLess(times["check"], DENSE_SECONDS / 2, rates["check"])
         self.assertGreater(report["store"]["check_steps"], 0)
         self.assertEqual((report["error"], report["overwritten"]), (None, 0))
         self.assertLessEqual(before["free"] - with_the_file["free"], len(self.clip) + len(self.clip) // 256 + SPACE_SLACK)

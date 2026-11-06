@@ -12961,3 +12961,22 @@ blocks is read whole at its refresh, as playback reads it.
 `core/src/file_source.h`, `FileSource::given`; `docs/core.md`, "The charge";
 `tests/core/test_decoder.py`, `TheChargeOfACall`; `tests/core/test_upload_check.py`,
 `TheBounds`.
+
+## Seed 81: the board suite's upload of a dense minute
+
+**Question.** Requirement 13.6 names the core's, the emulator's and the app's suites as
+those whose tests counted the old pacing. The board suite's `DenseUpload`, in
+`tests/board/test_upload.py`, asserts that the check of the dense clip of 60 s on the
+two-leg canvas takes as long as the animation lasts, and that `status` is read 20 times
+during it. By the rule's model that clip, 865,351 bytes and 3,000 frames, is checked in
+9.8 s at 50 refreshes a second, 12.0 s at 40, 14.2 s at 33 and 59.9 s at 25, so
+`fw.py test-board` would fail on a board with this core. Is the board's test changed in
+this seed?
+
+**Answer.** Yes: no test may pin the old pacing, and this one was missed. It now asserts
+`{"ok":true}`, at least five rates read during the check, each 20 or more, and, when
+every one of them is 30 or more, a check shorter than half the 60 s the animation lasts.
+The board suite needs the board and is not run here; it runs at the owner's next board
+session.
+
+**Resolution.** `tests/board/test_upload.py`, `DenseUpload`.
