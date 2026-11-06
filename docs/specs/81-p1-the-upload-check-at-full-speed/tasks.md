@@ -35,7 +35,7 @@ known tests of this computer's shared-toolchain junction, and the app suite with
     `tests/core/test_docs.py` show.
   - Requirements: 2.3, 2.4, 8.2, 9.1, 9.5, 12.8, 13.7, 14.1, 14.2.
 
-- [ ] 2. The check at every refresh, charged and paced
+- [x] 2. The check at every refresh, charged and paced
   - First the model and the two tests of the fault. `tests/core/support.py`:
     `check_steps`, `CheckPace`, `check_end` and `refresh_times`, as the design gives them.
     `tests/core/test_upload_check.py`, new: `AtEveryRefresh` (13.1) and `TheOwnersClock`

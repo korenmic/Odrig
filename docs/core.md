@@ -1091,6 +1091,7 @@ leg; and `ready`.
 | `--trace-files` | Prints `open <name> <result>` for every call of `open`. |
 | `--trace-reads` | Prints `read <name> <bytes>` for every call of `close`: how many bytes of the file `read` gave since it was opened. |
 | `--trace-calls` | Prints `call <bytes>` after every `poll` and every command: how many bytes `read` and `read_at` gave during that call of the core. |
+| `--trace-check` | Prints `check <pace> <debt> <fell>` after the `data` lines of a refresh at which an upload was being checked when the refresh began: the pace and the debt of the check after that refresh, and 1 when its pace has fallen during the check, else 0. |
 | `--about TEXT` | The host has `about`, which gives this text. |
 | `--check-first` | The check after the start takes all its steps before the startup lines are printed, with no refresh between them. The session then begins as a core that has run for a while: every file is read. |
 | `--storage BYTES` | The total space `space` reports, 0 to 4,294,967,295. The free space is the total less the sizes of the files, each rounded up to 4,096, and not below 0. Without it the total is 13,500,416, the size of the board's storage on its bigger layout. |

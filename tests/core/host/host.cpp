@@ -77,7 +77,7 @@ int usage() {
         "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
         "       --read-back-fails OFFSET  --read-back-differs OFFSET\n"
         "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --drive-read-only  --trace-drive  --trace-read-at  --about TEXT\n"
-        "       --command-read-fails FILE OFFSET\n",
+        "       --command-read-fails FILE OFFSET  --trace-check\n",
         stderr);
     return kUsage;
 }
@@ -169,6 +169,7 @@ struct Options {
     bool trace_drive = false;       // print `drive list <count>` and `drive bind <place> <name>`
     bool trace_read_at = false;     // print `read_at <name> <offset> <count>` for every `read_at`
     bool trace_calls = false;       // print `call <bytes>` after every poll and command: what `read` and `read_at` gave in it
+    bool trace_check = false;       // print `check <pace> <debt> <fell>` after a refresh at which an upload was being checked
     std::string about;              // the text `about` gives; without one the host has no `about`
 };
 
@@ -1038,6 +1039,7 @@ public:
     bool checks_first() const { return options_.check_first; }
     bool has_drive() const { return !options_.drive.empty(); }
     bool traces_calls() const { return options_.trace_calls; }
+    bool traces_check() const { return options_.trace_check; }
     From from_ = kFromFolder;
     std::string folder_;
     std::map<std::string, std::string> files_;
@@ -1570,7 +1572,11 @@ private:
     }
 
     // `refresh <ms>` and the LED data of every leg, or `idle <ms>` when no refresh was due.
+    // With `--trace-check`, after a refresh at which an upload was being checked when it
+    // began, `check <pace> <debt> <fell>`: the pace and the debt after it, and 1 when the
+    // pace has fallen during the check.
     void poll(uint64_t now) {
+        const bool checking = host_.traces_check() && core_->state.upload.state == odrig::kUploadChecking;
         int produced;
         {
             guard::InCore inside;
@@ -1595,6 +1601,11 @@ private:
             }
             std::string rgb(reinterpret_cast<const char *>(leg.rgb), 3 * static_cast<size_t>(leg.led_count));
             std::printf("data %u %s\n", leg.leg, hex(rgb).c_str());
+        }
+        if (checking) {
+            const odrig::Upload &upload = core_->state.upload;
+            std::printf("check %u %u %u\n", static_cast<unsigned>(upload.pace), static_cast<unsigned>(upload.debt),
+                        static_cast<unsigned>(upload.pace_fell));
         }
     }
 
@@ -1870,6 +1881,9 @@ int main(int argc, char **argv) {
                 at += 1;
             } else if (arguments[at] == "--trace-calls") {
                 options.trace_calls = true;
+                at += 1;
+            } else if (arguments[at] == "--trace-check") {
+                options.trace_check = true;
                 at += 1;
             } else if (arguments[at] == "--about" && at + 1 < arguments.size()) {
                 options.about = arguments[at + 1];

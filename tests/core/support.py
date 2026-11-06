@@ -242,6 +242,130 @@ def taken_in(data):
     return _TAKEN[data]
 
 
+def _own_canvas(data):
+    """The canvas a runtime file names, or (0, 0) when its headers cannot say."""
+    try:
+        if odrgx.is_container(data):
+            container = odrgx.read_header(data)
+            return container.width, container.height
+        return struct.unpack_from("<HH", data, 6)
+    except (errors.Rejection, struct.error):
+        return 0, 0
+
+
+def check_steps(data, canvas=None):
+    """The steps the check of an uploaded file takes on a canvas, each as `(charge,
+    pending)`: one for a file whose headers or canvas are refused; for a text or a clock
+    the header, its payload and, when the payload is sound, the end, each charged 0; for
+    frames the header, charged 0, and each call of the core's decoder for a record or for
+    the end, as `decode --taken` gives them. Without a canvas the file is taken to fit."""
+    if header_fault(data, canvas if canvas is not None else _own_canvas(data)) is not None:
+        return ((0, False),)
+    if type_of(data) != "frames":
+        return ((0, False),) * (2 if found_in(data).reason is not None else 3)
+    return ((0, False),) + tuple((call.charge, call.pending) for call in taken_in(data))
+
+
+class CheckPace:
+    """The pace of the check of an uploaded file, stated a second time from the
+    requirements: the steps it still has to take, the pace that sets a refresh's budget, the
+    debt that larger steps leave, and the mark that the pace has fallen."""
+
+    UNIT = 256              # a budget's and a debt's unit, in bytes of charge
+    PACE_START = 1
+    PACE_MOST = 3
+    DEBT_MOST = 15
+    STEPS_MOST = 64         # the most steps of one refresh
+    RATE_SLOW = 21          # a second with fewer refreshes lowers the pace
+    RATE_STEADY = 40        # a second with this many or more raises it
+    RATE_TRIAL = 27         # a second with this many or more raises it while it has not fallen
+    MIDDLE_MS = 500         # a second that has had TRIAL_FEWEST refreshes or fewer at its
+    TRIAL_FEWEST = 11       # middle lowers it
+
+    def __init__(self, steps):
+        self.steps = tuple(steps)
+        self.taken = 0
+        self.pace = self.PACE_START
+        self.debt = 0
+        self.fell = False
+
+    @property
+    def ended(self):
+        """Whether the check has taken its last step."""
+        return self.taken == len(self.steps)
+
+    def _down(self):
+        self.pace = max(0, self.pace - 1)
+        self.fell = True
+
+    def _up(self):
+        self.pace = min(self.PACE_MOST, self.pace + 1)
+
+    def refresh(self, into_second_ms, new_second, last_second, this_second):
+        """One refresh of the check: `into_second_ms` past the start of its second, whether
+        it is the first refresh of a new second, the refreshes of the second before it and
+        those of its own second, this one included. Returns the steps it took."""
+        if new_second:
+            if last_second < self.RATE_SLOW:
+                self._down()
+            elif last_second >= self.RATE_STEADY or (last_second >= self.RATE_TRIAL and not self.fell):
+                self._up()
+        if not self.fell and into_second_ms >= self.MIDDLE_MS and this_second <= self.TRIAL_FEWEST:
+            self._down()
+        budget = self.UNIT << self.pace
+        owed = self.UNIT * self.debt
+        if owed >= budget:
+            self.debt -= budget // self.UNIT
+            return 0
+        allowance = budget - owed
+        charge = taken = 0
+        pending = False
+        while not self.ended and taken < self.STEPS_MOST and charge < allowance:
+            step, pending = self.steps[self.taken]
+            self.taken += 1
+            taken += 1
+            charge += step
+        over = 0 if pending or charge <= allowance else (charge - allowance) // self.UNIT
+        self.debt = min(over, self.DEBT_MOST)
+        return taken
+
+    def line(self):
+        """The line `--trace-check` prints after a refresh of the check."""
+        return f"check {self.pace} {self.debt} {int(self.fell)}"
+
+
+def refresh_times(polls, t0, grid=20):
+    """The times of the polls that produce a refresh, by the grid rule, for a session whose
+    first call came at t0 and whose polls come at these times, in order."""
+    times = []
+    due = t0
+    for now in polls:
+        if now >= due:
+            due = t0 + (now - t0) // grid * grid + grid
+            times.append(now)
+    return times
+
+
+def check_end(steps, refreshes, t0, first):
+    """The index of the refresh at which a check of these steps ends, or None: `refreshes`
+    are the times of every refresh of a session whose first call came at t0, those before
+    the check included, and the check begins at the refresh with index `first`."""
+    pace = CheckPace(steps)
+    counts = collections.Counter()
+    running = 0
+    for index, now in enumerate(refreshes):
+        second = (now - t0) // 1000
+        new_second = second != running
+        running = second
+        counts[second] += 1
+        if index < first:
+            continue
+        pace.refresh((now - t0) % 1000, new_second, counts[second - 1] if second else 0, counts[second])
+        if pace.ended:
+            return index
+    return None
+
+
 @functools.lru_cache(maxsize=None)
 def fade():
     """An ODRG file of a fade of 60 x 60, three bytes a pixel, uncompressed: 1,024 frames of
@@ -807,12 +931,14 @@ class ReferencePlayer:
     RESERVE = 16384
     BASE64 = frozenset(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
 
-    def __init__(self, files, storage=BOARD_STORAGE, changeable=True, check_first=True):
+    def __init__(self, files, storage=BOARD_STORAGE, changeable=True, check_first=True, trace_check=False):
         """`files` maps the name of each installed file to its content. `storage` is the
         total space the host reports, or None for a host that cannot tell its space.
         `changeable` says whether the host's storage can be changed. With `check_first`
         the check after the start has ended before the first call, as the test host's
-        option of that name has it; without, the player is as after power-on."""
+        option of that name has it; without, the player is as after power-on. With
+        `trace_check` a refresh of the check of an upload prints its pace and its debt, as
+        the test host's option `--trace-check` has it."""
         self.storage = storage
         self.changeable = changeable
         self.error = None       # the reason the show is invalid, or None
@@ -825,10 +951,8 @@ class ReferencePlayer:
         self.upload = None      # the open upload
         self.had_refresh = False
         self.last_grid = None   # the grid time of the latest refresh
-        # For a file whose body is refused: the frame records that decode before the one
-        # that is refused, by the CRC-32 of the file. The check ends two steps later.
-        # Without an entry the check is taken to end after every record the header names.
-        self.sound_records = {}
+        self.second_running = 0 # the second after power-on of the latest refresh
+        self.trace_check = trace_check
         # The check after the start: for each file whose body is still to be read, in the
         # order of the checks, its name, the steps left, and the reason its body is
         # refused for or None; and the refreshes in a row without a grid time left out.
@@ -1021,6 +1145,7 @@ class ReferencePlayer:
             # A host whose storage cannot be changed has no second reader: there the
             # body is read at the start.
             steps, reason, clip = self._judge(data)
+            steps = len(steps)
             if reason is not None and not self.changeable:
                 self._quarantine(name, reason)
                 continue
@@ -1238,16 +1363,20 @@ class ReferencePlayer:
             self.window_started = now
         grid = self.t0 + (now - self.t0) // self.GRID * self.GRID
         self.next_due = grid + self.GRID
-        self.refreshes_in[(now - self.t0) // 1000] += 1
+        second = (now - self.t0) // 1000
+        self.refreshes_in[second] += 1
+        new_second = second != self.second_running
+        self.second_running = second
         in_step = self.had_refresh and grid == self.last_grid + self.GRID
         self.had_refresh, self.last_grid = True, grid
         picture = self._picture(now, grid)
-        # The check of an uploaded file takes one step after a refresh that followed the
-        # one before it without a gap.
-        if in_step and self.upload is not None and self.upload["state"] == "checking":
+        # The check of an uploaded file takes its steps at every refresh, in step or late,
+        # as its pace and its debt allow; every refresh of the check is progress.
+        if self.upload is not None and self.upload["state"] == "checking":
             self.upload["progress"] = now
-            self.upload["steps"] -= 1
-            if self.upload["steps"] == 0:
+            pace = self.upload["pace"]
+            pace.refresh((now - self.t0) % 1000, new_second, self.refreshes_in[second - 1] if second else 0, self.refreshes_in[second])
+            if pace.ended:
                 self.upload["state"] = "checked"
         # The check after the start takes as many steps as refreshes have followed one
         # another without a gap and no more than 2 ms after their grid times, while the
@@ -1501,30 +1630,28 @@ class ReferencePlayer:
         self.upload = None
 
     def _judge(self, data):
-        """What the check of an uploaded file finds: the steps it takes, and the reason
-        the file is refused for, or None with the frames of the file."""
+        """What the check of an uploaded file finds: its steps with their charges, and the
+        reason the file is refused for, or None with the frames of the file."""
+        steps = check_steps(data, self.canvas)
         fault = header_fault(data, self.canvas)
         if fault is not None:
-            return 1, fault, None
+            return steps, fault, None
         if type_of(data) != "frames":
             # The payload is read whole in one step, and the end in another.
             reason = found_in(data).reason
-            return (2, reason, None) if reason is not None else (3, None, _Drawn(data, odrgx.read_header(data).loop_ms))
+            return (steps, reason, None) if reason is not None else (steps, None, _Drawn(data, odrgx.read_header(data).loop_ms))
         try:
             records = odrg.decode(frames_payload(data)).records
         except errors.Rejection as rejection:
-            sound = self.sound_records.get(zlib.crc32(data))
-            if sound is None:
-                sound = len(found_in(data).records)
-            return sound + 2, rejection.reason, None
+            return steps, rejection.reason, None
         if odrgx.is_container(data):
             # After the last record: the payload's length, then the loop.
             container = odrgx.read_header(data)
             if len(data) - odrgx.HEADER.size != container.payload_size:
-                return len(records) + 2, "payload-size", None
+                return steps, "payload-size", None
             if sum(duration for duration, _ in records) != container.loop_ms:
-                return len(records) + 2, "loop-mismatch", None
-        return len(records) + 2, None, _Clip(records)
+                return steps, "loop-mismatch", None
+        return steps, None, _Clip(records)
 
     def _read(self, arguments):
         """`read <id> <offset>`: up to 600 bytes of the file of an animation, from an offset,
@@ -1599,7 +1726,8 @@ class ReferencePlayer:
             self.files["upload.part"] = upload["data"]
             if len(upload["data"]) == upload["size"]:
                 upload["state"] = "checking"
-                upload["steps"], upload["reason"], upload["clip"] = self._judge(upload["data"])
+                steps, upload["reason"], upload["clip"] = self._judge(upload["data"])
+                upload["pace"] = CheckPace(steps)
             return b'{"ok":true,"received":%d}\n' % len(upload["data"])
         if verb == b"end":
             if len(arguments) != 2 or not re.fullmatch(rb"[0-9a-f]{8}", arguments[1]):
@@ -1837,11 +1965,13 @@ class ReferencePlayer:
         """The lines the test host prints for one input line of a session."""
         word, _, rest = line.partition(" ")
         if word == "poll":
+            checking = self.upload["pace"] if self.upload is not None and self.upload["state"] == "checking" else None
             refresh = self.poll(int(rest))
             logs, self.logged = [f"log {text}" for text in self.logged], []
             if refresh is None:
                 return logs + [f"idle {rest}"]
-            return logs + [f"refresh {rest}"] + [f"data {leg} {rgb.hex()}" for leg, rgb in refresh]
+            traced = [checking.line()] if self.trace_check and checking is not None else []
+            return logs + [f"refresh {rest}"] + [f"data {leg} {rgb.hex()}" for leg, rgb in refresh] + traced
         if line == "error":
             return [f"error {self.error or 'none'}"]
         if word in ("line", "linehex", "bytes"):

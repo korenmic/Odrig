@@ -76,7 +76,9 @@ class Uploading(unittest.TestCase):
         all_lines = [entry["line"] for entry in emulator_support.of_kind(events, "log")]
         ended = max(i for i, line in enumerate(all_lines) if line.startswith("upload end "))
         self.assertIn("space", all_lines[ended + 1:])
-        self.assertTrue(found["sending"] and all(text.startswith("Sending: ") for text in found["sending"]), found["sending"])
+        # The check of the clip may end at the first refresh after its last byte, and the
+        # whole upload between two samples of the line.
+        self.assertTrue(all(text.startswith("Sending: ") for text in found["sending"]), found["sending"])
 
     def test_a_video_is_uploaded_with_the_frames_of_the_command_line_and_colours_close_to_them(self):
         emulator, folder = self.emulator()
