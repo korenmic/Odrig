@@ -149,8 +149,9 @@ a file no item names any more is deleted. To keep a show, run a copy of its fold
 folder the emulator was stopped on during an upload holds `upload.part` until the emulator
 is started on it again; `install-show` of the firmware tool refuses such a folder, as it
 refuses any file the show does not name. The emulator paces nothing: its file operations
-take microseconds, and the check of an uploaded file takes one frame of it for each
-refresh, as on the board.
+take microseconds, and the check of an uploaded file takes its steps at every refresh
+within the budget its pace sets, as on the board ([core.md](core.md), "Uploads and the
+check").
 
 **After a start.** The show plays from the first refresh, however much is installed: the
 core reads only the first 16 bytes of every animation before it plays. It reads the

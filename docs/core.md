@@ -547,7 +547,7 @@ of. When settling ends with a reason, the player acts on it as on any reason.
 |---|---|---|
 | Settling in one call | 32,768 bytes | The decoder inflates about 30 MB a second on the board's chip; 32 KiB is about a millisecond, far below a refresh of 20 ms. |
 | Decoding at one refresh | 131,072 bytes | Twelve dense 60 x 60 records: a pause of a quarter of a second is caught up at once, and a longer one over a few refreshes. |
-| The check of an upload at one refresh | 256 to 2,048 bytes of charge, by the pace; at most 64 steps | The work of a refresh follows the budget whatever the file holds, and the pace follows the refresh rate. |
+| The check of an upload at one refresh | 256 to 2,048 bytes of charge, by the pace; at most 64 steps | A refresh does at most its allowance and one step more, whatever the file holds, and the pace follows the refresh rate. The rests after a larger step pay at most 3,840 of its charge, so records far larger than the budget, such as dense 60 x 60 ones, average about 2.6 times it. |
 | One call on the board | 50 ms at most | A command waits for one call; 50 ms keeps a session of commands quick. |
 | One read of the host | 250 ms at most | The microSD card's and the USB drive's own drivers time out sooner; a read that fails is `read-error`. |
 
@@ -955,9 +955,13 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
     left by the pace (256, 512, 1,024 or 2,048), less 256 times the debt. What the steps
     passed the allowance by is the debt, in whole 256s rounded down, at most 15; a refresh
     whose debt is a whole budget or more takes no step and pays the budget's 256s. A
-    refresh whose last step was a slice of settling leaves no debt. So a record larger
-    than the budget is spread over the refreshes after it, the work of a refresh is about
-    its budget, and a file of small records never rests.
+    refresh whose last step was a slice of settling leaves no debt. So a refresh does at
+    most its allowance and one step more, a file of small records never rests, and the
+    refreshes after a record larger than the budget rest for at most 3,840 of its charge:
+    the work of a refresh is about its budget on average while records pass the
+    allowance by no more than that, and more for larger ones, about 2.6 times the budget
+    for the dense 60 x 60 records of 10,805 bytes, which are taken every 2 refreshes at
+    the pace 3 and every 16 at the pace 0.
   - *The pace.* It is 1 when the last byte arrives. At the first refresh of each whole
     second it changes by the refreshes of the second before, as `status` reports them as
     `fps`: below 21 it goes down by one, and the pace has fallen; otherwise at 40 or more it
@@ -967,7 +971,7 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
     cost the board its rate is taken back. It stays between 0 and 3.
   - *The time.* On a host that refreshes 50 times a second the tracked clock of 14,399
     small frames, `collection/card/clocks/time-original-5-every-row-another-time.odrg`,
-    is checked in 381 refreshes, 7.6 s, where one record a refresh in step took 14,401
+    is checked in 381 refreshes, 7.6 s, where one record a refresh in step took 14,402
     refreshes, 288 s; at 22 a second in 1,223 refreshes, where the check never ended. A
     text or a clock is checked at the first refresh after its last byte.
 

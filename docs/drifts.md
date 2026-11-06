@@ -12980,3 +12980,26 @@ The board suite needs the board and is not run here; it runs at the owner's next
 session.
 
 **Resolution.** `tests/board/test_upload.py`, `DenseUpload`.
+
+## Seed 81: the average work of the check for records larger than the budget
+
+**Question.** The seed says that a record larger than the allowance is taken about once in
+every (its charge / the budget) refreshes, so that the check's work at a refresh is, on
+average, its budget; the pages said at most about 2,048 bytes of body a refresh on average,
+and `AGENTS.md` a larger record spread over the refreshes after it. But the debt is at most
+15 x 256 = 3,840 (requirement 3.4), so the rests after a record pay only that much of its
+charge: the dense 60 x 60 records of 10,805 bytes are taken every 2 refreshes at the pace
+3 and every 16 at the pace 0, about 2.6 times the budget on average. The review of pull
+request #54 read it from the core's own `--trace-check` lines: 5,388 of charge a refresh
+at the pace 3. Which holds, the rule or the average?
+
+**Answer.** The rule of the requirements, with its cap, and the pages are corrected. A
+debt without the cap would make a file of dense records about 2.6 times as slow to check,
+which the seed does not want, and the pace keeps the refresh rate whatever the average.
+The times the seed and the pages give come from the rule's model, which has the cap, and
+stand. What holds of every refresh is that it does at most its allowance and one step
+more.
+
+**Resolution.** `docs/core.md`, the budget of the check in "The budgets" and "The budget
+and the debt"; `docs/commands.md`, `busy` of `upload end`; `docs/android-app.md`, the
+upload's Checking line; `AGENTS.md`, the line of seed 81.

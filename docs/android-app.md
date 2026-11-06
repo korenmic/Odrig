@@ -587,8 +587,9 @@ colours do. A video is drawn at most 1,280 pixels wide or high before it is fitt
   piece the line says `Checking the animation on the installation: 0:12`, the minutes and
   seconds since then by the app's own clock, counted on once a second, the time the app
   was not on the screen included; `Cancel` stays and stops it. The check takes its steps
-  beside the show at every refresh, at most about 2,048 bytes of the file's body a refresh
-  on average: about 8 s for a clock of 14,399 small frames on an installation that
+  beside the show at every refresh, at most 2,048 bytes of the file's body and one frame
+  more a refresh, up to about 2.6 times that on average for a file of large frames: about
+  8 s for a clock of 14,399 small frames on an installation that
   refreshes 50 times a second, longer on a slower one or for a larger file. Then the app
   says `Uploaded as animation <id> <file>. It plays in the playlist.` The animation is
   last in the list of Animations and in the playlist until it is moved, and plays when it

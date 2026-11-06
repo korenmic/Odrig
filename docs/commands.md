@@ -357,8 +357,9 @@ nine bytes `123456789` is `cbf43926`.
 - `bad-checksum`: the bytes received have another CRC-32. The upload is discarded.
 - `busy`: the file is still being checked. The upload stays open; send `upload end`
   again. The check decodes the whole file while the show goes on playing, at each LED
-  refresh as much as a budget of the work of decoding allows, at most about 2,048 bytes
-  of the file's body a refresh on average, less on a board whose refresh rate falls. So
+  refresh as much as a budget of the work of decoding allows, at most 2,048 bytes of the
+  file's body and one frame more, less on a board whose refresh rate falls; a file of
+  large frames, such as dense 60 x 60 ones, averages up to about 2.6 times the budget. So
   the 14,399 small frames of a clock are checked in about 8 s on a board that refreshes
   50 times a second, and a file takes longer on a slower board and the larger its body.
 - `bad-file`: the file is not a valid ODRG file for the canvas. The reply has one more
