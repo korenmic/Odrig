@@ -95,7 +95,7 @@ known tests of this computer's shared-toolchain junction, and the app suite with
     tests.emulator.test_docs` and the onboarding suite.
   - Requirements: 12.1, 12.2.
 
-- [ ] 5. The command tool and the emulator's check of the owner's clock
+- [x] 5. The command tool and the emulator's check of the owner's clock
   - `tests/emulator/test_tool.py`:
     `test_after_10800_seconds_of_busy_the_upload_is_cancelled_and_the_reply_is_busy`, with
     54,100 `busy` replies, in place of the test of 600 s. A test of a changed limit: seen

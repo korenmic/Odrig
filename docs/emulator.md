@@ -1053,8 +1053,11 @@ here; the board's is in [firmware.md](firmware.md).
   is written over again.
 - After the last piece the tool writes `upload: checking` once. While the reply to
   `upload end` is `busy`, the target is checking the file, and the tool sends
-  `upload end` again every 0.2 seconds. After 600 seconds of `busy` it sends
-  `upload cancel`, prints the last reply and exits with status 1.
+  `upload end` again every 0.2 seconds. After 10800 seconds of `busy` it sends
+  `upload cancel`, prints the last reply and exits with status 1. The core discards an
+  upload whose check does not move for 60 s by itself; the limit is for a target that
+  would answer `busy` for ever, and leaves time for the largest file of the collection
+  on a board at 20 refreshes a second.
 - After an upload that ended well, one more line on standard error says what it came to:
   `upload: committed: <bytes> bytes sent and checked by the target`, or `upload:
   unchanged: the target holds this file already; nothing was sent`. A reply that was not
