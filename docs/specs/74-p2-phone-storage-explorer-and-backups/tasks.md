@@ -24,7 +24,7 @@ seen failing first. Part A is delivered on its own before part B begins.
   - App tests against the emulator; `docs/android-app.md`.
   - Requirements: 3.1–3.9.
 
-- [ ] 4. Deliver part A
+- [x] 4. Deliver part A
   - Firmware for the installation's board and the spare's, and the signed APK, built
     from the pushed head; the files on the Drive; `verification.md`.
   - Requirements: 7.1.
