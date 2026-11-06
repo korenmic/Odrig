@@ -59,7 +59,7 @@ carries no history.
     `python -B -m unittest tests.converter.test_docs`, and the onboarding suite.
   - Requirements: 5.1-5.4.
 
-- [ ] 3. The pull request and the three images
+- [x] 3. The pull request and the three images
   - Push the branch. `gh pr edit 50` with a title that names seeds 77 and 78 and a
     description that keeps seed 77's and names this seed, its verdict, the folder made by
     `write_open` and the owner's open checks of this seed beside seed 77's. No new pull
