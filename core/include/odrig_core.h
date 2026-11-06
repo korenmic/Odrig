@@ -119,6 +119,12 @@ typedef struct odrig_host {
     /* Optional: 1 when the core may change the files of this drive with the storage
        functions, 0 otherwise. A host without it has a drive that is read only. */
     int (*drive_writable)(void *ctx, uint32_t drive);
+
+    /* Optional: makes the folder of the drive's folder odrig with this name, `drive/<path>`,
+       its path made as a drive's name is, of folders alone, whose parent is there. Returns 1
+       when the folder is there afterwards, made now or before, and -1 on failure and when a
+       file has that name. A host without it makes no folder. */
+    int (*make_folder)(void *ctx, const char *name);
 } odrig_host;
 
 /* One leg, as the mapping file lists it, and its LED data from the last refresh:

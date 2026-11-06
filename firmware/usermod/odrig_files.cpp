@@ -324,6 +324,7 @@ odrig_host OdrigFiles::host() {
   made.drive_list = nullptr;
   made.drive_bind = nullptr;
   made.drive_writable = nullptr;
+  made.make_folder = nullptr;
   return made;
 }
 

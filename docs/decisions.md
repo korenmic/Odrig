@@ -903,3 +903,13 @@ the app is not changed.
   stays as it is. `status` names in its host text the external memory the board found
   and the internal memory free when the core started, which the app shows unchanged. No
   new command; no APK; nothing of the wiring, the power or the LEDs is touched.
+
+### Seed 74: folders of the card, and moves from the app
+
+On 2026-11-06 the owner approved in advance the new board commands seed 74 needs, folder
+creation and listing, moves and readback among them, choosing "Approve fully now": the
+specification designs them and implementation follows without a second review. Under that
+answer the core gets `folder make external <path>`, which makes a real folder of the card
+and keeps it in the card's index while it is empty, and the host interface gets the optional
+`make_folder`. The decision of the catalog that a folder without a file is in no line of the
+index narrows: a folder made by `folder make` is listed empty until a rebuild.

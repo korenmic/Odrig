@@ -129,6 +129,14 @@ bool catalog_move_external(Core &core, uint32_t position, uint32_t before);
 // file. False on a failed storage call.
 bool catalog_remove_external(Core &core, uint32_t position);
 
+// `folder make external <path>`: makes the folder of the drive with this path, whose parent is
+// the root or a folder of the index, and adds it to the index empty, in one commit of the
+// drive's catalog; a folder the index has at that path is answered with its id and nothing is
+// written. `busy` while an upload is open, a rebuild runs, a test shows or the drive's catalog
+// is read; `read-only` when the core may not change the drive; `unknown-id` for a parent the
+// index has not; `in-use` for a file or a folder of the parent whose name is the same in any
+// case; `no-space` without a free id; `storage-error` on a failed storage call.
+uint32_t catalog_folder_make(Core &core, const char *path, Reply &reply);
 // `catalog rebuild internal` and `catalog rebuild external`: reads every animation of the
 // storage with the check's steps and commits its catalog anew at the end. `busy` while an
 // upload is open, a test shows, a rebuild runs or the drive's catalog is read; `read-only` on

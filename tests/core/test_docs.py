@@ -40,7 +40,7 @@ class CoreDocument(unittest.TestCase):
         members = {}
         for struct, body in structs.items():
             members[struct] = re.findall(r"(?:\(\*|[ *])([a-z_]+)\)?(?:\([^;]*\))?;", body)
-        self.assertEqual(members["odrig_host"], ["ctx", "alloc", "open", "read", "close", "log", "write_open", "write", "write_close", "rename", "remove", "space", "read_at", "drive", "drive_name", "drive_space", "about", "drive_list", "drive_bind", "drive_writable"])
+        self.assertEqual(members["odrig_host"], ["ctx", "alloc", "open", "read", "close", "log", "write_open", "write", "write_close", "rename", "remove", "space", "read_at", "drive", "drive_name", "drive_space", "about", "drive_list", "drive_bind", "drive_writable", "make_folder"])
         self.assertEqual(members["odrig_leg"], ["leg", "pin", "led_count", "rgb"])
         for struct, names in members.items():
             self.assertTrue(struct in self.named, struct)
@@ -142,10 +142,10 @@ class CommandsDocument(unittest.TestCase):
     def test_its_commands_are_the_ones_the_front_end_reads(self):
         table = self.text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "brightness <id> <n> save", "brightness <id> default", "status", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save", "repeat <id> default", "clocks on", "clocks off", "clocks only", "clocks message on", "clocks message off", "upload begin <id> <file> <bytes>",
-                                      "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel", "debug mini on", "debug mini off"])
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "brightness <id> <n> save", "brightness <id> default", "status", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save", "repeat <id> default", "saved <id>", "clocks on", "clocks off", "clocks only", "clocks message on", "clocks message off", "upload begin <id> <file> <bytes>",
+                                      "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel", "folder make external <path>", "debug mini on", "debug mini off"])
         self.assertEqual(set(re.findall(r'words\.is\(0, "([a-z]+)"\)', self.sources)), {command.split(" ")[0] for command in documented})
-        self.assertEqual(set(re.findall(r'words\.is\(1, "([a-z]+)"\)', self.sources)), {"all", "begin", "data", "end", "cancel", "get", "set", "test", "many", "move", "expect", "rebuild", "page", "message", "mini"})
+        self.assertEqual(set(re.findall(r'words\.is\(1, "([a-z]+)"\)', self.sources)), {"all", "begin", "data", "end", "cancel", "get", "set", "test", "many", "move", "expect", "rebuild", "page", "message", "mini", "make"})
 
     def test_its_limits_are_the_cores(self):
         limits = dict(re.findall(r"#define (ODRIG_[A-Z_]+)\s+([0-9]+)", self.header))

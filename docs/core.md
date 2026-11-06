@@ -97,6 +97,7 @@ Every function receives `ctx` as its first argument.
 | `drive_list` | `int32_t drive_list(void *ctx, uint32_t drive)`: optional; lists the drive's folder `odrig` and its sub-folders to three levels now, depth first, a folder's animation files by the bytes of their names and then its sub-folders by the bytes of their names, every file or, as the firmware does, up to the 256th file and the 32nd sub-folder, and returns the number of files listed, or -1 when that drive is not plugged in any more. A host that has it lists the folder only when it is called: the core calls it for a drive without a catalog and for a rebuild of a drive's catalog. |
 | `drive_bind` | `int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name)`: optional; gives the place to the file of the drive's folder with this name, so that `drive_name` gives the name and `drive/<place>` opens it. Returns 1, or 0 when that drive is not plugged in any more or the name is not one of the drive. Without it every drive is listed. |
 | `drive_writable` | `int drive_writable(void *ctx, uint32_t drive)`: optional; 1 when the core may change the files of that drive with the storage functions, by the names `drive/<name>`, 0 otherwise. Without it the drive is read only. |
+| `make_folder` | `int make_folder(void *ctx, const char *name)`: optional; makes the folder `drive/<path>` of the drive's folder `odrig`, a path of folders alone whose parent is there; 1 when the folder is there afterwards, made now or before, -1 on failure and when a file has that name. Without it `folder make` answers `unsupported`. Before an upload into a folder the core asks for each folder of its path, so that a folder of the index removed from the drive while it was empty is there again. |
 
 Capacity callbacks must meet the 50 ms per-call budget and must not start or wait
 for an allocation-table scan under a lock playback needs. The microSD firmware
@@ -966,7 +967,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,712 |
+| The core object | fixed | 3,720 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -984,13 +985,13 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
 | Miniature state and physical RGB, only for a 60x60 canvas | fixed | 188 |
-| **Total** | | **125,177** |
+| **Total** | | **125,185** |
 
 That is about 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-45,776 of them. The example show on the two-leg mapping asks for 88,466 bytes. A host
+45,776 of them. The example show on the two-leg mapping asks for 88,474 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,637 bytes for the target file. A host with a drive
+of the check and the saved order: 77,645 bytes for the target file. A host with a drive
 is asked for three blocks more, after the three of the check: the table of a drive
 without a catalog, 12 bytes for each of 256 places, 3,072 bytes; the boot's memory of 16
 files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive's index,
@@ -1001,7 +1002,7 @@ a table of 33 records of 8 bytes and 104 bytes of room for the current playlist'
 368, the saved repeats of32 drive files at6 bytes each (192), and32 brightness
 preferences at5 bytes each (160), followed by128 external exclusion records at5 bytes
 each (640). Positions retain all32 bits. With it
-the target file takes 130,965 bytes, below 131,072. The clocks between the animations add
+the target file takes 130,973 bytes, below 131,072. The clocks between the animations add
 no block: their settings, their counts, the paused turn and the key and the place of their
 order are fields of the core object, and the order is a permutation computed from its key. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
@@ -1107,6 +1108,7 @@ leg; and `ready`.
 | `--command-read-fails FILE OFFSET` | `read_at` returns -1 for that file at or after that offset when it is called inside a command, as `read` and `upload expect` call it; the checks read the file whole. |
 | `--drive-read-fails NAME OFFSET` | With `--drive`: `read` fails at that offset of the drive's file of that name. `read_at` is not touched, so the check finds the file sound and the player meets the fault. |
 | `--drive-read-only` | With `--drive`: `drive_writable` says 0, and every storage call on a name of the drive fails. |
+| `--no-folders` | With `--drive`: the host has no `make_folder`. |
 | `--trace-drive` | With `--drive`: prints `drive list <count>` for every `drive_list` and `drive bind <place> <name>` for every `drive_bind`. |
 | `--trace-read-at` | Prints `read_at <name> <offset> <count>` for every `read_at`: the name, where it read from and how many bytes it gave. |
 
