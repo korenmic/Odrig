@@ -13,7 +13,7 @@ seen failing first.
     new failure kinds and their messages; the stand-in sender scenario and its tests.
   - Requirements: 2.1–2.5.
 
-- [ ] 3. Give the APK's sender the board's USB serial port
+- [x] 3. Give the APK's sender the board's USB serial port
   - `TargetPlugin`'s `usb`, `connect`, `write` and `read`, the detach, the manifest's
     feature and filter and `usb_device.xml`; the Android checks; `docs/commands.md`.
   - Requirements: 3.1–3.4, 4.1–4.2.

@@ -1003,6 +1003,15 @@ The target screen says how requests travel:
 | `Sent from this browser.` | The web code runs in a browser and not in the app. |
 | `Sent over USB serial.` | The link is `USB serial`: the lines go over the cable to the board's USB port. |
 
+On `USB serial` the app sends every line it sends over Wi-Fi over the board's USB serial
+port, the port the command tool uses from a computer, with the same replies, so that every
+screen works as on Wi-Fi. The APK finds the board by the ids of the ESP32-S3's USB serial
+port, `303a:1001`, asks Android for it once, and opens it at 115,200 baud with both modem
+lines low, which never resets the chip. Before a line the app drops what the port holds;
+after it, it passes over the board's log, lines beginning with `#`, until the reply. Android
+offers the app when the board is plugged in. Installing firmware stays with the existing
+ways.
+
 The app allows plain HTTP, because the installation speaks nothing else, and it sends to
 no address but the one that is set. Anyone on the network can send the same commands with
 any program: the network's password is what keeps others out.
@@ -1134,7 +1143,14 @@ installed; the phone with mobile data on.
     Include. Check dark recovery when all faces are excluded, mode restoration, reconnect
     and another controller's changes. Repeat upright and sideways. These physical and
     phone observations remain open until actually performed.
-24. **Note** the phone's model, its Android version, the web view's version from the
+24. **USB serial.** Connect the phone to the board's USB port with a USB-C cable or an
+   OTG adapter. On the target screen choose `USB serial` and press `Connect over USB`;
+   allow the app when Android asks. *Seen:* `Answers`, `Sent over USB serial.`, the list,
+   and every action of steps 3, 4 and 12 on the LEDs, with the board not reset by the
+   connection. Pull the cable: the app says that no board is connected by USB; plug it in
+   and press `Connect over USB`: the app answers again. Choose `Wi-Fi`: the app answers over
+   Wi-Fi.
+25. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites

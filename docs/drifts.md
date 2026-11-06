@@ -12791,3 +12791,24 @@ as it is, when it has one. The page needs no change: the legs come from the core
 file from that route.
 
 **Resolution.** `emulator/httpd.py`, `docs/emulator.md`.
+
+## Seed 82: how the app reaches the board's USB serial port
+
+**Question.** Where are the lines framed, how is the port opened without a reset, and how
+is the link tested without a phone?
+
+**Answer.** The APK's sender only moves bytes: `connect`, `write` and `read`, so that it
+still looks into no line, and `target.js`, the only file that knows how a line travels,
+drops what the port held before a line and finds the reply, the first whole line that is a
+JSON object with a boolean `ok`, passing over the board's log. The port is set to 115,200
+8N1 and both modem lines are lowered by one `SET_CONTROL_LINE_STATE` of 0, so that the pair
+that resets the chip, DTR low while RTS is high, is never made, as the command tool lowers
+RTS before DTR. The bytes are read as ISO-8859-1, one character for each byte, since the
+board's replies are ASCII. A browser has no such port, so the app suite tests the web side
+through a stand-in of the sender that relays to the emulator over HTTP, with log lines and
+replies in pieces; the Android side is checked by its text and by the APK's build, and on
+the phone by the owner. The switch stands below the link's block, so that the address keeps
+its place when the keyboard opens.
+
+**Resolution.** `app/www/target.js`, `TargetPlugin.java`, `tests/app/test_serial.py`,
+`docs/android-app.md`.
