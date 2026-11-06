@@ -21,14 +21,16 @@ class Recorded(unittest.TextTestResult):
     sink = None
 
     def startTest(self, test):
-        self._began = time.monotonic()
+        # The finest clock of every system: time.monotonic() counts in steps of 1/64 of a
+        # second with Python 3.12 and earlier on Windows.
+        self._began = time.perf_counter()
         self._outcome = "ok"
         self._detail = ""
         super().startTest(test)
 
     def _write(self, test, outcome, detail):
         began = getattr(self, "_began", None)
-        seconds = 0.0 if began is None else time.monotonic() - began
+        seconds = 0.0 if began is None else time.perf_counter() - began
         line = {"id": test.id(), "outcome": outcome, "seconds": round(seconds, 3), "detail": detail}
         self.sink.write(json.dumps(line) + "\n")
         self.sink.flush()

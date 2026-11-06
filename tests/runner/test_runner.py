@@ -8,10 +8,11 @@ import shutil
 import sys
 import tempfile
 import textwrap
+import time
 import unittest
 from unittest import mock
 
-from tests import run
+from tests import run, runner_worker
 from firmware.fwtool import host as firmware_host
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -73,7 +74,10 @@ class Passing(unittest.TestCase):
         self.assertTrue(True)
 
     def test_slower(self):
-        time.sleep(0.2)
+        # 0.2 s at least by the finest clock, however the system rounds a sleep.
+        ends = time.perf_counter() + 0.2
+        while (left := ends - time.perf_counter()) > 0:
+            time.sleep(left)
 """
 
 FAILING = """
@@ -221,6 +225,25 @@ class Running(unittest.TestCase):
         self.assertIn("beta: 0 tests", out)
         self.assertIn("a worker ended without its results", out)
         self.assertIn("ended with status 3", out)
+
+
+class Seconds(unittest.TestCase):
+    def test_a_test_within_one_step_of_the_coarse_clock_still_has_its_seconds(self):
+        # time.monotonic() counts in steps of 1/64 of a second with Python 3.12 and earlier
+        # on Windows, so it may not move during a short test; here it does not move at all.
+        class Brief(unittest.TestCase):
+            def test_brief(self):
+                began = time.perf_counter()
+                while time.perf_counter() - began < 0.002:
+                    pass
+
+        results = io.StringIO()
+        with mock.patch.object(runner_worker.Recorded, "sink", results), mock.patch("time.monotonic", return_value=0.0):
+            tests = unittest.defaultTestLoader.loadTestsFromTestCase(Brief)
+            unittest.TextTestRunner(stream=io.StringIO(), resultclass=runner_worker.Recorded).run(tests)
+        line = json.loads(results.getvalue())
+        self.assertEqual(line["outcome"], "ok")
+        self.assertGreaterEqual(line["seconds"], 0.002)
 
 
 LEAVES = """

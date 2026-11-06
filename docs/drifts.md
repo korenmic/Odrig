@@ -12691,3 +12691,36 @@ available while locked; applying either photo reading is an edit.
 
 **Resolution.** `app/www/screens/mapping.js`, `app/www/screens/photomap.js`,
 `app/www/client.js` and `docs/android-app.md`.
+
+## The runner: the clock of a test's seconds
+
+**Question.** A worker of `tests/run.py` measured each test with `time.monotonic()`, which
+counts in steps of 1/64 of a second with Python 3.12 and earlier on Windows. The runner's
+own test wants a stand-in that waits 0.2 seconds to be reported with at least 0.2 seconds,
+and on GitHub's Windows runner, with Python 3.12, it read 0.188 in the first two attempts
+of run 42145977846, of pull request #50 at eef6320d, a commit of Markdown alone; the third
+attempt passed. Seed 53's specification says the report holds each test's seconds, not by
+which clock. Is the bound lowered by a step of the clock, as the entry "Seed 11: The final
+check on Windows" had two tests of the command tool do with `CLOCK_STEP`, or is the clock
+changed?
+
+**Answer.** The clock is changed. The worker measures with `time.perf_counter()`, the
+finest clock of every system, which Windows serves from its performance counter with every
+Python the repository takes, so a test's seconds are right to the millisecond everywhere
+and the bound stays 0.2. The case of seed 11 was of the same kind, a whole wait read by a
+coarse clock, but there the clock was the test's own, around a wait the command tool ends
+by its socket's time limit, and allowing a step loosened only the test's reading; that
+entry stands, outside this question. Here the coarse clock was the worker's, and its
+seconds are what the report holds, so the clock is mended rather than the bound. The
+stand-in sleeps what is left of its 0.2 seconds by `time.perf_counter()` until nothing is
+left, so the bound does not lean on how a system rounds a sleep. The runner's other times,
+a suite's, a build's and the wall time, are printed in whole seconds and kept in the report
+to a tenth, many steps of that clock, and stay on `time.monotonic()`, as does the deadline
+of the processes `end()` waits for.
+
+**Resolution.** `tests/runner_worker.py`; `tests/runner/test_runner.py`, the stand-in
+`test_slower`, and `Seconds`, whose test holds `time.monotonic()` still and finds a test of
+2 milliseconds reported with at least 0.002 seconds. With Python 3.12.10 on Windows 11,
+before the change 6 of 40 runs of the report's test failed as it was, and 5 of 40 with the
+new stand-in, each with `0.188` or `0.187 not greater than or equal to 0.2`; after it,
+100 of 100 runs with Python 3.12.10 and 40 of 40 with Python 3.14.2 passed.
