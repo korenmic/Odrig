@@ -71,7 +71,7 @@ known tests of this computer's shared-toolchain junction, and the app suite with
   - Requirements: 1.1-1.4, 2.1, 2.2, 3.1-3.5, 4.1-4.6, 5.1-5.6, 6.1-6.3, 7.1, 7.3, 8.1,
     8.3, 9.2-9.4, 13.1, 13.2, 13.6.
 
-- [ ] 3. The rule pinned
+- [x] 3. The rule pinned
   - `tests/core/test_upload_check.py`: `TheFade` (13.3) with `--trace-check` and with
     `--trace-read-at`, the fade made in the test as the design defines it; `ThePace`
     (13.4), its two hosts on `support.dense_clip(60, 6, 10)` with `--trace-check`;

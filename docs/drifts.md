@@ -12791,3 +12791,22 @@ as it is, when it has one. The page needs no change: the legs come from the core
 file from that route.
 
 **Resolution.** `emulator/httpd.py`, `docs/emulator.md`.
+
+## Seed 81: the files of the tests of the pace and of a debt
+
+**Question.** The design of seed 81 has the tests of the pace (requirement 13.4) upload
+`support.dense_clip(60, 6, 10)`, and the test of a host that rests to pay a debt (13.5)
+`support.dense_clip(60, 60, 1)`, "whose records of about 10,800 bytes leave a debt of 15
+at pace 0". Do these files do what the tests need?
+
+**Answer.** No. The dense clip is coded, not stored: `dense_clip(60, 6, 10)` charges
+167,792 in all, so a host at 50 a second has checked it within the third second, before
+the host of the test slows down; and `dense_clip(60, 60, 1)` charges about 2,860 a
+record, which leaves a debt of 9 at pace 0, ten refreshes or 39 s from one step to the
+next at a refresh every 3,900 ms, not more than 60 s. The tests take files that do what
+the design says: `dense_clip(60, 6, 30)` for the pace, 473,957 of charge, whose check
+outlasts both schedules; and ten pictures of noise of 60 x 60, three bytes a pixel,
+uncompressed, made in the test, whose stored records of 10,805 bytes leave a debt of 15 at
+pace 0, sixteen refreshes or 62.4 s from one step to the next.
+
+**Resolution.** `tests/core/test_upload_check.py`, `ThePace` and `TheBounds`.
