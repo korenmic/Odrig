@@ -1,0 +1,9 @@
+{
+  "number": 82,
+  "slug": "82-p1-the-app-over-the-boards-usb-serial-port",
+  "state": "remaining",
+  "title": "The app over the board's USB serial port",
+  "priority": "P1",
+  "addedAt": "2026-11-06",
+  "summary": "The APK reaches the board through its USB serial port with a cable from the phone, every command line it sends over Wi-Fi sent there with the same replies, so every screen and job works on either link; log lines beginning with # are passed over, the port is opened RTS then DTR lowered so the chip is never reset, the device found by 303a:1001 with Android's permission. The Target screen gets one 'Connect over Wi-Fi' control in place of the duplicate Use and Board buttons, and a kept switch Wi-Fi / USB serial; the emulator's page shows USB serial disabled. No command, reply, firmware, wiring or power change; firmware installation stays where it is."
+}
