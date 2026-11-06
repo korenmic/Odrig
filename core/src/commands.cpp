@@ -888,6 +888,19 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         return save ? repeats_save(core, id, loops, now, reply) : repeats_restore(core, id, now, reply);
     }
+    if (words.is(0, "saved")) {
+        uint32_t id = 0;
+        if (words.count != 2 || !number_word(words, 1, 1, 0xFFFFFFFFu, &id)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        if (catalog_rebuilding(core) || !check_complete(core) || core.upload.state != kUploadNone) {
+            return refuse(reply, "busy");
+        }
+        return repeats_saved_reply(core, id, reply);
+    }
     if (words.is(0, "folder")) {
         char path[kDrivePathRoom];
         if (words.count != 4 || !words.is(1, "make") || (!words.is(2, "external") && !words.is(2, "internal")) ||

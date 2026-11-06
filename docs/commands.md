@@ -48,6 +48,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `repeat <id> <n>` | Makes the playlist's turn in progress of that animation `n` loops long, for that turn alone. |
 | `repeat <id> <n> save` | Keeps `n` loops as the animation's saved repeat, for every later turn, and gives them to its turn in progress. |
 | `repeat <id> default` | Removes the animation's saved repeat: its turns play its own count again, the one in progress too. |
+| `saved <id>` | Reports the saved brightness and the saved repeat of an animation, and whether it is the show's start. |
 | `clocks on` | Switches the clocks between the animations on, and saves it. |
 | `clocks off` | Switches them off, and saves it. |
 | `clocks only` | Plays only the resolved Clocks subtree, and saves the mode. |
@@ -488,7 +489,7 @@ character boundary, so expanded status remains within the fixed reply limit.
 | `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
-| `busy` | `repeat <id> <n> save`, `repeat <id> default` and the four lines of `clocks` until the player has read every installed animation after a start, while an upload is open and while a rebuild runs; `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read; `folder make` while an upload is open, a rebuild runs, a test shows or the card's catalog is read. |
+| `busy` | `repeat <id> <n> save`, `repeat <id> default`, `saved` and the four lines of `clocks` until the player has read every installed animation after a start, while an upload is open and while a rebuild runs; `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read; `folder make` while an upload is open, a rebuild runs, a test shows or the card's catalog is read. |
 | `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation or a folder of a USB drive or the card; `repeat <id> <n> save` or `repeat <id> default` names one of nothing `list` lists; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation; `folder make` names a parent folder the card's index has not. A folder's id is unknown while the card is out. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
 | `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file; `folder make` names a path whose last name a file or a folder of its parent has, in any case. |
@@ -779,6 +780,21 @@ its files: `read-only`.
 A move does not change the animation whose turn it is, its time, the brightness or
 whether the LEDs are on; the next turn follows the new order. It works while a test of
 the mapping shows. Every route carries it to the one command parser of the core.
+
+## What is saved for an animation
+
+```
+saved 2
+{"ok":true,"brightness":27,"repeat":3,"start":false}
+```
+
+`saved <id>` reports what the board keeps for an animation of the show or of the card:
+`brightness`, its saved brightness of `brightness <id> <n> save`, 0 to 255, or null for
+none; `repeat`, its saved repeat of `repeat <id> <n> save`, or null for none; and `start`,
+true when it is the item the show's `start` names. A client reads it before it moves an
+animation, to give the new file the same settings. `in-use` for a cycle or a folder of the
+card, `unknown-id` for an id that `list` does not list, `busy` as for `repeat <id> default`,
+and `show-invalid` while the show is invalid. It writes nothing.
 
 ## Repeating the turn in progress
 

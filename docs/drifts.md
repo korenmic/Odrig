@@ -12819,3 +12819,15 @@ commit's `move upload.part` finds its folder and no commit record is left behind
 lists files only, so it keeps no empty folder; that is said where the rebuild is described.
 
 **Resolution.** `core/src/upload.cpp`, `docs/core.md`, `docs/commands.md`.
+
+## Seed 74: how the app reads the settings it carries in a move
+
+**Question.** The app gives a moved file the saved brightness and repeat of the old one, but
+`list` does not report them; how does it read them, and how does it know the show's start?
+
+**Answer.** With `saved <id>`, which reports both and whether the animation is the show's
+`start` item, under the owner's approval of 2026-11-06. It is refused `busy` as `repeat <id>
+default` is, since the saved repeats are read from the board's file then. A move of the start
+item is refused before anything is sent, as the seed asks.
+
+**Resolution.** `core/src/repeats.cpp`, `core/src/commands.cpp`, `docs/commands.md`.

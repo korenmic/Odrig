@@ -14,7 +14,7 @@ seen failing first. Part A is delivered on its own before part B begins.
     `docs/catalog.md`, the change log of `docs/decisions.md`, `docs/drifts.md`.
   - Requirements: 1.1–1.8.
 
-- [ ] 2. Report what is saved for an animation with `saved <id>`
+- [x] 2. Report what is saved for an animation with `saved <id>`
   - The command, its refusals, the command tool's line, tests and documents.
   - Requirements: 2.1–2.2.
 
