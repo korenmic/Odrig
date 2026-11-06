@@ -148,7 +148,7 @@ known tests of this computer's shared-toolchain junction, and the app suite with
     and `python -B -m unittest tests.converter.test_docs`.
   - Requirements: 7.2, 12.5, 12.6.
 
-- [ ] 8. The record, the deliveries and the pull request
+- [x] 8. The record, the deliveries and the pull request
   - `git fetch origin` and `git merge origin/master` on the branch, the change log of
     `docs/decisions.md` kept by hand with both sides, those of `master` first, and
     `docs/drifts.md` by union. Run `python tests/run.py`, every suite that works on this
