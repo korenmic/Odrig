@@ -58,8 +58,25 @@ export default async function (app) {
     seen.uploading = app.text("author-uploading");
     return seen;
   }
-  await app.until(() => app.text("message-text") !== null, "a message after the upload", 20000);
+  // Every text of the line, and for each Checking text whether Cancel is shown with it.
+  seen.sending = [];
+  seen.cancelShown = [];
+  await app.until(() => {
+    const now = app.text("author-uploading");
+    if (now !== null && seen.sending[seen.sending.length - 1] !== now) {
+      seen.sending.push(now);
+      if (now.startsWith("Checking")) {
+        seen.cancelShown.push(app.text("author-cancel") !== null);
+      }
+    }
+    return app.text("message-text") !== null;
+  }, "a message after the upload", 20000);
   seen.message = app.text("message-text");
+  seen.lineHidden = app.text("author-uploading") === null;
+  if (settings.listed === false) {
+    // A stand-in that lists the same items after the upload.
+    return seen;
+  }
   app.press("OK");
   app.press("Animations");
   await app.until(() => app.shown() === "animations" && spaceKnown(app) && storage(app).rows.length === settings.rows + 1, "Animations with the new row", 10000);

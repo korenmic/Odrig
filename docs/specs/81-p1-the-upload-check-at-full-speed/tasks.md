@@ -109,7 +109,7 @@ known tests of this computer's shared-toolchain junction, and the app suite with
   - Run the emulator and onboarding suites.
   - Requirements: 11.1, 12.4, 13.8, 13.9.
 
-- [ ] 6. The app says that the installation checks
+- [x] 6. The app says that the installation checks
   - First the tests. `tests/app/test_upload.py`: `checked_after(seconds)`,
     `test_while_the_installation_checks_the_line_counts_the_seconds` (13.10),
     `test_cancel_while_the_installation_checks` (13.13), and the sampled texts of

@@ -35,6 +35,16 @@ export default async function (app) {
     await app.until(() => app.text("uploading") === "Cancelled.", "the upload cancelled", 10000);
     seen.uploading = app.text("uploading");
     seen.sending = [];
+  } else if (settings.cancel === "checking") {
+    // Cancel while the installation checks the file; the line is read again a moment later.
+    await app.until(() => (app.text("uploading") || "").startsWith("Checking"), "the check under way", 10000);
+    seen.checking = app.text("uploading");
+    app.press("Cancel");
+    await app.until(() => app.text("uploading") === "Cancelled.", "the upload cancelled", 10000);
+    seen.uploading = app.text("uploading");
+    await app.sleep(1500);
+    seen.later = app.text("uploading");
+    seen.sending = [];
   } else {
     if (settings.hide === true) {
       // The app leaves the screen of the phone while it uploads, and comes back.
@@ -49,15 +59,22 @@ export default async function (app) {
       hidden = false;
       app.doc.dispatchEvent(new Event("visibilitychange"));
     }
+    // Every text of the line, and for each Checking text whether Cancel is shown with it.
     const progress = [];
+    const cancelShown = [];
     await app.until(() => {
       const now = app.text("uploading");
       if (now !== null && progress[progress.length - 1] !== now) {
         progress.push(now);
+        if (now.startsWith("Checking")) {
+          cancelShown.push(app.text("cancel-upload") !== null);
+        }
       }
       return app.text("message-text") !== null;
     }, "a message after the upload", 30000);
     seen.sending = progress;
+    seen.cancelShown = cancelShown;
+    seen.lineHidden = app.text("uploading") === null;
   }
   await app.sleep(1500);
   seen.message = app.text("message-text");

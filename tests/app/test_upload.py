@@ -1,6 +1,7 @@
 import json
 import pathlib
 import tempfile
+import time
 import unittest
 
 from tests.core import support as core_support
@@ -30,6 +31,39 @@ def target(**upload):
 
 def begun(line):
     return (200, '{"ok":true,"chunk":1500,"replacing":false}\n')
+
+
+def checked_after(seconds):
+    """A reply to `upload end` of a target that checks the file for some seconds by the
+    test's clock, counted from the first `upload end` it gets: `busy` until then, and then
+    `{"ok":true}`."""
+    first = []
+
+    def answer(line):
+        now = time.monotonic()
+        first[:] = first or [now]
+        return refusal("busy") if now - first[0] < seconds else OK
+
+    return answer
+
+
+CHECKING = "Checking the animation on the installation: "
+
+
+def checking_texts(case, texts):
+    """The texts of the line after the last byte, which a test of the line takes from all
+    those it sampled: Sending texts until then and Checking texts from then on."""
+    first = next((number for number, text in enumerate(texts) if text.startswith(CHECKING)), len(texts))
+    case.assertTrue(all(text.startswith("Sending: ") for text in texts[:first]), texts)
+    case.assertTrue(all(text.startswith(CHECKING) for text in texts[first:]), texts)
+    return texts[first:]
+
+
+def assert_counted(case, texts):
+    """The Checking texts read `0:00` first and each later one a second more."""
+    case.assertEqual(texts, [f"{CHECKING}0:{second:02d}" for second in range(len(texts))])
+    case.assertIn(f"{CHECKING}0:02", texts)
+    case.assertFalse([text for text in texts if "%" in text or "KB a second" in text])
 
 
 def taken(line):
@@ -77,8 +111,8 @@ class Uploading(unittest.TestCase):
         ended = max(i for i, line in enumerate(all_lines) if line.startswith("upload end "))
         self.assertIn("space", all_lines[ended + 1:])
         # The check of the clip may end at the first refresh after its last byte, and the
-        # whole upload between two samples of the line.
-        self.assertTrue(all(text.startswith("Sending: ") for text in found["sending"]), found["sending"])
+        # whole upload between two samples of the line: Sending texts, then Checking texts.
+        checking_texts(self, found["sending"])
 
     def test_a_video_is_uploaded_with_the_frames_of_the_command_line_and_colours_close_to_them(self):
         emulator, folder = self.emulator()
@@ -110,6 +144,24 @@ class Uploading(unittest.TestCase):
         self.assertEqual(counted[0], counted[1])
         self.assertEqual(found["message"], "Uploaded as animation 3 long.odrg. It plays in the playlist.")
         self.assertIn(b"upload end", b" ".join(line for _, line in stand_in.lines))
+
+    def test_while_the_installation_checks_the_line_counts_the_seconds(self):
+        with support.StandIn(target(begin=begun, data=taken, end=checked_after(3.5))) as stand_in:
+            found = self.uploaded(stand_in.address, file="clip.gif")
+        texts = checking_texts(self, found["sending"])
+        assert_counted(self, texts)
+        self.assertEqual(found["cancelShown"], [True] * len(texts))
+        self.assertEqual(found["message"], "Uploaded as animation 3 clip.odrg. It plays in the playlist.")
+        self.assertTrue(found["lineHidden"])
+
+    def test_cancel_while_the_installation_checks(self):
+        with support.StandIn(target(begin=begun, data=taken, end=refusal("busy"))) as stand_in:
+            found = self.uploaded(stand_in.address, file="clip.gif", cancel="checking")
+            sent = [line for _, line in stand_in.lines if line.startswith(b"upload")]
+        self.assertTrue(found["checking"].startswith(CHECKING), found["checking"])
+        self.assertEqual(sent[-1], b"upload cancel")
+        self.assertEqual((found["uploading"], found["later"]), ("Cancelled.", "Cancelled."))
+        self.assertIsNone(found["message"])
 
     def test_a_file_that_does_not_fit_is_not_sent(self):
         tight = dict(target(begin=begun, data=taken), space=(200, '{"ok":true,"free":16000,"total":10354688,"animations":2}\n'))
