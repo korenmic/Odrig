@@ -12831,3 +12831,18 @@ default` is, since the saved repeats are read from the board's file then. A move
 item is refused before anything is sent, as the seed asks.
 
 **Resolution.** `core/src/repeats.cpp`, `core/src/commands.cpp`, `docs/commands.md`.
+
+## Seed 74: moves made by the app
+
+**Question.** Does the board move a file between the storages by itself, or does the app?
+
+**Answer.** The app, with the commands the board has: `read`, the guarded upload, `ignore`,
+`brightness`, `repeat`, `saved` and `remove`, one file at a time, as a job the phone keeps
+until it is done. The seed asks to reuse the commands where they suffice, and they do for a
+file: nothing is removed before the new file is installed and its settings given, and an
+interrupted job is finished or ended from what the target lists. The new file gets a new id
+in its storage. Moves of folders and renaming moves inside the card are the board's, in
+part B. Replacing a file of the destination is not offered: the card's upload has no guard
+of the content it would replace, so the operator removes it first.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`.

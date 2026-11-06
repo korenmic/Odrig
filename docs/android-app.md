@@ -589,6 +589,39 @@ colours do. A video is drawn at most 1,280 pixels wide or high before it is fitt
   the list of Animations and in the playlist until it is moved, and plays when it is
   tapped.
 
+### Folders of the card, and moves
+
+In the selection mode a row of either storage can be selected; a line under the bar says how
+many are selected in Internal storage and in External storage. `Delete selected` removes
+internal animations only, and is disabled while an external one is selected.
+
+At a level of the card that the board may write, `New folder` and `New playlist folder` ask
+for a name and make that folder there with `folder make external`: both make the same real
+folder, since every folder of the card is a playlist, and neither plays anything. A board
+whose firmware answers `unknown-command` is told so.
+
+`Move to…` opens a chooser of the destination: `External storage` with every folder of the
+card, or `Internal storage`, the card disabled with its reason while it is absent, read-only
+or without a ready catalog. Before anything is sent it lists each file's new full path, and
+the files it skips and why: a name the destination has already, in any case on the card, a
+name the storage does not take, a file a cycle lists or another item names, or one whose size
+is not known yet. A skipped name can be given another name in the preview. Nothing is
+replaced or merged.
+
+`Move` moves the files one at a time, each as a job the phone keeps until it is done: the
+file read back with `read` and checked against its size and its catalog key; its saved
+brightness, repeat and whether it is the show's start read with `saved` (the start is not
+moved); the bytes uploaded to the destination with the absence guard, the card's folders
+made again when one is missing; the new file given the old one's ignore choice, brightness
+and repeat, and the old one's brightness and repeat removed; and the old file removed only
+after a fresh listing shows its id with its path and size. `Stop` ends the run after the file
+under way; the end says what was moved, skipped, failed and left unstarted. The run waits
+while the app is hidden and ends with a change of target.
+
+A move cut by a lost reply, a lost link or a restart of the app is found again the next time
+the list of the same target answers: with the new file there it is finished; without it the
+old file was never touched and the move ends as not moved.
+
 ### Ready-made files and upload destinations
 
 `Choose a ready-made animation` accepts `.odrg` and `.odrgx`. Actual headers identify

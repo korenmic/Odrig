@@ -18,7 +18,7 @@ seen failing first. Part A is delivered on its own before part B begins.
   - The command, its refusals, the command tool's line, tests and documents.
   - Requirements: 2.1–2.2.
 
-- [ ] 3. Move files and make folders from the app
+- [x] 3. Move files and make folders from the app
   - The selection of both storages, `New folder` and `New playlist folder`, `Move to…`
     with its chooser and preview, the move job with its journal and reconciliation.
   - App tests against the emulator; `docs/android-app.md`.

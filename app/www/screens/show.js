@@ -12,6 +12,7 @@ import * as messages from "../messages.js";
 import * as previews from "../previews.js";
 import * as reorder from "./reorder.js";
 import * as selection from "./selection.js";
+import * as explorer from "./explorer.js";
 import * as tests from "./tests.js";
 
 // The inclusion changes under way, by id, each with the target it was sent to.
@@ -506,7 +507,7 @@ function row(animation) {
   made.dataset.editable = String(isEditable(animation));
   made.dataset.writable = String(onWritableCard(animation));
   made.dataset.fault = animation.fault ?? "";
-  if (isEditable(animation)) {
+  if (isEditable(animation) || (typeof animation.ignored === "boolean" && onWritableCard(animation))) {
     const pick = document.createElement("label");
     pick.className = "pick";
     const check = document.createElement("input");
@@ -759,6 +760,7 @@ function actions(animation) {
     items.push({label: "Select", act: () => selection.enter(animation.id), disabled: !free});
     items.push({label: "Delete", act: () => selection.askOne(animation), disabled: !free, danger: true});
   } else if (onWritableCard(animation)) {
+    items.push({label: "Select", act: () => selection.enter(animation.id), disabled: !free});
     items.push({label: "Delete", act: () => selection.askOne(animation), disabled: !free, danger: true});
   } else if (isExternal(animation)) {
     items.push({note: canIgnore(animation) ? "External storage is read-only: this animation cannot be deleted. Inclusion is saved on the target." :
@@ -879,6 +881,8 @@ export function start(options) {
   previews.watch(redraw);
   filters.start({redraw});
   selection.start({message, redraw, visible: () => true});
+  explorer.start({message, redraw, chosen: selection.rows, done: selection.finished});
+  extend({draw: explorer.draw});
   reorder.start({message, redraw, shownOrder, groupOf: folderOf, levelRows: shownOrder});
   extend({menu: reorder.menu, draw: reorder.draw, order: reorder.order});
   tests.start({message, isVisible});
