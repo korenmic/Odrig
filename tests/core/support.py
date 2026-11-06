@@ -200,6 +200,60 @@ def found_in(data):
     return _FOUND[data]
 
 
+Taken = collections.namedtuple("Taken", "bytes charge pending")
+Taken.__doc__ = """One call of the core's decoder for a record or for the end of a file of frames:
+the bytes of the body it took, the charge the core gives it, and whether it gave
+`pending`."""
+
+
+def _taken(lines):
+    """The calls `odrig_host decode --taken` printed for one file, up to its `end` or its
+    `rejected` line; none for a text or a clock."""
+    calls = []
+    for line in lines:
+        word, _, rest = line.partition(" ")
+        if word == "taken":
+            numbers = rest.split()
+            calls.append(Taken(int(numbers[0]), int(numbers[1]), numbers[2:] == ["pending"]))
+        elif word in ("end", "rejected"):
+            return tuple(calls)
+        elif word not in ("container", "header"):
+            break
+    raise AssertionError("odrig_host decode --taken printed no ending")
+
+
+def taken_each(files):
+    """The calls of the core's decoder for each of these files, given as bytes."""
+    lines = iter(host_lines("decode", "--taken", "--batch", stdin=batch(files)))
+    results = [_taken(lines) for _ in files]
+    if next(lines, None) is not None:
+        raise AssertionError(f"odrig_host decode --taken printed more than {len(files)} results")
+    return results
+
+
+_TAKEN = {}
+
+
+def taken_in(data):
+    """The calls of the core's decoder for one file, kept for the files that were asked for
+    before. The reference player takes the charge of each step of the check from it."""
+    if data not in _TAKEN:
+        _TAKEN[data] = taken_each([data])[0]
+    return _TAKEN[data]
+
+
+@functools.lru_cache(maxsize=None)
+def fade():
+    """An ODRG file of a fade of 60 x 60, three bytes a pixel, uncompressed: 1,024 frames of
+    20 ms, every value of frame k being k mod 56 above that of the first frame."""
+    frames = []
+    for k in range(1024):
+        d = k % 56
+        picture = bytes(value for y in range(60) for x in range(60) for value in ((4 * x) % 200 + d, (4 * y) % 200 + d, (x + y) % 200 + d))
+        frames.append((20, picture))
+    return odrg.encode(jsonframes.Animation(60, 60, tuple(frames)), compressed=False)
+
+
 # Row-leg mappings beyond the tracked one: a leg that starts on the left, legs of two and
 # of four rows, legs listed in another order than their numbers and their rows, one LED, and
 # ten legs of three rows of 60 from the top row down, leg N on pin N.

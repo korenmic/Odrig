@@ -201,6 +201,7 @@ Reason OdrgDecoder::open(FileSource *from, Inflate *with, uint8_t *window) {
     palette_pending = 0;
     compressed = 0;
     settling = 0;
+    record_mode = 0;
     settle_found = kNone;
     settle_missing = 0;
     settle_slice = kSettleSliceBytes;
@@ -422,6 +423,7 @@ Reason OdrgDecoder::coded(uint8_t *pixels, uint32_t mode, uint32_t data_bytes) {
 }
 
 Reason OdrgDecoder::next(uint8_t *pixels, uint16_t *duration) {
+    record_mode = 0;
     if (settling) {
         return settle_more();
     }
@@ -486,10 +488,12 @@ Reason OdrgDecoder::next(uint8_t *pixels, uint16_t *duration) {
 
     --records_left;
     *duration = static_cast<uint16_t>(milliseconds);
+    record_mode = static_cast<uint8_t>(mode);
     return kNone;
 }
 
 Reason OdrgDecoder::finish() {
+    record_mode = 0;
     if (settling) {
         return settle_more();
     }
@@ -510,6 +514,12 @@ Reason OdrgDecoder::finish() {
         }
     }
     return kNone;
+}
+
+uint32_t OdrgDecoder::charge_since(uint64_t before) const {
+    const uint32_t predictor = (static_cast<uint32_t>(record_mode) >> 4) & 3;
+    const bool walked = (record_mode & kRunBit) != 0 && (predictor == 1 || predictor == 2);
+    return static_cast<uint32_t>(body_read - before) + (walked ? n / kWalkDivisor : 0);
 }
 
 }  // namespace odrig

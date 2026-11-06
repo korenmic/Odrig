@@ -63,7 +63,7 @@ int usage() {
     std::fputs(
         "usage: odrig_host reasons\n"
         "       odrig_host inflate [--batch]\n"
-        "       odrig_host decode [--slice BYTES] FILE | --batch\n"
+        "       odrig_host decode [--slice BYTES | --taken] FILE | --batch\n"
         "       odrig_host render [--seed N] FILE MS...\n"
         "       odrig_host shuffle KEY COUNT\n"
         "       odrig_host session DIR | --batch [options]\n"
@@ -1138,8 +1138,11 @@ int inflate(bool in_batch) {
 // record with the picture as three bytes for each pixel, then `end`; or, at the point where
 // the file is refused, `rejected <reason>`. The decoder is called again while it settles a
 // defect. With a slice, settling takes at most that many bytes in one call, and
-// `pending <calls>`, the calls that gave kPendingWork, comes before the last line.
-void decode_one(Host &host, const char *name, uint32_t slice) {
+// `pending <calls>`, the calls that gave kPendingWork, comes before the last line. With
+// `taken`, no `frame` line is printed: after each call of the decoder for a record or for
+// the end, `taken <bytes> <charge>`, the bytes of the body the call took and the charge the
+// core gives it, with ` pending` after a call that gave kPendingWork.
+void decode_one(Host &host, const char *name, uint32_t slice, bool taken) {
     odrig_host functions = host.interface();
     odrig::FileSource file;
     std::memset(&file, 0, sizeof file);
@@ -1174,15 +1177,28 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
                     decoder.frames, decoder.compressed);
         std::vector<uint8_t> pixels(decoder.n, 0);
         std::string picture;
+        // One call of the decoder, with its `taken` line.
+        const auto call = [&](odrig::Reason given, uint64_t before) {
+            if (taken) {
+                std::printf("taken %llu %u%s\n", static_cast<unsigned long long>(decoder.body_read - before),
+                            decoder.charge_since(before), given == odrig::kPendingWork ? " pending" : "");
+            }
+            return given;
+        };
         for (uint32_t record = 0; record < decoder.frames && reason == odrig::kNone; ++record) {
             uint16_t duration = 0;
-            while ((reason = decoder.next(pixels.data(), &duration)) == odrig::kPendingWork) {
+            uint64_t before = decoder.body_read;
+            while ((reason = call(decoder.next(pixels.data(), &duration), before)) == odrig::kPendingWork) {
                 ++pending;
+                before = decoder.body_read;
             }
             if (reason != odrig::kNone) {
                 break;
             }
             total_ms += duration;
+            if (taken) {
+                continue;
+            }
             picture.clear();
             if (decoder.colours != 0) {
                 for (uint8_t index : pixels) {
@@ -1194,8 +1210,10 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
             std::printf("frame %u %s\n", duration, hex(picture).c_str());
         }
         if (reason == odrig::kNone) {
-            while ((reason = odrig::content_finish(&file, &decoder, content, total_ms)) == odrig::kPendingWork) {
+            uint64_t before = decoder.body_read;
+            while ((reason = call(odrig::content_finish(&file, &decoder, content, total_ms), before)) == odrig::kPendingWork) {
                 ++pending;
+                before = decoder.body_read;
             }
         }
     }
@@ -1283,11 +1301,11 @@ int render(const std::string &path, const std::vector<std::string> &times, uint3
     return 0;
 }
 
-int decode(const std::string &argument, uint32_t slice) {
+int decode(const std::string &argument, uint32_t slice, bool taken) {
     if (argument == "--batch") {
         for (const std::string &content : batch(standard_input())) {
             Host host = Host::of_memory(content);
-            decode_one(host, "file.odrg", slice);
+            decode_one(host, "file.odrg", slice, taken);
         }
         return 0;
     }
@@ -1295,7 +1313,7 @@ int decode(const std::string &argument, uint32_t slice) {
     std::string folder = slash == std::string::npos ? "." : argument.substr(0, slash);
     std::string name = slash == std::string::npos ? argument : argument.substr(slash + 1);
     Host host = Host::of_folder(folder);
-    decode_one(host, name.c_str(), slice);
+    decode_one(host, name.c_str(), slice, taken);
     return 0;
 }
 
@@ -1743,12 +1761,15 @@ int main(int argc, char **argv) {
         return inflate(true);
     }
     if (invocation == "decode" && arguments.size() == 2) {
-        return decode(arguments[1], 0);
+        return decode(arguments[1], 0, false);
+    }
+    if (invocation == "decode" && arguments.size() == 3 && arguments[1] == "--taken") {
+        return decode(arguments[2], 0, true);
     }
     long slice = 0;
     if (invocation == "decode" && arguments.size() == 4 && arguments[1] == "--slice" &&
         whole_number(arguments[2], &slice) && slice > 0 && slice <= 0x7FFFFFFF) {
-        return decode(arguments[3], static_cast<uint32_t>(slice));
+        return decode(arguments[3], static_cast<uint32_t>(slice), false);
     }
     if (invocation == "shuffle" && arguments.size() == 3) {
         // The permutation of 0 to COUNT - 1 that the key draws, in the order of the places.

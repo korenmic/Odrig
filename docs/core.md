@@ -1051,6 +1051,7 @@ repeated exactly.
 | `odrig_host shuffle KEY COUNT` | Prints on one line the permutation of 0 to COUNT - 1, 1 to 65,536, that the 32-bit KEY draws, as the player orders the clocks of its breaks: the place of each index in turn. The suite compares it with the twin `clock_shuffle` of `tests/core/support.py`. |
 | `odrig_host decode --batch` | The same for any number of files on standard input. |
 | `odrig_host decode --slice BYTES FILE`, `decode --slice BYTES --batch` | The same, with the decoder settling a defect in slices of `BYTES` bytes, not of 32,768: it is called again while it gives `pending`, and `pending <calls>`, how many calls gave it, comes before the last line. |
+| `odrig_host decode --taken FILE`, `decode --taken --batch` | The same without the `frame` lines: after each call of the decoder for a record or for the end, `next` or `finish`, one line `taken <bytes> <charge>`, the bytes of the body the call took and the charge the check of an upload gives it, with ` pending` at its end for a call that gave `pending`. A text or a clock has no such line. |
 | `odrig_host inflate` | Decodes standard input as one raw DEFLATE stream with the core's decoder. Prints `data <hex>` and `left <n>`, the number of bytes of input after the stream; or `rejected <reason>`. |
 | `odrig_host inflate --batch` | The same for any number of streams on standard input. |
 | `odrig_host reasons` | Prints every reason name the core can report, one on a line. |

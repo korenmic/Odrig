@@ -11,7 +11,7 @@ through `python tests/run.py --suites <names>`; the firmware suite is run with
 known tests of this computer's shared-toolchain junction, and the app suite without
 `ODRIG_TOOLS`.
 
-- [ ] 1. The charge of a call of the decoder
+- [x] 1. The charge of a call of the decoder
   - `core/src/odrg_decoder.h` and `.cpp`: `kWalkDivisor`, `record_mode` after `settling`,
     set by `next` for a record decoded whole and 0 at the start of `next`, of `finish` and
     in `open`; `charge_since(before)`, as the design gives them.
