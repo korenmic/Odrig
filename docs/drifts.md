@@ -12934,3 +12934,30 @@ Checking text and that no Sending text follows a Checking text. The counting of 
 is asserted against stand-ins that answer `busy` for 3.5 s, on Upload and in the forms.
 
 **Resolution.** `tests/app/test_upload.py`, `checking_texts`.
+
+## Seed 81: the bytes of a compressed stream that inflate to nothing
+
+**Question.** The seed charges a step the bytes of the body it took, inflated bytes of a
+compressed body, and says that the check's work at a refresh is so about its budget,
+whatever the file holds. A valid compressed file can hold, before each record, empty
+stored blocks of DEFLATE that inflate to nothing: such a step is charged the few bytes of
+its record, and 64 of them at one refresh read far more of the file than the budget. The
+review of pull request #54 made one of 1,503,578 bytes, 1,000 empty blocks before each of
+300 records, of which one refresh read 270,770 bytes of `upload.part`. Which of the two
+statements holds?
+
+**Answer.** The work. A step is charged the bytes of the body it took or the bytes of the
+file it took, whichever are more, and n / 32 more for a record that walks the picture. The
+bytes of the file are more only in a compressed stream: at a block's header, at empty
+blocks, and at the end of the stream, which is charged its last bytes. Requirements 2.2
+and 2.4 of the spec, a charge from `body_read` alone and an end charged 0, are replaced on
+this point. The tracked clock's charges change at the 26 records with which a block of its
+stream begins, by 2,318 of 657,686: it is checked in 381 refreshes every 20 ms where it
+took 380, the rotated clock in 375 where it took 374, and the times of the seed's point 5
+stand. A step's own input is still not bounded: one record behind a long run of empty
+blocks is read whole at its refresh, as playback reads it.
+
+**Resolution.** `core/src/odrg_decoder.cpp`, `OdrgDecoder::charge_since`, and
+`core/src/file_source.h`, `FileSource::given`; `docs/core.md`, "The charge";
+`tests/core/test_decoder.py`, `TheChargeOfACall`; `tests/core/test_upload_check.py`,
+`TheBounds`.

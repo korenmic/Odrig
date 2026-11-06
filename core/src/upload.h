@@ -13,9 +13,9 @@ namespace odrig {
 const uint64_t kUploadQuietMs = 60000;
 
 // The check of an uploaded file. Each step is charged by its work: the bytes of the body it
-// took, and more for a record that walks the picture (OdrgDecoder::charge_since); the
-// header, a drawn payload and the end of a drawn file 0. A refresh takes steps while their
-// charge is below its allowance, its budget less its debt.
+// took, or of the file when those are more, and more for a record that walks the picture
+// (OdrgDecoder::charge_since); the header, a drawn payload and the end of a drawn file 0.
+// A refresh takes steps while their charge is below its allowance, its budget less its debt.
 // A budget's and a debt's unit, in bytes of charge: the budget is this shifted by the pace.
 const uint32_t kUploadChargeUnit = 256;
 // The pace when the check begins, and the highest.

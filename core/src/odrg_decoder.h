@@ -43,10 +43,13 @@ struct OdrgDecoder {
     // for `next`.
     Reason finish();
 
-    // The work of the call of `next` or `finish` that has just ended, in bytes of the body:
-    // the bytes it took since `before`, a value of `body_read` taken before the call, and
-    // n / kWalkDivisor more when it decoded a whole record that walks the picture.
-    uint32_t charge_since(uint64_t before) const;
+    // The work of the call of `next` or `finish` that has just ended, in bytes: the bytes of
+    // the body it took since `before`, a value of `body_read` taken before the call, or the
+    // bytes of the file it took since `given_before`, a value of `file->given()` taken
+    // before it, whichever are more; and n / kWalkDivisor more when it decoded a whole
+    // record that walks the picture. The bytes of the file are more only in a compressed
+    // body, where input that inflates to little is work as well.
+    uint32_t charge_since(uint64_t before, uint32_t given_before) const;
 
     int body_get() {
         const int byte = compressed ? inflate->get() : file->get();

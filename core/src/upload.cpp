@@ -102,8 +102,9 @@ uint32_t upload_step(Core &core, bool *pending) {
             uint16_t duration = 0;
             record = checker.decoder.frames - upload.records_left;
             const uint64_t before = checker.decoder.body_read;
+            const uint32_t given = checker.file.given();
             reason = checker.decoder.next(core.check_pixels, &duration);
-            charge = checker.decoder.charge_since(before);
+            charge = checker.decoder.charge_since(before, given);
             if (reason == kPendingWork) {
                 // A slice of the settling of a defect: the next step goes on with it.
                 *pending = true;
@@ -121,8 +122,9 @@ uint32_t upload_step(Core &core, bool *pending) {
         record = checker.decoder.frames;
         const bool drawn = is_drawn(core.check_content.type);
         const uint64_t before = checker.decoder.body_read;
+        const uint32_t given = checker.file.given();
         reason = content_finish(&checker.file, &checker.decoder, core.check_content, upload.total_ms);
-        charge = drawn ? 0 : checker.decoder.charge_since(before);
+        charge = drawn ? 0 : checker.decoder.charge_since(before, given);
         if (reason == kPendingWork) {
             *pending = true;
             return charge;

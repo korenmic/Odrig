@@ -706,6 +706,28 @@ def dense_clip(width, height, seconds, compressed=True):
     return odrg.encode(animation, compressed=compressed)
 
 
+# A stored block of DEFLATE that is not the last and holds no byte, at a byte's boundary.
+EMPTY_BLOCK = b"\x00\x00\x00\xff\xff"
+
+
+def with_empty_blocks(data, blocks):
+    """A compressed ODRG file with the frames of this one, whose DEFLATE stream holds
+    `blocks` empty stored blocks before each frame record: a valid file, 5 bytes larger for
+    each block, whose added bytes inflate to nothing."""
+    _, _, flags, _, _, colours, _ = odrg.HEADER.unpack_from(data)
+    if not flags & 1:
+        raise ValueError("the file's body is not compressed")
+    body = zlib.decompress(data[odrg.HEADER.size:], wbits=-15)
+    deflater = zlib.compressobj(9, zlib.DEFLATED, -15)
+    at = 3 * colours
+    stream = deflater.compress(body[:at]) + deflater.flush(zlib.Z_SYNC_FLUSH)
+    while at < len(body):
+        end = at + 4 + struct.unpack_from("<H", body, at + 2)[0]
+        stream += EMPTY_BLOCK * blocks + deflater.compress(body[at:end]) + deflater.flush(zlib.Z_SYNC_FLUSH)
+        at = end
+    return data[:odrg.HEADER.size] + stream + deflater.flush()
+
+
 def upload_lines(number, name, data, piece=1500):
     """The command lines that open an upload and send a file in pieces: `upload begin` and
     one `upload data` for each piece."""

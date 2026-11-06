@@ -516,10 +516,12 @@ Reason OdrgDecoder::finish() {
     return kNone;
 }
 
-uint32_t OdrgDecoder::charge_since(uint64_t before) const {
+uint32_t OdrgDecoder::charge_since(uint64_t before, uint32_t given_before) const {
     const uint32_t predictor = (static_cast<uint32_t>(record_mode) >> 4) & 3;
     const bool walked = (record_mode & kRunBit) != 0 && (predictor == 1 || predictor == 2);
-    return static_cast<uint32_t>(body_read - before) + (walked ? n / kWalkDivisor : 0);
+    const uint32_t body = static_cast<uint32_t>(body_read - before);
+    const uint32_t input = file->given() - given_before;
+    return (input > body ? input : body) + (walked ? n / kWalkDivisor : 0);
 }
 
 }  // namespace odrig

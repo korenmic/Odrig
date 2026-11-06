@@ -1180,19 +1180,21 @@ void decode_one(Host &host, const char *name, uint32_t slice, bool taken) {
         std::vector<uint8_t> pixels(decoder.n, 0);
         std::string picture;
         // One call of the decoder, with its `taken` line.
-        const auto call = [&](odrig::Reason given, uint64_t before) {
+        const auto call = [&](odrig::Reason given, uint64_t before, uint32_t given_before) {
             if (taken) {
                 std::printf("taken %llu %u%s\n", static_cast<unsigned long long>(decoder.body_read - before),
-                            decoder.charge_since(before), given == odrig::kPendingWork ? " pending" : "");
+                            decoder.charge_since(before, given_before), given == odrig::kPendingWork ? " pending" : "");
             }
             return given;
         };
         for (uint32_t record = 0; record < decoder.frames && reason == odrig::kNone; ++record) {
             uint16_t duration = 0;
             uint64_t before = decoder.body_read;
-            while ((reason = call(decoder.next(pixels.data(), &duration), before)) == odrig::kPendingWork) {
+            uint32_t given_before = file.given();
+            while ((reason = call(decoder.next(pixels.data(), &duration), before, given_before)) == odrig::kPendingWork) {
                 ++pending;
                 before = decoder.body_read;
+                given_before = file.given();
             }
             if (reason != odrig::kNone) {
                 break;
@@ -1213,9 +1215,11 @@ void decode_one(Host &host, const char *name, uint32_t slice, bool taken) {
         }
         if (reason == odrig::kNone) {
             uint64_t before = decoder.body_read;
-            while ((reason = call(odrig::content_finish(&file, &decoder, content, total_ms), before)) == odrig::kPendingWork) {
+            uint32_t given_before = file.given();
+            while ((reason = call(odrig::content_finish(&file, &decoder, content, total_ms), before, given_before)) == odrig::kPendingWork) {
                 ++pending;
                 before = decoder.body_read;
+                given_before = file.given();
             }
         }
     }

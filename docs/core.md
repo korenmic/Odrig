@@ -943,11 +943,13 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
   its payload whole in one step; the step after the last record asks for the end of the
   file and compares the size and the CRC-32 of what was read back with what was received.
   - *The charge.* Each step is charged by its work: the bytes of the body it took,
-    inflated bytes of a compressed body, the palette with the first record; and a whole
-    coded record with the run bit and predictor 1 or 2, which walks every position of the
-    picture whatever its bytes, n / 32 more, n being the decoder's pixel buffer: 337 for a
-    picture of 60 x 60 of three bytes a pixel, 112 with a palette. The header, a text's or
-    a clock's payload and the end of a text or a clock are charged 0.
+    inflated bytes of a compressed body, the palette with the first record, or the bytes
+    of the file it took when those are more, as a compressed stream's block headers and
+    its empty blocks are; and a whole coded record with the run bit and predictor 1 or 2,
+    which walks every position of the picture whatever its bytes, n / 32 more, n being the
+    decoder's pixel buffer: 337 for a picture of 60 x 60 of three bytes a pixel, 112 with a
+    palette. The end of a compressed body is charged the last bytes of its stream. The
+    header, a text's or a clock's payload and the end of a text or a clock are charged 0.
   - *The budget and the debt.* A refresh takes steps while their charge is below its
     allowance, at most 64 and the first always. The allowance is the budget, 256 shifted
     left by the pace (256, 512, 1,024 or 2,048), less 256 times the debt. What the steps
@@ -965,8 +967,8 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
     cost the board its rate is taken back. It stays between 0 and 3.
   - *The time.* On a host that refreshes 50 times a second the tracked clock of 14,399
     small frames, `collection/card/clocks/time-original-5-every-row-another-time.odrg`,
-    is checked in 380 refreshes, 7.6 s, where one record a refresh in step took 14,401
-    refreshes, 288 s; at 22 a second in 1,221 refreshes, where the check never ended. A
+    is checked in 381 refreshes, 7.6 s, where one record a refresh in step took 14,401
+    refreshes, 288 s; at 22 a second in 1,223 refreshes, where the check never ended. A
     text or a clock is checked at the first refresh after its last byte.
 
   No upload is open while the check after the start reads the installed files. The check

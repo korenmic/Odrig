@@ -58,6 +58,21 @@ def checks_of(printed):
     return found
 
 
+def most_read(printed):
+    """The most bytes of `upload.part` that `read_at` gave within one refresh of a run with
+    `--trace-read-at`."""
+    read = most = 0
+    for line in printed:
+        if line.startswith("read_at upload.part "):
+            read += int(line.split()[3])
+        elif line.startswith("refresh "):
+            most = max(most, read)
+            read = 0
+        elif line.startswith(("idle ", "reply ")):
+            read = 0
+    return most
+
+
 def tiny_records():
     """A clip of 60 x 6 with a palette in which one pixel changes at each of 2,000 frames:
     records of a few bytes."""
@@ -151,16 +166,7 @@ class TheFade(Uploads):
 
     def test_a_refresh_reads_of_the_file_its_budget_and_one_step_at_most(self):
         fade, script, _ = self.script()
-        run = support.start({}, script.lines, ["--trace-read-at"])
-        read = most = 0
-        for line in run.lines:
-            if line.startswith("read_at upload.part "):
-                read += int(line.split()[3])
-            elif line.startswith("refresh "):
-                most = max(most, read)
-                read = 0
-            elif line.startswith(("idle ", "reply ")):
-                read = 0
+        most = most_read(support.start({}, script.lines, ["--trace-read-at"]).lines)
         largest = max(call.charge for call in support.taken_in(fade))
         self.assertGreater(most, 0)
         self.assertLessEqual(most, 2048 + largest + 256)
@@ -214,7 +220,9 @@ class TheBounds(Uploads):
         clip = tiny_records()
         steps = support.check_steps(clip)
         self.assertEqual(len(steps), 2002)
-        self.assertLess(max(charge for charge, _ in steps), 32)
+        # The first record takes the palette and the header of the stream's block as well.
+        self.assertLess(steps[1][0], 256)
+        self.assertLess(max(charge for charge, _ in steps[2:]), 32)
         # The check begins late in the first second, and the pace is 2 in the second.
         script = Script().polls(45).send(9, "new.odrg", clip)
         ends_after_each_poll(script, clip, script.needed(clip) + 1, 20)
@@ -237,6 +245,17 @@ class TheBounds(Uploads):
         self.assertEqual(set(fast), {64})
         self.assertLess(max(took for at_pace, took, _ in taken if at_pace == 1), 64)
         self.assertEqual([line for line in self.printed if line.startswith("check ")], [f"check {at_pace} 0 0" for at_pace, _, _ in taken])
+
+    def test_a_refresh_reads_of_a_stream_of_empty_blocks_its_budget_and_one_step_at_most(self):
+        # Each record lies behind 2,000 bytes of the stream that inflate to nothing.
+        clip = support.with_empty_blocks(support.clip(81, 60, 6, (20,) * 100), 400)
+        script = Script().send(9, "blocks.odrg", clip)
+        ends_after_each_poll(script, clip, script.needed(clip) + 1, 20)
+        run = support.start(small_show(ITEMS, start=6), script.lines, ["--trace-read-at"])
+        largest = max(charge for charge, _ in support.check_steps(clip))
+        self.assertLessEqual(most_read(run.lines), 2048 + largest + 256)
+        self.assertGreater(largest, 2000)
+        self.assertEqual(replies(run.lines)[len(script.sent) - 2:], [OK, refused("no-upload")])
 
     def test_a_slice_of_settling_ends_the_steps_of_its_refresh_and_leaves_no_debt(self):
         data = small()
