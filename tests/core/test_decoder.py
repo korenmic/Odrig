@@ -236,7 +236,7 @@ class TheChargeOfACall(unittest.TestCase):
                 alone.append(support._taken(iter(support.host_lines("decode", "--taken", path))))
         self.assertEqual(support.taken_each(files), alone)
         self.assertEqual([support.taken_in(data) for data in files], alone)
-        # Without `--taken` the decoder prints its frames as before.
+        # Without `--taken` the decoder prints its frames.
         self.assertEqual(len(support.decode_each(files[3:])[0].records), 5)
 
 
