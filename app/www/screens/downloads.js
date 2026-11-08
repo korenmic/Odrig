@@ -82,7 +82,7 @@ function buttons() {
 function begin(version) {
   const run = {stop: false, version};
   running = run;
-  client.setContentBusy(true);
+  client.setContentBusy("download");
   buttons();
   return {stopped: () => run.stop, changed: () => version !== client.targetVersion()};
 }

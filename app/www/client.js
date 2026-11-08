@@ -102,12 +102,16 @@ let pageWait = null;
 let keeper = {kept: () => null, keep: () => {}, forget: () => {}, placed: () => null, place: () => {}, unplace: () => {}, unlisted: () => {}};
 let keptUnder = null;
 let keptTaken = false;
+// The stored name of each file of a folder of the board's own storage that a list named, by
+// its path: its catalog names it so.
+const storedNames = new Map();
 // Counts the targets: a reply that belongs to an earlier address is dropped.
 let target = 0;
 let connectionDue = true;
-// Who holds the content lock, which keeps an upload, a check of its destination and a
-// deletion apart: "preflight" while the Upload screen checks a destination, "deletion"
-// while the selection removes animations, or null.
+// Who holds the content lock, which keeps an upload, a check of its destination, a
+// deletion, a download and a move apart: "preflight" while the Upload screen checks a
+// destination, "deletion" while the selection removes animations, "download" while files are
+// read back to be saved, "move" while files are moved, or null.
 let holder = null;
 // Whether the target takes `read <id> <offset> <count>`, as `{target, counts}` of the target
 // that told it, or null until a read found out.
@@ -472,6 +476,9 @@ async function askListPart() {
       state.listVersion += 1;
       state.listBusy = false;
       state.animations = items.filter((item) => typeof item.file === "string");
+      for (const item of state.animations) {
+        if (item.external !== true && typeof item.stored === "string" && item.stored !== item.file) storedNames.set(item.file, item.stored);
+      }
       state.folders = items.filter((item) => typeof item.playlist === "string");
       state.cycles = items.filter((item) => item.cycle === true).map((item) => item.id);
       if (level.id === null) {
@@ -774,13 +781,17 @@ export function keyOf(animation) {
 }
 
 // An upload of this phone ended with success: the place keeps the key of its bytes, and the
-// keys an earlier read of the storage gave the name are not taken until a page read after
-// it names it again.
+// keys an earlier read of the storage gave the name, or the stored name a list gave its path,
+// are not taken until a page read after it names it again.
 export function uploadedTo(storage, name, key) {
-  for (const read of reads) {
-    if (read.storage === storage) read.byName.delete(name);
+  const names = [name];
+  if (storage === "internal" && storedNames.has(name)) names.push(storedNames.get(name));
+  for (const named of names) {
+    for (const read of reads) {
+      if (read.storage === storage) read.byName.delete(named);
+    }
+    state.keys[storage]?.byName.delete(named);
   }
-  state.keys[storage]?.byName.delete(name);
   keeper.place(keptUnder, storage, name, key);
   state.keysVersion += 1;
   changed();
@@ -999,6 +1010,7 @@ export function begin() {
   rootDue = false;
   rooting = null;
   state.animations = null;
+  storedNames.clear();
   state.cycles = [];
   state.folders = [];
   state.space = null;
@@ -1457,8 +1469,8 @@ export function contentBusy() {
   return contentHolder() !== null;
 }
 
-// Takes the content lock for its holder, "preflight" or "deletion", or lets it go with
-// false.
+// Takes the content lock for its holder, "preflight", "deletion", "download" or "move", or
+// lets it go with false.
 export function setContentBusy(value) {
   holder = value ? value : null;
   changed();

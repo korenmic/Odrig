@@ -2,7 +2,7 @@
 // does not answer, or answers late, and while the app is busy: what the form, its lines
 // and its button say.
 
-import {shown, startSelection} from "../reading.js";
+import {choose, menuOf, shown, startSelection} from "../reading.js";
 
 function displayed(element) {
   return element.getClientRects().length > 0;
@@ -98,6 +98,20 @@ export default async function (app) {
     await app.until(() => /^A deletion is under way/.test(lockOf(app) ?? ""), "the line naming the deletion", 8000);
     seen.deleting = snapshot(app);
     await app.until(() => !app.byId("upload-made").disabled, "the button enabled after the deletion", 12000);
+    seen.after = snapshot(app);
+  } else if (settings.flow === "download") {
+    // A download from an animation's menu, whose file the installation reads back slowly; the
+    // file the app saves goes nowhere.
+    app.frame.contentWindow.HTMLAnchorElement.prototype.click = () => {};
+    app.press("Animations");
+    await app.until(() => app.shown() === "animations", "Animations");
+    menuOf(app, 1);
+    choose(app, "Download");
+    app.press("Upload");
+    await app.until(() => app.shown() === "upload", "Upload during the download");
+    await app.until(() => app.byId("upload-made").disabled, "the button disabled by the download", 8000);
+    seen.downloading = snapshot(app);
+    await app.until(() => !app.byId("upload-made").disabled, "the button enabled after the download", 20000);
     seen.after = snapshot(app);
   } else if (settings.flow === "preflight") {
     await app.step();

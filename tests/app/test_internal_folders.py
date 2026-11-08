@@ -115,6 +115,63 @@ class InternalFolders(unittest.TestCase):
         self.assertEqual((folder / '1' / 'face-2.odrg').read_bytes(), clip(7))
         self.assertEqual((folder / '1' / 'new.odrg').read_bytes(), clip(8))
 
+    def test_a_batch_whose_internal_folder_goes_at_a_files_turn_ends_the_run(self):
+        folder, emulator = self.board()
+        pruned = []
+
+        def answer(line):
+            reply = emulator.command(line.decode('utf-8')).decode('utf-8')
+            if not pruned and line.startswith(b'upload end ') and reply.startswith('{"ok":true'):
+                # The folder loses its last files to another controller: it goes.
+                ids = ','.join(str(row['id']) for row in self.listed(emulator, 21) if 'file' in row)
+                pruned.append(self.answered(emulator, f'remove many {ids}'))
+            return 200, reply
+
+        stand_in = entered(self, support.StandIn(answer))
+        media = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        for name, seed in (('a.odrg', 7), ('b.odrg', 8), ('c.odrg', 9)):
+            (media / name).write_bytes(clip(seed))
+        found = support.run('batch', address=stand_in.address, media=media,
+                            settings={'mode': 'run', 'rows': 1, 'path': 'shows/night', 'files': ['a.odrg', 'b.odrg', 'c.odrg']}).seen
+        self.assertEqual(found['destination'], 'Internal /shows/night/')
+        self.assertEqual(found['rows'], ['uploaded as animation 4', 'failed: The explored folder changed or disappeared.', 'not sent'])
+        self.assertEqual(found['end'], '1 of 3 uploaded, 1 failed, 1 not sent.')
+        self.assertEqual([row.get('playlist') for row in self.listed(emulator, 20) if 'playlist' in row], [])
+        self.assertFalse(any(line.startswith(b'upload begin') and b'b.odrg' in line for _, line in stand_in.lines))
+
+    def test_a_batch_whose_internal_folder_goes_between_the_check_and_the_begin_ends_the_run(self):
+        folder, emulator = self.board()
+
+        def answer(line):
+            if line.startswith(b'upload begin ') and b'/b.odrg ' in line:
+                return 200, '{"ok":false,"error":"unknown-id"}\n'
+            return 200, emulator.command(line.decode('utf-8')).decode('utf-8')
+
+        stand_in = entered(self, support.StandIn(answer))
+        media = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        for name, seed in (('a.odrg', 7), ('b.odrg', 8), ('c.odrg', 9)):
+            (media / name).write_bytes(clip(seed))
+        found = support.run('batch', address=stand_in.address, media=media,
+                            settings={'mode': 'run', 'rows': 1, 'path': 'shows/night', 'files': ['a.odrg', 'b.odrg', 'c.odrg']}).seen
+        self.assertEqual(found['rows'], ['uploaded as animation 4', 'failed: The folder of this upload is not on the installation any more. (unknown-id)', 'not sent'])
+        self.assertFalse((folder / '2' / 'c.odrg').exists())
+
+    def test_an_upload_prepared_at_an_internal_folder_that_went_since_is_refused_in_words(self):
+        folder, emulator = self.board()
+        media = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        (media / 'ready.odrg').write_bytes(clip(7))
+
+        def prune():
+            ids = ','.join(str(row['id']) for row in self.listed(emulator, 21) if 'file' in row)
+            self.answered(emulator, f'remove many {ids}')
+
+        found = support.run('ready-upload', address=f'127.0.0.1:{emulator.port}', media=media,
+                            settings={'rows': 1, 'path': 'shows/night', 'file': 'ready.odrg', 'stepBeforeSend': True}, steps=[prune]).seen
+        self.assertEqual(found['destination'], 'Internal /shows/night/ready.odrg')
+        self.assertEqual(found['message'], 'The explored folder changed or disappeared. Select the destination again.')
+        self.assertFalse((folder / 'ready.odrg').exists())
+        self.assertEqual([path.name for path in folder.rglob('ready.odrg')], [])
+
     def test_a_file_moved_out_of_an_internal_folder_leaves_it_and_takes_its_settings(self):
         folder, emulator = self.board()
         data = (folder / '1' / 'face.odrg').read_bytes()

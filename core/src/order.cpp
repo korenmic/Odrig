@@ -257,6 +257,7 @@ void tree_build(Core &core) {
 }
 
 void tree_find_current(Core &core) {
+    bool unreadable = false;
     if (core.playlist_path != nullptr && core.playlist_path[0] == ':') {
         // The path of an internal folder.
         FolderLine line;
@@ -266,13 +267,17 @@ void tree_find_current(Core &core) {
         while (path[length] != '\0') {
             ++length;
         }
-        if (folder_by_path(core, path, length, line, &twin) == 1 && internal_choose(core, line.id)) {
+        const int32_t found = folder_by_path(core, path, length, line, &twin);
+        if (found == 1 && internal_choose(core, line.id)) {
             breaks_tree(core);
             return;
         }
+        // While the board's folders cannot be read, the root plays in the folder's place and
+        // the path stays saved, as a card's does while the card's tree is not known.
+        unreadable = found < 0;
     }
     core.current = 0;
-    if (core.playlist_path != nullptr && core.playlist_path[0] != '\0') {
+    if (!unreadable && core.playlist_path != nullptr && core.playlist_path[0] != '\0') {
         const uint32_t found = drive_folder_with_path(core, core.playlist_path);
         if (found != kNoFolder) {
             core.current = found;

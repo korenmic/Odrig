@@ -1,7 +1,8 @@
 // The keys the app learns from the catalogs' pages, as its client holds them, followed
 // through the plan the test gives: waits for a condition or for rows, steps of the test,
-// sleeps, presses, a folder entered, the app loaded again, another address, and a snapshot
-// of the client and of the rows' squares by a name at each `snap`.
+// sleeps, presses, a folder entered, the app loaded again, another address, an upload of
+// this phone that ended, and a snapshot of the client and of the rows' squares by a name at
+// each `snap`.
 
 function keysOf(kept) {
   return kept === null ? null : {generation: kept.generation, entries: kept.entries, byName: Object.fromEntries(kept.byName)};
@@ -80,7 +81,8 @@ export default async function (app) {
     } else if (step.untilRows !== undefined) {
       await app.until(() => app.doc.querySelectorAll("#animations-list > .row").length >= step.untilRows, `${step.untilRows} rows`, step.ms || 8000);
     } else if (step.enter !== undefined) {
-      app.doc.querySelector(`#animations-list > .folder-row[data-path="${step.enter}"]`).click();
+      const open = await app.until(() => app.doc.querySelector(`#animations-list button[aria-label="Open folder ${step.enter}"]`), `the row of ${step.enter}`);
+      open.click();
       await app.until(() => app.text("level-title") === step.enter, `the folder ${step.enter}`);
     } else if (step.press !== undefined) {
       app.press(step.press);
@@ -90,6 +92,9 @@ export default async function (app) {
       app.press("Connect over Wi-Fi");
       await app.until(() => app.kept() === step.address, "the new address kept");
       app.press("Animations");
+    } else if (step.uploaded !== undefined) {
+      // An upload of this phone ended with success: its storage, its path and its key.
+      client.uploadedTo(...step.uploaded);
     } else if (step.snap !== undefined) {
       seen[step.snap] = snapshot(client, app);
     } else if (step.say !== undefined) {

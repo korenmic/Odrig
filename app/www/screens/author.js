@@ -320,8 +320,9 @@ async function upload(message) {
   const named = state.rootNames;
   const saving = editing;
   // A new item's id is free among the root's and those of the folders of the board's own
-  // storage, which the root's list holds no item of.
-  let taken = named.ids;
+  // storage, which the root's list holds no item of. An edited one keeps its id and its file,
+  // and is saved while the root's names may still be read.
+  let taken = saving === null ? named.ids : [];
   if (saving === null && named.internal === true) {
     try {
       taken = taken.concat(await client.takenIds());

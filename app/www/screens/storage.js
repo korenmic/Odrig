@@ -67,7 +67,7 @@ function locked() {
 
 // Why the button is disabled now, the first of these reasons that holds: the installation
 // does not answer, this screen checks the destination, an upload of any screen is under
-// way, or a deletion runs on Animations. Null while none holds.
+// way, or a deletion, a download or a move runs on Animations. Null while none holds.
 function lockReason(state) {
   if (batch.running()) return "A batch upload is under way.";
   if (state.link === "checking") return "The installation has not answered yet.";
@@ -76,6 +76,8 @@ function lockReason(state) {
   if (preparing || holder === "preflight") return "Checking the destination with the installation.";
   if (sending !== null || holder === "upload") return "An upload is under way.";
   if (holder === "deletion") return "A deletion is under way on Animations.";
+  if (holder === "download") return "A download is under way on Animations.";
+  if (holder === "move") return "A move is under way on Animations.";
   return null;
 }
 
@@ -221,7 +223,7 @@ async function upload(message) {
   client.setContentBusy("preflight");
   draw(client.state);
   try {
-  const fresh = await client.uploadSnapshot(captured.storage === "external" ? captured.level : {path: "", id: null});
+  const fresh = await client.uploadSnapshot(destinations.snapshotLevel(captured));
   if (form !== captured || made !== prepared) throw new Error("The selected animation changed. Prepare it again.");
   const moved = destinations.synchronize(captured, fresh.space, client.clocksOnly());
   const boundary = destinations.blocked(captured, fresh.space, client.clocksOnly());

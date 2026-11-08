@@ -14156,6 +14156,82 @@ chosen, so nothing the board would refuse can be pressed.
 
 **Resolution.** `app/www/screens/show.js`, `app/www/screens/selection.js`.
 
+## A saved playlist of a folder of the board's own storage while `folders.txt` cannot be read
+
+**Question.** A boot that cannot read `folders.txt` has no folders. The saved playlist
+names a folder of the board's own storage, `:` and its path. The core found no folder of
+that path and made the root current with a fresh window, saved as such: the operator's
+choice was lost for every later boot, while a card's saved playlist is kept as long as the
+card's tree is not known. Which holds for a folder of the board's own storage?
+
+**Answer.** The card's rule. While `folders.txt` cannot be read, the root plays in the
+folder's place and the path stays saved; the next boot that reads the file makes the folder
+current again. Only a file that was read and has no folder of that path makes the root
+current, saved as such.
+
+**Resolution.** `core/src/order.cpp` (`tree_find_current`), `docs/core.md`,
+`tests/core/test_internal_folders.py`.
+
+## The reason under Upload while a download or a move holds the content lock
+
+**Question.** The line under `Upload to the installation` names the holder of the content
+lock: a check of the destination, an upload, a deletion. A download, a backup and a move of
+files on Animations take the same lock and named no holder, so the button was disabled
+with no line under it. What does the line say then?
+
+**Answer.** `A download is under way on Animations.` while files are read back to be saved,
+and `A move is under way on Animations.` while files are moved, after the reasons of the
+earlier holders. The lists of a batch and of an archive show the same line.
+
+**Resolution.** `app/www/client.js`, `app/www/screens/downloads.js`,
+`app/www/screens/explorer.js`, `app/www/screens/storage.js`, `docs/android-app.md`,
+`tests/app/test_upload_lock.py`.
+
+## The check of an upload's folder of the board's own storage
+
+**Question.** A single upload and a batch prepared at a folder of the board's own storage
+go into it, but the check before each file read the root: a folder gone since was not seen,
+the board refused the file with `unknown-id`, and a batch went on and failed every file the
+same way. Its names were also checked against the root's. What does the check read?
+
+**Answer.** The folder the file goes into, as for a folder of the card: a folder gone or
+changed fails that file with `The explored folder changed or disappeared.`, a batch ends
+there and leaves the rest `not sent`, and a name is checked against the folder's own files.
+A folder that goes between the check and `upload begin` is refused `unknown-id`, which the
+app words `The folder of this upload is not on the installation any more.`, and a batch
+ends there too.
+
+**Resolution.** `app/www/upload-destination.js` (`snapshotLevel`), `app/www/batch.js`
+(`gone`, `turn`), `app/www/screens/storage.js`, `app/www/messages.js`,
+`tests/app/test_internal_folders.py`, `tests/app/test_messages.py`.
+
+## The key of a file of a folder of the board's own storage after an upload of this phone
+
+**Question.** An upload of this phone that ended forgets the key the catalog gave its name,
+so that the key of its own bytes is taken until a page read names it again. The internal
+catalog names a file of a folder by its stored name, `<n>/<name>`, and the upload by its
+path, so the old key of an edited text or clock of the same size was still taken. Which
+name is forgotten?
+
+**Answer.** Both: the path, and the stored name the last list of its folder gave that path.
+The client keeps the stored names its lists gave until the target changes.
+
+**Resolution.** `app/www/client.js` (`uploadedTo`), `tests/app/test_keys.py`.
+
+## The words of a destination at the root of the board's storage
+
+**Question.** Requirement 2.3 of the spec of the reason beside Upload keeps the sentence
+`Internal storage has a flat root.`, and the archive refused a name with `/` for the board's
+storage with `The board's storage has no folders`. The board's own storage has folders now.
+What do they say?
+
+**Answer.** What happens: `This upload goes to the root of Internal storage: the explored
+folder is on the card.`, and `An archive's files go to the root of the board's storage: use
+a name without /.` The rule itself is unchanged.
+
+**Resolution.** `app/www/upload-destination.js` (`reason`), `app/www/screens/archive.js`,
+`tests/app/test_ready_upload.py`, `tests/app/test_archive.py`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where
