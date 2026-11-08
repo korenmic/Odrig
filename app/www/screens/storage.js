@@ -1,5 +1,6 @@
 // New animations: converted media or original ready-made bytes, with a visible destination.
 
+import * as batchList from "./batch-list.js";
 import * as capacity from "../capacity.js";
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
@@ -95,6 +96,7 @@ function draw(state) {
   say("upload-locked-reason", button.hidden || !button.disabled ? null : lockReason(state));
   byId("upload-space").classList.toggle("stale", state.link === "no-answer");
   byId("upload-card-space").classList.toggle("stale", state.link === "no-answer");
+  batchList.draw(state, lockReason(state));
 }
 
 // Milliseconds of a field, or null for an empty field where `empty` allows it. A text
@@ -381,13 +383,26 @@ export function start(options) {
     }
   });
   byId("ready-file").addEventListener("change", () => {
-    const files = byId("ready-file").files;
+    const files = [...byId("ready-file").files];
+    byId("ready-file").value = "";
     if (files.length === 1) {
-      const file = files[0];
-      byId("ready-file").value = "";
-      chooseReady(file, message);
+      batchList.close();
+      chooseReady(files[0], message);
+    } else if (files.length > 1) {
+      if (!batchList.open() && sending === null && !preparing) {
+        picked = null;
+        forget();
+        byId("chosen").hidden = true;
+      }
+      batchList.take(files, message);
     }
   });
+  byId("batch-more").addEventListener("change", () => {
+    const files = [...byId("batch-more").files];
+    byId("batch-more").value = "";
+    if (files.length > 0) batchList.take(files, message);
+  });
+  byId("batch-storage").addEventListener("change", () => batchList.choose(byId("batch-storage").value, client.state));
   for (const name of Object.keys(FITS)) {
     byId(`fit-${name}`).addEventListener("click", () => chooseFit(name));
   }

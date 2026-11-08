@@ -3,7 +3,7 @@
 Each task is one proof commit with only its own checkbox ticked. A test for a fault is
 seen failing first.
 
-- [ ] 1. Take several ready-made files into a checked, named list
+- [x] 1. Take several ready-made files into a checked, named list
   - `inspectReady`; the multiple chooser, the list, `Add more`, `Remove`, the names and their
     checks, the destination, the sum and the button's line; the scenario's pick cases seen
     failing first.
