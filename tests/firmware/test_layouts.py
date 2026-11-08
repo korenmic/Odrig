@@ -1,18 +1,37 @@
-"""The two layouts the firmware tool knows, and the line in which a command names the one it
-found on the board."""
+"""The three layouts the firmware tool knows, and the line in which a command names the one
+it found on the board."""
 
+import hashlib
 import pathlib
 import shutil
 import tempfile
 import unittest
 from unittest import mock
 
-from fwtool import build, limit, partitions, paths
+from fwtool import build, limit, partitions, paths, stock
 
 from . import FIRMWARE, support
+from .test_flasher import STOCK_NAMES, Temporary
 
 STOCK_TABLE = FIRMWARE / "wled-16.0.1" / "partitions_s3_16m.bin"
+TRACKED_TABLE = FIRMWARE / "partitions" / "odrig-8mb.csv"
+BUILT_TABLE = paths.WLED / ".pio" / "build" / "odrig_microsd_n8r2" / "partitions.bin"
+# The spare board's table as it was read from the board: 3,072 bytes.
+EIGHT_MB_SHA256 = "dc19fc0fcd52efb130e273d9e69a3cfec1b86f1595a0f24bd74c0656f3efd17f"
+# The words of a table file of the build, as the numbers of the entries they name.
+CSV_NUMBERS = {"app": partitions.TYPE_APPLICATION, "data": partitions.TYPE_DATA, "factory": 0x00, "ota": 0x00, "nvs": 0x02, "coredump": 0x03, "spiffs": 0x82}
 REPLY = support.VALID
+
+
+def tracked_table(path):
+    """The partitions of a table file of the build, past its comment lines."""
+    found = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("#"):
+            continue
+        name, kind, subtype, offset, size = (word.strip() for word in line.split(","))
+        found.append(partitions.Partition(name, CSV_NUMBERS[kind], CSV_NUMBERS[subtype], int(offset, 16), int(size, 16)))
+    return found
 
 
 class Tables(unittest.TestCase):
@@ -37,14 +56,31 @@ class Tables(unittest.TestCase):
                 self.assertEqual(entry, wleds[entry.name])
         self.assertEqual(13500416 - 10354688, 3145728)
 
+    def test_the_8_mb_layout_is_the_spares_table(self):
+        made = partitions.table(partitions.EIGHT_MB)
+        self.assertEqual(made, support.partition_table(support.EIGHT_MB_LAYOUT))
+        self.assertEqual((len(made), hashlib.sha256(made).hexdigest()), (3072, EIGHT_MB_SHA256))
+        if BUILT_TABLE.is_file():
+            self.assertEqual(made, BUILT_TABLE.read_bytes())
+        slot, kept = partitions.check(made, 3 * 1024 * 1024)
+        self.assertEqual((slot.name, slot.subtype, slot.offset, slot.size), ("app0", 0x00, 0x10000, 0x300000))
+        self.assertEqual((kept.offset, kept.size), (0x310000, 5111808))
+        self.assertEqual(kept.offset + kept.size, 0x7F0000)
+        self.assertEqual([entry.name for entry in partitions.EIGHT_MB if entry.type == partitions.TYPE_APPLICATION], ["app0"])
+        self.assertEqual(tracked_table(TRACKED_TABLE), list(partitions.EIGHT_MB))
+
     def test_each_table_is_named_by_its_firmware_slots(self):
-        for layout, name in ((support.LAYOUT, "WLED's"), (support.small_layout(), "WLED's"), (support.BIGGER_LAYOUT, "bigger"), (support.small_bigger_layout(), "bigger")):
+        for layout, name in ((support.LAYOUT, "WLED's"), (support.small_layout(), "WLED's"), (support.BIGGER_LAYOUT, "bigger"), (support.small_bigger_layout(), "bigger"),
+                             (support.EIGHT_MB_LAYOUT, "8 MB"), (support.small_eight_mb_layout(), "8 MB")):
             with self.subTest(layout=name):
                 self.assertEqual(partitions.layout_of(partitions.parse(support.partition_table(layout))), name)
+        twelve_mb = (*support.EIGHT_MB_LAYOUT[:3], ("spiffs", 1, 0x82, 0x310000, 0x8E0000), ("coredump", 1, 0x03, 0xBF0000, 0x10000))
+        self.assertEqual(support.reason_of(self, lambda: partitions.layout_of(partitions.parse(support.partition_table(twelve_mb)))), "layout-mismatch")
 
     def test_the_line_names_the_layout_and_the_size_of_its_storage(self):
         self.assertEqual(partitions.layout_line(partitions.table(partitions.WLED)), "layout: WLED's, storage 10354688 bytes")
         self.assertEqual(partitions.layout_line(partitions.table(partitions.BIGGER)), "layout: bigger, storage 13500416 bytes")
+        self.assertEqual(partitions.layout_line(partitions.table(partitions.EIGHT_MB)), "layout: 8 MB, storage 5111808 bytes")
 
     def test_a_table_that_is_neither_is_refused(self):
         no_storage = tuple(entry for entry in support.BIGGER_LAYOUT if entry[0] != "spiffs")
@@ -58,7 +94,7 @@ class OnEachLayout(unittest.TestCase):
     """The commands that read the board's table, on a stand-in board of each layout, with a
     storage of a few blocks."""
 
-    LAYOUTS = (("WLED's", support.small_layout(), 0x610000), ("bigger", support.small_bigger_layout(), 0x310000))
+    LAYOUTS = (("WLED's", support.small_layout(), 0x610000), ("bigger", support.small_bigger_layout(), 0x310000), ("8 MB", support.small_eight_mb_layout(), 0x310000))
 
     def setUp(self):
         holder = tempfile.TemporaryDirectory()
@@ -116,6 +152,51 @@ class OnEachLayout(unittest.TestCase):
                 result, esptool = self.run_on(layout, address, "flash", "--image", image)
                 self.assertEqual((result.status, result.out), (0, f"{self.line(name)}\n{REPLY}\n"))
                 self.assertEqual(esptool.written(), [("0x10000", "odrig-firmware.bin")])
+
+
+class RefusedOnTheSpare(Temporary):
+    """`restore-stock` and `install-firmware` on a stand-in board of the spare's table: the
+    stock files and the installation's image are the 16 MB module's, and neither belongs on
+    the 8 MB layout."""
+
+    def setUp(self):
+        super().setUp()
+        patched = mock.patch.object(paths, "STORAGE", self.folder / "storage")
+        patched.start()
+        self.addCleanup(patched.stop)
+        self.stock = self.stock_folder()
+        self.settings = self.folder / "wifi.json"
+        self.settings.write_text('{"name": "odrig-on-the-spare", "password": "made-for-this-test"}')
+
+    def run_on(self, table, *arguments):
+        esptool = support.RecordedEsptool(table)
+        with mock.patch.object(stock, "LIST", self.folder / "stock.sha256"), mock.patch.object(build, "checked_image", side_effect=lambda image: self.image()):
+            with support.no_board(esptool, answer=REPLY):
+                return support.run_main(*arguments), esptool
+
+    def test_restore_stock_is_refused_before_anything_is_written(self):
+        for extra in ((), ("--full",)):
+            with self.subTest(extra=extra):
+                result, esptool = self.run_on(support.partition_table(support.EIGHT_MB_LAYOUT), "restore-stock", "--stock-dir", self.stock, *extra)
+                self.assertEqual((result.status, result.out), (1, ""))
+                self.assertRegex(result.err, r"\Aerror: layout-mismatch: .*8 MB.*16 MB module.*0x1000000[^\n]*\n\Z")
+                self.assertEqual(esptool.wrote, [])
+                self.assertNotIn("write-flash", esptool.commands())
+                self.assertEqual(esptool.commands(), ["read-flash"])
+
+    def test_install_firmware_is_refused_before_anything_is_written(self):
+        result, esptool = self.run_on(support.partition_table(support.EIGHT_MB_LAYOUT), "install-firmware", "--settings", self.settings)
+        self.assertEqual((result.status, result.out), (1, ""))
+        self.assertRegex(result.err, r"\Aerror: layout-mismatch: .*8 MB.*flash --image[^\n]*\n\Z")
+        self.assertEqual(esptool.wrote, [])
+        self.assertNotIn("write-flash", esptool.commands())
+        self.assertEqual(esptool.commands(), ["read-flash"])
+
+    def test_a_full_restore_still_brings_back_a_board_whose_table_cannot_be_read(self):
+        result, esptool = self.run_on(b"\xff" * support.TABLE_SIZE, "restore-stock", "--stock-dir", self.stock, "--full")
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "erase-region", "write-flash"])
+        self.assertEqual(esptool.written(), [("0x0", STOCK_NAMES[1]), ("0x8000", STOCK_NAMES[2]), ("0x10000", STOCK_NAMES[0])])
 
 
 if __name__ == "__main__":

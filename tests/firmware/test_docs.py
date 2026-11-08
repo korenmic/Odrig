@@ -3,7 +3,7 @@ import re
 import shlex
 import unittest
 
-from fwtool import cli, flasher
+from fwtool import build, cli, flasher
 from odrig import jsonframes, mapping, odrg
 from odrig.generators import hello_world
 
@@ -129,6 +129,17 @@ class Firmware(unittest.TestCase):
         self.assertRegex(regions, r"(?m)^\| Storage \(`spiffs`\) \| `0x610000` \| `0x9E0000` \| `install-show`")
         for never in ("never erased", "fuse"):
             self.assertIn(never, regions)
+        # The 8 MB layout, the spare board's, row for row, and the line a command prints on it.
+        for row in (r"^\| `spiffs` \| `0x310000` \| `0x4E0000`, 5,111,808 bytes", r"^\| `coredump` \| `0x7F0000` \| `0x10000` \|$",
+                    r"^\| `app0`, a factory slot \| `0x10000` \| `0x300000` \|$", r"^\| `nvs`, `otadata` \| `0x9000`, `0xE000` \| `0x5000`, `0x2000`, as in WLED's \|$"):
+            self.assertRegex(regions, "(?m)" + row)
+        self.assertIn("layout: 8 MB, storage 5111808 bytes", section(self.text, "Commands"))
+
+    def test_it_names_the_spares_image_in_the_table_of_kinds(self):
+        told = section(self.text, "Commands").split("\n### build\n")[1].split("\n### ")[0]
+        kind = build.KINDS["n8r2"]
+        self.assertRegex(told, rf"(?m)^\| `build --module n8r2` \| `{re.escape(kind.environment)}` \| `{re.escape(kind.image)}` \| .*`qio_qspi`.*`firmware/partitions/odrig-8mb\.csv`.*`odrig_ESP32-S3_8MB_qspi`.* \|$")
+        self.assertIn("python3 firmware/fw.py build --module n8r2", told)
 
     def test_it_says_how_to_roll_back(self):
         back = section(self.text, "Rolling back")
@@ -240,6 +251,7 @@ class Firmware(unittest.TestCase):
     def test_it_says_what_the_firmware_writes_how_it_paces_and_what_an_upload_measured(self):
         does = " ".join(section(self.text, "What the firmware does").split())
         for expected in ("**Storage.**", "Every path is `/odrig/<name>`", "The firmware writes, renames and deletes a file only there", "`upload.part`", "`show.part`", "`pending.txt`",
+                         "The folder itself is made by `write_open`, once, when a write finds it missing",
                          "**Storage calls are paced.**", "the longer of 20 ms and twice d", "The port's queue for what arrives has 4,096 bytes",
                          "Of a body longer than 4,096 bytes the first 4,096 are passed on"):
             self.assertIn(expected, does)

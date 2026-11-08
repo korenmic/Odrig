@@ -51,6 +51,10 @@ jobs:
         run: python -X utf8 firmware/fw.py build
       - name: Offline image, source and symbol inspection
         run: python -X utf8 firmware/verify_build.py
+      - name: Spare module build
+        run: python -X utf8 firmware/fw.py build --module n8r2
+      - name: Offline inspection of the spare's image
+        run: python -X utf8 firmware/verify_build.py --module n8r2
       - name: Firmware and runner verification by discovery
         run: python -X utf8 tests/run.py --suites firmware,firmware-host,runner --workers 2 --slowest 5
       - name: Newcomer walkthrough on its supported host
@@ -66,6 +70,7 @@ jobs:
           path: |
             odrig source/build/firmware/out/
             odrig source/build/firmware/WLED/.pio/build/odrig_microsd/firmware.elf
+            odrig source/build/firmware/WLED/.pio/build/odrig_microsd_n8r2/firmware.elf
             odrig source/build/tests/report.json
             odrig source/build/tests/*/*.log
             odrig source/build/tests/*/*.jsonl

@@ -175,6 +175,12 @@ A file that breaks a rule is not used: the tools refuse it as `mapping-malformed
 missing file as `mapping-missing` (see [reasons.md](reasons.md)). The two reasons are the
 same for both kinds.
 
+The player refuses a file that breaks a rule the same way, and does not refuse a missing
+one: a board or an emulator folder without `mapping.json` plays on the target's mapping,
+`mapping/legs-20.json`, which the core holds. The first change of the show writes that
+file beside the show file, and a saved pin assignment writes it too; from then on the
+file is read.
+
 ### Where each LED is
 
 A row leg whose `rows` has R entries has W * R LEDs. For LED number n (1 to W * R) on that

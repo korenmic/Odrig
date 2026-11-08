@@ -1,0 +1,9 @@
+{
+  "number": 77,
+  "slug": "77-p1-a-firmware-for-the-spare-boards-module",
+  "state": "completed",
+  "title": "A firmware for the spare board's module",
+  "priority": "P1",
+  "addedAt": "2026-11-05",
+  "summary": "A second build environment for the spare board's module, an ESP32-S3 with 8 MB of flash and 2 MB of quad PSRAM, with the spare's own partition table, which the firmware tool builds and verifies as odrig-firmware-n8r2.bin beside the installation's image, which stays as it is; status names the board's external memory and the internal memory free at the core's start, which the app shows on the Target page. Firmware only, no new command, the app unchanged; a pull request of its own."
+}

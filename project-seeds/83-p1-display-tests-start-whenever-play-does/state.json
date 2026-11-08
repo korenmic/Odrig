@@ -1,0 +1,9 @@
+{
+  "number": 83,
+  "slug": "83-p1-display-tests-start-whenever-play-does",
+  "state": "remaining",
+  "title": "The display tests start whenever play does",
+  "priority": "P1",
+  "addedAt": "2026-11-07",
+  "summary": "The diagonal and snake tests are no longer refused busy while the board reads its animations after a start or while an upload is open, since play is taken then and the tests use playback's own decoder; an upload already open goes on to its end under a test, the mutations a test refuses today stay refused, and mapping set no longer waits for the reading after a start. Core only; firmware images rebuilt; no command, reply or error change."
+}

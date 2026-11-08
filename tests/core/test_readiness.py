@@ -123,7 +123,10 @@ class TheHostsName(unittest.TestCase):
         self.assertIsNone(self.status())
         self.assertEqual(self.status(["--about", "odrig test host, storage internal, reset power-on"]), "odrig test host, storage internal, reset power-on")
         self.assertEqual(self.status(["--about", 'a "quoted" \\ name']), 'a "quoted" \\ name')
-        self.assertEqual(self.status(["--about", "x" * 200]), "x" * 95)
+
+    def test_it_holds_127_characters_and_cuts_a_longer_text_to_them(self):
+        self.assertEqual(self.status(["--about", "x" * 127]), "x" * 127)
+        self.assertEqual(self.status(["--about", "x" * 200]), "x" * 127)
 
 
 if __name__ == "__main__":

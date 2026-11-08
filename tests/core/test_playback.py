@@ -409,7 +409,7 @@ class NothingToShow(Playback):
             self.assertEqual([data for _, data in produced], [{1: bytes(540), 2: bytes(540)}] * 3)
 
     def test_an_invalid_mapping_gives_idle(self):
-        for change in ({"mapping.json": None}, {"mapping.json": "{}"}):
+        for change in ({"mapping.json": "{"}, {"mapping.json": "{}"}):
             files = playing(support.example_show(), 1)
             for name, content in change.items():
                 if content is None:

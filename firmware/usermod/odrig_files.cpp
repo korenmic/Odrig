@@ -5,6 +5,9 @@
 namespace {
 
 const char FOLDER[] = "/odrig/";
+// The folder itself, as the file system names it. A storage that was formatted and never
+// had a show has none, and the file system makes no folder for a file.
+const char FOLDER_PATH[] = "/odrig";
 const size_t LONGEST_NAME = 32;
 const size_t LOG_LENGTH = 96;
 // The shortest time a command line waits after a storage call, in microseconds.
@@ -197,9 +200,10 @@ int beginFile(void *, const char *name) {
   }
   if (!pathOf(name, path)) return -1;
   dropSecond(name);
-  // A file that has the name is emptied.
+  // A file that has the name is emptied. A storage without the folder gets it first.
   const size_t before = sizeAt(path);
   writtenFile = ODRIG_FS.open(path, "w");
+  if (!writtenFile && ODRIG_FS.mkdir(FOLDER_PATH)) writtenFile = ODRIG_FS.open(path, "w");
   if (!writtenFile) return -1;
   blocksFreed(before);
   strcpy(writtenName, name);

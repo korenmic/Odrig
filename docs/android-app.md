@@ -449,9 +449,10 @@ refreshes are counted as refreshes a second as at any other time.
 
 The target screen names the installation as its software names itself, from `host` of
 `status`, as `Installation: odrig emulator on Darwin arm64`: the board gives its release,
-the date and the time of its build, its storage and the reason of its last start. Each
-time the screen is opened while the installation answers, the app asks for `fault` and
-says the last fault the installation met in a file since its start, as
+the date and the time of its build, its storage, its external memory and the internal
+memory free at its start, and the reason of its last start. Each time the screen is
+opened while the installation answers, the app asks for `fault` and says the last fault
+the installation met in a file since its start, as
 `Last fault: b.odrg, while it was played, at frame record 3 after 1234 bytes of its
 frames: the file is damaged (truncated).` The work is `checked after the start`,
 `played`, `checked after its upload` or `read from the external storage`, and the words
@@ -958,7 +959,7 @@ When an animation cannot be made, the app says why:
 |---|---|---|
 | `unsupported-character` | A text holds a character no font has. | The fonts have no letter for `<characters>`. Write English letters, digits, signs and Hebrew letters. |
 | `does-not-fit` | A text cannot be seen whole on the canvas with its effect and motion. | The text cannot be seen whole on the canvas with this effect: `<the effects that show it>`. |
-| `no-canvas` | The installation reports no canvas: it has no mapping it can use, or its software is older than the app. | The installation has no usable mapping, so the app does not know the canvas to convert for. |
+| `no-canvas` | The installation reports no canvas: its mapping file cannot be used, or its software is older than the app; an installation without a mapping file reports the canvas of its built-in mapping. | The installation has no usable mapping, so the app does not know the canvas to convert for. |
 | `no-gif-decoder` | The phone's web view has no `ImageDecoder`. | This phone's web view cannot read GIF files. Update Android System WebView. |
 | `unreadable-media` | The web view cannot read the file as a video or a GIF. | The phone cannot read this file as a video or a GIF. |
 | `bad-part` | `Start at` or `Length` is no number of seconds. | Write the start and the length in seconds, like 2.5, and leave the length empty for the rest of the file. |

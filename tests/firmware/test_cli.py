@@ -113,6 +113,8 @@ class Images(unittest.TestCase):
         self.assertEqual(build.KINDS["stock"], ("esp32s3dev_16MB_opi", "stock-built.bin"))
         self.assertEqual(build.KINDS["firmware"].image, "odrig-firmware.bin")
         self.assertEqual(build.KINDS["probe"].image, "odrig-probe.bin")
+        self.assertEqual(build.KINDS["n8r2"], ("odrig_microsd_n8r2", "odrig-firmware-n8r2.bin"))
+        self.assertIn("n8r2", build.ON_NEWER)
         self.assertEqual(build.APPLICATION_SIZE, 3145728)
 
 
@@ -147,6 +149,16 @@ class Building(unittest.TestCase):
             self.assertEqual(patched.call_args.kwargs, {"patches": build.paths.PATCHES})
             self.assertIn(f"{image}: ", result.out)
 
+    def test_the_module_chooses_the_spares_environment_or_the_installations(self):
+        for arguments, environment, image in ((["--module", "n8r2"], "odrig_microsd_n8r2", "odrig-firmware-n8r2.bin"), (["--module", "n16r8"], "odrig_microsd", "odrig-firmware.bin")):
+            with self.subTest(arguments=arguments):
+                result, ran, patched = self.build(*arguments)
+                self.assertEqual(result.status, 0, result.err)
+                self.assertEqual(ran[0][0][0], str(build.paths.NEWER_PYTHON))
+                self.assertEqual(ran[0][0][-4:], ["-e", environment, "-j", "2"])
+                self.assertEqual(patched.call_args.kwargs, {"patches": build.paths.PATCHES})
+                self.assertIn(f"{image}: ", result.out)
+
     def test_stock_and_probe_do_not_go_together(self):
         self.assertEqual(support.run_main("build", "--stock", "--probe").status, 2)
 
@@ -154,6 +166,23 @@ class Building(unittest.TestCase):
         result, _, _ = self.build("--stock", status=1)
         self.assertEqual(result.status, 1)
         self.assertRegex(result.err, r"^error: build-failed: .*esp32s3dev_16MB_opi\n$")
+
+
+class TheModule(unittest.TestCase):
+    def test_the_spares_module_goes_with_no_other_choice_of_image(self):
+        for other in ("--stock", "--probe", "--stick", "--standalone", "--microsd"):
+            with self.subTest(other=other), mock.patch.object(build, "build") as built:
+                result = support.run_main("build", "--module", "n8r2", other)
+            self.assertEqual(result.status, 2, result.err)
+            self.assertIn("--module n8r2 does not go with --stock, --probe, --stick, --standalone or --microsd", result.err)
+            built.assert_not_called()
+
+    def test_a_module_that_is_not_known_is_refused_by_the_choices(self):
+        with mock.patch.object(build, "build") as built:
+            result = support.run_main("build", "--module", "n4r2")
+        self.assertEqual(result.status, 2)
+        self.assertIn("invalid choice: 'n4r2'", result.err)
+        built.assert_not_called()
 
 
 class Commands(unittest.TestCase):

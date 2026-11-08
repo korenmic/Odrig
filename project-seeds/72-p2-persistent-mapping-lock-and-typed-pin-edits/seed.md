@@ -21,6 +21,10 @@ This seed intentionally supersedes seed69's transient lock/reset policy. The
 lock remains a local interaction preference; the board still owns its saved
 mapping, and its existing validation and revision checks remain authoritative.
 
+Seed 84, added on 2026-11-07 as a fix, delivers items 2 and 3, the kept lock
+value, first, on the current toggle. This seed's checkbox shows and changes that
+same stored value; it adds no second one.
+
 ## Required Behavior
 
 1. Put a standard, labelled `Lock mapping edits` checkbox directly on the main

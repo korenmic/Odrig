@@ -1,0 +1,9 @@
+{
+  "number": 80,
+  "slug": "80-p1-ready-made-animations-uploaded-as-a-batch",
+  "state": "remaining",
+  "title": "Ready-made animations uploaded as a batch",
+  "priority": "P1",
+  "addedAt": "2026-11-06",
+  "summary": "The Upload screen's chooser takes several .odrg and .odrgx files at once (Add more for a file app that gives one); each is checked as a single file and named as a converted file, with suffixes, and one press of Upload <n> animations sends them one after another through the existing upload to one destination, each later file guarded by its own preflight. The run goes on while the operator uses the app, holds the content lock, shows a line under the top of every screen, marks each failed file, retries busy and stale, starts a dropped file again once, waits out a lost link or a hidden app, and offers Stop and Try the failed again; at most two files are held. One file keeps today's form; the run is a module seed 73 can feed. Built after PR #48 (seed 75). No command, reply or firmware change."
+}

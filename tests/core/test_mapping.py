@@ -1,11 +1,29 @@
 import json
 import unittest
+import zlib
 
 from odrig import errors, jsonframes, mapping, odrg
 
 from . import support
 
-MAPPING_REASONS = ("mapping-missing", "mapping-malformed")
+MAPPING_REASONS = ("mapping-malformed",)
+
+# The installation's mapping, which the core holds: twenty legs of 180 LEDs on these pins.
+PINS = (*range(1, 19), 21, 47)
+TARGET_LEGS = tuple((number, pin, 180) for number, pin in enumerate(PINS, start=1))
+
+
+def without_mapping(files=None):
+    """The demo show's files, or these, without the mapping file: a show on the built-in
+    mapping."""
+    files = dict(support.demo_show() if files is None else files)
+    del files["mapping.json"]
+    return files
+
+
+def reply(run, number):
+    """The reply with this number among the lines of a session."""
+    return json.loads([line for line in run.lines if line.startswith("reply ")][number][len("reply "):])
 
 
 def one_leg(**changes):
@@ -316,7 +334,7 @@ class LegList(unittest.TestCase):
     def test_the_target_file_has_twenty_legs_of_180_leds_on_the_pins_1_to_18_21_and_47(self):
         run = support.start({"mapping.json": support.mapping_texts()["legs-20"]})
         self.assertEqual(run.core, "ok")
-        self.assertEqual(run.error, "show-missing")
+        self.assertIsNone(run.error)
         pins = (*range(1, 19), 21, 47)
         self.assertEqual(len(pins), 20)
         self.assertEqual(run.legs, tuple((number, pin, 180) for number, pin in enumerate(pins, start=1)))
@@ -375,7 +393,7 @@ class LegList(unittest.TestCase):
         for name, run in zip(texts, runs):
             with self.subTest(mapping=name):
                 self.assertEqual(run.core, "ok")
-                self.assertEqual(run.error, "show-missing")
+                self.assertIsNone(run.error)
                 self.assertEqual(run.legs, LEGS_OF_THE_COLUMN_MAPPINGS[name])
 
     def test_column_leg_mappings_at_the_edges_of_the_rules_are_accepted(self):
@@ -388,19 +406,43 @@ class LegList(unittest.TestCase):
                 self.assertEqual(run.legs, leg_list(json.dumps(value)))
 
 
-class RefusedMappings(unittest.TestCase):
-    def test_a_missing_file_gives_mapping_missing_and_no_legs(self):
-        run = support.start({}, ["error"])
+class BuiltInMapping(unittest.TestCase):
+    """A file set without a mapping file has the installation's mapping, which the core
+    holds: the host is asked for the file once, and nothing is logged."""
+
+    def test_a_file_set_without_a_mapping_file_has_the_installations_twenty_legs(self):
+        run = support.start(without_mapping(), [support.line(1000, "status")], options=["--trace-files"])
         self.assertEqual(run.core, "ok")
-        self.assertEqual(run.error, "mapping-missing")
-        self.assertEqual(run.legs, ())
-        self.assertEqual(run.logs, ("mapping-missing",))
-        self.assertEqual(run.lines, ["error mapping-missing"])
+        self.assertIsNone(run.error)
+        self.assertEqual(run.legs, TARGET_LEGS)
+        self.assertEqual(run.logs, ())
+        self.assertEqual(run.opened.count(("mapping.json", 0)), 1)
+        status = reply(run, 0)
+        self.assertEqual((status["error"], status["width"], status["height"], status["playing"]), (None, 60, 60, "all"))
 
     def test_a_file_under_another_name_is_not_the_mapping(self):
-        run = support.start({"legs-2.json": support.mapping_texts()["legs-2"]})
-        self.assertEqual(run.error, "mapping-missing")
+        run = support.start({**without_mapping(), "legs-2.json": support.mapping_texts()["legs-2"]})
+        self.assertIsNone(run.error)
+        self.assertEqual(run.legs, TARGET_LEGS)
 
+    def test_mapping_get_reports_the_default_pins_editable_with_their_revision(self):
+        run = support.start(without_mapping(), [support.line(1000, "mapping get")])
+        self.assertEqual(reply(run, 0), {"ok": True, "editable": True, "pins": list(PINS), "revision": zlib.crc32(bytes(PINS)), "test": False, "snake": None})
+
+    def test_mapping_set_writes_the_file_and_the_next_start_reads_it(self):
+        swapped = list(PINS)
+        swapped[0], swapped[1] = swapped[1], swapped[0]
+        source = without_mapping()
+        run, left = support.start_and_keep(source, [support.line(1000, f"mapping set {zlib.crc32(bytes(PINS))} " + ",".join(map(str, swapped)))])
+        self.assertEqual(reply(run, 0), {"ok": True})
+        self.assertEqual([leg["pin"] for leg in json.loads(left["mapping.json"])["legs"]], swapped)
+        self.assertEqual({name: content for name, content in left.items() if name != "mapping.json"}, {name: content if isinstance(content, bytes) else content.encode() for name, content in source.items()})
+        again = support.start(left)
+        self.assertIsNone(again.error)
+        self.assertEqual(again.legs, tuple((number, pin, 180) for number, pin in enumerate(swapped, start=1)))
+
+
+class RefusedMappings(unittest.TestCase):
     def test_each_broken_rule_gives_mapping_malformed_and_no_legs(self):
         self.assertGreaterEqual(len(BROKEN), 40)
         runs = support.start_each([{"mapping.json": json.dumps(value)} for value in BROKEN.values()], ["error"])
@@ -442,12 +484,18 @@ class RefusedMappings(unittest.TestCase):
         self.assert_each_refused(BROKEN_TWICE)
 
     def test_a_refused_mapping_asks_for_no_more_memory_than_its_checks_need(self):
-        missing = support.start({})
+        refused = support.start({"mapping.json": "{"})
         # The core object, and the line and the reply of the byte entry.
-        self.assertEqual(missing.memory[1], 3)
+        self.assertEqual(refused.memory[1], 3)
         cut = support.start({"mapping.json": support.mapping_texts()["legs-20"][:-3]})
         self.assertEqual(cut.error, "mapping-malformed")
-        self.assertEqual(cut.memory, missing.memory)
+        self.assertEqual(cut.memory, refused.memory)
+
+    def test_the_built_in_mapping_asks_for_the_memory_the_target_file_asks_for(self):
+        built_in = support.start(without_mapping())
+        from_file = support.start(support.demo_show())
+        self.assertIsNone(built_in.error)
+        self.assertEqual(built_in.memory, from_file.memory)
 
 
 class Starts(unittest.TestCase):
@@ -564,9 +612,9 @@ class ChangedBetweenTheReadings(unittest.TestCase):
         first = column_file(height=4, legs=[column_leg(1, 1, columns=(1, 2)), column_leg(2, 2, "top", columns=(3,))])
         second = column_file(height=4, legs=[column_leg(8, 5, "top", columns=(3,)), column_leg(9, 6, columns=(2, 1))])
         run = self.read_twice(first, second)
-        self.assertEqual(run.error, "show-missing")
+        self.assertIsNone(run.error)
         self.assertEqual(run.legs, ((8, 5, 4), (9, 6, 8)))
-        self.assertEqual(run.lines, ["error show-missing", "refresh 0", "data 8 " + "00" * 12, "data 9 " + "00" * 24])
+        self.assertEqual(run.lines, ["error none", "refresh 0", "data 8 " + "00" * 12, "data 9 " + "00" * 24])
 
 
 if __name__ == "__main__":

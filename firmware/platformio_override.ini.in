@@ -5,7 +5,10 @@
 ; odrig_probe are the USB stick's firmware on WLED's own platform. odrig_microsd, the
 ; firmware, and odrig_microsd_probe take the platform of the newer software, which that
 ; software's own PlatformIO builds, in build/firmware/newer/, and read a microSD card on
-; GPIO39 to GPIO42 in place of the USB stick.
+; GPIO39 to GPIO42 in place of the USB stick. odrig_microsd_n8r2 is the firmware built for
+; the spare board's module, with 8 MB of flash and 2 MB of quad PSRAM: the memory type
+; qio_qspi, the flash size 8MB, the tracked table firmware/partitions/odrig-8mb.csv and
+; the release name odrig_ESP32-S3_8MB_qspi, in place of what odrig_microsd gives it.
 
 [env:odrig]
 extends = env:esp32s3dev_16MB_opi
@@ -54,3 +57,14 @@ build_flags = ${env:odrig.build_flags}
 extends = env:odrig_microsd
 build_flags = ${env:odrig_microsd.build_flags}
   -D ODRIG_PROBE
+
+[env:odrig_microsd_n8r2]
+extends = env:odrig_microsd
+board_build.arduino.memory_type = qio_qspi
+board_build.partitions = @REPO@/firmware/partitions/odrig-8mb.csv
+board_upload.flash_size = 8MB
+board_upload.maximum_size = 3145728
+build_unflags = ${env:odrig_microsd.build_unflags}
+  -D WLED_RELEASE_NAME=\"odrig_ESP32-S3_16MB_opi\"
+build_flags = ${env:odrig_microsd.build_flags}
+  -D WLED_RELEASE_NAME=\"odrig_ESP32-S3_8MB_qspi\"

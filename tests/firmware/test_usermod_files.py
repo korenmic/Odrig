@@ -383,7 +383,9 @@ class Host(unittest.TestCase):
         self.assertEqual(users, {"odrig_files.cpp"})
         for path in SOURCES:
             text = text_of(path)
-            self.assertNotRegex(text, r"ODRIG_FS\.(mkdir|rmdir|format)\b", path.name)
+            self.assertNotRegex(text, r"ODRIG_FS\.(rmdir|format)\b", path.name)
+            self.assertEqual(re.findall(r"ODRIG_FS\.mkdir\(([^)]*)\)", text),
+                             ["FOLDER_PATH"] if path.name == "odrig_files.cpp" else [], path.name)
             self.assertNotRegex(text, r"serializeConfig|writeObjectToFile|doSerializeConfig|configNeedsWrite", path.name)
 
     def test_every_path_given_to_the_file_system_is_in_the_shows_folder(self):

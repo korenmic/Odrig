@@ -52,6 +52,13 @@ class BuildingMicroSD(unittest.TestCase):
             self.assertIn("--microsd does not go with", result.err)
             built.assert_not_called()
 
+    def test_micro_sd_does_not_go_with_the_spares_module(self):
+        with mock.patch.object(build, "build") as built:
+            result = support.run_main("build", "--microsd", "--module", "n8r2")
+        self.assertEqual(result.status, 2, result.err)
+        self.assertIn("does not go with", result.err)
+        built.assert_not_called()
+
     def test_micro_sd_is_the_firmware_kept_under_a_name_of_its_own(self):
         self.assertEqual(build.KINDS.get("microsd"), ("odrig_microsd", "odrig-microsd.bin"))
         self.assertEqual(build.KINDS["firmware"], ("odrig_microsd", "odrig-firmware.bin"))

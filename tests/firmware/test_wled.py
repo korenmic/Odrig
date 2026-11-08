@@ -1,3 +1,4 @@
+import configparser
 import pathlib
 import re
 import tempfile
@@ -179,8 +180,26 @@ class Override(TemporaryFolder):
             environment = re.search(rf"(?ms)^\[env:{name}\]\n(.*?)(?=^\[|\Z)", text).group(1)
             for setting in ("board", "platform", "board_build.partitions", "board_build.flash_mode", "board_upload.flash_size"):
                 self.assertNotRegex(environment, rf"(?m)^{setting}\s*=", f"{name} {setting}")
-        for setting in ("board", "board_build.partitions", "board_build.flash_mode", "board_upload.flash_size"):
-            self.assertNotRegex(text, rf"(?m)^{setting}\s*=", setting)
+        for name in ("odrig", "odrig_probe", "odrig_microsd", "odrig_microsd_probe"):
+            environment = re.search(rf"(?ms)^\[env:{name}\]\n(.*?)(?=^\[|\Z)", text).group(1)
+            for setting in ("board", "board_build.partitions", "board_build.flash_mode", "board_upload.flash_size"):
+                self.assertNotRegex(environment, rf"(?m)^{setting}\s*=", f"{name} {setting}")
+
+    def test_the_spares_environment_names_its_module(self):
+        text = wled.override_text()
+        self.assertRegex(text, r"(?m)^\[env:odrig_microsd_n8r2\]\nextends = env:odrig_microsd$")
+        parsed = configparser.ConfigParser(interpolation=None, strict=True)
+        parsed.read_string(text)
+        spare = parsed["env:odrig_microsd_n8r2"]
+        self.assertEqual(spare["extends"], "env:odrig_microsd")
+        self.assertEqual(spare["board_build.arduino.memory_type"], "qio_qspi")
+        self.assertEqual(spare["board_build.partitions"], f"{support.ROOT.as_posix()}/firmware/partitions/odrig-8mb.csv")
+        self.assertEqual(spare["board_upload.flash_size"], "8MB")
+        self.assertEqual(spare["board_upload.maximum_size"], "3145728")
+        for setting in ("board", "platform", "board_build.flash_mode"):
+            self.assertNotIn(setting, spare, setting)
+        self.assertEqual(spare["build_unflags"].split("\n")[-1], '-D WLED_RELEASE_NAME=\\"odrig_ESP32-S3_16MB_opi\\"')
+        self.assertEqual(spare["build_flags"].split("\n")[-1], '-D WLED_RELEASE_NAME=\\"odrig_ESP32-S3_8MB_qspi\\"')
 
     def test_a_repository_path_with_a_space_is_supported(self):
         spaced = self.folder / "my odrig"

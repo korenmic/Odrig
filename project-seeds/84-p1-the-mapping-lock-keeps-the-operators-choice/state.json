@@ -1,0 +1,9 @@
+{
+  "number": 84,
+  "slug": "84-p1-the-mapping-lock-keeps-the-operators-choice",
+  "state": "remaining",
+  "title": "The mapping lock keeps the operator's choice",
+  "priority": "P1",
+  "addedAt": "2026-11-07",
+  "summary": "Lock mapping edits becomes an app setting kept on the phone, one value for every link, target and board, changed only by the operator's confirmed press; leaving Settings, another app, a lost reply, a reconnection, Wi-Fi or USB serial, a new target or a restart no longer relock; locked only on a phone that never stored a value; the control usable without a board; unsent edits still dropped. App only, on master; seed 72 later builds its checkbox on this value."
+}

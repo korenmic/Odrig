@@ -12,6 +12,8 @@ const uint32_t kLargestId = 65535;
 // How long an animation without a number of loops plays at least, in a show that does not say.
 const uint32_t kMinSeconds = 30;
 const uint32_t kMostToCount = 0xFFFFFFFFu;
+// The brightness of the empty show of a host that has no show file.
+const uint32_t kEmptyShowBrightness = 128;
 
 // What one reading of the file has seen so far.
 struct Seen {
@@ -356,6 +358,28 @@ Reason check_ids(Core &core, const Seen &seen, char *id_text) {
     return kNone;
 }
 
+// The show of a host that has no show file: no item, with the room a show file with no
+// item gets in the tables, and the brightness of the empty show.
+Reason empty_show(Core &core) {
+    core.items = static_cast<ItemInfo *>(arena_take(core, kFewestItems * static_cast<uint32_t>(sizeof(ItemInfo))));
+    core.entries = static_cast<uint16_t *>(arena_take(core, 2));
+    core.files = static_cast<FileInfo *>(arena_take(core, kFewestItems * static_cast<uint32_t>(sizeof(FileInfo))));
+    if (core.items == nullptr || core.entries == nullptr || core.files == nullptr) {
+        return kOutOfMemory;
+    }
+    core.item_capacity = kFewestItems;
+    core.item_count = 0;
+    core.entry_count = 0;
+    core.file_count = 0;
+    core.has_start = 0;
+    core.start_item = 0;
+    core.has_min_seconds = 0;
+    core.min_seconds = static_cast<uint16_t>(kMinSeconds);
+    core.brightness = static_cast<uint8_t>(kEmptyShowBrightness);
+    core.show_brightness = core.brightness;
+    return kNone;
+}
+
 }  // namespace
 
 bool is_file_name(const char *name) {
@@ -373,9 +397,13 @@ bool is_file_name(const char *name) {
 Reason read_show(Core &core, char *id_text) {
     id_text[0] = '\0';
 
-    // The first reading checks the format of the file and counts what the tables hold.
+    // The first reading checks the format of the file and counts what the tables hold. A
+    // host without a show file has the empty show.
     Seen first;
     Reason reason = read_once(core, nullptr, first);
+    if (reason == kShowMissing) {
+        return empty_show(core);
+    }
     if (reason != kNone) {
         return reason;
     }

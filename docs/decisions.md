@@ -872,3 +872,34 @@ app API, `mapping cross` command and `cross` reply member. Generic mapping forma
 support remains; editing pins preserves installed geometry without a wiring change.
 The owner also requested a confirmed mapping-edit lock in Settings; its app interaction
 guard uses the existing mapping protocol and adds no board command.
+
+### Seed 76: an empty board takes its first animation
+
+The owner ruled on 2026-11-05 that the canvas is always 60 x 60, and that whether a first
+animation already exists must not keep a board from taking its first animation. The core
+therefore plays a board without `mapping.json` on the installation's mapping, which it
+holds, and a board without `show.json` as an empty show; `status` reports the canvas, and
+the first upload is accepted. This narrows the decision of seed 32 of 2026-10-24: a mapping
+file or a show file that is there and cannot be used still makes the show invalid, and a
+missing one no longer does. The firmware is rebuilt from the core; no command is added;
+the app is not changed.
+
+- 2026-11-05: Seed 77, under the owner's order of that day. The owner, at the installation
+  with the spare board and the phone, flashed seed 76's image from the phone and wrote:
+  "I flashed your new fw as you asked me to, but the 2 issues persisted." and "If you
+  think the actual fix is a new seed then create it on master right now. Then tell me if
+  its ready for s2s with zero open questions." Under that order the seed decides that the
+  fault is the firmware's, built for the installation's module alone, and that the
+  firmware comes in two images from now on, one for each module. The installation's
+  board, the line `Board: ESP32-S3-N16R8 (16 MB flash, 8 MB PSRAM)` above, keeps its
+  environment `odrig_microsd`, its image `odrig-firmware.bin` and its release name
+  `odrig_ESP32-S3_16MB_opi`, unchanged in any way. The spare board's module, an ESP32-S3
+  with 8 MB of flash and 2 MB of quad PSRAM, gets the environment `odrig_microsd_n8r2`,
+  the memory type `qio_qspi`, the tracked table `firmware/partitions/odrig-8mb.csv`
+  equal to the spare's, the release name `odrig_ESP32-S3_8MB_qspi` and the image
+  `odrig-firmware-n8r2.bin`, built by `build --module n8r2` and verified by
+  `verify_build.py --module n8r2`; `flash --image` writes it, and `restore-stock` and
+  `install-firmware` refuse the spare's `8 MB` layout. The 192 KB reserve of `allocate()`
+  stays as it is. `status` names in its host text the external memory the board found
+  and the internal memory free when the core started, which the app shows unchanged. No
+  new command; no APK; nothing of the wiring, the power or the LEDs is touched.
