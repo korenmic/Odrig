@@ -126,6 +126,9 @@ void storage_clear_parts(Core &core) {
         return;
     }
     uint8_t probe;
+    if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, "rotation.part", 0, &probe, 1) >= 0) {
+        core.host.remove(core.host.ctx, "rotation.part");
+    }
     if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, "mapping.part", 0, &probe, 1) >= 0) {
         core.host.remove(core.host.ctx, "mapping.part");
     }

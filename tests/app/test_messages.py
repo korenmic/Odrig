@@ -62,6 +62,7 @@ class TheTable(unittest.TestCase):
         self.assertEqual(self.text("busy", "remove 7", None), "The installation is busy. Try again in a moment. (busy)")
         self.assertEqual(self.text("in-use", "remove 7", None), "Animation 7 cannot be removed: a cycle plays it, or it is on a USB stick. (in-use)")
         self.assertEqual(self.text("mapping-conflict"), "Mapping changed on the target. Reload before saving. (mapping-conflict)")
+        self.assertEqual(self.text("rotation-conflict"), "Another controller changed the rotation. The saved angle is read again. (rotation-conflict)")
         self.assertEqual(self.text("unsupported"), "This target cannot use miniature display mode with its current output setup. (unsupported)")
         self.assertEqual(self.text("storage-error", "space", None), "The installation could not use its storage. (storage-error)")
         # A code the app does not know, also one that is a word of the language.

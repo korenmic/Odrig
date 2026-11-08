@@ -868,6 +868,7 @@ private:
                            given == "brightness.txt" || given == "brightness.part" || given == "ignored.txt" || given == "ignored.part" ||
                            given == "timezone.bin" || given == "timezone.part" ||
                            given == "schedule.txt" || given == "schedule.part" ||
+                           given == "rotation.txt" || given == "rotation.part" ||
                            given == "catalog.new" || given == "catalog.do" || page;
         if (!sound || !(animation || fixed)) {
             stop("file misuse", kFileMisuse);

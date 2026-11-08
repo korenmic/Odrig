@@ -13316,3 +13316,43 @@ this run; it stays open with the owner's check.
 **Resolution.** `converter/lib/inflate.js`, `converter/lib/odrg.js`,
 `converter/lib/thumbnail.js`, `app/www/previews.js`, `app/www/client.js`,
 `converter/tests/inflatestream.test.js`, `tests/app/test_phone_previews.py`.
+## Seed 65: permanently square output and rotation direction
+
+**Question.** Does legacy rectangular test geometry require a fit decision before
+the owner's installation can rotate, and which sample direction is clockwise?
+
+**Answer.** The owner fixes the installation at1:1 permanently; rectangular fitting
+is outside scope and never a delivery blocker. For bottom-left coordinates growing
+upward,90 clockwise samples source(N-1-y,x). Rotate the complete composition once
+before physical mapping and mini averaging. Diagnostics remain physical. Approving
+autonomous implementation authorizes the proposed rotation read/set command forms.
+
+**Resolution.** AGENTS.md, the hardened seed65, its spec, rotation.h/rotation.cpp and
+commands.md record this. Legacy rectangular playback stays unchanged/unsupported
+for this setting. The previous fit-question deferral is superseded.
+
+## Seed 65: fresh storage and content-independent orientation
+
+**Question.** Why can a fresh board report rotation unsupported, and may missing
+content prevent changing an installation setting?
+
+**Answer.** The shipped application image did not install mapping/show files.
+The core stopped with mapping-missing and rotation incorrectly treated that content
+fault as missing capability. The owner explicitly fixes the installation at60x60
+whether or not any content exists, and requires its setting to remain editable.
+Read, restore and atomically save orientation independently of content validity or
+inventory validation. Keep the playback failure and real storage errors visible;
+only valid legacy rectangular fixtures retain their technical unsupported result.
+
+For a genuinely absent/empty Odrig store, initialize the existing canonical mapping
+and a valid empty show before the core starts. An empty transaction directory and
+verified temporary writes permit restart recovery without replacing operator data.
+The bootstrap accepts independent rotation files only while its own marker exists,
+preserves those files, and never formats storage or changes WLED configuration.
+An application-only flash therefore retains saved hotspot credentials; existing
+install-firmware/set-wifi provisioning or WLED's settings page changes them.
+
+**Resolution.** `core/src/rotation.cpp`, `firmware/usermod/odrig_bootstrap.h`,
+`firmware/usermod/odrig_files.cpp`, the seed65 spec, `docs/commands.md`,
+`docs/firmware.md` and `docs/wifi.md`. Fresh-storage, interruption, operator-file,
+unusable-content and persistent rotation regressions cover the resolved behavior.
