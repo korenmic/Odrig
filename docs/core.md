@@ -1007,7 +1007,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,776 |
+| The core object | fixed | 3,784 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -1025,13 +1025,13 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
 | Miniature state and physical RGB, only for a 60x60 canvas | fixed | 188 |
-| **Total** | | **125,241** |
+| **Total** | | **125,249** |
 
 That is about 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-45,776 of them. The example show on the two-leg mapping asks for 88,530 bytes. A host
+45,776 of them. The example show on the two-leg mapping asks for 88,538 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,701 bytes for the target file. A host with a drive
+of the check and the saved order: 77,709 bytes for the target file. A host with a drive
 is asked for three blocks more, after the three of the check: the table of a drive
 without a catalog, 12 bytes for each of 256 places, 3,072 bytes; the boot's memory of 16
 files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive's index,
@@ -1042,7 +1042,7 @@ a table of 33 records of 8 bytes and 104 bytes of room for the current playlist'
 368, the saved repeats of32 drive files at6 bytes each (192), and32 brightness
 preferences at5 bytes each (160), followed by128 external exclusion records at5 bytes
 each (640). Positions retain all32 bits. With it
-the target file takes 131,029 bytes, below 131,072. The clocks between the animations add
+the target file takes 131,037 bytes, below 131,072. The clocks between the animations add
 no block: their settings, their counts, the paused turn and the key and the place of their
 order are fields of the core object, and the order is a permutation computed from its key. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
@@ -1390,7 +1390,7 @@ The zone grammar and commands are in [commands.md](commands.md#board-time). A
 complete snapshot fits the existing 1500-byte chunk and 2048-byte command line.
 Publication verifies the complete staged bytes before atomic rename. Missing or
 damaged rules never supply invented time. Routine clock sets write no storage.
-The combined clock and schedule state uses56 Core bytes; the target with a drive takes131,029 bytes in
+The combined clock and schedule state uses56 Core bytes; the target with a drive takes131,037 bytes in
 21 blocks, below the unchanged128 KiB bound. No allocation occurs after startup,
 and the512-byte compiler frame bound remains enabled.
 
@@ -1410,5 +1410,5 @@ no tick or boundary writes timing settings.
 The atomic grammar, revision guards and error semantics are specified in
 [commands.md](commands.md#daily-schedule-and-manual-control). Manual control is
 immediate even on a persistence failure, which remains explicitly observable.
-The current target takes131,029 host bytes with a drive in21blocks, and Core is
-3776 bytes. The existing128KiB/4096-byte limits and512-byte frame guard remain.
+The current target takes131,037 host bytes with a drive in21blocks, and Core is
+3784 bytes. The existing128KiB/4096-byte limits and512-byte frame guard remain.
