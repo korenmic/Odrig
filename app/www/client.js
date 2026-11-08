@@ -20,15 +20,17 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 // with the Failure in `failure`. `status` is the newest reply to `status`, `heardAt` the
 // time of the newest reply of any kind, `since` the time the app began with this address,
 // and `answered` whether the target of this address has answered at least once. `level` is
-// the level of the card's folders the list is of, `{path, id}`, "" and null for the root,
-// which holds the show's items too; nothing of another level is kept. `animations` is the
+// the level of the folders the list is of, `{path, id, storage}`, "", null and null for the
+// root, which holds the show's items too, `storage` "internal" for a folder of the board's
+// own storage and "external" for one of the card; nothing of another level is kept. `animations` is the
 // animation items of the level's newest complete list, in its order, each as
 // `{id, file, bytes}` with optional `ignored`, or null while there is none; `cycles` is the
 // ids of its cycles, and `folders` its folders of the card, each `{id, playlist, files}` with
 // its path and the number of its own files, in the order they play. `rootNames` holds what
 // the root's newest list named, `{ids, files}`, the ids and the file names of the show's
-// items and of the root's files, which an upload chooses its id and its name against, or
-// null while none is known. `space` holds internal and external capacity from the newest reply, or
+// items, of the root's folders and of the root's files, which an upload chooses its id and
+// its name against, and whether the board's own storage has folders, or null while none is
+// known. `space` holds internal and external capacity from the newest reply, or
 // null while none came from this address or the newest said the capacity is unknown; a request
 // that fails leaves it.
 // `listBusy` says whether the newest `list` request was answered `busy`. `order` is the
@@ -42,7 +44,7 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 // for the first one after a command. `statusFresh` requires a valid status after the
 // latest communication failure; replies to other commands cannot restore it.
 // `onlyUnavailable` marks a Clocks location whose current folder ID cannot be resolved.
-export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, level: {path: "", id: null}, rootNames: null,
+export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, level: {path: "", id: null, storage: null}, rootNames: null,
   animations: null, cycles: [], folders: [], space: null,
   listVersion: 0, listBusy: false, order: null, orderVersion: 0, orderKnown: true, catalog: null, keys: {internal: null, external: null}, keysVersion: 0,
   catalogNone: false, pagesRefused: false, statusCount: 0, statusFresh: false, connectionVersion: 0, onlyUnavailable: false};
@@ -61,7 +63,7 @@ let listTimer = null;
 // The list that is being asked for in parts: the items so far and the position to ask
 // for next. Null when none is.
 let listing = null;
-// The folders entered from the root down to the level shown, each `{path, id}`.
+// The folders entered from the root down to the level shown, each `{path, id, storage}`.
 const trail = [];
 let onlyActive = false;
 let onlyFolder = null;
@@ -107,6 +109,9 @@ let connectionDue = true;
 // deletion apart: "preflight" while the Upload screen checks a destination, "deletion"
 // while the selection removes animations, or null.
 let holder = null;
+// Whether the target takes `read <id> <offset> <count>`, as `{target, counts}` of the target
+// that told it, or null until a read found out.
+let readForm = null;
 
 // Calls a function now and whenever the state changes.
 export function watch(watcher) {
@@ -190,7 +195,7 @@ function reconcileOnly(reply) {
   if (entering) onlyDesired = "clocks";
   if (onlyFolder === null) {
     unavailableClocks();
-  } else if (entering || !inClocks(state.level.path)) {
+  } else if (entering || !inClocks(state.level)) {
     trail.splice(0, trail.length, {path: "clocks", id: onlyFolder});
     toLevel();
   } else if (before !== onlyFolder && state.level.id === null) {
@@ -310,21 +315,50 @@ function parentOf(path) {
   return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
 }
 
-function inClocks(path) {
+// Whether a path of the card, or a level or a trail's step `{path, storage}`, is the Clocks
+// folder or inside it. The Clocks folder of Clocks only is the card's: no folder of the
+// board's own storage is inside it, whatever its path.
+function inClocks(where) {
+  const path = where !== null && typeof where === "object" ? (where.storage === "internal" ? null : where.path) : where;
   return path === "clocks" || typeof path === "string" && path.startsWith("clocks/");
 }
 
 // What an upload chooses its id and its name against, from the items of the root's list.
 function namesOf(items) {
-  const named = items.filter((item) => typeof item.playlist !== "string");
-  return {ids: named.map((item) => item.id), files: named.filter((item) => typeof item.file === "string").map((item) => item.file)};
+  return {ids: items.map((item) => item.id), files: items.filter((item) => typeof item.file === "string").map((item) => item.file),
+    internal: items.some((item) => typeof item.playlist === "string" && item.external === false)};
+}
+
+// The storage of a folder's row: "internal" for one of the board's own storage.
+function storageOf(row) {
+  return row.external === false ? "internal" : "external";
+}
+
+// Every id of the board's own storage: those of the root's rows, and those of the rows of
+// each of its folders, walked level by level through `list`.
+async function idsWithin(root, list) {
+  const ids = root.map((row) => row.id);
+  const pending = root.filter((row) => typeof row.playlist === "string" && row.external === false).map((row) => row.id);
+  while (pending.length > 0) {
+    const folder = pending.shift();
+    let from = 0;
+    do {
+      const reply = await list(from, folder);
+      for (const row of reply.items) {
+        ids.push(row.id);
+        if (typeof row.playlist === "string" && row.external === false) pending.push(row.id);
+      }
+      from = reply.next;
+    } while (from !== null);
+  }
+  return ids;
 }
 
 // Resolve the captured path without changing the visible level. A failed lookup
 // or an unavailable catalog does not establish that the folder was removed. Inside Clocks
 // in Only, the path is resolved only while the target names a Clocks folder.
 async function recoverLevel(asked, level, fromRoot = false) {
-  const bounded = onlyActive && inClocks(level.path);
+  const bounded = onlyActive && inClocks(level);
   const current = () => asked === target && level === state.level && (!bounded || onlyFolder !== null);
   const found = [];
   let path = "";
@@ -346,7 +380,7 @@ async function recoverLevel(asked, level, fromRoot = false) {
       do {
         const reply = await commands.list(from, parent);
         if (!current()) return;
-        folder = reply.items.find(item => item.playlist === path) ?? null;
+        folder = reply.items.find(item => typeof item.playlist === "string" && item.playlist === path && storageOf(item) === (level.storage ?? "external")) ?? null;
         from = reply.next;
       } while (folder === null && from !== null);
       if (folder === null) {
@@ -355,7 +389,7 @@ async function recoverLevel(asked, level, fromRoot = false) {
           if (!(error instanceof commands.Refusal && ["unknown-command", "bad-argument"].includes(error.code))) throw error;
         }
         if (!current()) return;
-        const authoritative = catalog === null || ["ok", "absent", "none"].includes(catalog.external.state);
+        const authoritative = level.storage === "internal" || catalog === null || ["ok", "absent", "none"].includes(catalog.external.state);
         if (bounded) {
           heard();
           if (authoritative && found.length > 0) {
@@ -375,7 +409,7 @@ async function recoverLevel(asked, level, fromRoot = false) {
         }
         break;
       }
-      found.push({path, id: folder.id});
+      found.push({path, id: folder.id, storage: level.storage ?? "external"});
       parent = folder.id;
     }
     if (found.length === desired.split("/").length) {
@@ -431,8 +465,10 @@ async function askListPart() {
       // The places this phone uploaded to that the complete list of their folder does not
       // name are dropped.
       const files = items.filter((item) => typeof item.file === "string");
-      if (level.id === null) keeper.unlisted(keptUnder, "internal", "", new Set(files.filter((item) => item.external !== true).map((item) => item.file)), part.began);
-      keeper.unlisted(keptUnder, "external", level.path, new Set(files.filter((item) => item.external === true).map((item) => item.file)), part.began);
+      const internalFiles = new Set(files.filter((item) => item.external !== true).map((item) => item.file));
+      if (level.id === null) keeper.unlisted(keptUnder, "internal", "", internalFiles, part.began);
+      if (level.storage === "internal") keeper.unlisted(keptUnder, "internal", level.path, internalFiles, part.began);
+      else keeper.unlisted(keptUnder, "external", level.path, new Set(files.filter((item) => item.external === true).map((item) => item.file)), part.began);
       state.listVersion += 1;
       state.listBusy = false;
       state.animations = items.filter((item) => typeof item.file === "string");
@@ -724,9 +760,11 @@ export function keyOf(animation) {
   if (typeof animation.bytes !== "number") {
     return null;
   }
+  // A file of a folder of the board's own storage is named in its catalog by its stored name.
+  const name = typeof animation.stored === "string" ? animation.stored : animation.file;
   const read = reads.find((one) => one.storage === storage);
   const kept = state.keys[storage];
-  const key = (read === undefined ? undefined : read.byName.get(animation.file)) ?? (kept === null ? undefined : kept.byName.get(animation.file));
+  const key = (read === undefined ? undefined : read.byName.get(name)) ?? (kept === null ? undefined : kept.byName.get(name));
   if (key !== undefined && key.endsWith(`-${animation.bytes}`)) {
     return key;
   }
@@ -748,8 +786,9 @@ export function uploadedTo(storage, name, key) {
   changed();
 }
 
-// Sends what the operator asked for, once. A status is due at once after its reply, and
-// after a removal the list and the space are due too.
+// Sends what the operator asked for, once. A status is due at once after its reply, but
+// for a request of a long job in the background, between which a status comes at its own
+// time; after a removal the list and the space are due too.
 async function give(request) {
   if (request.allowed && !request.allowed()) {
     request.resolve?.(false);
@@ -807,8 +846,10 @@ async function give(request) {
     spaceDue = true;
   }
   // The status that shows what the command did goes before a list that waits.
-  statusDue = true;
-  listWaited = false;
+  if (!request.background) {
+    statusDue = true;
+    listWaited = false;
+  }
   changed();
 }
 
@@ -851,7 +892,8 @@ function due() {
   if (document.hidden) {
     return null;
   }
-  if (wanted.length > 0) {
+  // A request of a long job in the background lets a status that is due go first.
+  if (wanted.length > 0 && !(wanted[0].background && statusDue)) {
     const request = wanted.shift();
     return () => give(request);
   }
@@ -934,6 +976,7 @@ export function begin() {
   connectionDue = true;
   keptUnder = address();
   holder = null;
+  readForm = null;
   state.listVersion = 0;
   if (job !== null) {
     job.failed(new Error("the address changed"));
@@ -951,7 +994,7 @@ export function begin() {
   onlyFolder = null;
   onlyDesired = "clocks";
   state.onlyUnavailable = false;
-  state.level = {path: "", id: null};
+  state.level = {path: "", id: null, storage: null};
   state.rootNames = null;
   rootDue = false;
   rooting = null;
@@ -1004,7 +1047,7 @@ export function showing(name) {
   next();
 }
 
-// Shows another level of the card's folders: `folder`, `{id, playlist}`, a folder of the
+// Shows another level of the folders: `folder`, `{id, playlist, external}`, a folder of the
 // level shown, entered; or with `back` the level above. Its list is read at once, and
 // nothing of the level left is kept.
 export function clocksOnly() {
@@ -1012,19 +1055,19 @@ export function clocksOnly() {
 }
 
 export function canEnter(folder) {
-  return !onlyActive || state.link === "answers" && state.statusFresh && inClocks(state.level.path) &&
+  return !onlyActive || state.link === "answers" && state.statusFresh && inClocks(state.level) &&
     typeof folder?.playlist === "string" && inClocks(folder.playlist) &&
     parentOf(folder.playlist) === state.level.path &&
-    state.folders.some(known => known.id === folder.id && known.playlist === folder.playlist);
+    state.folders.some(known => known.id === folder.id && known.playlist === folder.playlist && storageOf(known) === "external");
 }
 
 export function canGoBack() {
-  return trail.length > 0 && (!onlyActive || trail.length > 1 && inClocks(state.level.path));
+  return trail.length > 0 && (!onlyActive || trail.length > 1 && inClocks(state.level));
 }
 
 export function enter(folder) {
   if (!canEnter(folder)) return false;
-  trail.push({path: folder.playlist, id: folder.id});
+  trail.push({path: folder.playlist, id: folder.id, storage: storageOf(folder)});
   toLevel();
   return true;
 }
@@ -1037,13 +1080,13 @@ export function back() {
 }
 
 function toLevel() {
-  if (onlyActive && !inClocks(trail[trail.length - 1]?.path ?? "")) {
+  if (onlyActive && !inClocks(trail[trail.length - 1])) {
     trail.splice(0, trail.length, {path: "clocks", id: onlyFolder});
   }
   const top = trail[trail.length - 1];
-  state.level = top === undefined ? {path: "", id: null} : {path: top.path, id: top.id};
-  if (onlyActive && inClocks(state.level.path) && state.level.id !== null) onlyDesired = state.level.path;
-  state.onlyUnavailable = onlyActive && inClocks(state.level.path) && state.level.id === null;
+  state.level = top === undefined ? {path: "", id: null, storage: null} : {path: top.path, id: top.id, storage: top.storage};
+  if (onlyActive && inClocks(state.level) && state.level.id !== null) onlyDesired = state.level.path;
+  state.onlyUnavailable = onlyActive && inClocks(state.level) && state.level.id === null;
   state.listBusy = false;
   // The unavailable Clocks location lists nothing while its folder is resolved again.
   state.animations = state.onlyUnavailable ? [] : null;
@@ -1132,8 +1175,10 @@ export function remove(animation, done) {
   });
 }
 
+// Whether an item of a list is the card's Clocks folder or inside it; a folder or a file of
+// the board's own storage never is.
 export function inClockFolder(item) {
-  const path = typeof item.playlist === "string" ? item.playlist : item.external === true ? item.file : null;
+  const path = typeof item.playlist === "string" ? (item.external === false ? null : item.playlist) : item.external === true ? item.file : null;
   return inClocks(path);
 }
 
@@ -1267,7 +1312,7 @@ export function uploadSnapshot(level) {
     const status = await commands.status();
     unchanged();
     takeStatus(status);
-    if (onlyActive && (!inClocks(level.path) || level.id === null)) {
+    if (onlyActive && (!inClocks(level) || level.id === null)) {
       throw new commands.Refusal("in-use", "upload");
     }
     const space = await commands.space();
@@ -1292,11 +1337,11 @@ export function uploadSnapshot(level) {
     const root = await all(null);
     let items = root;
     let folderValid = level.id === null;
-    if (level.id !== null && space.external?.present === true) {
+    if (level.id !== null && (level.storage === "internal" || space.external?.present === true)) {
       let path = "";
       for (const part of level.path.split("/")) {
         path += (path ? "/" : "") + part;
-        const folder = items.find(row => row.playlist === path);
+        const folder = items.find(row => typeof row.playlist === "string" && row.playlist === path && storageOf(row) === (level.storage ?? "external"));
         if (!folder) break;
         if (path === level.path) folderValid = folder.id === level.id;
         items = await all(folder.id);
@@ -1307,13 +1352,37 @@ export function uploadSnapshot(level) {
       unchanged();
       if (["internal", "external"].some(storage => after[storage].generation !== catalog[storage].generation)) throw new commands.Refusal("stale", "upload preflight");
     }
-    return {space, catalog, root, items, folderValid};
+    const ids = await idsWithin(root, async (from, folder) => {
+      const reply = await commands.list(from, folder);
+      unchanged();
+      return reply;
+    });
+    return {space, catalog, root, items, folderValid, ids};
   });
 }
 
-function requestOperation(kind, carry, confirm, allowed, guard) {
+// Every id of the board's own storage, its root's and its folders', that a new item's id is
+// chosen against.
+export function takenIds() {
+  return requestOperation("ids", async () => {
+    const asked = target;
+    return idsWithin(await (async () => {
+      const rows = [];
+      let from = 0;
+      do {
+        const reply = await commands.list(from, null);
+        if (asked !== target) throw new Error("the target changed");
+        rows.push(...reply.items);
+        from = reply.next;
+      } while (from !== null);
+      return rows;
+    })(), (from, folder) => commands.list(from, folder));
+  });
+}
+
+function requestOperation(kind, carry, confirm, allowed, guard, background = false) {
   return new Promise((resolve, reject) => {
-    wanted.push({kind, carry, confirm, allowed, resolve, reject, guard});
+    wanted.push({kind, carry, confirm, allowed, resolve, reject, guard, background});
     next();
   });
 }
@@ -1331,9 +1400,12 @@ export function timingOperation(carry, version, current = () => true) {
   }, undefined, undefined, guard);
 }
 
+// A request that was not sent: the app was hidden, or another target was chosen.
+export class Withdrawn extends Error {}
+
 function cancelWaiting() {
   for (const request of wanted) {
-    request.reject?.(new Error("the request was cancelled"));
+    request.reject?.(new Withdrawn("the request was cancelled"));
     request.settle?.(false);
   }
   wanted.length = 0;
@@ -1406,27 +1478,91 @@ export function ignore(id, ignored) {
   });
 }
 
-// The whole file of an animation, read from the target in pieces, as bytes.
-export function readFile(id) {
+// Whether the target takes `read <id> <offset> <count>`, which `read <id> 0 1` shows: it is
+// refused with `bad-argument` by one that does not. The answer is kept for the target.
+async function probeReadCount(id, asked) {
+  let counts = true;
+  try {
+    await commands.read(id, 0, 1);
+  } catch (error) {
+    if (!(error instanceof commands.Refusal && error.code === "bad-argument")) throw error;
+    counts = false;
+  }
+  if (asked === target) readForm = {target: asked, counts};
+  return counts;
+}
+
+// One piece of the file of an animation from an offset, `{bytes, data}`: 720 bytes at most
+// from a target that takes a count, which `read <id> 0 1` finds out once for each target,
+// else 600 at most. A count refused with `bad-argument` is asked about again, as another
+// installation may answer at the same address. It goes in its turn as a request in the
+// background.
+export function readPiece(id, offset) {
   return requestOperation("read", async () => {
-    const parts = [];
-    let offset = 0;
-    for (;;) {
-      const {bytes, data} = await commands.read(id, offset);
-      parts.push(data);
-      offset += data.length;
-      if (data.length === 0 || offset >= bytes) {
-        break;
+    const asked = target;
+    const known = readForm !== null && readForm.target === asked ? readForm.counts : await probeReadCount(id, asked);
+    if (!known) return commands.read(id, offset);
+    try {
+      return await commands.read(id, offset, commands.READ_COUNT);
+    } catch (error) {
+      if (!(error instanceof commands.Refusal && error.code === "bad-argument") || await probeReadCount(id, asked)) throw error;
+      return commands.read(id, offset);
+    }
+  }, undefined, undefined, undefined, true);
+}
+
+// Waits until the app is on the screen.
+function onTheScreen() {
+  return new Promise((resolve) => {
+    if (!document.hidden) {
+      resolve();
+      return;
+    }
+    const seen = () => {
+      if (!document.hidden) {
+        document.removeEventListener("visibilitychange", seen);
+        resolve();
       }
-    }
-    const whole = new Uint8Array(offset);
-    let at = 0;
-    for (const part of parts) {
-      whole.set(part, at);
-      at += part.length;
-    }
-    return whole;
+    };
+    document.addEventListener("visibilitychange", seen);
   });
+}
+
+// The whole file of an animation, read from the target piece by piece, as bytes, each piece
+// in its turn among the other requests; a piece withdrawn while the app was hidden is asked
+// again once it is shown, from the same target. `progress(read, size)` is told after each
+// piece. A file whose size changes between two pieces is not the one whose reading began.
+export async function readFile(id, progress = () => {}) {
+  const asked = target;
+  const parts = [];
+  let offset = 0;
+  let size = null;
+  for (;;) {
+    let piece;
+    try {
+      piece = await readPiece(id, offset);
+    } catch (error) {
+      if (!(error instanceof Withdrawn) || asked !== target) throw error;
+      await onTheScreen();
+      continue;
+    }
+    const {bytes, data} = piece;
+    if (size !== null && bytes !== size) throw new Error("The file changed while it was read.");
+    size = bytes;
+    parts.push(data);
+    offset += data.length;
+    progress(offset, size);
+    if (data.length === 0 || offset >= bytes) {
+      break;
+    }
+  }
+  const whole = new Uint8Array(offset);
+  let at = 0;
+  for (const part of parts) {
+    whole.set(part, at);
+    at += part.length;
+  }
+  return whole;
 }
 
 export function removeMany(ids) {
@@ -1436,6 +1572,12 @@ export function removeMany(ids) {
 // Sends one request of a job of the app, such as a move, in its turn among the operator's.
 export function operation(kind, carry) {
   return requestOperation(kind, carry);
+}
+
+// Sends one request of a long job of the app, such as a backup, in its turn, letting a
+// status that is due go before it.
+export function background(kind, carry) {
+  return requestOperation(kind, carry, undefined, undefined, undefined, true);
 }
 
 // The catalogs of the target, the rebuild of one of them and its cancel.

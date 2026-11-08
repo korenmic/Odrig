@@ -981,3 +981,22 @@ resolved Clocks folder and its descendants. Settings, Target and leaving the mod
 available. Uploads in Only require a writable external Clocks destination; the app does
 not fall back to internal root, and its flat-root authoring save is disabled. Raw command
 browsing and the firmware command list remain unchanged.
+
+### Seed 74: reads of 720 bytes, backups, and folders of the board's own storage
+
+On 2026-11-08, under the answer of 2026-11-06, `read` gets a count: `read <id> <offset> <count>` gives
+1 to 720 bytes of a file from an offset, through the chunk buffer, at no memory of the core,
+and `read <id> <offset>` keeps its 600. A reply holds 1,024 bytes, which with a size of ten
+digits leave room for 737; 720 make a reply of 1,001. The app downloads a file under its name
+and backs up a selection of one storage as one zip with the manifest `odrig-backup.json` of
+version 1, and the APK gets another plugin of its own, `Save`, which keeps a download or a
+backup where the operator chooses in the system's dialog.
+
+On 2026-11-08, under the same answer, the board's own storage gets folders: `folder make
+internal <path>` makes one, a playlist as a folder of the card is, `upload begin` takes a
+folder's path before a file's name, `list` and `list in` give the folders and their files,
+and `ignore` of a folder's id holds its subtree. A file of a folder keeps the name
+`<n>/<name>`, in the storage's folder `n`, in `show.json` and the other files that name it;
+the folders' paths are in `folders.txt`. The host interface's names, `remove` and
+`make_folder` take the number of such a folder, and `make_folder` may answer 0 for a storage
+that makes no folders. The core's memory is as it was.

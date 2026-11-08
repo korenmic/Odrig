@@ -89,7 +89,7 @@ class TheSavedOrder(unittest.TestCase):
     def test_move_up_and_move_down_in_the_menu(self):
         emulator, _ = self.emulator()
         found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 4, "menu": [3, "Move up", [1, 3, 2, 4]]}).seen
-        self.assertEqual(found["menu"], ["Ignore in playlist", "Move up", "Move down", "Select", "Delete"])
+        self.assertEqual(found["menu"], ["Ignore in playlist", "Move up", "Move down", "Download", "Select", "Delete"])
         self.assertEqual(found["after"], [1, 3, 2, 4])
         found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 4, "menu": [1, "Move down", [3, 1, 2, 4]]}).seen
         self.assertEqual(found["after"], [3, 1, 2, 4])
@@ -117,7 +117,7 @@ class TheSavedOrder(unittest.TestCase):
     def test_the_first_row_cannot_move_up_nor_the_last_down(self):
         emulator, _ = self.emulator(2, drive=["c.odrg"])
         found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "look": 60001}).seen
-        self.assertEqual(found["menu"], ["Ignore in playlist", "Move up", "Move down (disabled)", "External storage is read-only: this animation cannot be deleted. Inclusion is saved on the target."])
+        self.assertEqual(found["menu"], ["Ignore in playlist", "Move up", "Move down (disabled)", "Download", "Select", "External storage is read-only: this animation cannot be deleted. Inclusion is saved on the target."])
         found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "menu": [2, "Move up", [2, 1, 60001]]}).seen
         self.assertEqual(self.order_of(emulator), [2, 1, 60001])
         found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "older": True}).seen
@@ -152,7 +152,7 @@ class TheSavedOrder(unittest.TestCase):
             lines = [line for _, line in target.lines]
         self.assertEqual(found["first"], [3, 1, 2])
         self.assertEqual(found["note"], "This installation's software keeps no order of its own: the list is in the order of its show.")
-        self.assertEqual(found["menu"], ["Ignore in playlist", "Move up (disabled)", "Move down (disabled)", "Select", "Delete"])
+        self.assertEqual(found["menu"], ["Ignore in playlist", "Move up (disabled)", "Move down (disabled)", "Download", "Select", "Delete"])
         self.assertEqual([line for line in lines if line.startswith(b"order move")], [])
 
     def test_while_selecting_dragging_and_moving_are_off_and_say_why(self):

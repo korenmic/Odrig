@@ -1,6 +1,6 @@
-// The explorer's actions on the list: a new folder of the card at the level shown, and the
-// move of the selected files to a storage and a folder the operator names in full, each
-// destination shown before anything is sent.
+// The explorer's actions on the list: a new folder at the level shown, of the board's own
+// storage or of the card, and the move of the selected files to a storage and a folder the
+// operator names in full, each destination shown before anything is sent.
 
 import * as client from "../client.js";
 import * as commands from "../commands.js";
@@ -28,6 +28,16 @@ function byId(id) {
 export function cardWritable(state) {
   const card = state.space?.external;
   return card?.present === true && card.read_only === false && state.catalog?.external?.state === "ok";
+}
+
+// Whether it is known whether the board may write the card: its space is known, and a card
+// that is present and not read-only has had its catalog read.
+function cardSettled(state) {
+  if (state.space === null || state.space === undefined) return false;
+  const card = state.space.external;
+  if (card?.present !== true || card.read_only !== false) return true;
+  const catalog = state.catalog?.external?.state;
+  return catalog !== undefined && catalog !== "loading";
 }
 
 // Why the card cannot be a destination now, or null.
@@ -62,11 +72,32 @@ export function folderProblem(parent, name) {
   return null;
 }
 
+// The storage of a new folder at the level shown: the level's own inside a folder, and at
+// the root the one chosen, the card only while it may be written.
+function folderStorage(state) {
+  if (state.level.id !== null) return state.level.storage === "internal" ? "internal" : "external";
+  const chosen = byId("folder-storage").value;
+  return chosen === "external" && cardWritable(state) ? "external" : "internal";
+}
+
+function showWhere() {
+  if (folderAt === null) return;
+  folderAt.storage = folderStorage(client.state);
+  byId("folder-where").textContent = `In ${moves.label(folderAt.storage, folderAt.path ? `${folderAt.path}/` : "")}`;
+}
+
 function openFolder(playlist) {
-  const level = client.state.level;
-  folderAt = {path: level.path, playlist, version: client.targetVersion()};
+  const state = client.state;
+  const level = state.level;
+  folderAt = {path: level.path, playlist, version: client.targetVersion(), storage: "internal"};
   byId("folder-dialog-title").textContent = playlist ? "New playlist folder" : "New folder";
-  byId("folder-where").textContent = `In ${moves.label("external", level.path ? `${level.path}/` : "")}`;
+  const atRoot = level.id === null;
+  const chooser = byId("folder-storage");
+  chooser.hidden = !atRoot;
+  byId("folder-storage-label").hidden = !atRoot;
+  chooser.querySelector('option[value="external"]').disabled = !cardWritable(state);
+  if (atRoot) chooser.value = cardWritable(state) ? "external" : "internal";
+  showWhere();
   byId("folder-name").value = "";
   byId("folder-problem").textContent = "";
   byId("folder-dialog").hidden = false;
@@ -91,8 +122,8 @@ async function makeFolder() {
   if (asked.version !== client.targetVersion()) return;
   const path = asked.path ? `${asked.path}/${name}` : name;
   try {
-    const made = await client.operation("folder", () => commands.folderMake(path));
-    message(made.made ? `Made the folder ${moves.label("external", path)}. It plays as a playlist once files are in it.` : `The folder ${moves.label("external", path)} was there already.`);
+    const made = await client.operation("folder", () => commands.folderMake(path, asked.storage));
+    message(made.made ? `Made the folder ${moves.label(asked.storage, path)}. It plays as a playlist once files are in it.` : `The folder ${moves.label(asked.storage, path)} was there already.`);
   } catch (error) {
     message(`The folder was not made. ${refusalText(error)}`);
   } finally {
@@ -110,7 +141,7 @@ async function cardFolders() {
     do {
       const reply = await client.operation("move", () => commands.list(from, folder));
       for (const row of reply.items) {
-        if (typeof row.playlist === "string" && !found.includes(row.playlist)) {
+        if (typeof row.playlist === "string" && row.external === true && !found.includes(row.playlist)) {
           found.push(row.playlist);
           pending.push(row.id);
         }
@@ -121,18 +152,15 @@ async function cardFolders() {
   return found;
 }
 
-// The reasons some files cannot move at all, by id, from the root's rows with its cycles.
+// The reasons some files cannot move at all, by id, from the root's rows with its cycles and
+// the rows of each file's own level.
 async function blockedOf(files) {
-  const rows = [];
-  let from = 0;
-  do {
-    const reply = await client.operation("move", () => commands.list(from, null));
-    rows.push(...reply.items);
-    from = reply.next;
-  } while (from !== null);
   const reasons = new Map();
+  const levels = new Map();
   for (const file of files) {
-    const held = moves.heldBy(rows, file);
+    const key = `${file.external === true}:${moves.sourceFolder(file)}`;
+    if (!levels.has(key)) levels.set(key, await moves.sourceRows(client.operation, file));
+    const held = moves.heldBy(levels.get(key), file);
     if (held !== null) reasons.set(file.id, held);
   }
   return reasons;
@@ -146,18 +174,9 @@ async function destinationRows(storage, folder) {
   return (await client.uploadSnapshot({path: folder, id: level})).items;
 }
 
+// The id of the card's folder with this path, or null when there is none.
 async function levelId(path) {
-  let rows = (await client.operation("move", () => commands.list(0, null))).items;
-  let id = null;
-  let walked = "";
-  for (const part of path.split("/")) {
-    walked = walked ? `${walked}/${part}` : part;
-    const folder = rows.find((row) => row.playlist === walked);
-    if (folder === undefined) return null;
-    id = folder.id;
-    if (walked !== path) rows = (await client.operation("move", () => commands.list(0, id))).items;
-  }
-  return id;
+  return (await moves.folderId(client.operation, path, "external")) ?? null;
 }
 
 function drawPlan() {
@@ -359,13 +378,16 @@ async function reconcile(state) {
 // Draws the explorer's buttons with the screen.
 export function draw(state) {
   const level = state.level;
-  const atCard = cardWritable(state) && state.status?.clockMode !== "only";
+  // The board's own storage makes folders at its root, once it is known whether the card may
+  // be written, and in its folders; the card at its levels while it may be written.
+  const offered = state.status?.clockMode !== "only" && ((level.id === null && cardSettled(state)) || level.storage === "internal" || cardWritable(state));
   for (const id of ["new-folder", "new-playlist-folder"]) {
     const button = byId(id);
-    button.hidden = !atCard;
+    button.hidden = !offered;
     button.disabled = running !== null || client.contentBusy() || state.link !== "answers";
   }
-  byId("new-folder").title = `Makes a folder in External /${level.path}`;
+  const storage = level.id === null ? (cardWritable(state) ? "external" : "internal") : level.storage === "internal" ? "internal" : "external";
+  byId("new-folder").title = `Makes a folder in ${moves.label(storage, level.path)}`;
   reconcile(state);
 }
 
@@ -377,6 +399,7 @@ export function start(options) {
   byId("new-folder").addEventListener("click", () => openFolder(false));
   byId("new-playlist-folder").addEventListener("click", () => openFolder(true));
   byId("folder-make").addEventListener("click", makeFolder);
+  byId("folder-storage").addEventListener("change", showWhere);
   byId("folder-cancel").addEventListener("click", closeFolder);
   byId("folder-name").addEventListener("keydown", (event) => {
     if (event.key === "Enter") makeFolder();

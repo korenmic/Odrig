@@ -87,7 +87,7 @@ Every function receives `ctx` as its first argument.
 | `write` | `int write(void *ctx, const uint8_t *bytes, size_t length)`: adds bytes to the file being written. `length` is 1 to 1,500. Returns 1, or -1. |
 | `write_close` | `int write_close(void *ctx)`: ends the writing. When it has returned 1, the file is whole in storage and stays so through a power cut. Returns 1, or -1 on a failure. |
 | `rename` | `int rename(void *ctx, const char *from, const char *to)`: gives the file `from` the name `to`, in place of a file that has it. After a power cut during the call, `to` is its old file or the new one, whole. Returns 1, or -1. |
-| `remove` | `int remove(void *ctx, const char *name)`: removes the file of this name. A file being written under it is given up. Returns 1 when it removed one, 0 when there was none, -1 on a failure. |
+| `remove` | `int remove(void *ctx, const char *name)`: removes the file of this name. A file being written under it is given up. Returns 1 when it removed one, 0 when there was none, -1 on a failure. Given the number of a folder of the storage, `<n>`, it removes that folder while it is empty, -1 while it holds a file. |
 | `space` | `int space(void *ctx, uint32_t *free_bytes, uint32_t *total_bytes)`: the free and the total bytes of the storage the files are in; a value above 4,294,967,295 is given as that. Returns 1, or -1 when the host cannot tell. |
 | `read_at` | `int32_t read_at(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity)`: reads a file apart from the one that `open`, `read` and `close` hold: up to `capacity` bytes from this offset. Returns the number read, 0 at or after the end of the file, -1 on a failure and when there is no such file. `capacity` is never above 512. |
 | `drive` | `uint32_t drive(void *ctx)`: the number of the drive of animations that is plugged in now: a number other than 0 that changes each time a drive is plugged in, or 0 while none is. The core calls it at each refresh, before the LED data is made. `NULL` for a host without a drive; see [a drive](#a-drive). |
@@ -98,7 +98,7 @@ Every function receives `ctx` as its first argument.
 | `drive_bind` | `int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name)`: optional; gives the place to the file of the drive's folder with this name, so that `drive_name` gives the name and `drive/<place>` opens it. Returns 1, or 0 when that drive is not plugged in any more or the name is not one of the drive. Without it every drive is listed. |
 | `identity` | `int identity(void *ctx, char *buffer, size_t capacity)`: optional stable board ID, complete NUL-terminated1..31 ASCII letters/digits/hyphen/underscore. Returns1 or0 unavailable; never truncate. |
 | `drive_writable` | `int drive_writable(void *ctx, uint32_t drive)`: optional; 1 when the core may change the files of that drive with the storage functions, by the names `drive/<name>`, 0 otherwise. Without it the drive is read only. |
-| `make_folder` | `int make_folder(void *ctx, const char *name)`: optional; makes the folder `drive/<path>` of the drive's folder `odrig`, a path of folders alone whose parent is there; 1 when the folder is there afterwards, made now or before, -1 on failure and when a file has that name. Without it `folder make` answers `unsupported`. Before an upload into a folder the core asks for each folder of its path, so that a folder of the index removed from the drive while it was empty is there again. |
+| `make_folder` | `int make_folder(void *ctx, const char *name)`: optional; makes the folder `drive/<path>` of the drive's folder `odrig`, a path of folders alone whose parent is there, or the folder of the storage `<n>`, 1 to 255, inside the storage's own folder; 1 when the folder is there afterwards, made now or before, 0 when that storage makes no folders, -1 on failure and when a file has that name. The storage's own folder is made only by `write_open`. Without it, or with 0, `folder make` answers `unsupported`. Before an upload into a folder the core asks for each folder of its path, so that a folder removed while it was empty is there again. |
 
 Capacity callbacks must meet the 50 ms per-call budget and must not start or wait
 for an allocation-table scan under a lock playback needs. The microSD firmware
@@ -117,11 +117,13 @@ The last seven members are the storage functions: three that write a file, `rena
 `remove`, `space`, and `read_at`, which reads a second file beside the one that plays.
 
 - A name the core gives any of them is 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_`
-  and `.`: `mapping.json`, `show.json`, the name of an `.odrg` file, or one of the names
-  the core keeps for itself, `upload.part`, `show.part`, `pending.txt`, `mapping.part`,
+  and `.`: `mapping.json`, `show.json`, the name of an `.odrg` file, alone or after the
+  number of a folder of the storage, `<n>/`, 1 to 255 without a leading zero, or one of the
+  names the core keeps for itself, `upload.part`, `show.part`, `pending.txt`, `mapping.part`,
   `order.txt`, `order.part`, `repeats.txt`, `repeats.part`, `clocks.txt`, `clocks.part`,
-  `playlist.txt`, `playlist.part`, `brightness.txt`, `brightness.part`, `ignored.txt`
-  and `ignored.part`.
+  `playlist.txt`, `playlist.part`, `brightness.txt`, `brightness.part`, `ignored.txt`,
+  `ignored.part`, `folders.txt` and `folders.part`; and to `make_folder` and `remove` the
+  number `<n>` of a folder of the storage alone.
 - The core has at most one file being written, gives `write` at most 1,500 bytes in one
   call, and reads a file with `read_at` from offset 0 on, each call where its last call for
   that file ended; only the commands `read` and `catalog page`, and the reads of the files
@@ -144,8 +146,8 @@ The last seven members are the storage functions: three that write a file, `rena
 The drive and drive_name members describe the drive. A host with a drive sets both, and has storage that
 can be changed; with either of them `NULL`, or with `write_open` `NULL`, the core has no
 drive and calls neither. To `open` and `read_at` the core names the file at place `p` of
-the drive's list `drive/p`, as `drive/0`; no name of the installed file set has a slash,
-and a drive's file is named by its path from the drive's folder, `drive/night/comet.odrg`
+the drive's list `drive/p`, as `drive/0`; no name of the installed file set has a slash but
+after the number of its folder, and a drive's file is named by its path from the drive's folder, `drive/night/comet.odrg`
 for one in a sub-folder. A host that is given such a name for a drive that is gone answers
 as for a file that is not there.
 
@@ -319,6 +321,13 @@ five words at most, and a line with more is no valid command. Every line gets ex
 reply, an empty line too: one JSON object on one line of at most 1,024 bytes, ended by a
 newline, without a zero after it. The reply is written into the room the caller gives.
 
+`read` gathers the bytes it gives in the chunk buffer, before byte 1,400, from which a
+rebuild of a catalog keeps the counts and the CRC-32s of its pages between its steps, and
+`read` is not refused while one runs: 600 without a count, and as many as its count asks
+for, 720 at most. 720 bytes in base64 and a size of ten digits make a reply of 1,001 bytes.
+Two `static_assert`s of `content.cpp` hold both bounds, the 1,400 bytes before the kept
+pages and the reply's 1,024, so the count takes no memory of its own.
+
 `odrig_core_feed` is for a transport that delivers bytes, such as a serial port. Every
 newline ends a line. The core keeps an unfinished line of up to 2,048 characters, and a
 carriage return after them, from one call to the next, and of a line without end it keeps
@@ -393,9 +402,14 @@ change left:
    items, and then `repeats.txt`, for their saved repeats; see [the saved
    order](#the-saved-order) and [the saved repeats](#the-saved-repeats).
 
+After `pending.txt` it opens `folders.txt`, the folders of the storage, and reads it, see
+[internal folders](#internal-folders); a show without one has no folders and pays nothing
+more.
+
 A folder with none of the files is asked to remove two names that are not there,
-`upload.part` and `show.part`, and to open five that are not there, `catalog.do`,
-`mapping.json`, `show.json`, `pending.txt` and `catalog.txt`, and for nothing else; the
+`upload.part` and `show.part`, and to open six that are not there, `catalog.do`,
+`mapping.json`, `show.json`, `pending.txt`, `folders.txt` and `catalog.txt`, and for
+nothing else; the
 reads with `read_at` of the saved order, the repeats and the settings find nothing, as
 for a show with no item. It then plays on the installation's mapping with the empty show.
 
@@ -785,6 +799,79 @@ its id, and asks the host for a name only when `list` writes it or a log line ne
   refresh keeps the picture before, the playlist goes on as after a pull, and the show
   stays valid. One file left out never drops the drive's other files.
 
+## Internal folders
+
+The board's own storage has folders, each a playlist, as the card's folders are; the
+commands are in [commands.md](commands.md#folders-of-the-boards-own-storage). They cost the
+core no memory: every figure of [Memory](#memory) is as it is without them.
+
+- **Numbered folders and stored names.** A folder is a folder of the storage named by its
+  number, 1 to 255, and a file in it has the stored name `<n>/<name>`, at most 36
+  characters; a file at the root keeps its name. `show.json`, the file table, every host
+  call, the internal catalog's keys, `pending.txt` and the `f` lines of `repeats.txt` and
+  `brightness.txt` hold the stored name, which stays while the file stays in its folder.
+- **`folders.txt`.** The folders' paths, ids and Ignore are kept in one file, in the tree's
+  order, depth first, siblings by the bytes of their names, a folder's line after its
+  parent's:
+
+  ```
+  odrig-folders 1 4
+  2 41 0 shows
+  1 39 0 shows/night
+  3 42 1 shows/old
+  ```
+
+  The header names the next number to give; each line is `<number> <id> <ignored> <path>`:
+  the number, 1 to 255, the id, 1 to 60,000, unique and no item's, 0 or 1, and the path,
+  one to three names under the card's rule, 93 bytes at most, the last not ending in
+  `.odrg` or `.odrgx`. Siblings differ in more than the case of their letters. A show
+  without the file has no folders. The core never keeps the file: it reads it through
+  `read_at` from its start, a line at a time into a buffer of 128 bytes on the stack,
+  whenever a command, the start or the rotation needs it, and writes it as `folders.part`,
+  renamed onto it.
+- **What the file table keeps.** A file's entry, 48 bytes as before, holds its stored name
+  in 37 bytes, its length as a 32-bit number that stays at 4,294,967,295 ms for a longer
+  file, while the catalogs keep the exact length, its `checked` and its type in two bits
+  each, `held`, whether its folder or a folder above it is ignored, and `rank`, 1 and the
+  index of its folder's line, 0 at the root. The core object keeps the number of lines and
+  whether the file could not be read in this boot, one byte inside its own padding. The
+  start, and every change of a folder or of a file in one, marks each file again with one
+  reading of the file.
+- **The start.** It opens `folders.txt` after `pending.txt` and reads it whole, each line
+  checked against the line before it. A line out of form or of order, a line whose parent
+  is not before it, or two lines with one number or one id make the file damaged: the core
+  logs `folders unreadable`, leaves the file as it is and has no folders in this boot; the
+  files of folders then play and are listed at the root under their stored names, and a
+  command that would change a folder answers `storage-error`. A folder whose id an item has
+  is given the lowest free id, and the file is written again; this is the only write the
+  start makes for the folders, and only for such a file.
+- **The walk.** The show's animations play in the order of their walk key: the rank of the
+  folder, then the key of the saved order. The root's playlist plays the root's animations,
+  then each folder's in the tree's order, its own files before its sub-folders', then the
+  card's. A folder's playlist is the ranks of its subtree; the current one is kept as
+  `kInternalLevel` and its number in `current`, its ranks in the record of the current
+  folder and `:` and its path in `playlist.txt`, which an older firmware takes for a folder
+  of the card it has not. The rotation goes from the root to the folders in the tree's
+  order, then the card's, then the root. A held file plays only by `play` of it. A host
+  without a drive keeps no current playlist and plays the root's.
+- **Changes.** `folder make internal` writes the new line into `folders.part`, which makes
+  the storage's folder of the show when there is none, then makes the folder `<n>` with
+  `make_folder`, then renames the part: a cut leaves the old file or the new one, and at
+  worst an empty numbered folder without a line, which a later folder of that number takes.
+  A folder emptied of its last file by a removal or an upload, with no sub-folder, loses
+  its line, and so does each folder above it left empty the same way, and then the core
+  removes the numbered folders with `remove("<n>")`. A removal while a rebuild runs or an
+  upload is received, or one that a power cut ends before the prune, leaves the emptied
+  folder with its line, as a folder never filled is. Numbers are given in turn from the
+  header's, back to 1 after 255, passing over one a line or a stored name of the file
+  table has. A folder's id is the lowest that no item and no folder has.
+- **Limits.** 32 folders, three levels, a folder's path of 93 bytes, a file's path of 100
+  bytes, a name of 32 characters, a stored name of 36. `upload begin` refuses a longer
+  path, and a file that a computer's tool put in a folder of a longer path has rank 0: it
+  is listed and played at the root under its stored name. So `file` in `status` holds 100
+  bytes at most, and `checking` gives the first 32 characters of a path, as of a drive's
+  name, which keeps the longest reply to `status` under 1,024 bytes.
+
 ## The catalogs
 
 The core reads and writes the catalog of the board's storage and of a drive in the format
@@ -829,7 +916,7 @@ tables. The core keeps three names in the folder for itself:
 |---|---|
 | `upload.part` | The bytes of the open upload. |
 | `show.part` | The next `show.json`, until it is renamed. |
-| `pending.txt` | The names of `.odrg` files that a change makes or is about to delete, one on a line, each ended by a line feed. A file named here that no item of `show.json` names is not part of the show. |
+| `pending.txt` | The stored names of `.odrg` files that a change makes or is about to delete, one on a line, each ended by a line feed. A file named here that no item of `show.json` names is not part of the show. |
 
 The saved order and the saved playlist have files of their own, `order.txt` and
 `playlist.txt`, each written as `order.part` or `playlist.part` and renamed: see [the saved
@@ -1150,13 +1237,16 @@ leg; and `ready`.
 | `--command-read-fails FILE OFFSET` | `read_at` returns -1 for that file at or after that offset when it is called inside a command, as `read` and `upload expect` call it; the checks read the file whole. |
 | `--drive-read-fails NAME OFFSET` | With `--drive`: `read` fails at that offset of the drive's file of that name. `read_at` is not touched, so the check finds the file sound and the player meets the fault. |
 | `--drive-read-only` | With `--drive`: `drive_writable` says 0, and every storage call on a name of the drive fails. |
-| `--no-folders` | With `--drive`: the host has no `make_folder`. |
+| `--no-folders` | The host has no `make_folder`: it makes neither a folder of the drive nor a numbered folder of its own storage. |
 | `--trace-drive` | With `--drive`: prints `drive list <count>` for every `drive_list` and `drive bind <place> <name>` for every `drive_bind`. |
 | `--trace-read-at` | Prints `read_at <name> <offset> <count>` for every `read_at`: the name, where it read from and how many bytes it gave. |
 
-A storage call is one of `write_open`, `write`, `write_close`, `rename` and `remove`.
-`space` and `read_at` are not counted and not traced. The storage functions work on the
-folder of a session, and for `session --batch` on the files held in memory. A file that
+A storage call is one of `write_open`, `write`, `write_close`, `rename`, `remove` and
+`make_folder`. `space` and `read_at` are not counted and not traced. The storage functions
+work on the folder of a session, and for `session --batch` on the files held in memory;
+a numbered folder of the storage is a sub-folder of it, or a set of names in memory, and a
+file goes into one only when it was made. `space` counts two blocks for each numbered
+folder and the files in it. A file that
 was being written when the program ends stays with the bytes written so far.
 
 The host hands out every file in pieces of changing sizes, none above 512 bytes, through

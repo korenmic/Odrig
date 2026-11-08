@@ -6,6 +6,7 @@
 #include "crc32.h"
 #include "core_state.h"
 #include "drive.h"
+#include "folders.h"
 #include "mapping.h"
 #include "mini.h"
 #include "rotation.h"
@@ -50,7 +51,7 @@ void open_file(Core &core, uint32_t index) {
         if (reason == kNone && (header.width != core.width || header.height != core.height)) {
             reason = kSizeMismatch;
         }
-        info.type = header.type;
+        info.type = stored_type(header.type);
         if (reason == kNone && is_drawn(header.type)) {
             info.total_ms = header.loop_ms;
         }
@@ -79,7 +80,7 @@ void check_file(Core &core, uint32_t index) {
         return;
     }
     // Nothing waits on this check: it goes on through every slice of a settling.
-    info.type = header.type;
+    info.type = stored_type(header.type);
     uint64_t total = 0;
     uint32_t record = 0;
     if (reason == kNone && is_drawn(header.type)) {
@@ -111,7 +112,7 @@ void check_file(Core &core, uint32_t index) {
         quarantine_file(core, index, reason, kWorkStart, record, core.decoder.body_read);
     } else {
         info.bytes = bytes;
-        info.total_ms = total;
+        info.total_ms = kept_length(total);
         info.checked = 1;
     }
 }
@@ -208,9 +209,9 @@ void check_step(Core &core) {
     const StepOutcome outcome = check_file_step(core, info.name, &reason, &record);
     if (outcome == kStepWhole) {
         info.bytes = core.checker->file.taken;
-        info.total_ms = core.check_total_ms;
+        info.total_ms = kept_length(core.check_total_ms);
         info.checked = 1;
-        info.type = core.check_content.type;
+        info.type = stored_type(core.check_content.type);
         ++core.check_at;
         check_passes_done(core);
     } else if (outcome == kStepFault) {
@@ -354,7 +355,7 @@ void drive_step(Core &core) {
             return;
         }
         entry.bytes = core.checker->file.taken;
-        entry.total_ms = drive_length(core.check_total_ms);
+        entry.total_ms = kept_length(core.check_total_ms);
         entry.type = core.check_content.type;
         entry.state = kDriveInPlaylist;
         player_drive_joined(core, place);
@@ -438,6 +439,7 @@ void start(Core &core) {
         return;
     }
     storage_settle_pending(core);
+    folders_start(core);
 
     // The files are opened in the order in which the show first names them. Their bodies
     // are read while the show plays, by the second decoders. A host whose storage cannot
@@ -468,6 +470,10 @@ void start(Core &core) {
     if (!core.invalid) {
         order_start(core);
         playlist_start(core);
+        if (core.playlist_path != nullptr && core.playlist_path[0] == ':') {
+            // The saved playlist is an internal folder, found again by its path.
+            tree_find_current(core);
+        }
     }
 }
 

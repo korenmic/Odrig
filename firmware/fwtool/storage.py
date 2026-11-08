@@ -4,6 +4,7 @@ the blocks in which two images differ."""
 import collections
 import json
 import pathlib
+import re
 import struct
 import time
 
@@ -30,7 +31,13 @@ IGNORED_NAME = "ignored.txt"
 SCHEDULE_NAME = "schedule.txt"
 ZONE_NAME = "timezone.bin"
 ROTATION_NAME = "rotation.txt"
-KEPT_NAMES = (ORDER_NAME, PLAYLIST_NAME, REPEATS_NAME, CLOCKS_NAME, BRIGHTNESS_NAME, IGNORED_NAME, SCHEDULE_NAME, ZONE_NAME, ROTATION_NAME)
+# The internal folders: the line of each, `<number> <id> <ignored> <path>`, after a header.
+# The files of the folder with number `n` are in the folder `n` of `/odrig`.
+FOLDERS_NAME = "folders.txt"
+KEPT_NAMES = (ORDER_NAME, PLAYLIST_NAME, REPEATS_NAME, CLOCKS_NAME, BRIGHTNESS_NAME, IGNORED_NAME, SCHEDULE_NAME, ZONE_NAME, ROTATION_NAME, FOLDERS_NAME)
+FOLDER_LINE = re.compile(rb"([1-9][0-9]{0,2}) [0-9]+ [01] [^\n]+")
+FOLDERS_HEADER = re.compile(rb"odrig-folders 1 ([1-9][0-9]{0,2})")
+FOLDER_NUMBER = re.compile(r"[1-9][0-9]{0,2}")
 # The files of the internal catalog: its marker and its pages.
 CATALOG_NAMES = (catalog.MARKER, *(catalog.page_name(number) for number in range(catalog.PAGES)))
 MARK = b"littlefs"
@@ -132,6 +139,46 @@ def change_of(present, wanted):
     )
 
 
+def folder_numbers(text):
+    """The numbers of the internal folders a `folders.txt` names, as texts; none for no file."""
+    if not text:
+        return set()
+    return {found.group(1).decode("ascii") for found in (FOLDER_LINE.fullmatch(line) for line in text.split(b"\n")[1:]) if found is not None}
+
+
+def folders_header(text):
+    """The first line of a `folders.txt` alone, which keeps the number its next folder takes
+    and names no folder; None for a file without a sound header."""
+    head = (text or b"").split(b"\n", 1)[0]
+    found = FOLDERS_HEADER.fullmatch(head)
+    return head + b"\n" if found is not None and int(found.group(1)) <= 255 else None
+
+
+def show_folder_numbers(text):
+    """The numbers of the internal folders that the files of a `show.json` are in, as texts;
+    none for a show that cannot be read."""
+    try:
+        items = json.loads(text)["items"]
+    except (ValueError, KeyError, TypeError):
+        return set()
+    if not isinstance(items, list):
+        return set()
+    numbers = set()
+    for item in items:
+        name = item.get("file") if isinstance(item, dict) else None
+        number = numbered_folder(name) if isinstance(name, str) else None
+        if number is not None and FOLDER_NUMBER.fullmatch(number) and int(number) <= 255:
+            numbers.add(number)
+    return numbers
+
+
+def numbered_folder(name):
+    """The internal folder of a name of `/odrig`, `<n>/<name>`, as text; None for a file at
+    the root."""
+    folder, slash, _ = name.partition("/")
+    return folder if slash else None
+
+
 def _spare_name(taken):
     """A short name that no file of `taken` has: a new file waits under it until it takes
     the place of the file it replaces."""
@@ -153,6 +200,12 @@ def _changed(image, present, wanted, write_first):
     system = mount(image)
     if not has_folder(system, FOLDER):
         system.mkdir(FOLDER)
+    # The internal folders the files are in and those `folders.txt` names, each made before
+    # a file is written into it.
+    numbered = folder_numbers(wanted.get(FOLDERS_NAME)) | {numbered_folder(name) for name in wanted if numbered_folder(name)}
+    for number in sorted(numbered):
+        if not has_folder(system, f"{FOLDER}/{number}"):
+            system.mkdir(f"{FOLDER}/{number}")
     gone = change.removed if write_first else change.removed + change.replaced
     if not write_first:
         for name in gone:
@@ -172,9 +225,10 @@ def _changed(image, present, wanted, write_first):
     if write_first:
         for name in gone:
             system.remove(f"{FOLDER}/{name}")
-    # A folder inside `/odrig` that is empty now goes too.
+    # A folder inside `/odrig` that is empty now goes too, unless it is an internal folder
+    # that is kept.
     for root, folders, names in list(system.walk(FOLDER))[::-1]:
-        if root.rstrip("/") != FOLDER and not folders and not names:
+        if root.rstrip("/") != FOLDER and not folders and not names and root.rstrip("/")[len(FOLDER) + 1:] not in numbered:
             system.rmdir(root.rstrip("/"))
     system.unmount()
     return bytes(system.context.buffer)
@@ -184,11 +238,12 @@ def with_show(image, files):
     """The image with `/odrig` holding exactly the files given, and everything else as it
     was. A file the folder holds with the same bytes stays where it is, unread and
     unwritten; only the files that are new, changed or gone are written or removed. The
-    result is checked before it is returned. An image that holds exactly these files
-    already is returned as it is."""
+    internal folders that `folders.txt` names are there, empty or not. The result is checked
+    before it is returned. An image that holds exactly these files and folders already is
+    returned as it is."""
     wanted = dict(files)
     present = show_of(image)
-    if present == wanted:
+    if present == wanted and all(has_folder(mount(image), f"{FOLDER}/{number}") for number in folder_numbers(wanted.get(FOLDERS_NAME))):
         return image
     try:
         try:
@@ -336,20 +391,32 @@ def _rejected(rejection):
 
 
 def folder_files(folder, check=True):
-    """The files of a show folder: the content of each by its name.
+    """The files of a show folder: the content of each by its name, `<n>/<name>` for a file
+    of an internal folder.
 
-    The folder must be flat. With `check` it must also be a valid installed file set, as
-    the readers of the converter judge it, and hold no file the show does not name besides
-    the saved operator settings.
+    The folder must be flat but for the internal folders its `folders.txt` or the files of its
+    show name, each a folder of files. With `check` it must also be a valid installed file set, as the
+    readers of the converter judge it, and hold no file the show does not name besides the
+    saved operator settings.
     """
     folder = pathlib.Path(folder)
     if not folder.is_dir():
         raise Failure("not-a-show-folder", f"{folder} is not a folder")
     entries = sorted(folder.iterdir())
+    listed = folder / FOLDERS_NAME
+    show_path = folder / SHOW_NAME
+    numbers = folder_numbers(listed.read_bytes() if listed.is_file() else None) | show_folder_numbers(show_path.read_bytes() if show_path.is_file() else b"")
+    files = {}
     for entry in entries:
+        if entry.is_dir() and entry.name in numbers:
+            for inside in sorted(entry.iterdir()):
+                if not inside.is_file():
+                    raise Failure("not-a-show-folder", f"{inside} is not a file; an internal folder holds files")
+                files[f"{entry.name}/{inside.name}"] = inside.read_bytes()
+            continue
         if not entry.is_file():
-            raise Failure("not-a-show-folder", f"{entry} is not a file; a show folder is flat")
-    files = {entry.name: entry.read_bytes() for entry in entries}
+            raise Failure("not-a-show-folder", f"{entry} is not a file; a show folder is flat but for the internal folders its {FOLDERS_NAME} or its show names")
+        files[entry.name] = entry.read_bytes()
     if check:
         # A folder's own catalog, as `read-show` copies it, is made anew.
         files = {name: data for name, data in files.items() if name not in CATALOG_NAMES}
@@ -366,7 +433,7 @@ def folder_files(folder, check=True):
             made, refused = catalog_files(files, allowed, (canvas.width, canvas.height))
             refused_names = sorted((name for name, _ in refused), key=named.index)
             for name in refused_names[:1] + [name for name in named if name not in allowed]:
-                _check_animation(folder / name, files[name], canvas)
+                _check_animation(folder.joinpath(*name.split("/")), files[name], canvas)
             if refused:
                 raise show_errors.Rejection(show_errors.FILE_MALFORMED, f"{folder / refused_names[0]}: {dict(refused)[refused_names[0]]}")
         except show_errors.Rejection as rejection:
@@ -418,13 +485,21 @@ def with_board_generation(files, present):
 
 
 def write_folder(folder, files):
-    """Copies files into a folder that is new or empty."""
+    """Copies files into a folder that is new or empty, a file of an internal folder,
+    `<n>/<name>`, into the folder `n` of it."""
     folder = paths.output(folder)
     if folder.exists() and (not folder.is_dir() or any(folder.iterdir())):
         raise Failure("output-not-empty", f"{folder} exists and is not an empty folder")
     folder.mkdir(parents=True, exist_ok=True)
     for name, content in files.items():
-        (folder / name).write_bytes(content)
+        path = folder.joinpath(*name.split("/"))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+
+
+def folder_files_removed(present, wanted):
+    """The files of the board's internal folders that an install of `wanted` would remove."""
+    return sorted(name for name in present if numbered_folder(name) and name not in wanted)
 
 
 def stamp():

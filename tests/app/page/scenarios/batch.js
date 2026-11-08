@@ -136,7 +136,7 @@ async function running(app) {
     if (words !== null && lines[lines.length - 1] !== words) lines.push(words);
   };
   const recorder = setInterval(record, 10);
-  const seen = {};
+  const seen = {names: listed(app).map((row) => row.name), destination: app.text("batch-destination")};
   const state = (at) => listed(app)[at].state;
   app.byId("batch-upload").click();
   await app.until(() => batch.running(), "the run", 15000);

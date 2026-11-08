@@ -167,8 +167,10 @@ class TheLineWhileTheInstallationChecks(unittest.TestCase):
         listed = (200, json.dumps({"ok": True, "items": [item], "next": None}, separators=(",", ":")) + "\n")
 
         def read(line):
-            offset = int(line.split(b" ")[2])
-            data = base64.urlsafe_b64encode(clock[offset:offset + 600]).rstrip(b"=").decode("ascii")
+            words = line.split(b" ")
+            offset = int(words[2])
+            count = int(words[3]) if len(words) > 3 else 600
+            data = base64.urlsafe_b64encode(clock[offset:offset + count]).rstrip(b"=").decode("ascii")
             return (200, json.dumps({"ok": True, "bytes": len(clock), "data": data}, separators=(",", ":")) + "\n")
 
         target = {**stand_in_of(60, 6, begin=begun, data=taken, end=checked_after(3.5)), "list": listed, "read": read}

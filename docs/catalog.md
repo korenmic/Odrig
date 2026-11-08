@@ -94,8 +94,9 @@ the bytes of their names, then its sub-folders by the bytes of their names, each
 way, every file of it; only a drive without a catalog is taken as at most 256 files and 32
 sub-folders, a folder counted with its uncounted ancestors when the first file at or below
 it is kept. A name of the board's own storage follows the
-show's rule too: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, so it holds no
-folder. A reader from before paths were names finds a catalog that names a file in a
+show's rule too: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, alone or after the
+number of a folder of the storage and `/`, `2/stars.odrg`, the name the show gives the file;
+the storage's folders keep their paths in `folders.txt`, not in the catalog. A reader from before paths were names finds a catalog that names a file in a
 folder `damaged`, with `line` saying where.
 
 ### The index of a drive

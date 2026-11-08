@@ -51,24 +51,37 @@ struct ItemInfo {
     uint32_t count;
 };
 
-// One `.odrg` or `.odrgx` file the show names. `type` is what it holds, as its header says.
-// `bytes` is its size, known once a check has read its body to its end. `total_ms` is its
-// length, the sum of the durations of its frames, and 0 while it is not known: a check
-// finds it, and so does playing the file through once. `fault` is the Reason of a fault of
-// the file in this boot, kNone while it is usable: a file with a fault is quarantined, and
-// its animations are unavailable until an upload replaces it. `checked` says that its
-// `bytes` are known: kCheckedRead when a check has read it whole in this boot,
-// kCheckedFromCatalog when they came from the storage's catalog.
+// Room for the stored name of a file of the show, with its 0: a name of 32 characters at
+// most, at the root of the storage, or `<n>/<name>` in the storage's folder `n`, 1 to 255.
+const uint32_t kStoredNameRoom = 37;
+
+// One `.odrg` or `.odrgx` file the show names, by its stored name. `type` is what it holds,
+// as its header says: kTypeFrames for any type that is not drawn. `bytes` is its size, known
+// once a check has read its body to its end. `total_ms` is its length, the sum of the
+// durations of its frames, and 0 while it is not known: a check finds it, and so does
+// playing the file through once; a length of 4,294,967,295 ms or more is kept as
+// 4,294,967,295. `fault` is the Reason of a fault of the file in this boot, kNone while it
+// is usable: a file with a fault is quarantined, and its animations are unavailable until
+// an upload replaces it. `checked` says that its `bytes` are known: kCheckedRead when a
+// check has read it whole in this boot, kCheckedFromCatalog when they came from the
+// storage's catalog. `rank` is 0 for a file at the root and for one whose folder
+// `folders.txt` does not name, else 1 and the index of its folder's line there; `held` says
+// that its folder or one above it is ignored.
 const uint8_t kCheckedRead = 1;
 const uint8_t kCheckedFromCatalog = 2;
 struct FileInfo {
-    char name[33];
+    char name[kStoredNameRoom];
     uint8_t fault;
-    uint8_t checked;
-    uint8_t type;
+    uint8_t checked : 2;
+    uint8_t type : 2;
+    uint8_t held : 1;
+    uint8_t spare : 3;
+    uint8_t rank : 6;
+    uint8_t spare_rank : 2;
     uint32_t bytes;
-    uint64_t total_ms;
+    uint32_t total_ms;
 };
+static_assert(sizeof(FileInfo) == 48, "a file of the show takes 48 bytes");
 
 // The work in which a file came to a reason: the check at the start or after it, playback,
 // the check of an upload, the check of a drive's file.
@@ -142,8 +155,9 @@ struct Upload {
     uint32_t records_left;  // the frame records the check has still to decode
     uint64_t total_ms;      // the sum of the durations of the records decoded
     uint32_t progress;      // low timestamp bits; quiet intervals use modular subtraction
-    uint32_t folder;        // external folder id, zero for the root
+    uint32_t folder;        // external folder id, zero for the root; of an internal upload the number of its folder, 0 for the root
 };
+static_assert(sizeof(Upload) == 72, "the upload takes 72 bytes");
 
 // What the core knows of the file at one place of a drive's list: its size, its length and
 // its type once the check has read it whole, the id it got when the drive was taken up, its
@@ -241,8 +255,13 @@ struct OrderReader {
     char line[kOrderLineRoom];
 };
 
-// A length as the drive's table keeps it.
-inline uint32_t drive_length(uint64_t total_ms) {
+// A type as the tables of files keep it: a drawn one, or kTypeFrames for any other.
+inline uint8_t stored_type(uint8_t type) {
+    return is_drawn(type) ? type : kTypeFrames;
+}
+
+// A length as the tables of files keep it.
+inline uint32_t kept_length(uint64_t total_ms) {
     return total_ms < 0xFFFFFFFFu ? static_cast<uint32_t>(total_ms) : 0xFFFFFFFFu;
 }
 
@@ -296,6 +315,10 @@ struct Folder {
 // The most folders of the table of a drive without a catalog, the root among them; a
 // folder that is none; and the room for the current playlist's path, with its 0.
 const uint32_t kFolderMost = 33;
+// The most folders of the internal storage, and the mark of a level or of a current
+// playlist that is an internal folder, with its number in the low bits.
+const uint32_t kInternalFolderMost = 32;
+const uint32_t kInternalLevel = 0x40000000u;
 const uint32_t kNoFolder = 0xFFFFFFFFu;
 const uint32_t kPlaylistPathRoom = 104;
 
@@ -817,6 +840,11 @@ struct Core {
     uint8_t rebuild_page;
 
     uint8_t rebuild_open;
+
+    // The internal folders: the lines of `folders.txt`, 0 for none, which spares a flat
+    // show every reading of it; and whether the file could not be read in this boot.
+    uint8_t internal_folders : 6;
+    uint8_t folders_error : 1;
 
 };
 

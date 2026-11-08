@@ -27,16 +27,14 @@ export function open() {
 }
 
 // The names the destination has, by the list the app holds of it: the root's of the
-// board's storage, the browsed folder's of the card, none without a list.
+// board's storage, the browsed folder's of either storage, none without a list.
 function destinationNames(form) {
   const state = client.state;
-  const here = state.animations !== null && state.level.path === form.level.path;
-  if (form.storage === "internal") {
-    if (here && state.level.path === "") return new Set(state.animations.filter((item) => item.external !== true).map((item) => item.file));
-    return new Set(state.rootNames?.files ?? []);
-  }
-  if (!here) return new Set();
-  return new Set(state.animations.filter((item) => item.external === true).map((item) => item.file.slice(item.file.lastIndexOf("/") + 1)));
+  const internal = form.storage === "internal";
+  const folder = destinations.folderOf(form);
+  const here = state.animations !== null && state.level.path === folder && (folder === "" || (state.level.storage === "internal") === internal);
+  if (here) return new Set(state.animations.filter((item) => (item.external === true) !== internal).map((item) => item.file.slice(item.file.lastIndexOf("/") + 1)));
+  return new Set(internal && folder === "" ? state.rootNames?.files ?? [] : []);
 }
 
 // Names rows against the destination's names and the names the list already holds, in the
@@ -223,7 +221,7 @@ export function draw(state, reason = null) {
   selector.value = list.form.storage;
   selector.options[0].disabled = !destinations.present(state.space);
   selector.disabled = ran;
-  byId("batch-destination").textContent = `${list.form.storage === "external" ? "External" : "Internal"} /${list.form.storage === "external" && list.form.level.path ? list.form.level.path + "/" : ""}`;
+  byId("batch-destination").textContent = destinations.label(list.form, "");
   byId("batch-destination-reason").textContent = destinations.reason(list.form, state.space);
   drawRows(ran);
   byId("batch-add").hidden = ran;
@@ -266,7 +264,7 @@ export function itemOf(row) {
     row,
     name: row.name,
     storage: list.form.storage,
-    folder: list.form.storage === "external" ? list.form.level.path : "",
+    folder: destinations.folderOf(list.form),
     size: row.size,
     replace: false,
     read: async () => {

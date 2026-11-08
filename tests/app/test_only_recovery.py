@@ -52,17 +52,17 @@ class OnlyRecovery(unittest.TestCase):
     def test_repeated_only_status_keeps_a_valid_descendant(self):
         seen = support.run('only-recovery', settings=dict(case='child')).seen
         self.assertEqual(set(seen['paths']), {'clocks/message'})
-        self.assertEqual(seen['level'], dict(path='clocks/message', id=60008))
+        self.assertEqual(seen['level'], dict(path='clocks/message', id=60008, storage='external'))
 
     def test_remapped_folder_ids_resolve_the_descendant_without_root(self):
         seen = support.run('only-recovery', settings=dict(case='remap')).seen
         self.assertNotIn('', seen['paths'])
-        self.assertEqual(seen['level'], dict(path='clocks/message', id=60018))
+        self.assertEqual(seen['level'], dict(path='clocks/message', id=60018, storage='external'))
 
     def test_clock_storage_return_restores_clocks_with_its_new_id(self):
         seen = support.run('only-recovery', settings=dict(restore=True)).seen
         self.assertNotIn('', seen['paths'])
-        self.assertEqual(seen['restored'], dict(path='clocks', id=60017))
+        self.assertEqual(seen['restored'], dict(path='clocks', id=60017, storage='external'))
 
     def test_unknown_policy_does_not_release_the_last_confirmed_only_context(self):
         seen = support.run('only-recovery', settings=dict(case='unknown')).seen
@@ -72,7 +72,7 @@ class OnlyRecovery(unittest.TestCase):
     def test_late_folder_reply_cannot_restore_a_previous_targets_only_policy(self):
         seen = support.run('only-recovery', settings=dict(case='target')).seen
         self.assertEqual(set(seen['paths']), {''})
-        self.assertEqual(seen['level'], dict(path='', id=None))
+        self.assertEqual(seen['level'], dict(path='', id=None, storage=None))
         self.assertEqual(seen['mode'], 'off')
 
     def test_unavailable_view_explains_recovery_and_keeps_target_settings_and_mode_exit_usable(self):

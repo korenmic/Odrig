@@ -38,8 +38,22 @@ export function absent(space) {
   return space != null && !present(space);
 }
 
+// The storage of the level a form was prepared at: the board's own for one of its folders,
+// the card for one of the card's.
+function levelStorage(form) {
+  return form.level.storage === "internal" ? "internal" : "external";
+}
+
+// Whether the file goes into the folder of the level, which is of the storage chosen.
+function intoLevel(form) {
+  return form.level.path !== "" && form.storage === levelStorage(form);
+}
+
+// In Clocks only the form goes to the card; else to the board's own storage when it was
+// prepared at one of its folders or no card is present, and to the card otherwise.
 export function capture(state, target, only = state.status?.clockMode === "only") {
-  return {target, level: {...state.level}, only, storage: only || present(state.space) ? "external" : "internal", explicitInternal: false,
+  const internalLevel = state.level.storage === "internal";
+  return {target, level: {...state.level}, only, storage: only ? "external" : internalLevel || !present(state.space) ? "internal" : "external", explicitInternal: internalLevel,
     generations: {internal: state.catalog?.internal?.generation ?? null, external: state.catalog?.external?.generation ?? null}};
 }
 
@@ -65,29 +79,34 @@ export function select(form, storage, space, only = form.only) {
 export function blocked(form, space, only = form.only) {
   if (!only) return null;
   const path = form.level.path;
-  return form.storage !== "external" || form.level.id === null ||
+  return form.storage !== "external" || form.level.id === null || levelStorage(form) !== "external" ||
     !(path === "clocks" || path.startsWith("clocks/")) || !present(space) ||
     space.external.read_only !== false ? ONLY_REASON : null;
 }
 
+// The folder of the destination, or "" for the root of its storage.
+export function folderOf(form) {
+  return intoLevel(form) ? form.level.path : "";
+}
+
 export function pathOf(form, name) {
   if (name.length > 32 || !/^[a-z0-9_-][a-z0-9._-]*\.(odrg|odrgx)$/.test(name)) throw new Error("Use a filename of at most 32 lowercase letters, digits, dots, - or _, ending in .odrg or .odrgx.");
-  const path = form.storage === "external" && form.level.path ? `${form.level.path}/${name}` : name;
+  const path = intoLevel(form) ? `${form.level.path}/${name}` : name;
   if (path.length > 100) throw new Error("The destination path exceeds 100 characters; use a shorter filename.");
   return path;
 }
 
 export function label(form, name) {
-  return `${form.storage === "external" ? "External" : "Internal"} /${form.storage === "external" && form.level.path ? form.level.path + "/" : ""}${name}`;
+  return `${form.storage === "external" ? "External" : "Internal"} /${intoLevel(form) ? form.level.path + "/" : ""}${name}`;
 }
 
 export function reason(form, space) {
   const boundary = blocked(form, space);
   if (boundary !== null) return boundary;
   if (!present(space) && !absent(space)) return "Storage not known yet: the installation has not answered.";
-  if (absent(space)) return `External storage is disconnected or not detected. Using Internal /${form.level.path ? "; internal storage has no matching subfolders" : ""}.`;
+  if (absent(space)) return `External storage is disconnected or not detected. Using Internal /${intoLevel(form) ? form.level.path + "/" : form.level.path ? "; internal storage has no matching subfolders" : ""}.`;
   if (form.storage === "external" && space.external.read_only !== false) return "External storage is detected but read-only. It will not be redirected to Internal.";
-  if (form.storage === "internal" && form.level.path) return "Internal storage has a flat root. This upload uses Internal / instead of the explored SD folder.";
+  if (form.storage === "internal" && form.level.path && !intoLevel(form)) return "Internal storage has a flat root. This upload uses Internal / instead of the explored SD folder.";
   return "The destination stays here even if you browse elsewhere.";
 }
 
@@ -104,8 +123,8 @@ export function validate(form, fresh, name, bytes, target, {replace = false, onl
   const captured = form.generations[form.storage];
   if (captured !== null && captured !== generation) throw new Error("The storage catalog changed. Select the file again to revalidate its destination.");
   if (external && (current?.state !== "ok" || current.writable !== true)) throw new Error("External storage needs a ready writable catalog before uploading.");
-  if (external && form.level.id !== null && !fresh.folderValid) throw new Error("The explored folder changed or disappeared. Select the destination again.");
-  const rows = external ? fresh.items : fresh.root;
+  if (form.level.id !== null && intoLevel(form) && !fresh.folderValid) throw new Error("The explored folder changed or disappeared. Select the destination again.");
+  const rows = form.level.id === null || intoLevel(form) ? fresh.items : fresh.root;
   if (!replace && rows.some(item => item.file === path && (external ? item.external === true : item.external !== true))) throw new Error("A file already exists at this destination. Choose another filename; nothing was replaced.");
   const free = external ? fresh.space.external.free : fresh.space.free;
   if (typeof free === "number" && !fits(bytes, free)) return {path, external, noSpace: free};

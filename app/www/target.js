@@ -1,5 +1,6 @@
 // The target: its address, and how one command line travels to it. This is the only
-// file that knows whether a line is sent by the app's sender or by the browser.
+// file that knows whether a line is sent by the app's sender or by the browser, and the
+// only one that knows the app's native shell.
 
 export const BOARD = "4.3.2.1";
 
@@ -123,6 +124,12 @@ export function usbDiagnostics() {
     diagnostics: () => invoke("diagnostics"),
     share: () => invoke("share"),
   };
+}
+
+// The app's native shell, whose plugins a page calls by name and method, or null in a
+// browser.
+export function shell() {
+  return sender();
 }
 
 // A promise that is refused when the one given has not settled in time.
