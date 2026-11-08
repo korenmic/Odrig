@@ -495,6 +495,8 @@ struct Core {
 
     uint64_t break_rest;
 
+    uint64_t clocks_retry;
+
     uint8_t *pixels;        // the pixel buffer of the decoder
 
     uint8_t *window;        // the window of the DEFLATE decoder
@@ -731,6 +733,7 @@ struct Core {
     uint8_t only_dirty : 1;
     uint8_t rotation : 2;
     uint8_t rotation_error : 1;
+    uint8_t clocks_error : 1;
 
     // Whether the saved repeats of a drive without a catalog are to be read before its files
     // are checked.

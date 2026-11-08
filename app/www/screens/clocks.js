@@ -37,7 +37,7 @@ function draw() {
   byId("clocks-panel").hidden = !known;
   let open = false;
   if (sending?.phase === "confirm" && state.statusFresh && state.statusCount > sending.count) {
-    const matches = current(status, sending.id) === sending.value;
+    const matches = !status?.clockError && current(status, sending.id) === sending.value;
     said = matches ? saved(sending) : "The target reports a different setting. The setting in force is shown.";
     open = matches && sending.id === "clocks" && sending.value === "only" && sending.before !== "only";
     sending = null;
@@ -54,7 +54,7 @@ function draw() {
   mode.querySelector('option[value="only"]').disabled = status?.hasClockMode !== true;
   const message = byId("clock-message");
   message.checked = sending?.id === "clock-message" ? sending.value : status?.clockMessage === true;
-  message.disabled = !ready || typeof status?.clockMessage !== "boolean";
+  message.disabled = !ready || status?.clockError != null || typeof status?.clockMessage !== "boolean";
   words("clocks-support", known && !status.hasClockMode ?
     "This target supports Off and Between animations. Update its firmware for Clocks only." : "");
   const reasons = {
@@ -63,7 +63,9 @@ function draw() {
     "missing-folder": "Clocks only is waiting: the external clocks folder is missing.",
     "no-clocks": "Clocks only is waiting: no included, available clock face can play.",
   };
-  words("clocks-state", status?.clockMode === "only" ? reasons[status.clockOnly?.state] ?? "" : "");
+  words("clocks-state", status?.clockError ?
+    "Saved clock settings could not be read. Output stays dark while the board retries. Choose a clock mode to replace the saved setting." :
+    status?.clockMode === "only" ? reasons[status.clockOnly?.state] ?? "" : "");
   words("clocks-said", said);
   if (open) go("animations");
 }

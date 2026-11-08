@@ -664,8 +664,8 @@ function rowsState(state, animations, here) {
   }
   const only = client.clocksOnly();
   byId("play-all").textContent = only ? "Restart clocks" : "Play this folder";
-  byId("play-all").disabled = only && (state.status?.clockOnly?.folder == null || !state.statusFresh);
-  say("only-boundary", only ? `Clocks only. Browsing stays inside Clocks; leave this mode in Settings to browse elsewhere.${state.level.id === null ? " The Clocks folder is unavailable." : ""}` : null);
+  byId("play-all").disabled = only && (state.onlyUnavailable || state.status?.clockOnly?.folder == null || !state.statusFresh);
+  say("only-boundary", only ? `Clocks only. Browsing stays inside Clocks; leave this mode in Settings to browse elsewhere.${state.level.id === null ? " The Clocks folder is unavailable; the app will retry without returning to Root. Settings and Target remain available." : ""}` : null);
 }
 
 function draw(state) {

@@ -314,6 +314,7 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
         reply.text(breaks_only_state(core));
         reply.text("\"}");
     } else reply.text("null");
+    if (core.clocks_error) reply.text(",\"clock_error\":\"unreadable\"");
     // The seconds left in the current playlist's window.
     reply.text(",\"left\":");
     reply.number(player_window_left(core));
@@ -322,6 +323,7 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
 }
 
 uint32_t play_only(Core &core, uint32_t id, bool all, Reply &reply) {
+    if (core.clocks_error) return refuse(reply, "storage-error");
     if (all) return refuse(reply, "in-use");
     if (core.clocks_id != 0 && id == core.clocks_id) {
         player_only_restart(core);

@@ -1,0 +1,85 @@
+{
+  "recordedAtUtc": "2026-11-01T23:01:10.992100+00:00",
+  "scope": "Standalone automatic Clocks-only recovery on master",
+  "coreFirmwareSourceCommit": "1b73c2fff42128b9aa7f7df9ffb326bee7f64a81",
+  "coreFirmwareUnchangedAfterThatCommit": true,
+  "fullDiscoveredRunBeforeFinalUncertaintyGuards": {
+    "run": "20261102-000305-166488",
+    "counts": {
+      "app": {
+        "cases": 458,
+        "outcomes": {
+          "ok": 458
+        }
+      },
+      "emulator": {
+        "cases": 662,
+        "outcomes": {
+          "ok": 642,
+          "skip": 20
+        }
+      }
+    },
+    "allPassed": true,
+    "sourceCommitBeforeTask2": "1b73c2fff42128b9aa7f7df9ffb326bee7f64a81",
+    "testedTrackedWorkingTreeDirty": true,
+    "runtimeFiles": {
+      "app/www/client.js": "52f036bf2d548d52ae09fb28ae65c3630011ab38679ac245e432700fd3067d47",
+      "app/www/screens/show.js": "2d6258c54c3338b71ad9813e7dd108124648f19bd1f7a534ad9a776fd8db255d",
+      "app/www/commands.js": "a9fcf3cae4d1fd4d502751206b8f6003f9453eb19a644c0fbe2e421a7e996511",
+      "app/www/screens/clocks.js": "23821b9d63ab2cd74080d3669fbe928998daebb6ae7192907ed719d62862e806"
+    },
+    "qualification": "Full pass precedes the separately verified uncertain-catalog restart correction."
+  },
+  "observedFailuresBeforeRepair": {
+    "initialRootFallbackProductionScenarios": 3,
+    "damagedLoadingRestartBrowserSubcases": 2,
+    "damagedLoadingRestartModelSubcases": 2,
+    "busyRefusalRestartModelSubcases": 1
+  },
+  "finalAffectedDiscovery": {
+    "command": "python -m unittest discover -s tests/app -t . -k OnlyRecovery -k FolderRecovery -k AutomaticClocksRecovery -v",
+    "methods": 20,
+    "passed": 20,
+    "seconds": 41.864,
+    "ordinaryFolderRecoveryMethods": 8,
+    "clocksOnlyBrowserMethods": 11,
+    "productionBodyMethods": 1,
+    "productionBodyScenarios": 6
+  },
+  "finalOnboardingDiscovery": {
+    "command": "python -m unittest discover -s tests/onboarding -t . -v",
+    "methods": 88,
+    "passed": 88,
+    "seconds": 14.877
+  },
+  "finalRuntimeSha256": {
+    "app/www/client.js": "b5953cbbfd582472a0431160a5e2131451ff319bfe56284cce78f8f7fadf3aaf",
+    "app/www/screens/show.js": "2d6258c54c3338b71ad9813e7dd108124648f19bd1f7a534ad9a776fd8db255d",
+    "app/www/commands.js": "a9fcf3cae4d1fd4d502751206b8f6003f9453eb19a644c0fbe2e421a7e996511",
+    "app/www/screens/clocks.js": "23821b9d63ab2cd74080d3669fbe928998daebb6ae7192907ed719d62862e806"
+  },
+  "fullAppEmulatorRunRepeatedAfterFinalGuards": false,
+  "logSha256": {
+    "build/recovery-before.log": "60f14a5fb9384d5809ef84971ab526fb0a56b791328e19ff8857807c788db7f2",
+    "build/recovery-model-after.log": "814c637f7fe9c36054e0b85aa31ea06ed3883b8c93ed7471f6b8599c2bfdfd2d",
+    "build/recovery-browser.log": "4b95cc1fe94894c811fe868b1636cf7da046ef3f5d4b763a3ec9c7bac394108f",
+    "build/recovery-final.log": "09ee0954198b8d01009b7f2fa2d99993323b07f8b4ebf83d2140cee25203fac3",
+    "build/recovery-edge-before.log": "3b0d81b727210db01f4d36ce143c7d1c9bff975e73bcd8557a2019b8027c8785",
+    "build/recovery-affected-after.log": "ca9fce98dbc498a065a3a8a5812890c312c3ea3914f2b636951a99070f181b66",
+    "build/recovery-refusal-before.log": "53bbde910ab1f37d81ad15b01a2478d5d4a7a1d70625dd0a8eaa3bbc8a135e93",
+    "build/recovery-final-affected.log": "3ed98e05e441ccf22d0677a32facb6e153bd9f8a475b762d411576bdfbd61bc8",
+    "build/recovery-onboarding.log": "1114a2dea40cda941821c5a91195a5caa67e687aa7e54059a15f8b86f73944af"
+  },
+  "excluded": [
+    "global inventory caching or fingerprint protocol",
+    "rotation",
+    "explicit browsing or upload boundary",
+    "time and schedule",
+    "producer fairness and watchdog changes",
+    "USB diagnostics"
+  ],
+  "physicalAcceptanceCompleted": false,
+  "physicalBootFailureFixedClaimed": false,
+  "deliveryTaskCompleted": false
+}
