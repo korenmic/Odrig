@@ -13178,6 +13178,28 @@ the page helpers find it.
 **Resolution.** `app/www/screens/mapping.js`, `app/www/index.html`,
 `tests/mapping/test_lock.py`.
 
+## Seed 71: the audit of the cross-wire feature's last paths
+
+**Question.** Which paths of the retired Snake10 cross-wire feature were left after seed
+69, and which layers were already clean?
+
+**Answer.** Two were left, and both are gone: the emulator's core binding counted
+successful `mapping cross` replies as `wiring_saves`, which its engine compared to send
+the page the mapping again, and the command tool still took `mapping cross on|off` and
+sent it to a target that answers `bad-argument`. A search for `cross` without regard to
+case over `app/www`, `emulator/web`, `core/src`, `firmware/usermod`, `firmware/*.py` and
+`odrigctl` found nothing else of the feature: the photo reading's and the drawing's
+`across`, the clock and text drawing's `across`, the core's strip count `across`, the
+firmware's `microsSince`, and the cross compiler of `verify_build.py`. The pages that face
+the user name only the retirement sentence of `docs/commands.md`; `docs/emulator.md`'s
+lines that cross are the drawing's wires. The photo reading of a strip wired another way,
+its test `crossedTen`, the core's refusal test `tests/mapping/test_retired_cross.py`, the
+generic mapping format with `crossed-columns`, and the records of seeds 43 and 69 stay.
+The APK takes its assets from `app/www`, so it holds no path of the feature either.
+
+**Resolution.** `emulator/binding.py`, `emulator/engine.py`, `odrigctl/cli.py`,
+`tests/emulator/test_retired_cross.py`, `tests/mapping/test_hosts.py`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where
