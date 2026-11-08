@@ -17,7 +17,7 @@ seen failing first.
     checked.
   - Requirements: 4.1–4.2, 5.1–5.2.
 
-- [ ] 4. Deliver
+- [x] 4. Deliver
   - Every suite that runs here; the pull request; the APK built from the branch that joins
     every unmerged seed, and its place on the Drive in `verification.md`.
   - Requirements: 5.1.
