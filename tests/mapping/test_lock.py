@@ -1,4 +1,5 @@
 import json
+import socket
 import threading
 import unittest
 
@@ -19,6 +20,50 @@ class MappingLock(unittest.TestCase):
         folder = self.enterContext(support.installed(source))
         return self.enterContext(Emulator(folder))
 
+    def test_the_operators_choice_is_kept_through_hiding_leaving_a_new_start_and_a_reload(self):
+        target = self.opened()
+        seen = browser.run('mapping-lock', address=f'127.0.0.1:{target.port}', settings=dict(mode='kept')).seen
+        self.assertEqual(seen, dict(afterHide=True, afterLeave=True, afterBegin=True, afterReload=True, locked=True, lockKept=True))
+        self.assertEqual(json.loads(target.command('mapping get'))['pins'], PINS)
+
+    def test_the_control_answers_without_a_board_and_says_why_edits_wait(self):
+        with socket.socket() as unused:
+            unused.bind(('127.0.0.1', 0))
+            port = unused.getsockname()[1]
+        seen = browser.run('mapping-lock', address=f'127.0.0.1:{port}', settings=dict(mode='noboard')).seen
+        self.assertEqual(seen, dict(enabled=True, cancelKeepsLocked=True, unlocked=True, waits=True, stored=True))
+
+    def test_a_choice_the_phone_cannot_keep_holds_for_the_run_and_is_said(self):
+        target = self.opened()
+        seen = browser.run('mapping-lock', address=f'127.0.0.1:{target.port}', settings=dict(mode='refused')).seen
+        self.assertEqual(seen, dict(unlocked=True, said=True, lockedAfterReload=True))
+
+    def test_a_stored_value_the_app_does_not_know_is_locked(self):
+        target = self.opened()
+        seen = browser.run('mapping-lock', address=f'127.0.0.1:{target.port}', settings=dict(mode='unknown')).seen
+        self.assertEqual(seen, dict(locked=True, canEdit=False))
+
+    def test_the_lock_is_a_checkbox_of_the_kept_value_with_or_without_a_board(self):
+        want = dict(kind='checkbox', label='Lock mapping edits', checked=True, inPanel=True, keptWhileAsked=True, cancelKeeps=True, unchecked=True, stored=True)
+        target = self.opened()
+        self.assertEqual(browser.run('mapping-lock', address=f'127.0.0.1:{target.port}', settings=dict(mode='checkbox')).seen, want)
+        with socket.socket() as unused:
+            unused.bind(('127.0.0.1', 0))
+            port = unused.getsockname()[1]
+        self.assertEqual(browser.run('mapping-lock', address=f'127.0.0.1:{port}', settings=dict(mode='checkbox', noBoard=True)).seen, want)
+
+    def test_each_pin_is_a_typed_field_that_moves_its_pin_as_a_drag_does(self):
+        target = self.opened()
+        seen = browser.run('mapping-lock', address=f'127.0.0.1:{target.port}', settings=dict(mode='typed')).seen
+        entered = [PINS[4], *PINS[:4], *PINS[5:]]
+        left = [PINS[0], PINS[1], PINS[4], PINS[2], PINS[3], *PINS[5:]]
+        which = "Type the number of a GPIO."
+        self.assertEqual(seen, dict(fields=20, numeric=True, labelled=True, values=PINS, lockedDisabled=True, entered=entered, left=left, escaped=True,
+                                    refused=[['abc', True, which, False], ['2.5', True, which, False], ['-3', True, which, False], ['', True, which, False],
+                                             ['99', True, "GPIO 99 is not one of the installation's twenty pins.", False]],
+                                    sameNothing=True, draftKept=True, hiddenDropped=True, final=left))
+        self.assertEqual(json.loads(target.command('mapping get'))['pins'], left)
+
     def test_default_lock_blocks_accidental_edits_and_photo_save_handler(self):
         target = self.opened(PINS[::-1])
         seen = browser.run('mapping-lock-default', address=f'127.0.0.1:{target.port}').seen
@@ -26,14 +71,14 @@ class MappingLock(unittest.TestCase):
         self.assertEqual(seen, dict(handlesDisabled=True, defaultsDisabled=True,
                                     photoAccepted=False, lifted=False, pins=PINS[::-1]))
 
-    def test_confirm_cancel_escape_and_session_resets_keep_edits_deliberate(self):
+    def test_confirm_cancel_and_escape_keep_edits_deliberate_and_leaving_or_hiding_keeps_the_choice(self):
         target = self.opened()
         seen = browser.run('mapping-lock', address=f'127.0.0.1:{target.port}').seen
         self.assertIn('Are you sure', seen.pop('question'))
         self.assertTrue(all(seen.values()), seen)
         self.assertEqual(json.loads(target.command('mapping get'))['pins'], [PINS[1], PINS[0], *PINS[2:]])
 
-    def test_a_stale_confirmation_cannot_unlock_another_target(self):
+    def test_leaving_settings_for_another_target_closes_the_confirmation_unanswered(self):
         first = self.opened()
         other = self.opened(PINS[::-1])
         seen = browser.run('mapping-lock', address=f'127.0.0.1:{first.port}',
@@ -42,7 +87,7 @@ class MappingLock(unittest.TestCase):
         self.assertEqual(json.loads(first.command('mapping get'))['pins'], PINS)
         self.assertEqual(json.loads(other.command('mapping get'))['pins'], PINS[::-1])
 
-    def test_a_lost_reply_relocks_and_reconnection_does_not_unlock(self):
+    def test_a_lost_reply_and_the_reconnection_keep_the_choice_and_edits_come_back(self):
         target = self.opened()
         armed = threading.Event()
         def answer(line):
@@ -53,7 +98,7 @@ class MappingLock(unittest.TestCase):
         proxy = self.enterContext(browser.StandIn(answer))
         seen = browser.run('mapping-lock', address=proxy.address, settings=dict(mode='disconnect'),
                            steps=[armed.set]).seen
-        self.assertEqual(seen, dict(locked=True, canEdit=False))
+        self.assertEqual(seen, dict(locked=False, canEdit=True))
 
     def test_photo_analysis_remains_available_but_apply_and_other_reading_require_unlock(self):
         target = self.opened(PINS[::-1])
@@ -82,6 +127,6 @@ class MappingLock(unittest.TestCase):
             self.assertTrue(entered.wait(8), 'status did not reach controlled peer')
         seen = browser.run('mapping-lock', address=proxy.address, settings=dict(mode='queued'),
                            steps=[armed.set, blocked, release.set]).seen
-        self.assertEqual(seen, dict(locked=True, link='answers'))
+        self.assertEqual(seen, dict(locked=False, link='answers'))
         self.assertFalse(any(line.startswith(b'mapping set ') for _, line in proxy.lines))
         self.assertEqual(json.loads(target.command('mapping get'))['pins'], PINS)

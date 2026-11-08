@@ -16,6 +16,8 @@ const LIFT_MS = 450;
 const SLOP = 8;
 const EDGE = 56;
 const STEP = 12;
+// The lock's value, kept on the phone for every link, target and board.
+const LOCK_KEY = "odrig.mappingLock";
 
 let visible = false;
 let ready = false;
@@ -39,8 +41,11 @@ let press = null;
 let focused = null;
 // A click right after a drag is no press on a handle.
 let swallowClick = false;
-let editLocked = true;
-let lockEpoch = 0;
+// The phone's store refused the lock's value: it holds while the app runs.
+let unkept = false;
+let editLocked = keptLock();
+// Counts the times unsent edits were dropped, so that a save queued before is not sent.
+let editEpoch = 0;
 let lockRequest = null;
 const watchers = new Set();
 
@@ -68,16 +73,36 @@ function setDisabled(element, disabled) {
   if (element.disabled !== disabled) element.disabled = disabled;
 }
 
+// Only a stored "unlocked" unlocks; nothing stored, a value of no meaning or a store that
+// cannot be read is locked.
+function keptLock() {
+  try {
+    return localStorage.getItem(LOCK_KEY) !== "unlocked";
+  } catch {
+    return true;
+  }
+}
+
+function keepLock(locked) {
+  try {
+    localStorage.setItem(LOCK_KEY, locked ? "locked" : "unlocked");
+    unkept = false;
+  } catch {
+    unkept = true;
+  }
+}
+
 function closePrompt() {
   lockRequest = null;
   const dialog = byId("mapping-lock-dialog");
   if (dialog.open) dialog.close();
 }
 
-function relock() {
-  editLocked = true;
-  lockEpoch += 1;
-  closePrompt();
+// Drops what is not sent yet: a held move, the assignment wanted next and, while no call is
+// out, the saving. The lock's value stays.
+function dropEdits() {
+  editEpoch += 1;
+  dropDrafts();
   if (live !== null) {
     live.wanted = null;
     if (!live.sending) live = null;
@@ -86,8 +111,8 @@ function relock() {
 }
 
 function requestLock() {
-  if (!visible || document.hidden || pending || live !== null || press !== null || !fresh || !editable() || client.state.link !== "answers") return;
-  lockRequest = {version, epoch: lockEpoch, locked: !editLocked};
+  if (!visible || live !== null || press !== null) return;
+  lockRequest = {locked: !editLocked};
   byId("mapping-lock-question").textContent = lockRequest.locked ?
     "Are you sure you want to lock mapping edits?" :
     "Are you sure you want to unlock mapping edits? Pin moves and photo fixes will save immediately.";
@@ -99,19 +124,16 @@ function requestLock() {
 function confirmLock() {
   const request = lockRequest;
   closePrompt();
-  if (request !== null && request.version === version && request.epoch === lockEpoch && visible &&
-      !document.hidden && fresh && editable() && client.state.link === "answers") {
-    if (request.locked) relock();
-    else {
-      editLocked = false;
-      lockEpoch += 1;
-    }
+  if (request !== null) {
+    editLocked = request.locked;
+    keepLock(editLocked);
+    if (editLocked) dropEdits();
   }
   draw();
 }
 
 function reset() {
-  relock();
+  dropEdits();
   version = client.targetVersion();
   latest = null;
   pending = false;
@@ -135,11 +157,46 @@ function card(pin, snake) {
   handle.className = "handle";
   handle.textContent = "\u2261";
   handle.setAttribute("aria-label", `Move GPIO ${pin}, now driving snake ${snake}; the arrow keys move it one place`);
-  const words = document.createElement("span");
+  // The pin is a field too: a number typed into it moves that pin to this snake.
+  const words = document.createElement("label");
   words.className = "words";
-  words.textContent = `GPIO ${pin}`;
+  const field = document.createElement("input");
+  field.className = "pin-field";
+  field.type = "text";
+  field.inputMode = "numeric";
+  field.autocomplete = "off";
+  field.value = String(pin);
+  field.dataset.pin = String(pin);
+  field.setAttribute("aria-label", `GPIO of snake ${snake}`);
+  words.append("GPIO ", field);
   item.append(handle, words);
   return item;
+}
+
+// Commits what a pin's field holds: a number that names one of the twenty pins moves that
+// pin to the field's snake, as a drag there does. Anything else writes nothing and says why;
+// the field shows its confirmed pin again either way.
+function commitTyped(field) {
+  const fields = [...byId("mapping-rows").querySelectorAll(".pin-field")];
+  const snake = fields.indexOf(field);
+  const confirmed = field.dataset.pin;
+  const text = field.value.trim();
+  field.value = confirmed;
+  if (snake < 0 || text === confirmed || locked() || live !== null) return;
+  if (!/^[0-9]{1,3}$/.test(text)) {
+    problem = "Type the number of a GPIO.";
+  } else if (!shownPins().includes(Number(text))) {
+    problem = `GPIO ${Number(text)} is not one of the installation's twenty pins.`;
+  } else {
+    problem = "";
+    moveTo(Number(text), snake);
+  }
+  draw();
+}
+
+// Puts every pin's field back to its confirmed pin: a typed draft is not kept.
+function dropDrafts() {
+  for (const field of document.querySelectorAll("#mapping-rows .pin-field")) field.value = field.dataset.pin;
 }
 
 function rows() {
@@ -154,6 +211,9 @@ function rows() {
   const pins = shownPins();
   const key = pins.join(",");
   if (column.dataset.key !== key) {
+    // A field that had the focus has it again, with its new confirmed pin.
+    const typing = document.activeElement instanceof Element && document.activeElement.classList.contains("pin-field") && column.contains(document.activeElement) ?
+      [...column.querySelectorAll(".pin-field")].indexOf(document.activeElement) : -1;
     column.dataset.key = key;
     const snakes = document.createElement("ol");
     snakes.className = "map-snakes";
@@ -170,12 +230,26 @@ function rows() {
     if (focused !== null) {
       column.querySelector(`.map-pin[data-pin="${focused}"] .handle`)?.focus();
     }
+    if (typing >= 0) column.querySelectorAll(".pin-field")[typing]?.focus();
   }
   // While moves are saved after a pin is let go no pin can be taken, but the handles stay
   // enabled: a disabled one would lose the focus.
   column.dataset.locked = String(locked() || (live !== null && press === null));
   const off = permissionLocked() || !fresh || !editable();
   for (const handle of column.querySelectorAll(".handle")) setDisabled(handle, off);
+  for (const field of column.querySelectorAll(".pin-field")) setDisabled(field, off);
+}
+
+// What the lock's line says: its value, why edits wait while it is unlocked, and when the
+// phone could not keep it.
+function lockState() {
+  let said = "Mapping edits are locked.";
+  if (!editLocked) {
+    said = client.state.link !== "answers" ? "Mapping edits are unlocked. Edits wait until the installation answers." :
+      pending || !fresh ? "Mapping edits are unlocked. Edits wait for the mapping to be read." :
+      editable() ? "Mapping edits are unlocked. Changes are saved immediately." : "Mapping edits are unlocked.";
+  }
+  return unkept ? `${said} This choice could not be kept on this phone; it holds until the app is closed.` : said;
 }
 
 function draw() {
@@ -192,9 +266,9 @@ function draw() {
   setHidden(byId("mapping-error"), error === "");
   setDisabled(byId("mapping-defaults"), locked() || live !== null || !defaultsAvailable() || same(latest.pins, DEFAULTS));
   setDisabled(byId("mapping-reload"), pending || live !== null);
-  byId("mapping-lock").setAttribute("aria-pressed", String(editLocked));
-  setDisabled(byId("mapping-lock"), pending || live !== null || press !== null || !fresh || !editable() || client.state.link !== "answers");
-  setText(byId("mapping-lock-state"), editLocked ? "Mapping edits are locked." : "Mapping edits are unlocked. Changes are saved immediately.");
+  if (byId("mapping-lock").checked !== editLocked) byId("mapping-lock").checked = editLocked;
+  setDisabled(byId("mapping-lock"), live !== null || press !== null);
+  setText(byId("mapping-lock-state"), lockState());
   for (const watcher of watchers) watcher();
 }
 
@@ -284,8 +358,8 @@ async function pump() {
     live.sending = true;
     draw();
     try {
-      const permitted = lockEpoch;
-      const saved = await client.mappingSet(live.revision, pins, () => asked === version && permitted === lockEpoch && !locked());
+      const permitted = editEpoch;
+      const saved = await client.mappingSet(live.revision, pins, () => asked === version && permitted === editEpoch && !locked());
       if (asked !== version || live === null) return;
       if (saved === false) {
         live = null;
@@ -493,7 +567,8 @@ export function saveFromPhoto(pins) {
 export function showing(shown) {
   visible = shown;
   if (!shown) {
-    relock();
+    dropEdits();
+    closePrompt();
     draw();
   }
   if (shown) {
@@ -506,6 +581,8 @@ export function start() {
   ready = true;
   const column = byId("mapping-rows");
   column.addEventListener("pointerdown", (event) => {
+    // A press on a pin's field types into it: it takes no pin.
+    if (event.target instanceof Element && event.target.closest(".pin-field") !== null) return;
     const item = event.target instanceof Element ? event.target.closest("#mapping-pins > .map-pin") : null;
     if (item === null || press !== null || locked() || live !== null || (event.pointerType === "mouse" && event.button !== 0)) return;
     note = "";
@@ -574,6 +651,23 @@ export function start() {
     focused = pin;
     moveTo(pin, at + (event.key === "ArrowUp" ? -1 : 1));
   });
+  // A pin's field commits on Enter and when it is left; Escape puts its pin back.
+  column.addEventListener("keydown", (event) => {
+    const field = event.target instanceof Element ? event.target.closest(".pin-field") : null;
+    if (field === null) return;
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitTyped(field);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      field.value = field.dataset.pin;
+    }
+  });
+  column.addEventListener("change", (event) => {
+    const field = event.target instanceof Element ? event.target.closest(".pin-field") : null;
+    if (field !== null) commitTyped(field);
+  });
   column.addEventListener("focusout", () => {
     setTimeout(() => {
       const handle = document.activeElement instanceof Element ? document.activeElement.closest("#mapping-rows .handle") : null;
@@ -589,7 +683,11 @@ export function start() {
     note = "";
     read();
   });
-  byId("mapping-lock").addEventListener("click", requestLock);
+  // The box shows the confirmed value: a press asks, and only a confirmation changes it.
+  byId("mapping-lock").addEventListener("click", (event) => {
+    event.preventDefault();
+    requestLock();
+  });
   byId("mapping-lock-yes").addEventListener("click", confirmLock);
   byId("mapping-lock-no").addEventListener("click", () => {
     closePrompt();
@@ -608,7 +706,8 @@ export function start() {
   });
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
-      relock();
+      dropEdits();
+      closePrompt();
       draw();
     }
   });
@@ -617,7 +716,7 @@ export function start() {
       reset();
       if (visible) read();
     }
-    if (client.state.link !== "answers" && (!editLocked || lockRequest !== null)) relock();
+    if (client.state.link !== "answers" && (live !== null || press !== null)) dropEdits();
     draw();
   });
   setInterval(() => {

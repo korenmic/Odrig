@@ -263,7 +263,7 @@
 <h2>Mapping</h2>
 <p class="small">Each three-column snake has the board's data pin that drives it beside it. Viewed from the front, snake 1 is columns 1&ndash;3 at the left; each snake starts at the bottom and runs up, down, up.</p>
 <p id="mapping-summary" role="status" aria-live="polite">Reading mapping&hellip;</p>
-<button id="mapping-lock" type="button" aria-pressed="true" aria-describedby="mapping-lock-state" disabled>Lock mapping edits</button>
+<label class="check" for="mapping-lock"><input id="mapping-lock" type="checkbox" checked aria-describedby="mapping-lock-state"><span class="title">Lock mapping edits</span></label>
 <p id="mapping-lock-state" role="status">Mapping edits are locked.</p>
 <p id="mapping-error" role="alert" hidden></p>
 <div id="mapping-rows"></div>
