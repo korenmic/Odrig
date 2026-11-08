@@ -85,6 +85,7 @@ class NativeTiming(unittest.TestCase):
 
     def test_identity_and_timing_reads_remain_available_during_show_recovery(self):
         with tempfile.TemporaryDirectory() as directory:
+            pathlib.Path(directory, "show.json").write_text("{", encoding="utf-8")
             files = host.FolderHost(pathlib.Path(directory))
             try:
                 core = binding.Core(support.LIBRARY, files)
