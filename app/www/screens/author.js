@@ -2,6 +2,7 @@
 // drawn as the player draws it, and uploading it as a new animation; and editing one that
 // is installed, read back from the target and saved in its place.
 
+import * as batch from "../batch.js";
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
 import {NotConverted, makeContainer, pictureOf, readContainer} from "../convert.js";
@@ -167,8 +168,13 @@ function draw() {
     remake();
     return;
   }
-  byId("author-upload").disabled = made === null || reading || locked();
+  const button = byId("author-upload");
+  button.disabled = made === null || reading || locked();
   byId("author-names").hidden = editing !== null || client.state.rootNames !== null;
+  // While a batch runs, the line under the button says so.
+  const reason = byId("author-locked-reason");
+  reason.hidden = button.hidden || !batch.running();
+  reason.textContent = reason.hidden ? "" : "A batch upload is under way.";
 }
 
 // What the form is about: its title and the words of its button.
@@ -362,6 +368,7 @@ function upload(message) {
     },
   );
   client.upload(sending);
+  batch.otherUpload();
   draw(client.state);
 }
 
@@ -390,4 +397,5 @@ export function start(options) {
   extend({menu: (animation) => (isEditable(animation) && (animation.type === "text" || animation.type === "widget") && animation.fault === undefined
     ? [{label: "Edit", act: () => edit(animation, message, options.go), disabled: !answers() || sending !== null || reading}] : [])});
   client.watch(draw);
+  batch.watch(draw);
 }

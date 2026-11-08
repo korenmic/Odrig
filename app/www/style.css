@@ -1222,3 +1222,52 @@ input[type="checkbox"] {
   border-color: var(--edge-strong);
   box-shadow: 0 0 16px rgba(69, 224, 210, 0.28);
 }
+
+/* A batch of ready-made animations: its rows, and the line of its run on every screen. */
+#batch-rows {
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+#batch-rows > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--edge);
+}
+
+#batch-rows .batch-file,
+#batch-rows .batch-name {
+  flex: 1 1 12em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#batch-rows .batch-state {
+  flex: 1 1 100%;
+  overflow-wrap: anywhere;
+}
+
+#batch-rows .batch-why {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--warn, #ffb4a8);
+}
+
+#batch-rows .batch-remove {
+  flex: 0 0 auto;
+}
+
+#batch-line {
+  position: sticky;
+  top: calc(4px + var(--bar-top));
+  z-index: 4;
+  max-width: 696px;
+  margin: 8px auto 0;
+  width: fit-content;
+  color: var(--text);
+  cursor: pointer;
+}
