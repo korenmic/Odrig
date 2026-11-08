@@ -130,9 +130,12 @@ struct Upload {
     uint8_t reason;         // why the file is not valid, a Reason
     uint8_t header_read : 1; // the first step of the check has been taken
     uint8_t absent : 1;     // the external destination must remain absent
+    uint8_t pace : 2;       // the check's budget is kUploadChargeUnit << pace
+    uint8_t debt : 4;       // the charge the check owes, in kUploadChargeUnit
     uint16_t id;            // the id the item gets, or has
     char name[33];          // the name the file gets
-    uint8_t installed;      // the file is installed: the id, the name, the size and the CRC-32 are its
+    uint8_t installed : 1;  // the file is installed: the id, the name, the size and the CRC-32 are its
+    uint8_t pace_fell : 1;  // the pace has fallen during this check
     uint32_t size;          // the size `upload begin` named
     uint32_t received;
     uint32_t crc;           // the running CRC-32 of the bytes received

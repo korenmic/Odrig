@@ -9,7 +9,7 @@ import {crc32} from "../crc32.js";
 import * as messages from "../messages.js";
 import * as previews from "../previews.js";
 import {Failure} from "../target.js";
-import {fileName, fits, freeId, textName, uploading} from "../upload.js";
+import {fileName, fits, freeId, showChecking, textName, uploading} from "../upload.js";
 import {answers, extend, isEditable} from "./show.js";
 
 // The ending of a container, and how often the preview draws its next picture.
@@ -318,13 +318,18 @@ function upload(message) {
   shown.textContent = "Sending: 0%";
   byId("author-upload").hidden = true;
   byId("author-cancel").hidden = false;
+  let stopChecking = () => {};
   sending = uploading(
     {id, file, bytes, create: saving === null, expect: saving === null ? null : saving.crc},
     {
       report(part) {
         shown.textContent = `Sending: ${Math.floor(part * 100)}%`;
       },
+      checking(since) {
+        stopChecking = showChecking(shown, since);
+      },
       end(how) {
+        stopChecking();
         sending = null;
         byId("author-upload").hidden = false;
         byId("author-cancel").hidden = true;

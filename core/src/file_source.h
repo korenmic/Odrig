@@ -44,6 +44,12 @@ struct FileSource {
     // reports a failure.
     int32_t look(uint32_t want);
 
+    // The bytes `get` has given since the file was opened: those taken from the host less
+    // those held in the buffer that it has not given yet.
+    uint32_t given() const {
+        return taken - static_cast<uint32_t>(length - position);
+    }
+
     const odrig_host *host;
     const char *at_name;    // the file read with `read_at`, or null
     uint32_t taken;         // the bytes the host has handed out since the file was opened

@@ -149,8 +149,9 @@ a file no item names any more is deleted. To keep a show, run a copy of its fold
 folder the emulator was stopped on during an upload holds `upload.part` until the emulator
 is started on it again; `install-show` of the firmware tool refuses such a folder, as it
 refuses any file the show does not name. The emulator paces nothing: its file operations
-take microseconds, and the check of an uploaded file takes one frame of it for each
-refresh, as on the board.
+take microseconds, and the check of an uploaded file takes its steps at every refresh
+within the budget its pace sets, as on the board ([core.md](core.md), "Uploads and the
+check").
 
 **After a start.** The show plays from the first refresh, however much is installed: the
 core reads only the first 16 bytes of every animation before it plays. It reads the
@@ -1079,8 +1080,11 @@ here; the board's is in [firmware.md](firmware.md).
   is written over again.
 - After the last piece the tool writes `upload: checking` once. While the reply to
   `upload end` is `busy`, the target is checking the file, and the tool sends
-  `upload end` again every 0.2 seconds. After 600 seconds of `busy` it sends
-  `upload cancel`, prints the last reply and exits with status 1.
+  `upload end` again every 0.2 seconds. After 10800 seconds of `busy` it sends
+  `upload cancel`, prints the last reply and exits with status 1. The core discards an
+  upload whose check does not move for 60 s by itself; the limit is for a target that
+  would answer `busy` for ever, and leaves time for the largest file of the collection
+  on a board at 20 refreshes a second.
 - After an upload that ended well, one more line on standard error says what it came to:
   `upload: committed: <bytes> bytes sent and checked by the target`, or `upload:
   unchanged: the target holds this file already; nothing was sent`. A reply that was not

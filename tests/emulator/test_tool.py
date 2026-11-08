@@ -1086,20 +1086,20 @@ class UploadSteps(unittest.TestCase):
         self.assertEqual(session.sent[2:], [b"upload end %08x\n" % zlib.crc32(b"abc")] * 8)
         self.assertEqual(slept, [0.2] * 7)
 
-    def test_after_600_seconds_of_busy_the_upload_is_cancelled_and_the_reply_is_busy(self):
+    def test_after_10800_seconds_of_busy_the_upload_is_cancelled_and_the_reply_is_busy(self):
         now = [0.0]
 
         def sleep(seconds):
             now[0] += seconds
 
-        session = Told([BEGUN, received(3)] + [refused("busy")] * 4000 + [b'{"ok":true}'])
+        self.assertEqual(content.BUSY_SECONDS, 10800)
+        session = Told([BEGUN, received(3)] + [refused("busy")] * 54100 + [b'{"ok":true}'])
         reply = content.upload(session, 4, "a.odrg", b"abc", clock=lambda: now[0], sleep=sleep)
         self.assertEqual(reply, refused("busy"))
         self.assertEqual(session.sent[-1], b"upload cancel\n")
         ends = session.sent[2:-1]
         self.assertEqual(set(ends), {b"upload end %08x\n" % zlib.crc32(b"abc")})
-        self.assertAlmostEqual(len(ends) * 0.2, 600, delta=1)
-        self.assertEqual(content.BUSY_SECONDS, 600)
+        self.assertAlmostEqual(len(ends) * 0.2, 10800, delta=1)
 
     def test_a_reply_that_is_not_ok_ends_the_upload_and_it_is_cancelled_when_it_may_still_be_open(self):
         pieces = [BEGUN, received(700), received(1400), received(1539)]

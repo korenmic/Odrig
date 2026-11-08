@@ -63,7 +63,7 @@ int usage() {
     std::fputs(
         "usage: odrig_host reasons\n"
         "       odrig_host inflate [--batch]\n"
-        "       odrig_host decode [--slice BYTES] FILE | --batch\n"
+        "       odrig_host decode [--slice BYTES | --taken] FILE | --batch\n"
         "       odrig_host render [--seed N] FILE MS...\n"
         "       odrig_host shuffle KEY COUNT\n"
         "       odrig_host session DIR | --batch [options]\n"
@@ -77,7 +77,7 @@ int usage() {
         "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
         "       --read-back-fails OFFSET  --read-back-differs OFFSET\n"
         "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --drive-read-only  --trace-drive  --trace-read-at  --about TEXT\n"
-        "       --command-read-fails FILE OFFSET\n",
+        "       --command-read-fails FILE OFFSET  --trace-check\n",
         stderr);
     return kUsage;
 }
@@ -169,6 +169,7 @@ struct Options {
     bool trace_drive = false;       // print `drive list <count>` and `drive bind <place> <name>`
     bool trace_read_at = false;     // print `read_at <name> <offset> <count>` for every `read_at`
     bool trace_calls = false;       // print `call <bytes>` after every poll and command: what `read` and `read_at` gave in it
+    bool trace_check = false;       // print `check <pace> <debt> <fell>` after a refresh at which an upload was being checked
     std::string about;              // the text `about` gives; without one the host has no `about`
 };
 
@@ -1041,6 +1042,7 @@ public:
     bool checks_first() const { return options_.check_first; }
     bool has_drive() const { return !options_.drive.empty(); }
     bool traces_calls() const { return options_.trace_calls; }
+    bool traces_check() const { return options_.trace_check; }
     From from_ = kFromFolder;
     std::string folder_;
     std::map<std::string, std::string> files_;
@@ -1141,8 +1143,11 @@ int inflate(bool in_batch) {
 // record with the picture as three bytes for each pixel, then `end`; or, at the point where
 // the file is refused, `rejected <reason>`. The decoder is called again while it settles a
 // defect. With a slice, settling takes at most that many bytes in one call, and
-// `pending <calls>`, the calls that gave kPendingWork, comes before the last line.
-void decode_one(Host &host, const char *name, uint32_t slice) {
+// `pending <calls>`, the calls that gave kPendingWork, comes before the last line. With
+// `taken`, no `frame` line is printed: after each call of the decoder for a record or for
+// the end, `taken <bytes> <charge>`, the bytes of the body the call took and the charge the
+// core gives it, with ` pending` after a call that gave kPendingWork.
+void decode_one(Host &host, const char *name, uint32_t slice, bool taken) {
     odrig_host functions = host.interface();
     odrig::FileSource file;
     std::memset(&file, 0, sizeof file);
@@ -1177,15 +1182,30 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
                     decoder.frames, decoder.compressed);
         std::vector<uint8_t> pixels(decoder.n, 0);
         std::string picture;
+        // One call of the decoder, with its `taken` line.
+        const auto call = [&](odrig::Reason given, uint64_t before, uint32_t given_before) {
+            if (taken) {
+                std::printf("taken %llu %u%s\n", static_cast<unsigned long long>(decoder.body_read - before),
+                            decoder.charge_since(before, given_before), given == odrig::kPendingWork ? " pending" : "");
+            }
+            return given;
+        };
         for (uint32_t record = 0; record < decoder.frames && reason == odrig::kNone; ++record) {
             uint16_t duration = 0;
-            while ((reason = decoder.next(pixels.data(), &duration)) == odrig::kPendingWork) {
+            uint64_t before = decoder.body_read;
+            uint32_t given_before = file.given();
+            while ((reason = call(decoder.next(pixels.data(), &duration), before, given_before)) == odrig::kPendingWork) {
                 ++pending;
+                before = decoder.body_read;
+                given_before = file.given();
             }
             if (reason != odrig::kNone) {
                 break;
             }
             total_ms += duration;
+            if (taken) {
+                continue;
+            }
             picture.clear();
             if (decoder.colours != 0) {
                 for (uint8_t index : pixels) {
@@ -1197,8 +1217,12 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
             std::printf("frame %u %s\n", duration, hex(picture).c_str());
         }
         if (reason == odrig::kNone) {
-            while ((reason = odrig::content_finish(&file, &decoder, content, total_ms)) == odrig::kPendingWork) {
+            uint64_t before = decoder.body_read;
+            uint32_t given_before = file.given();
+            while ((reason = call(odrig::content_finish(&file, &decoder, content, total_ms), before, given_before)) == odrig::kPendingWork) {
                 ++pending;
+                before = decoder.body_read;
+                given_before = file.given();
             }
         }
     }
@@ -1286,11 +1310,11 @@ int render(const std::string &path, const std::vector<std::string> &times, uint3
     return 0;
 }
 
-int decode(const std::string &argument, uint32_t slice) {
+int decode(const std::string &argument, uint32_t slice, bool taken) {
     if (argument == "--batch") {
         for (const std::string &content : batch(standard_input())) {
             Host host = Host::of_memory(content);
-            decode_one(host, "file.odrg", slice);
+            decode_one(host, "file.odrg", slice, taken);
         }
         return 0;
     }
@@ -1298,7 +1322,7 @@ int decode(const std::string &argument, uint32_t slice) {
     std::string folder = slash == std::string::npos ? "." : argument.substr(0, slash);
     std::string name = slash == std::string::npos ? argument : argument.substr(slash + 1);
     Host host = Host::of_folder(folder);
-    decode_one(host, name.c_str(), slice);
+    decode_one(host, name.c_str(), slice, taken);
     return 0;
 }
 
@@ -1555,7 +1579,11 @@ private:
     }
 
     // `refresh <ms>` and the LED data of every leg, or `idle <ms>` when no refresh was due.
+    // With `--trace-check`, after a refresh at which an upload was being checked when it
+    // began, `check <pace> <debt> <fell>`: the pace and the debt after it, and 1 when the
+    // pace has fallen during the check.
     void poll(uint64_t now) {
+        const bool checking = host_.traces_check() && core_->state.upload.state == odrig::kUploadChecking;
         int produced;
         {
             guard::InCore inside;
@@ -1580,6 +1608,11 @@ private:
             }
             std::string rgb(reinterpret_cast<const char *>(leg.rgb), 3 * static_cast<size_t>(leg.led_count));
             std::printf("data %u %s\n", leg.leg, hex(rgb).c_str());
+        }
+        if (checking) {
+            const odrig::Upload &upload = core_->state.upload;
+            std::printf("check %u %u %u\n", static_cast<unsigned>(upload.pace), static_cast<unsigned>(upload.debt),
+                        static_cast<unsigned>(upload.pace_fell));
         }
     }
 
@@ -1746,12 +1779,15 @@ int main(int argc, char **argv) {
         return inflate(true);
     }
     if (invocation == "decode" && arguments.size() == 2) {
-        return decode(arguments[1], 0);
+        return decode(arguments[1], 0, false);
+    }
+    if (invocation == "decode" && arguments.size() == 3 && arguments[1] == "--taken") {
+        return decode(arguments[2], 0, true);
     }
     long slice = 0;
     if (invocation == "decode" && arguments.size() == 4 && arguments[1] == "--slice" &&
         whole_number(arguments[2], &slice) && slice > 0 && slice <= 0x7FFFFFFF) {
-        return decode(arguments[3], static_cast<uint32_t>(slice));
+        return decode(arguments[3], static_cast<uint32_t>(slice), false);
     }
     if (invocation == "shuffle" && arguments.size() == 3) {
         // The permutation of 0 to COUNT - 1 that the key draws, in the order of the places.
@@ -1852,6 +1888,9 @@ int main(int argc, char **argv) {
                 at += 1;
             } else if (arguments[at] == "--trace-calls") {
                 options.trace_calls = true;
+                at += 1;
+            } else if (arguments[at] == "--trace-check") {
+                options.trace_check = true;
                 at += 1;
             } else if (arguments[at] == "--about" && at + 1 < arguments.size()) {
                 options.about = arguments[at + 1];
