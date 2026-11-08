@@ -973,3 +973,11 @@ answer the core gets `folder make external <path>`, which makes a real folder of
 and keeps it in the card's index while it is empty, and the host interface gets the optional
 `make_folder`. The decision of the catalog that a folder without a file is in no line of the
 index narrows: a folder made by `folder make` is listed empty until a rebuild.
+
+### 2026-11-01: Clocks-only app browsing and destinations
+
+The owner replaces unrestricted app browsing in Only with a visible boundary at the
+resolved Clocks folder and its descendants. Settings, Target and leaving the mode remain
+available. Uploads in Only require a writable external Clocks destination; the app does
+not fall back to internal root, and its flat-root authoring save is disabled. Raw command
+browsing and the firmware command list remain unchanged.

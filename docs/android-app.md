@@ -1038,14 +1038,25 @@ status shows the actual setting without claiming the reply was acknowledged. A d
 reported choice is shown as such. Reconnect and other controllers update the controls;
 changing targets clears pending state and ignores replies belonging to the old target.
 
-Selecting Only initially opens the resolved Clocks folder on Animations once. Later
-browsing may go to root or any other folder without changing playback or being forced
-back on each poll. Outside Play buttons are disabled with an explanation. `Restart clocks`
-targets the currently resolved Clocks folder ID even while another level is browsed;
+Selecting Only opens the resolved Clocks folder on Animations. Browsing stays inside
+that folder and its descendants; Back stops at Clocks. Direct navigation uses the same
+guard as the visible controls. Missing media or uncertain status retains the boundary,
+with an unavailable Clocks view when its folder is unresolved. Confirmed Off or Between
+releases the boundary; Settings and Target remain available. `Restart clocks`
+targets the currently resolved Clocks folder ID;
 the raw `play all` command remains refused by the core. Inside files and folders remain
 manually playable when ignored or when automatic messages are off. Display tests require
 leaving Only first. Missing storage, missing Clocks or no eligible face keeps Only
 selected, with an explanation and dark output; a missing resolved folder disables restart.
+
+In Only, upload preparation and final preflight require a writable external destination
+inside Clocks. Missing external storage cannot redirect the attempt to internal root,
+and Internal is unavailable in the storage selector. A prepared destination stays fixed;
+entering Only later cannot move an outside draft into Clocks silently. Shared upload
+jobs recheck the boundary before each next step and cancel an opened staging upload
+when a confirmed mode change makes its destination invalid. The text/clock authoring
+form still previews, but its internal-root Upload/Save stays disabled until leaving Only.
+Ordinary Off/Between uploads retain their normal storage choices and fallback behavior.
 
 Older clock-capable firmware without explicit mode metadata maps its existing booleans
 to Off and Between; the Only option is unavailable, with an update explanation. A target

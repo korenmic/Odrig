@@ -41,7 +41,7 @@ function byId(id) {
 // Whether an upload cannot begin now: one is under way, another job holds the target, or
 // the target does not answer, or its installed names are still being read.
 function locked() {
-  return sending !== null || client.contentBusy() || client.state.link !== "answers" ||
+  return client.clocksOnly() || sending !== null || client.contentBusy() || client.state.link !== "answers" ||
     (editing === null && client.state.rootNames === null);
 }
 
@@ -171,6 +171,9 @@ function draw() {
   const button = byId("author-upload");
   button.disabled = made === null || reading || locked();
   byId("author-names").hidden = editing !== null || client.state.rootNames !== null;
+  byId("author-boundary").hidden = !client.clocksOnly();
+  byId("author-boundary").textContent = client.clocksOnly() ?
+    "Clocks only: this form saves to internal storage outside Clocks. Leave this mode in Settings to upload or save it." : "";
   // While a batch runs, the line under the button says so.
   const reason = byId("author-locked-reason");
   reason.hidden = button.hidden || !batch.running();
