@@ -939,3 +939,15 @@ Runtime WLED power mirroring does not create an override; external manual contro
   installation: m:ss` until `upload end` answers, and the command tool waits up to
   10,800 s. This follows the entry of seed 07 of 2026-10-12 ("its check takes as long as
   the animation lasts"), which stands as the record of that day.
+
+### Seed 83: the display tests start whenever play does
+
+The owner ruled on 2026-11-07, after the board answered `busy` to the diagonal and the
+snake tests while it read its animations after a start over USB serial, and played
+ordinary animations at the same time: "If there is no slowdown in deciding to play
+non-test animations, there is no reason why there should be a slowdown in selecting test
+animations." The tests are therefore taken whenever play is: while the check after a start
+goes on, and while an upload is open, which goes on under the test to its end. `mapping
+set` no longer waits for the check after a start and still waits for an open upload. A
+test still refuses `upload begin`, `ignore`, `remove`, `remove many` and `catalog
+rebuild`. No command, reply or error code changes.
