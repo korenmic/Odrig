@@ -64,7 +64,7 @@ class RotationControls(unittest.TestCase):
     def test_native_configuration_can_be_saved_without_a_usable_installation(self):
         square = files_for()
         cases = {
-            'missing mapping and show': {},
+            'malformed mapping without a show': {'mapping.json': b'broken'},
             'malformed show': {'mapping.json': square['mapping.json'], 'show.json': b'broken'},
         }
         for label, files in cases.items():
