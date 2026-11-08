@@ -465,7 +465,7 @@ def demo_show():
 # in the current playlist's window, which runs with the time, the counts of the turn in
 # progress, and the names of the file and the folder that play, which the tests of what
 # plays look at.
-READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "clocks", "clock_message", "clock_mode", "clock_only", "left", "mini", "dimming")
+READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "clocks", "clock_message", "clock_mode", "clock_only", "left", "mini", "dimming", "timing")
 
 
 def without_readiness(state):
@@ -812,6 +812,20 @@ class ReferencePlayer:
         self.clock_message = False  # the message after each clock is on
         content = {name: data if isinstance(data, bytes) else data.encode("utf-8") for name, data in files.items()}
         self.files = content    # the files of the folder by name
+        self.schedule = (1, 1080, 360, 0)
+        self.schedule_error = False
+        kept_schedule = content.get("schedule.txt")
+        if kept_schedule is not None:
+            form = re.fullmatch(rb"odrig-schedule 1\n([01]) ([0-9]+) ([0-9]+) ([012])\n", kept_schedule)
+            values = tuple(int(value) for value in form.groups()) if form else None
+            if values is None or any(len(value) > 1 and value.startswith(b"0") for value in form.groups()) or not (0 <= values[1] < 1440 and 0 <= values[2] < 1440) or values[1] == values[2]:
+                self.schedule = (0, 1080, 360, 0)
+                self.schedule_error = True
+                self.start_logs.append("schedule unreadable")
+            else:
+                self.schedule = values
+                if values[3]:
+                    self.on = values[3] == 1
         if changeable:
             for name in self.PARTS:
                 content.pop(name, None)
@@ -1337,6 +1351,13 @@ class ReferencePlayer:
             self._remove(value)
         elif name not in (b"status", b"fault"):
             self.on = name == b"on"
+            self.schedule = (*self.schedule[:3], 1 if self.on else 2)
+            if self.changeable:
+                if self.schedule_error:
+                    return "storage-error"
+                if self.upload is not None:
+                    return "busy"
+                self.files["schedule.txt"] = ("odrig-schedule 1\n" + " ".join(map(str, self.schedule)) + "\n").encode("ascii")
         return None
 
     def _counts(self):
@@ -1746,7 +1767,7 @@ class ReferencePlayer:
         checked = 0 if self.error is not None else len(names) - to_check
         unavailable = 0 if self.error is not None else len([item for item in self.items.values() if item.cycle is None and item.file in self.faults])
         readiness = "recovery" if self.error is not None else "checking" if to_check else "degraded" if unavailable else "ready"
-        state.update(readiness=readiness, checked=checked, to_check=to_check, unavailable=unavailable,
+        state.update(timing=True, readiness=readiness, checked=checked, to_check=to_check, unavailable=unavailable,
                      checking=self.checks[0][0] if self.error is None and self.checks else None, host=None)
         # The seed of the clock on the LEDs, then the seconds left in the window of the
         # current playlist, the root, the last member.

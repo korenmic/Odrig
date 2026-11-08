@@ -31,6 +31,11 @@ Firmware setup, building and host tests need no board and work across supported 
 Operations that read or write the board still follow the board rules and stay with its
 operator. Most work, and all work on animations, needs none.
 
+The board's real clock starts unset after reset. The operators' app can set it from
+the phone and save daily LED hours in Settings. Those hours are ignored until the
+clock is usable. Manual On or Off stays in force until Resume schedule. This clock
+is independent of the imaginary times drawn by clock animations.
+
 ## Read in this order
 
 1. [vocabulary.md](vocabulary.md): what the project's words mean. Everything else uses

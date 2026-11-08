@@ -19,12 +19,19 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 |---|---|
 | `play <id>` | Plays the animation with that id, from its first frame, and then goes on with the playlist; plays the cycle with that id; makes the playlist of the card's folder with that id current and plays its first animation. An unavailable animation is refused. |
 | `play all` | Plays the playlist, from its first animation, and makes the root playlist current. |
-| `on` | Switches the LEDs on. |
-| `off` | Switches the LEDs off: every LED is dark. Playback time keeps running. |
+| `on` | Manually switches the LEDs on and saves an override of scheduling. |
+| `off` | Manually blacks out the LEDs and saves an override; playback keeps running. |
 | `brightness <n>` | Sets the runtime default brightness, 0 to 255. |
 | `brightness <id> <n> save` | Saves brightness for the listed animation's file, including zero, without changing the default. |
 | `brightness <id> default` | Removes that file's saved brightness, using the latest default immediately if it is playing. |
 | `status` | Reports the current state. |
+| `schedule` | Reads daily times, enablement and manual override. |
+| `schedule set <revision> <on-HH:MM> <off-HH:MM> <on-or-off>` | Atomically saves the daily pair and enablement. |
+| `schedule resume <revision>` | Releases manual control back to the saved schedule. |
+| `time` | Reads the boot-local civil clock and accepted phone zone. |
+| `time zone <base64>` | Atomically installs a complete phone-zone snapshot. |
+| `time set <utc-seconds> <zone-crc32>` | Sets the clock against the accepted zone revision. |
+| `guard <board-id> <timing-command>` | Executes a time or schedule command only on the named board. |
 | `fault` | Reports the latest fault of a file since the start. |
 | `space` | Reports the free and the total storage and the number of animations. |
 | `list`, `list <from>` | Lists the items of the show and the root's level of a USB drive or a card: the playlists of its folders and its own animations. |
@@ -62,13 +69,13 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `debug mini on` | Requests temporary miniature output; status reports host acknowledgement. |
 | `debug mini off` | Requests restoration of normal output. |
 
-At power-on the LEDs are on, brightness is the value in `show.json`, and the show plays
-what [show.md](show.md) says it plays by itself: the playlist of its included animations, or
-the cycle its `start` names. What `on`, `off` and ordinary `brightness <n>` change is not kept across a
-restart, nor is a `play` of an animation or a cycle; the playlist that `play` makes
-current, a folder of the card or the root, is kept with the time spent in its window, see
-[show.md](show.md#the-playlist). What `remove` and `upload` change is: they change the
-installed show.
+At power-on brightness comes from `show.json` and the show plays what
+[show.md](show.md) specifies. The LEDs start on unless a saved manual override says
+otherwise. Scheduling waits for valid civil time after every reset. Manual `on` and
+`off` persist until explicit `schedule resume`; they never expire at a boundary.
+Ordinary `brightness <n>` and a `play` of an animation or cycle are not kept across a
+restart. The current playlist and its spent window are kept as [show.md](show.md#the-playlist)
+describes. `remove` and `upload` change the installed show.
 
 Brightness scales every colour value v to `(v * selected + 127) / 255`, rounded down,
 where selected is the file's saved override or the runtime default. Overrides replace
@@ -77,6 +84,80 @@ is zero. Power off always makes every LED black. Miniature output then caps the
 selected value at 40; WLED's existing current limiter remains in force.
 
 A number in a command is written in decimal digits.
+
+## Daily schedule and manual control
+
+`schedule` reports `ok`, boolean `enabled`, On/Off as HH:MM strings `on`/`off`,
+nullable `override` (on/off), CRC-32 `revision`, effective boolean `power`, boolean
+`active`, nullable `reason`, boolean `saved` and nullable `error`. Defaults are
+enabled, On 18:00, Off 06:00 and no override. An overnight On window includes18:00
+and excludes06:00; same-day windows use the same half-open rule. Clock/zone
+corrections evaluate the resulting current window without replaying missed edges.
+
+`schedule set REV ON OFF on|off` validates and atomically saves the complete pair
+and enablement against the read revision. Equal times, malformed HH:MM and values
+outside00:00..23:59 are bad-argument. `schedule resume REV` clears only the manual
+override and immediately evaluates an enabled schedule with valid time. Wrong
+revisions are stale. Disabled scheduling keeps its pair and manual mode.
+
+The canonical ASCII/LF `schedule.txt` is a header `odrig-schedule 1`, then one line
+`ENABLED ON_MINUTE OFF_MINUTE MODE`, then EOF. Enabled is0/1, minutes0..1439 and mode
+0 auto/1 on/2 off. Decimal tokens have no leading zeros. Missing means the defaults;
+its reported revision is the canonical defaults CRC without creating the file.
+Changed settings write `schedule.part`, close durably, verify every byte, and rename
+atomically. Unchanged settings write nothing. No tick/boundary/time sync writes it.
+Corrupt settings disable scheduling and report settings-unreadable; ordinary edits
+do not silently repair them. Restore a known-good file deliberately before editing.
+
+Manual `on`/`off` always immediately controls LED visibility and overrides scheduling,
+across boundaries, clock changes, reconnections, and reset after a successful save.
+Time-pair edits and auto-sync do not release it. If persistence fails, the immediate
+manual effect remains and the reply reports storage-error (or busy for a conflicting
+upload/rebuild). Read `schedule`: saved:false and manual-not-saved identify a volatile
+override; a corrupt file instead reports settings-unreadable. Hosts without write
+callbacks still accept ordinary volatile manual control. An off installation remains
+reachable and its playback keeps progressing; scheduled On never restarts it or
+resets brightness. Unset/invalid time bypasses automatic scheduling.
+
+## Board time
+
+`guard BOARD COMMAND` accepts only the complete `time` and `schedule` forms below.
+It checks the physical identity under the same core call before executing the inner
+command: a different board returns `stale` without applying it; no usable identity
+returns `unsupported`. IDs are complete 1..31 ASCII letters/digits/hyphen/underscore,
+never addresses or truncated names. Malformed wrappers yield `bad-argument`. This
+protects queued writes when different boards use the same Wi-Fi address. It is a
+target check, not authentication. A largest zone plus a 31-byte ID fits2048 bytes.
+The board reports its factory MAC as an opaque ID; the emulator hashes the resolved
+storage root, retaining the same ID across restarts and ports.
+
+`time` reports `ok`, `valid`, nullable UTC seconds `utc`, nullable IANA `zone`,
+nullable offset seconds `offset`, nullable eight-digit lowercase CRC-32 `revision`,
+zone coverage `from`/`until`, nullable stable `board` identity, and nullable `error`. Time is invalid after every core
+restart until a successful set, even when rules survive. Missing rules have null
+metadata; damaged rules report `zone-unreadable`. Reads work during show recovery.
+
+`time zone DATA` takes URL-safe unpadded base64 of the complete bounded snapshot
+format in [the design](specs/64-p2-board-time-and-daily-on-off-schedule/design.md#a-compact-complete-zone-snapshot).
+It is at most1500 decoded bytes: a120-byte header and up to276 five-byte UTC/offset
+index transitions. Rules cover a range inside[946684800,4102444800), carry up to8
+distinct signed offsets in seconds and a63-character IANA name, and must be exact,
+strictly ordered and canonical. They live in `timezone.bin`. Publication writes
+`timezone.part`, closes it durably, verifies its exact bytes and atomically renames
+it. An unchanged revision writes nothing. A failed update keeps prior accepted
+rules. Abandoned parts never supply rules on startup.
+
+`time set UTC REVISION` takes decimal UTC seconds from946684800 through4102444799
+and the zone's confirmed lowercase CRC. It writes no flash and affects neither
+playback time nor animation clocks. The rules must cover the given UTC. Time then
+advances offline from monotonic elapsed milliseconds, including zone transitions;
+no Internet, phone or NTP is needed. Range expiry is invalid time, never a wrap.
+
+Success replies are `{"ok":true}`; read `time` afterwards to confirm. Invalid forms,
+ranges, schema or encoding are `bad-argument`; a wrong revision is `stale`; no usable
+zone is `zone-unset`; unavailable write callbacks are `unsupported`; an active
+upload/rebuild is `busy`; failed storage or verification is `storage-error`. These
+operations share the same dispatch for existing serial, HTTP and native hosts.
 
 ## Saved animation brightness
 
@@ -128,11 +209,12 @@ file's override or latest default without restarting its timing. Missing/null
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"dimming":{"value":128,"saved":null,"error":null},"mini":{"supported":false,"on":false,"pending":false,"requested":false,"error":null,"brightness":40},"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"clock_mode":"off","clock_only":null,"left":86399}
+{"ok":true,"on":true,"brightness":128,"dimming":{"value":128,"saved":null,"error":null},"mini":{"supported":false,"on":false,"pending":false,"requested":false,"error":null,"brightness":40},"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"timing":true,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"clock_mode":"off","clock_only":null,"left":86399}
 ```
 
 | Member | Meaning |
 |---|---|
+| `timing` | True when board-time commands are supported; absent on older firmware. |
 | `on` | Whether the LEDs are switched on. |
 | `brightness` | Runtime default brightness, 0 to 255, initialized from the show. An animation override does not change this value. |
 | `dimming` | Selected animation brightness before blackout/mini cap as `value`, nullable saved override as `saved` (zero is valid), and nullable settings `error`. `null` when persistence is unsupported; absent in older firmware. A damaged settings file reports `settings-unreadable`. |
@@ -456,6 +538,7 @@ character boundary, so expanded status remains within the fixed reply limit.
 | `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file. |
 | `read-only` | `upload begin external`, `catalog rebuild`, or `order move` of a file of the drive, while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
+| `zone-unset` | No usable phone-zone rules have been installed for a time set. |
 | `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. `repeat <id> <n>`: no turn of that animation is reported. |
 | `order-conflict` | `order move`: the saved order or the listed animations changed since the client read the order's revision; read it again before moving. |
 | `no-space` | `repeat <id> <n> save`: no room is left for another saved repeat; `upload begin`: the file would not fit, or the show has no room for another item; `upload begin external`: the file would not fit on the drive. |

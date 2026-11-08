@@ -130,6 +130,8 @@ function tools(frame) {
 }
 
 async function main() {
+  if (asked.has("autoTime")) localStorage.setItem("odrig.time.auto", asked.get("autoTime"));
+  else localStorage.removeItem("odrig.time.auto");
   if (asked.has("address")) {
     localStorage.setItem(KEY, asked.get("address"));
   } else {

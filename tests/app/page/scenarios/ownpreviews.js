@@ -141,6 +141,7 @@ async function uploadText(app, words) {
   field.value = words;
   field.dispatchEvent(new Event("input", {bubbles: true}));
   field.dispatchEvent(new Event("change", {bubbles: true}));
+  await app.until(() => !app.byId("author-upload").disabled, "installed names ready for the new text");
   app.press("Upload to the installation");
   await app.until(() => app.text("message-text") !== null, "a message after the upload", 20000);
   const said = app.text("message-text");
@@ -153,6 +154,28 @@ export default async function (app) {
   const settings = app.settings;
   await ready(app);
   const seen = {};
+  if (settings.mode === "unknown-names" || settings.mode === "claimed-name") {
+    const {client} = await modules(app);
+    await app.until(() => client.state.rootNames !== null, "installed animation names");
+    app.press("Upload");
+    app.press("Make a text");
+    await app.until(() => app.text("author-says") !== null, "the text form");
+    const names = client.state.rootNames;
+    client.state.rootNames = settings.mode === "unknown-names" ? null : {ids: [], files: []};
+    const field = app.byId("text-words");
+    field.value = "Hi";
+    field.dispatchEvent(new Event("input", {bubbles: true}));
+    if (settings.mode === "unknown-names") {
+      seen.disabled = app.byId("author-upload").disabled;
+      client.state.rootNames = names;
+      field.dispatchEvent(new Event("input", {bubbles: true}));
+      seen.ready = !app.byId("author-upload").disabled;
+      return seen;
+    }
+    app.byId("author-upload").click();
+    await app.until(() => app.text("message-text") !== null, "the guarded upload result", 20000);
+    return {message: app.text("message-text")};
+  }
   if (settings.mode === "generated") {
     const {previews} = await modules(app);
     previews.makeOwn(new Uint8Array(settings.bytes));

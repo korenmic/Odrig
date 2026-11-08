@@ -13,21 +13,26 @@ function pointer(app, type, target, x, y) {
 // where it began when `back` is set. Gives where the placeholder stood: the row after it,
 // or "end" of the level.
 async function drag(app, id, toY, back = false) {
-  const play = rowOf(app, id).querySelector(".play");
-  play.scrollIntoView({block: "center"});
+  await app.until(() => app.byId("animations-list").dataset.movable === "true", "the saved order before a drag");
+  rowOf(app, id).querySelector(".play").scrollIntoView({block: "center"});
   await app.sleep(100);
+  const play = rowOf(app, id).querySelector(".play");
   const box = play.getBoundingClientRect();
   const x = box.left + 20;
   const y = box.top + box.height / 2;
   pointer(app, "pointerdown", play, x, y);
   await app.sleep(600);
-  // The height is read again at each step: the list may scroll while the row is dragged.
-  let to = toY();
+  // Keep the destination in page coordinates: scrolling changes its viewport height,
+  // and the placeholder can move the destination row while the pointer approaches it.
+  const destination = toY() + app.frame.contentWindow.scrollY;
+  let to;
   for (let step = 1; step <= 8; step += 1) {
-    to = toY();
+    to = destination - app.frame.contentWindow.scrollY;
     pointer(app, "pointermove", app.doc, x, y + (to - y) * step / 8);
     await app.sleep(30);
   }
+  to = destination - app.frame.contentWindow.scrollY;
+  pointer(app, "pointermove", app.doc, x, to);
   const placeholder = app.doc.querySelector("#animations-list > .placeholder");
   let next = placeholder === null ? null : placeholder.nextElementSibling;
   if (next !== null && Number(next.dataset.id) === id) next = next.nextElementSibling;
@@ -156,7 +161,7 @@ export default async function (app) {
       const {id, to, expected} = step.drag;
       const target = to === "bottom" ? () => app.byId("animations-list").getBoundingClientRect().bottom - 4 : () => rowOf(app, to).getBoundingClientRect().top + 4;
       const landing = await drag(app, id, target);
-      await app.until(() => rows(app).map((row) => row.id).join() === expected.join() && rowOf(app, id).dataset.saving !== "true", "the drag saved", 8000);
+      await app.until(() => rows(app).map((row) => row.id).join() === expected.join() && rowOf(app, id).dataset.saving !== "true", `the drag saved (${JSON.stringify(landing)})`, 8000);
       found.steps.push({landing, ...seen(app)});
       continue;
     } else if (step.back_drag !== undefined) {

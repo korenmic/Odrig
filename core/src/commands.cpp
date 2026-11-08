@@ -1,4 +1,5 @@
 #include "commands.h"
+#include <string.h>
 
 #include "breaks.h"
 #include "catalog.h"
@@ -213,7 +214,7 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     }
     // How far the check is, and what is unavailable.
     const Readiness counts = readiness_of(core);
-    reply.text(",\"readiness\":\"");
+    reply.text(",\"timing\":true,\"readiness\":\"");
     reply.text(core.invalid ? "recovery" : counts.to_check != 0 ? "checking" : counts.unavailable != 0 ? "degraded" : "ready");
     reply.text("\",\"checked\":");
     reply.number(counts.checked);
@@ -310,7 +311,7 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
         reply.text(breaks_only_state(core));
         reply.text("\"}");
     } else reply.text("null");
-    // The seconds left in the current playlist's window, the last member.
+    // The seconds left in the current playlist's window.
     reply.text(",\"left\":");
     reply.number(player_window_left(core));
     reply.text("}\n");
@@ -382,6 +383,19 @@ struct Words {
     uint32_t size[kMostWords];
     uint32_t count;
 };
+
+ODRIG_NOINLINE const char *board_guard(const Core &core, const Words &words) {
+    if (words.count < 3 || words.size[1] == 0 || words.size[1] > 31) return "bad-argument";
+    for (uint32_t at = 0; at < words.size[1]; ++at) {
+        const char byte = words.text[1][at];
+        if (!((byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') ||
+              (byte >= '0' && byte <= '9') || byte == '-' || byte == '_')) return "bad-argument";
+    }
+    if (!words.is(2, "time") && !words.is(2, "schedule")) return "bad-argument";
+    char board[32];
+    if (!civil_board(core, board)) return "unsupported";
+    return strlen(board) == words.size[1] && memcmp(board, words.text[1], words.size[1]) == 0 ? nullptr : "stale";
+}
 
 // The value of a word that must be a number from `least` to `most`, written in decimal
 // digits only. False for an empty word, for any other character and for any other value.
@@ -560,6 +574,7 @@ uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
 uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t length, char *bytes) {
     const uint64_t now = clock_touch(core, now_ms);
     upload_touch(core, now);
+    schedule_touch(core, now);
     Reply reply;
     reply.bytes = bytes;
     reply.length = 0;
@@ -576,6 +591,36 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
 
     Words words;
     words.split(line, length);
+
+    if (words.is(0, "guard")) {
+        const char *error = board_guard(core, words);
+        if (error != nullptr) return refuse(reply, error);
+        const char *inner = words.text[2];
+        words.split(inner, length - static_cast<uint32_t>(inner - line));
+    }
+
+    if (words.is(0, "schedule")) {
+        if (words.count == 1) return schedule_reply(core, now, reply);
+        uint32_t revision = 0;
+        if (words.count == 3 && words.is(1, "resume") && crc_word(words, 2, &revision)) {
+            return schedule_resume(core, now, revision, reply);
+        }
+        uint16_t on = 0, off = 0;
+        if (words.count == 6 && words.is(1, "set") && crc_word(words, 2, &revision) &&
+            schedule_minute(words.text[3], words.size[3], &on) && schedule_minute(words.text[4], words.size[4], &off) &&
+            (words.is(5, "on") || words.is(5, "off"))) return schedule_set(core, now, revision, on, off, words.is(5, "on"), reply);
+        return refuse(reply, "bad-argument");
+    }
+
+    if (words.is(0, "time")) {
+        if (words.count == 1) return civil_reply(core, now, reply);
+        if (words.count == 3 && words.is(1, "zone")) return civil_zone(core, now, words.text[2], words.size[2], reply);
+        uint32_t utc = 0, revision = 0;
+        if (words.count == 4 && words.is(1, "set") && number_word(words, 2, 946684800u, 4102444799u, &utc) && crc_word(words, 3, &revision)) {
+            return civil_set(core, now, utc, revision, reply);
+        }
+        return refuse(reply, "bad-argument");
+    }
 
     if (words.is(0, "mapping")) {
         if (words.count == 2 && words.is(1, "get")) return mapping_get(core, reply);
@@ -645,8 +690,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (words.count != 1) {
             return refuse(reply, "bad-argument");
         }
-        core.on = switch_on ? 1 : 0;
-        return succeed(reply);
+        return schedule_manual(core, switch_on, reply);
     }
     if (words.is(0, "clocks")) {
         // `clocks on`, `clocks off`, `clocks message on` and `clocks message off`.
