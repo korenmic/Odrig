@@ -28,4 +28,10 @@ the persistent key, its signature and alignment verified.
 
 ## The owner's check, open
 
-- [ ] The step `Previews made on this phone` of "The check on a phone", and the seed's measurement in Chrome with the two files of `space-scan-10x.odrg` on the Drive.
+- [ ] The step `Previews made on this phone` of "The check on a phone".
+
+## The measurement
+
+Made in Chrome against the emulator with the two files of `space-scan-10x.odrg` on the
+Drive, `odrig archive/seed-79/`: the times are in `docs/drifts.md`, "Seed 79: the
+measurement in Chrome against the emulator".

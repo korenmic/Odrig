@@ -1410,8 +1410,7 @@ By programs, on a Mac:
 ## What is open
 
 - **Previews made on this phone, on a phone.** No person has seen a preview this phone made
-  in a row of a storage without a catalog: the step `Previews made on this phone` above, and
-  the measurement of seed 79 in Chrome with the Drive's files.
+  in a row of a storage without a catalog: the step `Previews made on this phone` above.
 - **An archive on a phone.** No person has opened a zip on a phone and uploaded its
   animations from it: step 26 above.
 
