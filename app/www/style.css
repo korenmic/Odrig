@@ -920,10 +920,6 @@ nav button[aria-current="true"] {
   background: rgba(0, 0, 0, 0.7);
 }
 
-#mapping-lock[aria-pressed="true"] {
-  border-color: var(--teal);
-}
-
 /* Upload. */
 label.button {
   display: block;

@@ -3,7 +3,7 @@
 Each task is one proof commit with only its own checkbox ticked. A test for a fault is
 seen failing first.
 
-- [ ] 1. Make `Lock mapping edits` a checkbox of the kept value
+- [x] 1. Make `Lock mapping edits` a checkbox of the kept value
   - `index.html`, `style.css`, `mapping.js`; the scenario `checkbox` seen failing first; the
     helpers that read `aria-pressed` changed after.
   - Requirements: 1.1–1.5.

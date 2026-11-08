@@ -225,7 +225,7 @@ function draw() {
   setHidden(byId("mapping-error"), error === "");
   setDisabled(byId("mapping-defaults"), locked() || live !== null || !defaultsAvailable() || same(latest.pins, DEFAULTS));
   setDisabled(byId("mapping-reload"), pending || live !== null);
-  byId("mapping-lock").setAttribute("aria-pressed", String(editLocked));
+  if (byId("mapping-lock").checked !== editLocked) byId("mapping-lock").checked = editLocked;
   setDisabled(byId("mapping-lock"), live !== null || press !== null);
   setText(byId("mapping-lock-state"), lockState());
   for (const watcher of watchers) watcher();
@@ -623,7 +623,11 @@ export function start() {
     note = "";
     read();
   });
-  byId("mapping-lock").addEventListener("click", requestLock);
+  // The box shows the confirmed value: a press asks, and only a confirmation changes it.
+  byId("mapping-lock").addEventListener("click", (event) => {
+    event.preventDefault();
+    requestLock();
+  });
   byId("mapping-lock-yes").addEventListener("click", confirmLock);
   byId("mapping-lock-no").addEventListener("click", () => {
     closePrompt();

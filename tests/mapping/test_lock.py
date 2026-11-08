@@ -43,6 +43,15 @@ class MappingLock(unittest.TestCase):
         seen = browser.run('mapping-lock', address=f'127.0.0.1:{target.port}', settings=dict(mode='unknown')).seen
         self.assertEqual(seen, dict(locked=True, canEdit=False))
 
+    def test_the_lock_is_a_checkbox_of_the_kept_value_with_or_without_a_board(self):
+        want = dict(kind='checkbox', label='Lock mapping edits', checked=True, inPanel=True, keptWhileAsked=True, cancelKeeps=True, unchecked=True, stored=True)
+        target = self.opened()
+        self.assertEqual(browser.run('mapping-lock', address=f'127.0.0.1:{target.port}', settings=dict(mode='checkbox')).seen, want)
+        with socket.socket() as unused:
+            unused.bind(('127.0.0.1', 0))
+            port = unused.getsockname()[1]
+        self.assertEqual(browser.run('mapping-lock', address=f'127.0.0.1:{port}', settings=dict(mode='checkbox', noBoard=True)).seen, want)
+
     def test_default_lock_blocks_accidental_edits_and_photo_save_handler(self):
         target = self.opened(PINS[::-1])
         seen = browser.run('mapping-lock-default', address=f'127.0.0.1:{target.port}').seen

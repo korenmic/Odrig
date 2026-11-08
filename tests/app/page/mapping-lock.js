@@ -1,6 +1,6 @@
 export async function unlockMapping(app) {
   await app.until(() => !app.byId('mapping-lock').disabled, 'mapping lock ready');
-  if (app.byId('mapping-lock').getAttribute('aria-pressed') === 'true') {
+  if (app.byId('mapping-lock').checked) {
     app.byId('mapping-lock').click();
     await app.until(() => app.byId('mapping-lock-dialog').open, 'unlock confirmation');
     app.byId('mapping-lock-yes').click();

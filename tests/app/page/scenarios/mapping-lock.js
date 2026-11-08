@@ -2,7 +2,7 @@ import {shown} from '../reading.js';
 import {unlockMapping} from '../mapping-lock.js';
 import {photoCanvas} from './photo-analysis.js';
 
-const locked = app => app.byId('mapping-lock').getAttribute('aria-pressed') === 'true';
+const locked = app => app.byId('mapping-lock').checked === true;
 const ask = async app => {
   await app.until(() => !app.byId('mapping-lock').disabled, 'lock toggle ready');
   app.byId('mapping-lock').click();
@@ -116,7 +116,28 @@ async function unknown(app) {
   return {locked: locked(app), canEdit: mapping.canEdit()};
 }
 
+async function checkbox(app) {
+  if (!app.settings.noBoard) await shown(app, 2);
+  await settings(app);
+  const box = app.byId('mapping-lock');
+  await app.until(() => !box.disabled, 'the lock ready');
+  const seen = {kind: box.type ?? null, label: box.closest('label')?.textContent.trim() ?? null, checked: box.checked === true,
+    inPanel: box.closest('#mapping') !== null && box.closest('details, [hidden]') === null};
+  box.click();
+  await app.until(() => app.byId('mapping-lock-dialog').open, 'the confirmation');
+  seen.keptWhileAsked = box.checked === true;
+  app.byId('mapping-lock-no').click();
+  seen.cancelKeeps = box.checked === true;
+  box.click();
+  await app.until(() => app.byId('mapping-lock-dialog').open, 'the confirmation again');
+  app.byId('mapping-lock-yes').click();
+  seen.unchecked = box.checked === false;
+  seen.stored = app.frame.contentWindow.localStorage.getItem(LOCK_KEY) === 'unlocked';
+  return seen;
+}
+
 export default async function(app) {
+  if (app.settings.mode === 'checkbox') return checkbox(app);
   if (app.settings.mode === 'kept') return kept(app);
   if (app.settings.mode === 'noboard') return noBoard(app);
   if (app.settings.mode === 'refused') return refused(app);
