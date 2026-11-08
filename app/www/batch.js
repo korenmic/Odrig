@@ -148,7 +148,7 @@ function gone(fresh) {
 
 // Sends a file with the app's upload job. Gives how it ended, with whether its first line
 // was answered, whether the last byte's reply came, and whether the app left the screen.
-function send(item, id, path, external) {
+function sendFile(item, id, path, external) {
   return new Promise((resolve) => {
     let begun = false;
     let atEnd = false;
@@ -280,7 +280,7 @@ async function turn(item, guarded) {
       return null;
     }
     setState(item, "sending 0%");
-    const how = await send(item, id, checked.path, external);
+    const how = await sendFile(item, id, checked.path, external);
     if (how.done) {
       finish(item, "uploaded", external && how.id === null ? "uploaded to the card" : `uploaded as animation ${external ? how.id : id}`);
       await preview(item);
