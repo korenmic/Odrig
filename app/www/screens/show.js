@@ -669,7 +669,9 @@ function rowsState(state, animations, here) {
   const only = client.clocksOnly();
   byId("play-all").textContent = only ? "Restart clocks" : "Play this folder";
   byId("play-all").disabled = only && (state.onlyUnavailable || state.status?.clockOnly?.folder == null || !state.statusFresh);
-  say("only-boundary", only ? `Clocks only. Browsing stays inside Clocks; leave this mode in Settings to browse elsewhere.${state.level.id === null ? " The Clocks folder is unavailable; the app will retry without returning to Root. Settings and Target remain available." : ""}` : null);
+  const unavailable = only && state.onlyUnavailable;
+  say("only-boundary", only ? `Clocks only. ${unavailable ? "Clocks folder unavailable; the app will retry without returning to Root. " : ""}` +
+    `Browsing stays inside Clocks; leave this mode in Settings to browse elsewhere.${unavailable ? " Settings and Target remain available." : ""}` : null);
 }
 
 function draw(state) {
@@ -707,7 +709,7 @@ function draw(state) {
     drawRows(here);
     rowsState(state, animations, here);
   }
-  byId("none").hidden = state.animations === null || all.length > 0;
+  byId("none").hidden = state.animations === null || all.length > 0 || state.onlyUnavailable;
   byId("filter-empty").hidden = here.rows.length === 0 || animations.length > 0;
   selection.draw(state);
   if (menuFor !== null && !animations.some((animation) => animation.id === menuFor) && !here.folders.some((folder) => folder.id === menuFor)) {

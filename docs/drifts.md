@@ -13522,6 +13522,29 @@ over; `screens/usb-diagnostics.js` refuses the capture while the link is `USB se
 `setLink` connects the port again before the next line. The capture's state line is
 `usb-capture-state`, since `usb-state` is the link's. The physical check stays open.
 
+## Clocks only: one app state for the browsing boundary and its recovery
+
+**Question.** The browsing boundary and the fail-closed recovery were written apart.
+Together, may the app resolve the `clocks` path through a list of the root while the
+target's status names no Clocks folder, does a status without `clock_mode` release Only,
+and must a reconnect in Only keep the same list without asking for it again?
+
+**Answer.** The status is the authority on the Clocks folder. While it names none, the
+unavailable Clocks view lists nothing and asks for nothing; the status that names a
+folder resolves the remembered location by its path at once, and while a named folder
+cannot be resolved the list timer retries it. Only a status with mode metadata that
+confirms Off or Between releases the bound; one without it, mapped to the legacy
+booleans, keeps the confirmed Only context. A reconnect keeps the rows and the row on
+the screen and takes the keys kept on the phone, but the list is asked for again as
+everywhere else: retaining the inventory without that request is the separate caching
+feature, not part of this boundary or its recovery.
+
+**Resolution.** `app/www/client.js` (`reconcileOnly`, `recoverLevel`, `toLevel`, `due`),
+the Only line of `app/www/screens/show.js`, and `docs/android-app.md`. The recovery
+model evaluates `takeStatus`, where status handling now lives; the native reconnect test
+checks the files and the keys by content and the row on the screen by identity, not the
+list's identity or its version.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

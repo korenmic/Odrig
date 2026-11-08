@@ -33,7 +33,10 @@ class OnlyNativeReconnect(unittest.TestCase):
         self.assertEqual(seen['stale'], dict(retained=True, disabled=True, marked=True))
         self.assertNotIn('', seen['paths'])
         self.assertEqual((seen['level'], seen['mode']), ('clocks', 'only'))
-        for flag in ('sameList', 'sameKeys', 'sameVersion', 'sameRow'):
+        for flag in ('sameFiles', 'sameKeys', 'sameRow'):
             self.assertTrue(seen[flag], flag)
         later = [line for _, line in proxy.lines[boundary[0]:]]
-        self.assertFalse(any(line.startswith(b'list ') or line.startswith(b'catalog page ') for line in later), later)
+        self.assertFalse(any(line.startswith(b'catalog page ') for line in later), later)
+        lists = [line for line in later if line.startswith(b'list')]
+        self.assertTrue(lists, later)
+        self.assertTrue(all(line.startswith(b'list in ') for line in lists), lists)
