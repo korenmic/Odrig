@@ -13357,6 +13357,20 @@ install-firmware/set-wifi provisioning or WLED's settings page changes them.
 `docs/firmware.md` and `docs/wifi.md`. Fresh-storage, interruption, operator-file,
 unusable-content and persistent rotation regressions cover the resolved behavior.
 
+## Seed 66: standalone Android boundary on master
+
+**Question.** How can the browsing boundary stand alone without the separate clocks
+recovery or stable-inventory implementation?
+
+**Answer.** Retain only the last confirmed Only policy for the active target, gate shared
+enter/back and visible list publication, and guard destination capture/final preflight
+and shared upload steps. Unresolved Clocks stays visible without stale-ID spin. Keep
+master inventory refresh behavior and all firmware sources unchanged. Reuse the exact
+healthy master firmware for physical comparison, with separately built APK provenance.
+
+**Resolution.** docs/specs/66-p1-clocks-only-browsing-boundary/design.md and tasks.md
+record the independent scope; docs/android-app.md describes the operator behavior.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "scope": "Android/browser Clocks-only navigation and upload boundary directly on master",
+  "branch": "codex/standalone-clocks-boundary",
+  "baseCommit": "94300bdc3e4f3b2eb4bf3445b39b6a31cc4ec485",
+  "finalRun": "20261101-232203-169776",
+  "app": {
+    "cases": 467,
+    "outcomes": {
+      "ok": 462,
+      "fail": 4,
+      "error": 1
+    },
+    "allCasesHavePassingVerification": true,
+    "allFullSuiteRunsClean": false,
+    "correctedExpectationRecheck": {
+      "cases": 20,
+      "passed": true,
+      "recheckedOriginalFailures": [
+        "tests.app.test_clock_modes.ModePanel.test_missing_clocks_keeps_only_visible_and_restart_disabled",
+        "tests.app.test_clock_modes.ModePanel.test_other_clients_change_mode_but_reconnect_does_not_repeat_navigation",
+        "tests.app.test_clock_modes.RealEmulator.test_mode_manual_message_and_read_only_inclusion_use_the_shared_player"
+      ],
+      "logSha256": "67d1d62853ba97ce9f56dd0cc79c6e89e67730e5c3cb502ff3a1a0d5493b6be3",
+      "changedFiles": {
+        "tests/app/page/scenarios/clock-mode-ui.js": {
+          "before": "44e430e546caea3ea884727c2b079a1e9df3ba33cc4825e8aa2eb25e2bdc5d12",
+          "after": "c04a5b96abe3252ddfbf845d5fc477ac9d63aad1e2baf7eaee467d4f8ba0b9ae"
+        },
+        "tests/app/test_clock_modes.py": {
+          "before": "3e59061a35badc2e98a2465078b3372f8b6197f58d37809961c5708a9a433689",
+          "after": "5694d3d847f489be5c3dd8c007339f3fc8d835f66d04c95c4f1ba09dbab8ebfd"
+        }
+      }
+    },
+    "environmentRecheck": {
+      "originalError": "unittest.loader._FailedTest.test_message_source",
+      "reason": "The selected shared venv lacks Pillow; existing global Python has Pillow.",
+      "cases": 1,
+      "passed": true,
+      "sourceChanged": false,
+      "logSha256": "ab85aae073187b9de736beda00aeb5ab0e6a36932c3541e923c99e2dfafe63da"
+    },
+    "unchangedStartupRecheck": {
+      "originalFailure": "tests.app.test_upload_recovery.UploadRecovery.test_preflight_absence_changes_visible_destination_without_sending",
+      "observed": "Timed out waiting8s for the initial Animations screen; app was still Target/Checking.",
+      "cases": 7,
+      "passed": true,
+      "sourceChanged": false,
+      "logSha256": "9c8d93a5b6f87c179ef11c2e155dfcbc270f7efa3592e6747555a9465d1f2c15"
+    }
+  },
+  "onboarding": {
+    "cases": 88,
+    "outcomes": {
+      "ok": 88
+    }
+  },
+  "emulator": {
+    "run": "20261101-225805-150808",
+    "cases": 657,
+    "outcomes": {
+      "ok": 637,
+      "skip": 20
+    },
+    "reusedBecause": "All core/firmware/odrigctl inputs exactly match the same master baseline; no native behavior changed.",
+    "evidence": {
+      "kind": "retained suite completion log",
+      "logSha256": "4fd9a06a66d1123a08db7dfb5b6bf0b7df36debb89147cdebbaaaa567a54547d",
+      "perCaseJsonlRetained": false
+    }
+  },
+  "regressionEvidence": {
+    "navigation": {
+      "initialCases": 8,
+      "initialFailures": 7,
+      "finalFreshFocusedCases": 9,
+      "allPassed": true,
+      "extraFault": "Removed-folder fallback retained stale ID and could retry immediately; it now shows unresolved Clocks until later status."
+    },
+    "upload": {
+      "initialCases": 12,
+      "initialFailures": 11,
+      "finalFreshFocusedCases": 12,
+      "allPassed": true,
+      "nativeOriginalBytesUploadPassed": true
+    }
+  },
+  "frozenInputs": {
+    "files": 168,
+    "manifestSha256": "de9538af7a462f5a6563e7f0dfb15676c6b352306303a8591fa8b6eaa0eb7775",
+    "unchanged": false,
+    "runtimeUnchanged": true,
+    "testExpectationsChanged": [
+      "tests/app/page/scenarios/clock-mode-ui.js",
+      "tests/app/test_clock_modes.py"
+    ]
+  },
+  "qualifications": [
+    "The interim app/emulator run began before the last navigation guard/test was added, so it is not final frozen-source verification.",
+    "The interim native emulator suite completed successfully; the partial app suite was intentionally stopped after three missing converter dependency failures.",
+    "Converter dependencies were copied from an owned worktree only after matching package-lock bytes. The final frozen app run uses those dependencies.",
+    "A focused environment recheck tried to replace a loaded MSVC core DLL with GNU output; Windows refused the link and preserved the DLL. Rechecks reused the unchanged library with aligned settings.",
+    "Two ready-upload observer errors referenced the section instead of the submission button; the fixture was corrected and all12 focused cases passed.",
+    "The final selected-suite run replaced the earlier build/tests run directory. Emulator completion is supported by its preserved console log; earlier per-case JSONL is no longer available.",
+    "Final app discovery found three legacy expectations for unrestricted Only browsing. Only those expectations and the Back observation were updated; all clock-mode cases then passed in fresh discovery, with runtime inputs unchanged.",
+    "The final app run also recorded a one-case import placeholder for the unchanged message-source module because the selected venv lacks Pillow. Its one real case passed using the existing global Python/Pillow environment; no installation or source change was needed.",
+    "One unchanged upload-recovery case timed out waiting for initial app startup; the unchanged module passed in scoped discovery afterward. The original full-run failure is preserved."
+  ],
+  "coreFirmwareAndCommandToolUnchangedFromMaster": true,
+  "newWireCommands": false,
+  "physicalAcceptance": {
+    "phone": false,
+    "board": false
+  },
+  "deliveryTask": 3
+}

@@ -999,7 +999,8 @@ loop, including loops longer than 30 seconds. Own and ancestor Ignore choices ap
 to automatic candidates and are rechecked after changes. Without eligible faces, Only
 stays dark and reports why; it does not fall back to ordinary animations.
 
-Browsing remains unrestricted. Outside file/folder/cycle play and output-taking mapping
+Raw command browsing remains unrestricted; the operators' app confines visible browsing
+and upload destinations to Clocks in Only mode. Outside file/folder/cycle play and output-taking mapping
 diagnostics return `in-use` without changing playback. Raw `play all` is also refused;
 the app restarts Clocks with `play <resolved-clocks-folder-id>`.
 An explicit inside file remains playable even when ignored or when automatic messages
