@@ -12893,3 +12893,215 @@ the shared queue's delayed initial inventory.
 **Resolution.** `screens/author.js` and native preview/authoring regression cases
 verify both missing inventory and an id claimed since the inventory. Both failed
 before the fix; no new command or file format is introduced.
+
+## Seed 81: the files of the tests of the pace and of a debt
+
+**Question.** The design of seed 81 has the tests of the pace (requirement 13.4) upload
+`support.dense_clip(60, 6, 10)`, and the test of a host that rests to pay a debt (13.5)
+`support.dense_clip(60, 60, 1)`, "whose records of about 10,800 bytes leave a debt of 15
+at pace 0". Do these files do what the tests need?
+
+**Answer.** No. The dense clip is coded, not stored: `dense_clip(60, 6, 10)` charges
+167,792 in all, so a host at 50 a second has checked it within the third second, before
+the host of the test slows down; and `dense_clip(60, 60, 1)` charges about 2,860 a
+record, which leaves a debt of 9 at pace 0, ten refreshes or 39 s from one step to the
+next at a refresh every 3,900 ms, not more than 60 s. The tests take files that do what
+the design says: `dense_clip(60, 6, 30)` for the pace, 473,957 of charge, whose check
+outlasts both schedules; and ten pictures of noise of 60 x 60, three bytes a pixel,
+uncompressed, made in the test, whose stored records of 10,805 bytes leave a debt of 15 at
+pace 0, sixteen refreshes or 62.4 s from one step to the next.
+
+**Resolution.** `tests/core/test_upload_check.py`, `ThePace` and `TheBounds`.
+
+## Seed 81: the upload check at full speed
+
+**Question.** How fast does the board check a file it was sent, and what does the app say
+while it does? The check took one frame record at a refresh, and only at a refresh in
+step: the owner's rotated clock of 14,399 frames, 498,211 bytes, took 288 s at a perfect
+50 refreshes a second, and the phone showed `Sending: 100%` meanwhile.
+
+**Answer.** The check takes its steps at every refresh, in step or late, each charged by
+its work, within a budget of 256 to 2,048 bytes of charge a refresh paced by the refresh
+rate, a larger record leaving a debt that the refreshes after it pay ([core.md](core.md),
+"Uploads and the check"); the app says `Checking the animation on the installation:
+m:ss` by its own clock until `upload end` answers. The seed's point 5 measured the core
+on this computer, an Intel Core i7-14700 with GCC 16.1.0 at `-O2`: the whole check of the
+rotated clock is 22.6 ms of processor time, and the board, 135 to 167 times slower at the
+check and 1.4 times slower again beside its sends to twenty outputs, 189 to 234 in all,
+does it in 4.3 to 5.3 s of its work; its estimate is about 8 s on a board at 50 with room,
+within 30 s at 30 or more while a show that is not dense plays, 20 or more kept from 22
+before, about 19 from 20 or 21. Measured on the implementation, on 2026-11-06:
+
+- The test host, `upload end` after every poll, a board without show files, from the last
+  byte to `{"ok":true}`, before and after: the rotated clock at a refresh every 20 ms
+  14,402 refreshes (288.0 s) and 374 (7.5 s); every 30 ms 28,802 (864.0 s) and 353
+  (10.6 s); every 45 ms discarded after 60 s and 1,201 (54.0 s); every 50 ms discarded
+  after 60 s and 2,289 (114.4 s); the tracked clock, 471,095 bytes, after: 380 (7.6 s),
+  359 (10.7 s), 1,221 (54.9 s), 2,322 (116.1 s), as the rule's model gives.
+- The emulator, the tracked clock over HTTP to an empty folder: checked in 7.5 s, `status`
+  reporting 47 to 50 refreshes a second meanwhile.
+- The processor time of the implemented check here, three runs at a refresh every 20 ms:
+  the rotated clock's whole check 23.6 to 23.8 ms; a refresh at pace 1, 2 and 3 a median of
+  20, 39 and 76 µs and at most 41, 49 and 97 µs. By the factors above the board's work is
+  3.8 to 4.8 ms a refresh at pace 1 and 14 to 18 ms at pace 3, as the seed estimated. The
+  board's figures stay an estimate until the owner's check of seed 81.
+
+**Resolution.** `core/src/upload.cpp`, `app/www/upload.js`, `docs/core.md`.
+
+## Seed 81: the name of the branch
+
+**Question.** The seed names the branch `seed-81-the-upload-check-at-full-speed`; the
+owner's workflow made `seed-81-upload-check-at-full-speed`. Which?
+
+**Answer.** The workflow's, which holds the spec and the work and is the pull request's.
+
+**Resolution.** `docs/specs/81-p1-the-upload-check-at-full-speed/requirements.md`, 14.1.
+
+## Seed 81: a refresh that rests is progress
+
+**Question.** The seed has each step set the upload's progress, and a refresh that pays a
+debt take none, at most 15 in a row: a host refreshing less often than once in 3.75 s
+could then lose an upload whose check runs. Is a resting refresh progress?
+
+**Answer.** Yes: every refresh of the check sets the progress, a rest included, so the
+quiet timer discards a checked upload only when the host asks for no refresh for 60 s, as
+the seed says. A test refreshes every 3,900 ms and keeps the upload through rests of
+62.4 s.
+
+**Resolution.** `core/src/upload.cpp`, `upload_refresh`; `tests/core/test_upload_check.py`,
+`TheBounds`.
+
+## Seed 81: both pace rules at one refresh
+
+**Question.** The first refresh of a second can also be 500 ms or more into it, after a
+gap. Which rule of the pace comes first?
+
+**Answer.** The rule of the whole second, then the rule of the middle of the second.
+
+**Resolution.** `core/src/upload.cpp`, `upload_refresh`; `tests/core/support.py`,
+`CheckPace`.
+
+## Seed 81: the first refresh of a check in a new second
+
+**Question.** The seed's model began a check inside a second. When the first refresh after
+the last byte is also the first of a new second, does it change the pace?
+
+**Answer.** Yes, by the second before, as any refresh of the check does.
+
+**Resolution.** `core/src/upload.cpp`, `upload_refresh`.
+
+## Seed 81: the mode byte of the decoder
+
+**Question.** The charge of a record that walks the picture needs the mode of the record
+just decoded. When is the decoder's byte set?
+
+**Answer.** Only when `next` decodes a whole record; it is 0 at the start of every call of
+`next` and `finish` and after `open`. So one function, `OdrgDecoder::charge_since`, charges
+every call, a slice of settling and the end alike, and the test host's `decode --taken`
+calls the same function.
+
+**Resolution.** `core/src/odrg_decoder.h`, `core/src/odrg_decoder.cpp`.
+
+## Seed 81: the pace and the debt compared refresh for refresh
+
+**Question.** How are the core's pace and debt compared with the reference player's, and
+how are files counted that the reference player cannot decode in a short time?
+
+**Answer.** The test host's option `--trace-check` prints `check <pace> <debt> <fell>`
+after each refresh of a check, and the reference player prints the same lines; the rule
+also has a model of its own in `tests/core/support.py`, `check_end`, which the tests of the
+owner's clock of 14,399 frames count from.
+
+**Resolution.** `tests/core/host/host.cpp`, `tests/core/support.py`, `docs/core.md`.
+
+## Seed 81: where the tests of the rule live
+
+**Question.** Where do the tests of the new rule go, and where do their files come from?
+
+**Answer.** In a new file, `tests/core/test_upload_check.py`, so that a run of the core as
+it was shows their failure without the rewritten `TheCheck`; the fade of three bytes a
+pixel and the files of the bounds are made in the tests, the fade by `support.fade()`.
+
+**Resolution.** `tests/core/test_upload_check.py`, `tests/core/support.py`.
+
+## Seed 81: the sampled texts of the gif's upload
+
+**Question.** Requirement 13.11 has the test of a gif uploaded to the emulator expect
+Sending texts, then Checking texts. The emulator checks that small clip at the first
+refresh after its last byte, and the whole upload can end between two samples of the
+line. Must a text be seen?
+
+**Answer.** No: the test asserts that every text it sampled is a Sending text or a
+Checking text and that no Sending text follows a Checking text. The counting of the line
+is asserted against stand-ins that answer `busy` for 3.5 s, on Upload and in the forms.
+
+**Resolution.** `tests/app/test_upload.py`, `checking_texts`.
+
+## Seed 81: the bytes of a compressed stream that inflate to nothing
+
+**Question.** The seed charges a step the bytes of the body it took, inflated bytes of a
+compressed body, and says that the check's work at a refresh is so about its budget,
+whatever the file holds. A valid compressed file can hold, before each record, empty
+stored blocks of DEFLATE that inflate to nothing: such a step is charged the few bytes of
+its record, and 64 of them at one refresh read far more of the file than the budget. The
+review of pull request #54 made one of 1,503,578 bytes, 1,000 empty blocks before each of
+300 records, of which one refresh read 270,770 bytes of `upload.part`. Which of the two
+statements holds?
+
+**Answer.** The work. A step is charged the bytes of the body it took or the bytes of the
+file it took, whichever are more, and n / 32 more for a record that walks the picture. The
+bytes of the file are more only in a compressed stream: at a block's header, at empty
+blocks, and at the end of the stream, which is charged its last bytes. Requirements 2.2
+and 2.4 of the spec, a charge from `body_read` alone and an end charged 0, are replaced on
+this point. The tracked clock's charges change at the 26 records with which a block of its
+stream begins, by 2,318 of 657,686: it is checked in 381 refreshes every 20 ms where it
+took 380, the rotated clock in 375 where it took 374, and the times of the seed's point 5
+stand. A step's own input is still not bounded: one record behind a long run of empty
+blocks is read whole at its refresh, as playback reads it.
+
+**Resolution.** `core/src/odrg_decoder.cpp`, `OdrgDecoder::charge_since`, and
+`core/src/file_source.h`, `FileSource::given`; `docs/core.md`, "The charge";
+`tests/core/test_decoder.py`, `TheChargeOfACall`; `tests/core/test_upload_check.py`,
+`TheBounds`.
+
+## Seed 81: the board suite's upload of a dense minute
+
+**Question.** Requirement 13.6 names the core's, the emulator's and the app's suites as
+those whose tests counted the old pacing. The board suite's `DenseUpload`, in
+`tests/board/test_upload.py`, asserts that the check of the dense clip of 60 s on the
+two-leg canvas takes as long as the animation lasts, and that `status` is read 20 times
+during it. By the rule's model that clip, 865,351 bytes and 3,000 frames, is checked in
+9.8 s at 50 refreshes a second, 12.0 s at 40, 14.2 s at 33 and 59.9 s at 25, so
+`fw.py test-board` would fail on a board with this core. Is the board's test changed in
+this seed?
+
+**Answer.** Yes: no test may pin the old pacing, and this one was missed. It now asserts
+`{"ok":true}`, at least five rates read during the check, each 20 or more, and, when
+every one of them is 30 or more, a check shorter than half the 60 s the animation lasts.
+The board suite needs the board and is not run here; it runs at the owner's next board
+session.
+
+**Resolution.** `tests/board/test_upload.py`, `DenseUpload`.
+
+## Seed 81: the average work of the check for records larger than the budget
+
+**Question.** The seed says that a record larger than the allowance is taken about once in
+every (its charge / the budget) refreshes, so that the check's work at a refresh is, on
+average, its budget; the pages said at most about 2,048 bytes of body a refresh on average,
+and `AGENTS.md` a larger record spread over the refreshes after it. But the debt is at most
+15 x 256 = 3,840 (requirement 3.4), so the rests after a record pay only that much of its
+charge: the dense 60 x 60 records of 10,805 bytes are taken every 2 refreshes at the pace
+3 and every 16 at the pace 0, about 2.6 times the budget on average. The review of pull
+request #54 read it from the core's own `--trace-check` lines: 5,388 of charge a refresh
+at the pace 3. Which holds, the rule or the average?
+
+**Answer.** The rule of the requirements, with its cap, and the pages are corrected. A
+debt without the cap would make a file of dense records about 2.6 times as slow to check,
+which the seed does not want, and the pace keeps the refresh rate whatever the average.
+The times the seed and the pages give come from the rule's model, which has the cap, and
+stand. What holds of every refresh is that it does at most its allowance and one step
+more.
+
+**Resolution.** `docs/core.md`, the budget of the check in "The budgets" and "The budget
+and the debt"; `docs/commands.md`, `busy` of `upload end`; `docs/android-app.md`, the
+upload's Checking line; `AGENTS.md`, the line of seed 81.

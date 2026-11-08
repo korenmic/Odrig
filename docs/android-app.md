@@ -586,11 +586,17 @@ colours do. A video is drawn at most 1,280 pixels wide or high before it is fitt
   The app's status keeps coming meanwhile. While the app is not on the screen of the
   phone it sends nothing, and when it is back the upload goes on; when the installation
   dropped it meanwhile, after a minute, the app says so.
-- The installation checks the whole file before it takes it, which takes about a
-  fiftieth of a second for each frame. Then the app says
-  `Uploaded as animation <id> <file>. It plays in the playlist.` The animation is last in
-  the list of Animations and in the playlist until it is moved, and plays when it is
-  tapped.
+- The installation checks the whole file before it takes it. From the reply to the last
+  piece the line says `Checking the animation on the installation: 0:12`, the minutes and
+  seconds since then by the app's own clock, counted on once a second, the time the app
+  was not on the screen included; `Cancel` stays and stops it. The check takes its steps
+  beside the show at every refresh, at most 2,048 bytes of the file's body and one frame
+  more a refresh, up to about 2.6 times that on average for a file of large frames: about
+  8 s for a clock of 14,399 small frames on an installation that
+  refreshes 50 times a second, longer on a slower one or for a larger file. Then the app
+  says `Uploaded as animation <id> <file>. It plays in the playlist.` The animation is
+  last in the list of Animations and in the playlist until it is moved, and plays when it
+  is tapped.
 
 ### Ready-made files and upload destinations
 
@@ -661,6 +667,10 @@ lowest free id and a filename. The form explains that wait and disables Upload.
 New uploads use the existing creation-only begin form, so a place taken by another
 controller is refused without replacing an installed animation. Editing retains
 its separate existing-file CRC guard.
+While a text or a clock is sent, by `Upload to the installation` or by `Save` below, the
+line under the form says `Sending: 45%`, and from the reply to the last piece `Checking
+the animation on the installation: 0:01`, counted as on Upload, until the installation
+has checked it; `Cancel` stops it meanwhile.
 
 A text or a clock of the board's own storage has `Edit` in its row's menu. The app reads its
 file back from the installation, opens its form on Upload, titled with its id and its
