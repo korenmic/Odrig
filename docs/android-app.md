@@ -1088,7 +1088,9 @@ that folder and its descendants; Back stops at Clocks. Direct navigation uses th
 guard as the visible controls. Later status reconciles the folder's current ID while
 preserving valid Clocks descendants. If automatic recovery cannot resolve that location,
 the app shows an unavailable Clocks view and retries its ancestry without publishing
-Root. Unknown mode metadata preserves the confirmed Only context; confirmed Off or
+Root. While the target's status names no Clocks folder, that view lists nothing, not
+even a `clocks` folder a list of the root still names, and the status that names a
+folder again resolves it at once. Unknown mode metadata preserves the confirmed Only context; confirmed Off or
 Between, or a target change, releases the boundary. Settings and Target remain
 available. An unresolved ID keeps `Restart clocks` disabled and is not sent by a direct
 restart. `Restart clocks`
@@ -1422,7 +1424,7 @@ installed; the phone with mobile data on.
 23. **The clocks.** With current firmware and populated `clocks` and `clocks/message`,
     *Seen:* choose Between in Settings and enable messages. Check the clock break, complete
     message turns and persistence after restart. Choose Only: Clocks opens once, outside
-    playback stops, and browsing elsewhere leaves outside Play disabled. Restart clocks
+    playback stops, browsing stays inside Clocks and Back stops at Clocks. Restart clocks
     still targets Clocks. Play an inside message with automatic messages off; try Ignore
     on a face, a message and their folders, including an inherited child choice, then
     Include. Check dark recovery when all faces are excluded, mode restoration, reconnect

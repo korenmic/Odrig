@@ -158,14 +158,20 @@ function failed(error) {
   state.statusFresh = false;
 }
 
+// Shows the Clocks location as unavailable: no rows, and nothing of another folder in their
+// place.
 function unavailableClocks() {
   if (state.level.path === "clocks" && state.level.id === null) return;
   trail.splice(0, trail.length, {path: "clocks", id: null});
   toLevel();
 }
 
+// Takes the clock mode a status confirms. In Only, browsing stays inside the Clocks folder
+// the target names: entering Only opens it, a valid location inside it stays, and a status
+// that names no folder shows it unavailable. A status without mode metadata changes
+// nothing; a confirmed Off or Between releases the bound.
 function reconcileOnly(reply) {
-  if (["off", "between"].includes(reply.clockMode)) {
+  if (reply.hasClockMode && ["off", "between"].includes(reply.clockMode)) {
     onlyActive = false;
     onlyFolder = null;
     onlyDesired = "clocks";
@@ -181,13 +187,17 @@ function reconcileOnly(reply) {
   const before = onlyFolder;
   onlyActive = true;
   onlyFolder = reply.clockOnly.folder;
+  if (entering) onlyDesired = "clocks";
   if (onlyFolder === null) {
     unavailableClocks();
   } else if (entering || !inClocks(state.level.path)) {
-    onlyDesired = "clocks";
     trail.splice(0, trail.length, {path: "clocks", id: onlyFolder});
     toLevel();
-  } else if (before !== onlyFolder && state.level.id !== null) {
+  } else if (before !== onlyFolder && state.level.id === null) {
+    // The unavailable location is resolved again under the folder the target names now.
+    listing = null;
+    listDue = true;
+  } else if (before !== onlyFolder) {
     trail[0] = {path: "clocks", id: onlyFolder};
     if (state.level.path === "clocks") toLevel();
     else {
@@ -311,13 +321,14 @@ function namesOf(items) {
 }
 
 // Resolve the captured path without changing the visible level. A failed lookup
-// or an unavailable catalog does not establish that the folder was removed.
+// or an unavailable catalog does not establish that the folder was removed. Inside Clocks
+// in Only, the path is resolved only while the target names a Clocks folder.
 async function recoverLevel(asked, level, fromRoot = false) {
-  const current = () => asked === target && level === state.level;
+  const bounded = onlyActive && inClocks(level.path);
+  const current = () => asked === target && level === state.level && (!bounded || onlyFolder !== null);
   const found = [];
   let path = "";
   let parent = null;
-  const bounded = onlyActive && inClocks(level.path);
   const desired = bounded && level.id === null ? onlyDesired : level.path;
   let names = desired.split("/");
   const knownRoot = bounded && !fromRoot && level.id !== null && desired !== "clocks" && onlyFolder !== null;
@@ -868,8 +879,14 @@ function due() {
   if (listWaits) {
     listDue = false;
     listWaited = false;
-    return state.level.id === null && state.level.path !== "" ?
-      () => recoverLevel(target, state.level) : askListPart;
+    if (state.level.id === null && state.level.path !== "") {
+      // A location without an id is resolved by its path. In Only it waits while the
+      // target names no Clocks folder: the status that names one asks for it.
+      if (!onlyActive || onlyFolder !== null) return () => recoverLevel(target, state.level);
+      listing = null;
+    } else {
+      return askListPart;
+    }
   }
   if (rootDue || rooting !== null) {
     rootDue = false;
@@ -1028,7 +1045,8 @@ function toLevel() {
   if (onlyActive && inClocks(state.level.path) && state.level.id !== null) onlyDesired = state.level.path;
   state.onlyUnavailable = onlyActive && inClocks(state.level.path) && state.level.id === null;
   state.listBusy = false;
-  state.animations = null;
+  // The unavailable Clocks location lists nothing while its folder is resolved again.
+  state.animations = state.onlyUnavailable ? [] : null;
   state.folders = [];
   state.cycles = [];
   state.order = null;
