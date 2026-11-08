@@ -4,14 +4,13 @@
 import * as batch from "../batch.js";
 import * as capacity from "../capacity.js";
 import * as client from "../client.js";
-import {odrg, odrgx} from "../converter/index.js";
+import {kindAndLength} from "../convert.js";
 import * as destinations from "../upload-destination.js";
 import {prepare} from "../ready.js";
 import {fits} from "../upload.js";
 import {MOST_ENTRIES, extract, readZip} from "../zip.js";
 import {kilobytes} from "./show.js";
 
-const KINDS = {[odrgx.TYPES.frames]: "frames", [odrgx.TYPES.text]: "text", [odrgx.TYPES.widget]: "widget"};
 const LONGEST_PATH = 100;
 const DEEPEST = 3;
 const THERE = "A file of this name is there.";
@@ -28,10 +27,7 @@ const lastPart = (path) => path.slice(path.lastIndexOf("/") + 1);
 // The checks of an animation's bytes, as a ready-made file's, with its kind and its length.
 async function facts(bytes, path) {
   const checked = await prepare(new File([bytes], lastPart(path)), client.state.status);
-  const container = odrgx.isContainer(bytes);
-  const kind = container ? KINDS[checked.header.type] ?? "frames" : "frames";
-  const ms = container ? checked.header.loopMs : odrg.reader(bytes).loopMs();
-  return {...checked, kind, ms};
+  return {...checked, ...kindAndLength(bytes)};
 }
 
 function storage() {
@@ -252,7 +248,7 @@ function tickAll(value) {
 }
 
 // Sends the ticked files one after another, each read and checked again at its turn.
-function send() {
+function sendTicked() {
   if (archive === null || batch.running()) return;
   const there = existing();
   const bytes = archive.bytes;
@@ -284,6 +280,6 @@ export function start({message}) {
     destinations.select(archive.form, byId("archive-storage").value, client.state.space);
     draw(client.state);
   });
-  byId("archive-upload").addEventListener("click", send);
+  byId("archive-upload").addEventListener("click", sendTicked);
   byId("archive-stop").addEventListener("click", () => batch.stop());
 }
