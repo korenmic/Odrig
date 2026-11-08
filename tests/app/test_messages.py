@@ -31,6 +31,7 @@ class TheTable(unittest.TestCase):
         refusals = [[code, "play 2", "file-missing dvd.odrg"] for code in cls.codes]
         refusals += [["unknown-id", "play all", None], ["unknown-id", "play 65535", None], ["show-invalid", "play all", None], ["weird", "on", None], ["toString", "off", None]]
         refusals += [["unknown-id", "remove 7", None], ["busy", "remove 7", None], ["in-use", "remove 7", None], ["storage-error", "space", None]]
+        refusals += [["unknown-id", "upload begin 4 shows/night/a.odrg 1138 0badcafe", None]]
         failures = [["bad-address", "x y"], ["no-wifi", "4.3.2.1"], ["no-answer", "4.3.2.1"], ["bad-reply", "192.168.1.23:8600"]]
         cls.found = support.run("texts", settings={"refusals": refusals, "failures": failures}).seen
 
@@ -59,6 +60,8 @@ class TheTable(unittest.TestCase):
         self.assertEqual(self.text("unknown-id", "play 65535", None), "Animation 65535 is not installed any more. (unknown-id)")
         self.assertEqual(self.text("unknown-id", "play all", None), "No animation is installed. (unknown-id)")
         self.assertEqual(self.text("unknown-id", "remove 7", None), "Animation 7 is not installed any more. (unknown-id)")
+        self.assertEqual(self.text("unknown-id", "upload begin 4 shows/night/a.odrg 1138 0badcafe", None),
+                         "The folder of this upload is not on the installation any more. Select the destination again. (unknown-id)")
         self.assertEqual(self.text("busy", "remove 7", None), "The installation is busy. Try again in a moment. (busy)")
         self.assertEqual(self.text("in-use", "remove 7", None), "Animation 7 cannot be removed: a cycle plays it, or it is on a USB stick. (in-use)")
         self.assertEqual(self.text("mapping-conflict"), "Mapping changed on the target. Reload before saving. (mapping-conflict)")

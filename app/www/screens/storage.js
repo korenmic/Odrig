@@ -189,7 +189,7 @@ async function upload(message) {
   client.setContentBusy(true);
   draw(client.state);
   try {
-  const fresh = await client.uploadSnapshot(captured.storage === "external" ? captured.level : {path: "", id: null});
+  const fresh = await client.uploadSnapshot(destinations.snapshotLevel(captured));
   if (form !== captured || made !== prepared) throw new Error("The selected animation changed. Prepare it again.");
   if (destinations.synchronize(captured, fresh.space)) {
     message(`The destination changed to ${destinations.label(captured, byId("upload-name").value)}. Review it and press Upload again.`);

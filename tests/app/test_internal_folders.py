@@ -82,6 +82,34 @@ class InternalFolders(unittest.TestCase):
         self.assertEqual((folder / 'folders.txt').read_text(encoding='ascii'),
                          'odrig-folders 1 5\n3 4 0 made\n1 20 0 shows\n4 5 0 shows/inner\n2 21 0 shows/night\n')
 
+    def test_an_upload_prepared_at_an_internal_folder_that_went_since_is_refused_in_words(self):
+        folder, emulator = self.board()
+        media = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        (media / 'ready.odrg').write_bytes(clip(7))
+
+        def prune():
+            ids = ','.join(str(row['id']) for row in self.listed(emulator, 21) if 'file' in row)
+            self.answered(emulator, f'remove many {ids}')
+
+        found = support.run('ready-upload', address=f'127.0.0.1:{emulator.port}', media=media,
+                            settings={'rows': 1, 'path': 'shows/night', 'file': 'ready.odrg', 'stepBeforeSend': True}, steps=[prune]).seen
+        self.assertEqual(found['destination'], 'Internal /shows/night/ready.odrg')
+        self.assertEqual(found['message'], 'The explored folder changed or disappeared. Select the destination again.')
+        self.assertFalse((folder / 'ready.odrg').exists())
+        self.assertEqual([path.name for path in folder.rglob('ready.odrg')], [])
+
+    def test_an_upload_at_an_internal_folder_is_checked_against_the_files_of_that_folder(self):
+        folder, emulator = self.board()
+        face = (folder / '1' / 'face.odrg').read_bytes()
+        media = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        (media / 'face.odrg').write_bytes(clip(7))
+        found = support.run('ready-upload', address=f'127.0.0.1:{emulator.port}', media=media,
+                            settings={'rows': 1, 'path': 'shows', 'file': 'face.odrg'}).seen
+        self.assertEqual(found['destination'], 'Internal /shows/face.odrg')
+        self.assertEqual(found['message'], 'A file already exists at this destination. Choose another filename; nothing was replaced.')
+        self.assertEqual((folder / '1' / 'face.odrg').read_bytes(), face)
+        self.assertEqual([(row['id'], row['file']) for row in self.listed(emulator, 20) if 'file' in row], [(2, 'shows/face.odrg')])
+
     def test_a_file_moved_out_of_an_internal_folder_leaves_it_and_takes_its_settings(self):
         folder, emulator = self.board()
         data = (folder / '1' / 'face.odrg').read_bytes()

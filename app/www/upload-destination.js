@@ -35,6 +35,13 @@ export function select(form, storage, space) {
   synchronize(form, space);
 }
 
+// The level a check of the destination reads with `uploadSnapshot`: the level the form was
+// prepared at for the card, and for a folder of the board's own storage the file goes into;
+// else the root.
+export function snapshotLevel(form) {
+  return form.storage === "external" || intoLevel(form) ? form.level : {path: "", id: null};
+}
+
 export function pathOf(form, name) {
   if (name.length > 32 || !/^[a-z0-9_-][a-z0-9._-]*\.(odrg|odrgx)$/.test(name)) throw new Error("Use a filename of at most 32 lowercase letters, digits, dots, - or _, ending in .odrg or .odrgx.");
   const path = intoLevel(form) ? `${form.level.path}/${name}` : name;
@@ -47,9 +54,9 @@ export function label(form, name) {
 }
 
 export function reason(form, space) {
-  if (!present(space)) return `External storage is disconnected or not detected. Using Internal /${intoLevel(form) ? form.level.path + "/" : form.level.path ? "; internal storage has no matching subfolders" : ""}.`;
+  if (!present(space)) return `External storage is disconnected or not detected. Using Internal /${intoLevel(form) ? form.level.path + "/" : form.level.path ? "; the explored folder is on the card" : ""}.`;
   if (form.storage === "external" && space.external.read_only !== false) return "External storage is detected but read-only. It will not be redirected to Internal.";
-  if (form.storage === "internal" && form.level.path && !intoLevel(form)) return "Internal storage has a flat root. This upload uses Internal / instead of the explored SD folder.";
+  if (form.storage === "internal" && form.level.path && !intoLevel(form)) return "This upload goes to the root of Internal storage: the explored folder is on the card.";
   return "The destination stays here even if you browse elsewhere.";
 }
 

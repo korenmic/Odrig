@@ -13342,3 +13342,56 @@ a folder row of the list takes its count and its marks by its id.
 
 **Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `app/www/screens/show.js`,
 `tests/app/test_internal_folders.py`.
+
+## Seed 74: a saved playlist of a folder of the board's own storage while `folders.txt` cannot be read
+
+**Question.** A boot that cannot read `folders.txt` has no folders. The saved playlist
+names a folder of the board's own storage, `:` and its path. The core found no folder of
+that path and made the root current with a fresh window, saved as such: the operator's
+choice was lost for every later boot, while a card's saved playlist is kept as long as the
+card's tree is not known. Which holds for a folder of the board's own storage?
+
+**Answer.** The card's rule. While `folders.txt` cannot be read, the root plays in the
+folder's place and the path stays saved; the next boot that reads the file makes the folder
+current again. Only a file that was read and has no folder of that path makes the root
+current, saved as such.
+
+**Resolution.** `core/src/order.cpp` (`tree_find_current`), `docs/core.md`,
+`tests/core/test_internal_folders.py`.
+
+## Seed 74: the check of an upload into a folder of the board's own storage
+
+**Question.** An upload prepared at a folder of the board's own storage goes into it, but
+the check before it read the root: a folder gone since was not seen, and the board refused
+the file with `unknown-id`, which the app worded `Animation begin is not installed any
+more.` Its name was also checked against the root's files, not the folder's, so a name the
+folder has was sent and refused `in-use`. What does the check read?
+
+**Answer.** The folder the file goes into, as for a folder of the card: a folder gone or
+changed fails the upload with `The explored folder changed or disappeared. Select the
+destination again.`, and a name is checked against the folder's own files, `A file already
+exists at this destination.` A folder that goes between the check and `upload begin` is
+refused `unknown-id`, which the app words `The folder of this upload is not on the
+installation any more. Select the destination again.`
+
+**Resolution.** `app/www/upload-destination.js` (`snapshotLevel`),
+`app/www/screens/storage.js`, `app/www/messages.js`, `tests/app/test_internal_folders.py`,
+`tests/app/test_messages.py`.
+
+## Seed 74: the words of an upload to the root of the board's storage from a folder of the card
+
+**Question.** Requirement 2.2 of spec 63 has the board's own storage use "its existing flat
+root", and the destination line said `Internal storage has a flat root. This upload uses
+Internal / instead of the explored SD folder.` when Internal was chosen at a folder of the
+card, and `Using Internal /; internal storage has no matching subfolders.` when the card is
+not there. The board's own storage has folders now, and may have one of the same path. What
+do they say?
+
+**Answer.** What happens and why: `This upload goes to the root of Internal storage: the
+explored folder is on the card.`, and `External storage is disconnected or not detected.
+Using Internal /; the explored folder is on the card.` The rule itself is unchanged: an
+upload prepared at a folder of the card that goes to the board's own storage goes to its
+root, whatever folders it has.
+
+**Resolution.** `app/www/upload-destination.js` (`reason`), `tests/app/test_ready_upload.py`,
+`tests/app/page/scenarios/ready-checks.js`.

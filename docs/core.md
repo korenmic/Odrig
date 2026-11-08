@@ -833,8 +833,9 @@ core no memory: every figure of [Memory](#memory) is as it is without them.
   checked against the line before it. A line out of form or of order, a line whose parent
   is not before it, or two lines with one number or one id make the file damaged: the core
   logs `folders unreadable`, leaves the file as it is and has no folders in this boot; the
-  files of folders then play and are listed at the root under their stored names, and a
-  command that would change a folder answers `storage-error`. A folder whose id an item has
+  files of folders then play and are listed at the root under their stored names, a
+  command that would change a folder answers `storage-error`, and a saved playlist of one
+  of its folders stays saved while the root plays in its place. A folder whose id an item has
   is given the lowest free id, and the file is written again; this is the only write the
   start makes for the folders, and only for such a file.
 - **The walk.** The show's animations play in the order of their walk key: the rank of the
@@ -1364,8 +1365,9 @@ The core reads it at the start, once the show is read and after `order.txt`, thr
 second source, and keeps the path and the time: the root is current until the tree is
 known, and plays in the folder's place meanwhile; when the tree is built the folder of the
 path is current again, or the root when the card has no playlist of that path, with a
-fresh window, saved as such. The removal of the current folder's last file makes the root
-current the same way.
+fresh window, saved as such. A folder of the board's own storage is found again the same
+way, and while `folders.txt` cannot be read its path stays saved, the root playing in its
+place. The removal of the current folder's last file makes the root current the same way.
 
 The file is written as `playlist.part`, one `write` of at most 130 bytes from a buffer on
 the stack, `write_close` and `rename`, when the current playlist changes by a choice or by
