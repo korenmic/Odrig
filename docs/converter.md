@@ -488,9 +488,9 @@ a web page load the same files.
 | `whole.js` | Whole numbers and fractions beyond the exact range of a JavaScript number. |
 | `strictjson.js` | The strict reader of JSON. |
 | `jsonframes.js` | JSON frames files: `loads` reads one, `dumps` writes the canonical layout. |
-| `inflate.js` | The DEFLATE decoder. |
+| `inflate.js` | The DEFLATE decoder: `inflateRaw`, which decodes a whole stream, and `inflateStream`, the same stream fed in parts and pulled a part at a time with only its window of 32,768 bytes held, its verdicts those of `inflateRaw` and `truncated` only after the end is told. |
 | `deflate.js` | The DEFLATE compressor. |
-| `odrg.js` | ODRG files: `header`, `reader`, which reads the frame records one at a time and sums their durations, `decode` and `encode`. |
+| `odrg.js` | ODRG files: `header`, `reader`, which reads the frame records one at a time and sums their durations, `records`, the same records from any source of a body, `decode` and `encode`. |
 | `motion.js` | The motions of a still picture: `loadsMotion`, `pictureAt`, the picture of palette indices at a time, and `framesOf`, its frames over the loop. |
 | `inventory.js` | Inventories of pictures: `loads`, read strictly, and `filesOf`, the file of each tile. |
 | `odrgx.js` | ODRGX containers: `isContainer`, `readHeader`, `decode`, `framesReader`, `decodeFrames`, `encodeFrames` and `wrap`; texts: `loadsSource`, `encodeText`, `decodeText`, `textOf` and `dumpsText`; clocks: `encodeWidget`, `decodeWidget`, `widgetOf` and `dumpsWidget`; picture clocks: `loadsPicture`, `loadsPictureSettings`, `pictureRows` and `pictureFile`; and `pictureAt`, the picture of a text or a clock at a time. |
@@ -503,7 +503,7 @@ a web page load the same files.
 | `pack.js` | The installed file set of a show from the bytes of its files: `pack`. |
 | `fit.js` | Fitting a picture to a canvas: `place`. |
 | `timeline.js` | The 50 frames-per-second timeline of decoded frames: `importFrames`. |
-| `thumbnail.js` | Previews: `keyOf`, the key of a file, its CRC-32 of zlib and PNG and its size; `maker`, which makes a file's preview in steps, and `make`, at once: a GIF of 24 pictures taken over its first loop, or of 12 or 6 when it would be above 65,536 bytes; `encode`, `crc32`, `timesOf` and `delayOf`. |
+| `thumbnail.js` | Previews: `keyOf`, the key of a file, its CRC-32 of zlib and PNG and its size; `maker`, which makes a file's preview in steps, reading the header first and a body of frames in two passes through the DEFLATE stream, at most 256 records and 1 MiB of body a step, so that a compressed body is never held inflated, and `make`, at once: a GIF of 24 pictures taken over its first loop, or of 12 or 6 when it would be above 65,536 bytes; `encode`, `crc32`, `timesOf` and `delayOf`. |
 | `fonttables.js` | The glyphs of the fonts of texts and the sine table of the clocks, `FONT_TABLES` and `SINE`, written by `node fonts/generate.mjs` from the fonts of the folder `fonts/`. |
 
 **Loading it in a page.** A page loads `converter/lib/index.js` as a module, and the

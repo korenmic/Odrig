@@ -14,7 +14,7 @@ seen failing first.
     first.
   - Requirements: 1.1–1.6, 2.1–2.4, 3.1–3.4, 4.5, 5.1–5.2.
 
-- [ ] 3. The documents and the measurement
+- [x] 3. The documents and the measurement
   - `docs/android-app.md`, `docs/converter.md`, the check on a phone and
     `tests/app/test_docs.py`, `docs/drifts.md` with the times.
   - Requirements: 6.1.

@@ -86,8 +86,9 @@ a top bar with the app's name and whether the installation answers.
   on the square plays as a tap on the name does. The previews are those of the default
   preview catalog that comes with the app, `thumbnails/`, found by each animation's key
   (see "The keys of the animations" below), then the phone's own; while a row's key is not
-  known yet, the preview its file's name and size find in the default catalog, so that a
-  file of other bytes with the same name and size shows that preview until its own key is
+  known yet, the key this phone kept for the place it uploaded the file to, when its size is
+  the row's; else the preview its file's name and size find in the default catalog, so that
+  a file of other bytes with the same name and size shows that preview until its own key is
   read. Each square shows its preview as soon as its own row has one, without waiting for
   the others. Folder rows and the Tests group have none. The row then
   names its file, its id and its size, or `size not read yet` while the installation has
@@ -595,9 +596,11 @@ colours do. A video is drawn at most 1,280 pixels wide or high before it is fitt
 file opens the form below, several the batch list of the next section. Actual headers identify
 the format. Wrong/unsupported headers, damaged bounded containers and another canvas
 are refused in words. The exact encoded bytes are uploaded, without conversion,
-resizing or timing changes. Compressed frame bodies never inflate on the phone for
-a preview. The app reuses its content-key preview catalog/cache; otherwise it says
-that no preview is available and the target will check the complete animation.
+resizing or timing changes. Every file the checks take gets a preview made on the
+phone, a compressed body read through a DEFLATE stream in two passes so that it is never
+held inflated: the note under it says `Preview from the animation catalog. The original
+animation bytes are kept.` for one of the default catalog, and `Preview made on this
+phone. The original animation bytes are kept.` for one this phone made.
 
 Every new ready-made or converted-media selection starts with `External storage`
 when detected, even if Internal was chosen for the previous form. Choose `Internal
@@ -859,12 +862,21 @@ it, its read under way first; else by its file's name and size in the default ca
 one key of that size the catalog gives the name, or, for a card file whose path it does
 not name, its own name; else none, and the square stays empty and dark.
 
-**The phone's own previews.** After an upload from Upload, or from the form of a text or a
-clock, a new one or an edited one, has ended with success and its message is shown, the app
-makes the preview of the bytes it sent with the converter's library, a step at a time so
-that the screen keeps answering, and keeps it in the phone's own catalog of previews, in the
-web view's IndexedDB, under the key of those bytes; the row keeps its empty square until the
-preview is made, and shows it once the catalog's pages give the row that key. The app looks
+**The phone's own previews.** As an upload starts, from Upload, from the form of a text or a
+clock, a new one or an edited one, or as a file of a batch or an archive, the app starts
+making the preview of the bytes it sends with the converter's library, one preview at a
+time in the order the uploads started, a step at a time so that the screen keeps answering;
+a ready-made file starts it when it is picked. A preview made is this run's at once. It is
+written to the phone's own catalog of previews, in the web view's IndexedDB, under the key
+of those bytes, only when an upload of them has ended with success; a refused, failed or
+cancelled upload writes nothing. With the success the app keeps the upload's place, the
+target's address, the storage and the file's name as the list names it, with the key, in
+the store `uploads` of the database's version 3, and the row shows the preview at once by
+that place: on a storage without a catalog too, and before the catalog's pages are read. The
+name's key of an earlier read is set aside until a page read after the upload names it; a
+key the board gives decides over the kept place. A place goes when a complete list of its
+folder, asked after the upload, no longer names the file, when this app deletes it, or when
+a later upload to the name replaces it; two boards at one address share their places. The app looks
 a key up in the default catalog first and in the phone's own after, and at its start drops
 each preview of its own whose key the default catalog has; the phone's catalog has no other
 limit. It never leaves the phone, and each phone has its own; the Controller view and
@@ -1229,7 +1241,13 @@ installed; the phone with mobile data on.
     *Seen:* its 113 animations listed and ticked; `Tick none`, then a dozen ticked, and
     `Upload ticked` to the board's storage: the line on every screen shows the run, and the
     clocks play.
-27. **Note** the phone's model, its Android version, the web view's version from the
+27. **Previews made on this phone.** With the spare board, whose storage has no catalog,
+    upload a converted GIF, a compressed ready-made file whose preview the default catalog
+    does not hold, and a text. *Seen:* each row shows its moving preview within seconds after
+    the upload's message, and the panel of what plays too; after the app is closed and
+    opened again they are still there; after one is deleted, a new file of another size at
+    its name has no preview of the old.
+28. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1391,6 +1409,9 @@ By programs, on a Mac:
 
 ## What is open
 
+- **Previews made on this phone, on a phone.** No person has seen a preview this phone made
+  in a row of a storage without a catalog: the step `Previews made on this phone` above, and
+  the measurement of seed 79 in Chrome with the Drive's files.
 - **An archive on a phone.** No person has opened a zip on a phone and uploaded its
   animations from it: step 26 above.
 
