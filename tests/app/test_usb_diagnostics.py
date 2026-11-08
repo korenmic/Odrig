@@ -64,3 +64,4 @@ class UsbDiagnosticsView(unittest.TestCase):
         self.assertTrue(found.seen["denialVisible"])
         self.assertTrue(found.seen["noDevicesDisabled"])
         self.assertTrue(found.seen["unpluggedLogKept"])
+        self.assertTrue(found.seen["linkPortRefused"])

@@ -88,8 +88,10 @@ export function link() {
   return kept === "usb" && usbPossible() ? "usb" : "wifi";
 }
 
-// Keeps the link to use.
+// Keeps the link to use. The USB serial port is connected again before its next line,
+// since a capture may have taken it while the link was Wi-Fi.
 export function setLink(kind) {
+  usbOpen = false;
   try {
     window.localStorage.setItem(LINK, kind === "usb" ? "usb" : "wifi");
   } catch (error) {

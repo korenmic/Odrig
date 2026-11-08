@@ -208,6 +208,13 @@ app. Share uses a temporary FileProvider read grant, with no broad storage permi
 Permission denial, an absent/unsupported/busy device and disconnects are reported in
 the panel. Closing the app loses the in-memory log unless it was shared/saved.
 
+The board's native USB port, `303a:1001`, is also the port of the `USB serial` link, and
+only one of them holds it at a time. While the link is `USB serial`, **Start capture** on
+that port opens nothing and says that the link uses it: choose `Wi-Fi` first, or capture
+from the COM/UART port. With `Wi-Fi` chosen, a capture closes the link's idle port and
+opens it. Choosing `USB serial` during such a capture stops it, keeps its text and says
+that the link took the port. Captures of the other ports never touch the link.
+
 Capture cannot recover bytes printed before it was started. Collect `status`/`fault`
 before any reset when possible. A silent port does not prove a healthy board. Host
 tests cover bounded capture, fragmented text, cancellation, stale callbacks and UI;
