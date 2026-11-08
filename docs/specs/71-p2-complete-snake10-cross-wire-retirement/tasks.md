@@ -8,7 +8,7 @@ seen failing first.
     of the refused command, seen failing first.
   - Requirements: 1.1–1.2, 3.1.
 
-- [ ] 2. Remove the command tool's form of it
+- [x] 2. Remove the command tool's form of it
   - `odrigctl/cli.py`; `tests/mapping/test_hosts.py`, the usage error seen failing first.
   - Requirements: 2.1–2.2.
 
