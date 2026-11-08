@@ -3,7 +3,7 @@
 Each task is one proof commit with only its own checkbox ticked. A test for a fault is
 seen failing first.
 
-- [ ] 1. Read a compressed body as a stream, in two passes
+- [x] 1. Read a compressed body as a stream, in two passes
   - `inflateStream()`, `odrg.records`, the two-pass maker; the converter's tests seen
     failing first, the count of steps changed after.
   - Requirements: 4.1–4.4.
