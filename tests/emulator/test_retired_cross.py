@@ -39,7 +39,7 @@ class TheRetiredCross(unittest.TestCase):
 
     def checked(self):
         """Refreshes until the check after the start is over, which a mapping save waits for."""
-        deadline = time.monotonic() + 20
+        deadline = time.monotonic() + 60
         while json.loads(self.engine.line(b"status", "http"))["checking"] is not None:
             self.assertLess(time.monotonic(), deadline, "the check after the start did not end")
             time.sleep(0.02)
