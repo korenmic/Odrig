@@ -18,6 +18,7 @@ import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginHandle;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
@@ -28,8 +29,11 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @CapacitorPlugin(name = "UsbDiagnostics")
 public class UsbDiagnosticsPlugin extends Plugin {
@@ -114,6 +118,7 @@ public class UsbDiagnosticsPlugin extends Plugin {
                     JSObject item = new JSObject();
                     item.put("device", device.getDeviceName());
                     item.put("port", port.getPortNumber());
+                    item.put("link", TargetPlugin.isBoard(device));
                     item.put("label", String.format(java.util.Locale.ROOT, "%s %04x:%04x — port %d",
                         driver.getClass().getSimpleName().replace("SerialDriver", ""), device.getVendorId(), device.getProductId(), port.getPortNumber() + 1));
                     ports.put(item);
@@ -127,10 +132,44 @@ public class UsbDiagnosticsPlugin extends Plugin {
         call.resolve(result);
     }
 
-    @PluginMethod public synchronized void open(PluginCall call) {
+    /**
+     * Opens a capture. The page starts none on the board's own port while the app's USB
+     * serial link uses it; an idle link is closed first, and connects again on its next line.
+     */
+    @PluginMethod public void open(PluginCall call) {
         if (!foreground) { call.reject("Return to the foreground before starting USB capture."); return; }
         String name = call.getString("device", "");
-        int index = call.getInt("port", -1);
+        TargetPlugin link = serialLink();
+        if (link != null) link.release(name);
+        begin(call, name, call.getInt("port", -1));
+    }
+
+    private TargetPlugin serialLink() {
+        PluginHandle handle = getBridge() == null ? null : getBridge().getPlugin("Target");
+        Plugin found = handle == null ? null : handle.getInstance();
+        return found instanceof TargetPlugin ? (TargetPlugin) found : null;
+    }
+
+    /**
+     * Stops a capture of the device of this name, waiting at most a moment for its port to
+     * close, because the app's USB serial link is opening that port. The text is kept.
+     */
+    void yieldPort(String name) {
+        synchronized (this) {
+            if (!name.equals(connectedDevice)) return;
+            stopCapture("Capture stopped: the app's USB serial link took this port. Captured text is kept.");
+        }
+        try {
+            reader.submit(() -> { }).get(TargetPlugin.HANDOVER_MS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException stopped) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException | TimeoutException | RuntimeException late) {
+            // The link opens the port anyway; the capture's next read then reports the lost port.
+        }
+    }
+
+    private synchronized void begin(PluginCall call, String name, int index) {
+        if (!foreground) { call.reject("Return to the foreground before starting USB capture."); return; }
         long prepared = -1;
         try {
             for (UsbSerialDriver driver : UsbSerialProber.getDefaultProber().findAllDrivers(manager)) {

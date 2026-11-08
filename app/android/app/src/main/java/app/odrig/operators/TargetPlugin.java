@@ -21,6 +21,7 @@ import android.os.Build;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginHandle;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
@@ -32,8 +33,11 @@ import java.net.HttpURLConnection;
 import java.net.Proxy;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * The sender: carries one command line to the target on the phone's Wi-Fi network,
@@ -55,6 +59,8 @@ public class TargetPlugin extends Plugin {
     /** The most bytes one read gives back. */
     private static final int MOST_READ = 4096;
     private static final int TRANSFER_MS = 1000;
+    /** The longest wait for the other user of the board's port to close it. */
+    static final int HANDOVER_MS = 2000;
     /** SET_LINE_CODING of CDC: 115,200 baud, little-endian, one stop bit, no parity, 8 data bits. */
     private static final byte[] LINE_CODING = {(byte) 0x00, (byte) 0xC2, (byte) 0x01, (byte) 0x00, 0, 0, 8};
 
@@ -221,17 +227,48 @@ public class TargetPlugin extends Plugin {
         call.resolve(found);
     }
 
+    /** Whether a device is the ESP32-S3's USB serial port, the port of this link. */
+    static boolean isBoard(UsbDevice found) {
+        return found.getVendorId() == VENDOR && found.getProductId() == PRODUCT;
+    }
+
     /** The board on USB: the device of the ESP32-S3's USB serial port, or null. */
     private UsbDevice board() {
         if (usb == null) {
             return null;
         }
         for (UsbDevice found : usb.getDeviceList().values()) {
-            if (found.getVendorId() == VENDOR && found.getProductId() == PRODUCT) {
+            if (isBoard(found)) {
                 return found;
             }
         }
         return null;
+    }
+
+    /**
+     * Closes the board's port when it is the device of this name, so that a USB capture can
+     * open it; the next `connect` opens it again. Waits at most `HANDOVER_MS` for the USB
+     * thread. Not on the USB thread.
+     */
+    void release(String name) {
+        try {
+            serial.submit(() -> {
+                if (device != null && device.getDeviceName().equals(name)) {
+                    closeSerial();
+                }
+            }).get(HANDOVER_MS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException stopped) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException | TimeoutException | RuntimeException late) {
+            // The capture opens the port anyway; the link's next line then reports the lost port.
+        }
+    }
+
+    /** The plugin of the USB capture, which may hold the board's port, or null. */
+    private UsbDiagnosticsPlugin capture() {
+        PluginHandle handle = getBridge() == null ? null : getBridge().getPlugin("UsbDiagnostics");
+        Plugin found = handle == null ? null : handle.getInstance();
+        return found instanceof UsbDiagnosticsPlugin ? (UsbDiagnosticsPlugin) found : null;
     }
 
     /** Says whether the phone has USB host, whether the board is there, allowed and open. */
@@ -315,6 +352,11 @@ public class TargetPlugin extends Plugin {
         if (in == null || out == null) {
             call.reject("the board's USB port has no serial interface", "no-answer");
             return;
+        }
+        // A capture of this port stops and says that this link took it; its text is kept.
+        UsbDiagnosticsPlugin capture = capture();
+        if (capture != null) {
+            capture.yieldPort(found.getDeviceName());
         }
         UsbDeviceConnection opened = usb.openDevice(found);
         if (opened == null || !opened.claimInterface(bulk, true)) {

@@ -1,5 +1,7 @@
 // Phone-only USB evidence collection, independent of the Wi-Fi target and its commands.
-import {usbDiagnostics} from "../target.js";
+// The board's own USB serial port is also the port of the app's USB serial link: a
+// capture is not started on it while that link is in use.
+import {link, usbDiagnostics} from "../target.js";
 const byId = (id) => document.getElementById(id);
 let plugin;
 let visible = false;
@@ -17,7 +19,7 @@ function render() {
   byId("usb-diagnostics").disabled = busy || last.state !== "capturing";
   byId("usb-share").disabled = busy || last.bytes === 0;
   const state = `${last.detail || "Ready to capture."} Received ${last.bytes} bytes.`;
-  if (byId("usb-state").textContent !== state) byId("usb-state").textContent = state;
+  if (byId("usb-capture-state").textContent !== state) byId("usb-capture-state").textContent = state;
   const log = byId("usb-log");
   if (log.value !== last.text) {
     const bottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 8;
@@ -96,7 +98,11 @@ export function start() {
   byId("usb-refresh").addEventListener("click", () => action(refresh));
   byId("usb-start").addEventListener("click", () => action(async () => {
     const port = ports[Number(byId("usb-device").value)];
-    if (port) await plugin.open({device: port.device, port: port.port});
+    if (!port) return;
+    if (port.link === true && link() === "usb") {
+      throw new Error("The app's USB serial link uses this port. Choose Wi-Fi above to capture from it, or capture from the board's COM/UART port.");
+    }
+    await plugin.open({device: port.device, port: port.port});
   }));
   byId("usb-stop").addEventListener("click", () => action(() => plugin.stop()));
   byId("usb-diagnostics").addEventListener("click", () => action(() => plugin.diagnostics()));

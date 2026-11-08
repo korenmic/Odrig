@@ -13502,6 +13502,26 @@ with permanently busy storage before repair. The firmware adapter and its queued
 power helper now defer persistence. This confirmed code defect is separate from
 the still unconfirmed physical reset reason reported by the operator.
 
+## One holder of the board's USB port: the link or a capture
+
+**Question.** The `USB serial` link and the USB diagnostics capture both open the
+board's native USB port, `303a:1001`, and each claims its data interface with force,
+which takes it from the other. Which of them holds the port when both want it?
+
+**Answer.** One at a time, and never silently. While the link is `USB serial` the page
+starts no capture on that port and says that the link uses it (choose `Wi-Fi`, or capture
+from the COM/UART port); `devices` marks that port with `link`. With `Wi-Fi` chosen, the
+link's port is idle: a capture closes it first, and the link opens it again before its
+next line. Choosing `USB serial` during a capture of that port stops the capture before
+the link opens it, keeps the text and says that the link took the port. Each waits at most
+two seconds for the other to close. Captures of other ports are untouched. No command,
+reply, failure code or plugin method is added.
+
+**Resolution.** `TargetPlugin.release` and `UsbDiagnosticsPlugin.yieldPort` hand the port
+over; `screens/usb-diagnostics.js` refuses the capture while the link is `USB serial`;
+`setLink` connects the port again before the next line. The capture's state line is
+`usb-capture-state`, since `usb-state` is the link's. The physical check stays open.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

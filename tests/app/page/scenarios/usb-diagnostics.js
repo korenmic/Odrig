@@ -37,7 +37,7 @@ export default async function (app) {
   app.tap("usb-share");
   await app.until(() => shares === 1 && !app.byId("usb-share").disabled, "share button");
   status = {...status, state: "error", active: false, detail: "USB disconnected"};
-  await app.until(() => app.text("usb-state").includes("disconnected"), "unplug visible");
+  await app.until(() => app.text("usb-capture-state").includes("disconnected"), "unplug visible");
   const unpluggedLogKept = app.byId("usb-log").value === output && !app.byId("usb-share").disabled;
   devices = [other, port];
   app.tap("usb-refresh");
@@ -50,12 +50,26 @@ export default async function (app) {
   const stoppedOnLeave = stops > before && !status.active;
   status = {...status, state: "error", active: false, detail: "USB permission was denied"};
   screen.showing(true);
-  await app.until(() => app.text("usb-state").includes("denied"), "permission denial visible");
-  const denialVisible = app.text("usb-state").includes("denied");
+  await app.until(() => app.text("usb-capture-state").includes("denied"), "permission denial visible");
+  const denialVisible = app.text("usb-capture-state").includes("denied");
   devices = [];
   app.tap("usb-refresh");
   await app.until(() => app.text("usb-availability").includes("No USB"), "absence visible");
   const noDevicesDisabled = app.byId("usb-start").disabled;
+  // The board's own port is the port of the USB serial link: no capture opens it while
+  // that link is in use.
+  devices = [{device: "board-usb", port: 0, label: "Board port", link: true}];
+  win.localStorage.setItem("odrig.link", "usb");
+  let linkPortRefused;
+  try {
+    app.tap("usb-refresh");
+    await app.until(() => !app.byId("usb-start").disabled, "board port ready");
+    app.tap("usb-start");
+    await app.until(() => !app.byId("usb-error").hidden, "link port refused");
+    linkPortRefused = opened.device === "test-usb" && app.text("usb-error").includes("USB serial link");
+  } finally {
+    win.localStorage.removeItem("odrig.link");
+  }
   screen.showing(false);
-  return {open: opened, reports, shares, textSafe, unpluggedLogKept, stoppedOnLeave, denialVisible, noDevicesDisabled, selectedVisible, selectionKept};
+  return {open: opened, reports, shares, textSafe, unpluggedLogKept, stoppedOnLeave, denialVisible, noDevicesDisabled, selectedVisible, selectionKept, linkPortRefused};
 }
