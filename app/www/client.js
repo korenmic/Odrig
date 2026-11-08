@@ -1126,6 +1126,11 @@ function cancelWaiting() {
   wanted.length = 0;
 }
 
+// Takes back an upload the installation holds open, in the stream of requests.
+export function uploadCancel() {
+  return requestOperation("upload-cancel", () => commands.uploadCancel());
+}
+
 export function mappingGet() {
   return requestOperation("mapping", () => commands.mappingGet());
 }

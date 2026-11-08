@@ -17,8 +17,6 @@ const TWICE = "Another file of this batch has this name.";
 // The list, or null: its destination form, its rows, and the generation of the catalog the
 // pick captured.
 let list = null;
-// Waits for the run of the list: what the screen asks it when the button is pressed.
-let starter = null;
 
 function byId(id) {
   return document.getElementById(id);
@@ -111,8 +109,7 @@ export async function take(files, message) {
     return;
   }
   if (list === null || list.ran) {
-    list = {form: destinations.capture(client.state, client.targetVersion()), rows: [], ran: false};
-    starter?.forget?.();
+    list = {form: destinations.capture(client.state, client.targetVersion()), rows: [], ran: false, pressing: false};
   }
   const left = await add([...files]);
   if (left > 0) message(`At most ${MOST} animations are listed; ${left} were left out.`);
@@ -234,7 +231,7 @@ export function draw(state, reason = null) {
   button.hidden = ran;
   button.textContent = `Upload ${count} ${count === 1 ? "animation" : "animations"}`;
   const said = ran ? null : lockedReason(state, reason);
-  button.disabled = said !== null || count === 0;
+  button.disabled = said !== null || count === 0 || list.pressing;
   const line = byId("batch-locked-reason");
   line.hidden = said === null;
   line.textContent = said ?? "";
@@ -282,6 +279,35 @@ export function itemOf(row) {
   };
 }
 
-export function startedBy(handle) {
-  starter = handle;
+// The press of `Upload <n> animations`: a preflight that may move the list's destination,
+// as the single form's does, and then the run of every row not refused.
+export async function press(message) {
+  if (list === null || list.ran || list.pressing || batch.running()) return;
+  const form = list.form;
+  const external = form.storage === "external";
+  list.pressing = true;
+  draw(client.state);
+  try {
+    const fresh = await client.uploadSnapshot(external ? form.level : {path: "", id: null});
+    if (destinations.synchronize(form, fresh.space)) {
+      draw(client.state);
+      message(`The destination changed to ${byId("batch-destination").textContent}. Review it and press Upload again.`);
+      return;
+    }
+  } catch (error) {
+    message(destinations.refusalWords(error, external, sum(), client.state));
+    return;
+  } finally {
+    list.pressing = false;
+    draw(client.state);
+  }
+  list.ran = true;
+  batch.start(sendable().map(itemOf), form, {guarded: true});
+}
+
+// Sends the rows that failed or were not sent once more, with their names and destination.
+export function retry() {
+  if (list === null || batch.running()) return;
+  const rows = list.rows.filter((row) => ["failed", "not sent"].includes(batch.outcomeOf(row)));
+  if (rows.length > 0) batch.start(rows.map(itemOf), list.form, {guarded: false});
 }

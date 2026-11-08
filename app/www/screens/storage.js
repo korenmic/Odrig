@@ -1,5 +1,6 @@
 // New animations: converted media or original ready-made bytes, with a visible destination.
 
+import * as batch from "../batch.js";
 import * as batchList from "./batch-list.js";
 import * as capacity from "../capacity.js";
 import * as client from "../client.js";
@@ -62,6 +63,7 @@ function locked() {
 // does not answer, this screen checks the destination, an upload of any screen is under
 // way, or a deletion runs on Animations. Null while none holds.
 function lockReason(state) {
+  if (batch.running()) return "A batch upload is under way.";
   if (state.link === "checking") return "The installation has not answered yet.";
   if (state.link !== "answers") return `The installation does not answer.${state.failure === null ? "" : ` ${messages.ofFailure(state.failure)}`}`;
   const holder = client.contentHolder();
@@ -245,26 +247,14 @@ async function upload(message) {
         } else {
           shown.hidden = true;
           const error = how.error;
-          if (error instanceof Refusal && error.code === "no-space" && external) {
-            const card = client.state.space === null ? null : client.state.space.external;
-            message(messages.ofNoSpace(bytes.length, card === null || card.free === null ? null : card.free, "the card"));
-          } else if (error instanceof Refusal && error.code === "no-space") {
-            message(messages.ofNoSpace(bytes.length, client.state.space === null ? null : client.state.space.free));
-          } else if (error instanceof Refusal && !external && ["unsupported", "stale"].includes(error.code)) {
-            message("The chosen id was taken, or the firmware cannot confirm a safe new upload. No file bytes were sent. Select the file again or update the firmware.");
-          } else if (error instanceof Refusal && external && ["bad-argument", "unknown-command", "no-upload", "stale"].includes(error.code)) {
-            message("The destination changed, already exists, or the firmware lacks safe folder uploads. Check the folder and filename, or update the firmware. Nothing was acknowledged as installed.");
-          } else if (error instanceof Refusal) {
-            message(messages.ofRefusal(error, client.state.status === null ? null : client.state.status.error));
-          } else if (error instanceof Failure) {
-            message(`${messages.ofFailure(error)} The upload was not acknowledged as installed; check the destination before retrying.`);
-          }
+          if (error instanceof Refusal || error instanceof Failure) message(destinations.refusalWords(error, external, bytes.length, client.state));
         }
       },
       wake: client.wake,
     },
   );
   client.upload(sending);
+  batch.otherUpload();
   } catch (error) {
     if (error instanceof Refusal) message(messages.ofRefusal(error, client.state.status?.error ?? null));
     else if (error instanceof Failure) message(messages.ofFailure(error));
@@ -403,6 +393,10 @@ export function start(options) {
     if (files.length > 0) batchList.take(files, message);
   });
   byId("batch-storage").addEventListener("change", () => batchList.choose(byId("batch-storage").value, client.state));
+  byId("batch-upload").addEventListener("click", () => batchList.press(message));
+  byId("batch-stop").addEventListener("click", () => batch.stop());
+  byId("batch-retry").addEventListener("click", () => batchList.retry());
+  batch.watch(() => draw(client.state));
   for (const name of Object.keys(FITS)) {
     byId(`fit-${name}`).addEventListener("click", () => chooseFit(name));
   }

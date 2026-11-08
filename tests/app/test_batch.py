@@ -1,10 +1,12 @@
 """Ready-made animations picked several at once and uploaded as one run."""
 
+import json
 import math
 import pathlib
 import tempfile
 import unittest
 
+from odrig import catalog
 from tests.core import support as core_support
 from tests.emulator import support as emulator_support
 from . import support
@@ -89,6 +91,209 @@ class Picking(unittest.TestCase):
         self.assertTrue(found["facts"].startswith("Ready-made animation, 60 × 6,"))
         self.assertIsNone(found["list"])
         self.assertEqual(found["button"], "Upload to the installation")
+
+
+BUSY = (200, '{"ok":false,"error":"busy"}\n')
+STALE = (200, '{"ok":false,"error":"stale"}\n')
+WAITING = "Waiting for the installation to answer."
+
+
+class Between:
+    """A stand-in that hands each line to the emulator, and can answer some lines itself:
+    with a refusal, with nothing while it is silent, or with a card gone from `space`."""
+
+    def __init__(self, emulator):
+        self.emulator = emulator
+        self.rules = []
+        self.silent = False
+        self.card_gone = False
+        self.lines = []
+        # The card goes once the first upload has ended with success.
+        self.gone_after_an_end = False
+
+    def __call__(self, line):
+        self.lines.append(line)
+        if self.silent:
+            return None
+        for rule in self.rules:
+            reply = rule(line)
+            if reply is not None:
+                return reply
+        reply = self.emulator.command(line.decode("utf-8")).decode("utf-8")
+        if self.card_gone and line == b"space":
+            given = json.loads(reply)
+            given["external"] = {"present": False, "free": None, "total": None, "read_only": True}
+            reply = json.dumps(given) + "\n"
+        if self.gone_after_an_end and line.startswith(b"upload end ") and reply.startswith('{"ok":true'):
+            self.card_gone = True
+        return 200, reply
+
+    def times(self, start, reply, count):
+        """Answers the first `count` lines that begin with `start` with `reply`."""
+        left = [count]
+
+        def rule(line):
+            if line.startswith(start) and left[0] > 0:
+                left[0] -= 1
+                return reply
+            return None
+
+        self.rules.append(rule)
+
+    def sent(self, start):
+        return [line for line in self.lines if line.startswith(start)]
+
+
+class Running(unittest.TestCase):
+    """The run of a list: one file after another, while the app is used."""
+
+    def setUp(self):
+        self.show = entered(self, emulator_support.example_show())
+        self.hello = (self.show / "hello.odrg").read_bytes()
+        self.media = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        (self.media / "hello.odrg").write_bytes(self.hello)
+        # A file of many pieces, so that something can happen while it is sent.
+        self.long = core_support.clip(3, 60, 6, (20,) * 400, compressed=False)
+        (self.media / "long.odrg").write_bytes(self.long)
+        broken = bytearray(core_support.clip(4, 60, 6, (20,) * 3))
+        broken[len(broken) // 2:] = b"\xff" * (len(broken) - len(broken) // 2)
+        (self.media / "broken.odrg").write_bytes(bytes(broken))
+
+    def ran(self, address, files, steps=(), **settings):
+        return support.run("batch", address=address, media=self.media, steps=steps, settings={"mode": "run", "rows": 2, "files": files, **settings}).seen
+
+    def between(self, emulator):
+        between = Between(emulator)
+        stand_in = entered(self, support.StandIn(between))
+        return between, stand_in.address
+
+    def test_ten_files_go_to_the_boards_storage_one_after_another_while_the_app_is_used(self):
+        emulator = entered(self, emulator_support.Emulator(self.show))
+        names = [f"clip-{number:02}.odrg" for number in range(1, 11)]
+        found = self.ran(f"127.0.0.1:{emulator.port}", [["hello.odrg", name] for name in names],
+                         actions=[["row", 0, "^(sending|uploaded)"], ["elsewhere"], ["forms"]], tap=True)
+        self.assertEqual(found["rows"], [f"uploaded as animation {id}" for id in range(4, 14)])
+        self.assertEqual(found["end"], "10 of 10 uploaded.")
+        self.assertTrue(any(line.startswith("Uploading 1 of 10: clip-01.odrg") for line in found["lines"]), found["lines"])
+        self.assertTrue(any(line.startswith("Uploading 10 of 10: clip-10.odrg") for line in found["lines"]), found["lines"])
+        self.assertTrue(found["onAnimations"].startswith("Uploading "), found["onAnimations"])
+        self.assertTrue(found["deletionLocked"])
+        self.assertEqual(found["single"], {"disabled": True, "reason": "A batch upload is under way.", "list": True})
+        self.assertEqual(found["second"], "A batch upload is under way. Choose these when it has ended.")
+        self.assertEqual(found["text"], {"disabled": True, "reason": "A batch upload is under way."})
+        self.assertEqual(found["tapped"], {"screen": "upload", "line": None})
+        self.assertIsNone(found["retry"])
+        for name in names:
+            self.assertEqual((self.show / name).read_bytes(), self.hello)
+        listed = [item["file"] for item in json.loads((self.show / "show.json").read_text(encoding="utf-8"))["items"] if "file" in item]
+        self.assertEqual(listed[-10:], names)
+
+    def test_ten_files_go_to_a_card_folder_whose_catalog_moves_at_each_file(self):
+        top = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        drive = top / "odrig"
+        (drive / "night" / "deep").mkdir(parents=True)
+        (drive / "night" / "deep" / "old.odrg").write_bytes(self.hello)
+        _, refused = catalog.rebuild(catalog.Storage(drive, drive=True), names=["night/deep/old.odrg"], canvas=(60, 6))
+        self.assertEqual(refused, [])
+        emulator = entered(self, emulator_support.Emulator(self.show, "--drive", top))
+        names = [f"star-{number:02}.odrg" for number in range(1, 11)]
+        found = self.ran(f"127.0.0.1:{emulator.port}", [["hello.odrg", name] for name in names], rows=2, path="night/deep")
+        self.assertTrue(all(row.startswith("uploaded") for row in found["rows"]), found["rows"])
+        self.assertEqual(found["end"], "10 of 10 uploaded.")
+        for name in names:
+            self.assertEqual((drive / "night" / "deep" / name).read_bytes(), self.hello)
+
+    def test_a_file_refused_in_the_middle_is_marked_and_the_run_goes_on(self):
+        emulator = entered(self, emulator_support.Emulator(self.show))
+        found = self.ran(f"127.0.0.1:{emulator.port}", [["hello.odrg", "a.odrg"], ["broken.odrg", "b.odrg"], ["hello.odrg", "c.odrg"]])
+        self.assertEqual(found["rows"][0], "uploaded as animation 4")
+        self.assertTrue(found["rows"][1].startswith("failed: "), found["rows"])
+        self.assertEqual(found["rows"][2], "uploaded as animation 5")
+        self.assertEqual(found["end"], "2 of 3 uploaded, 1 failed.")
+        self.assertEqual(found["retry"], "Try the failed again")
+        self.assertFalse((self.show / "b.odrg").exists())
+
+    def test_a_busy_begin_is_tried_again_and_a_busy_end_is_not_counted(self):
+        emulator = entered(self, emulator_support.Emulator(self.show))
+        between, address = self.between(emulator)
+        between.times(b"upload begin ", BUSY, 2)
+        between.times(b"upload end ", BUSY, 1)
+        found = self.ran(address, [["hello.odrg", "a.odrg"], ["hello.odrg", "b.odrg"]], actions=[["row", 0, "try 2 of 30"]])
+        self.assertEqual(found["rows"], ["uploaded as animation 4", "uploaded as animation 5"])
+        self.assertEqual(len(between.sent(b"upload begin ")), 4)
+
+    def test_a_stale_begin_starts_the_turn_again_once_and_a_second_fails_the_file(self):
+        emulator = entered(self, emulator_support.Emulator(self.show))
+        between, address = self.between(emulator)
+        between.times(b"upload begin 4 a.odrg ", STALE, 1)
+        between.times(b"upload begin 5 b.odrg ", STALE, 2)
+        found = self.ran(address, [["hello.odrg", "a.odrg"], ["hello.odrg", "b.odrg"]])
+        self.assertEqual(found["rows"][0], "uploaded as animation 4")
+        self.assertEqual(found["rows"][1], "failed: The chosen id was taken, or the firmware cannot confirm a safe new upload. No file bytes were sent.")
+
+    def test_an_upload_dropped_while_the_app_was_away_starts_again_once(self):
+        emulator = entered(self, emulator_support.Emulator(self.show))
+        between, address = self.between(emulator)
+        found = self.ran(address, [["long.odrg", "a.odrg"], ["hello.odrg", "b.odrg"]],
+                         actions=[["row", 0, "^sending [1-9]"], ["hide"], ["sleep", 300], ["step"], ["show"]],
+                         steps=[lambda: emulator.command("upload cancel")])
+        self.assertEqual(found["rows"], ["uploaded as animation 4", "uploaded as animation 5"])
+        self.assertIn("Paused while the app was not on the screen.", found["lines"])
+        self.assertEqual(len(between.sent(b"upload begin 4 ")), 2)
+        self.assertEqual((self.show / "a.odrg").read_bytes(), self.long)
+
+    def test_an_upload_dropped_while_the_app_was_shown_fails_its_file(self):
+        emulator = entered(self, emulator_support.Emulator(self.show))
+        between, address = self.between(emulator)
+        found = self.ran(address, [["long.odrg", "a.odrg"], ["hello.odrg", "b.odrg"]], actions=[["row", 0, "^sending [1-9]"], ["step"]],
+                         steps=[lambda: emulator.command("upload cancel")])
+        self.assertTrue(found["rows"][0].startswith("failed: "), found["rows"])
+        self.assertEqual(found["rows"][1], "uploaded as animation 4")
+
+    def test_a_target_that_stops_answering_is_waited_for_and_the_run_goes_on(self):
+        emulator = entered(self, emulator_support.Emulator(self.show))
+        between, address = self.between(emulator)
+
+        def silent():
+            between.silent = True
+
+        def speaks():
+            between.silent = False
+
+        found = self.ran(address, [["long.odrg", "a.odrg"], ["hello.odrg", "b.odrg"]],
+                         actions=[["row", 0, "^sending [1-9]"], ["step"], ["line", WAITING, 30000], ["step"]], steps=[silent, speaks], timeout=120000)
+        self.assertEqual(found["rows"], ["uploaded as animation 4", "uploaded as animation 5"])
+        self.assertEqual((self.show / "a.odrg").read_bytes(), self.long)
+
+    def test_a_card_taken_out_at_a_files_turn_ends_the_run(self):
+        top = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        drive = top / "odrig"
+        drive.mkdir()
+        (drive / "old.odrg").write_bytes(self.hello)
+        _, refused = catalog.rebuild(catalog.Storage(drive, drive=True), names=["old.odrg"], canvas=(60, 6))
+        self.assertEqual(refused, [])
+        emulator = entered(self, emulator_support.Emulator(self.show, "--drive", top))
+        between, address = self.between(emulator)
+        between.gone_after_an_end = True
+        found = self.ran(address, [["hello.odrg", f"{letter}.odrg"] for letter in "abcd"], rows=3)
+        self.assertTrue(found["rows"][0].startswith("uploaded"), found["rows"])
+        self.assertEqual(found["rows"][1:], ["failed: External storage is absent or read-only. Check the displayed destination before retrying.", "not sent", "not sent"])
+        self.assertEqual(found["end"], "1 of 4 uploaded, 1 failed, 2 not sent.")
+
+    def test_a_change_of_target_ends_the_run(self):
+        emulator = entered(self, emulator_support.Emulator(self.show))
+        found = self.ran(f"127.0.0.1:{emulator.port}", [["long.odrg", "a.odrg"], ["hello.odrg", "b.odrg"], ["hello.odrg", "c.odrg"]],
+                         actions=[["row", 0, "^sending [1-9]"], ["target"]])
+        self.assertEqual(found["rows"], ["failed: The target changed.", "not sent", "not sent"])
+
+    def test_stop_ends_the_run_after_the_file_in_progress_and_the_failed_are_tried_again(self):
+        emulator = entered(self, emulator_support.Emulator(self.show))
+        found = self.ran(f"127.0.0.1:{emulator.port}", [["long.odrg", "a.odrg"], ["hello.odrg", "b.odrg"], ["hello.odrg", "c.odrg"]],
+                         actions=[["row", 0, "^sending [1-9]"], ["stop"]], retry=True)
+        self.assertEqual(found["rows"], ["uploaded as animation 4", "not sent", "not sent"])
+        self.assertEqual(found["end"], "1 of 3 uploaded, 2 not sent.")
+        self.assertEqual(found["retried"], ["uploaded as animation 4", "uploaded as animation 5", "uploaded as animation 6"])
+        self.assertEqual(found["retriedEnd"], "2 of 2 uploaded.")
 
 
 if __name__ == "__main__":

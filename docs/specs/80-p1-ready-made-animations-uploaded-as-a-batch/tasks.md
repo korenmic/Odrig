@@ -9,7 +9,7 @@ seen failing first.
     failing first.
   - Requirements: 1.1–1.5, 2.1, 3.1–3.3, 4.1–4.3, 4.5.
 
-- [ ] 2. Send the list as one run
+- [x] 2. Send the list as one run
   - `batch.js`, its waits, retries and ends, the content lock, `Stop`, `Try the failed
     again`, the line on every screen, the single and the text form's lines; the run's
     cases seen failing first.

@@ -94,7 +94,110 @@ async function one(app) {
   return {facts: app.text("made-facts"), list: app.text("batch-sum"), button: app.text("upload-made")};
 }
 
+// Opens the folders of a path on Animations, as the operator browses to a folder of the card.
+async function browse(app, path) {
+  let entered = "";
+  for (const part of (path ?? "").split("/").filter(Boolean)) {
+    entered += (entered ? "/" : "") + part;
+    const name = entered;
+    const button = await app.until(() => app.doc.querySelector(`button[aria-label="Open folder ${name}"]`), "the folder row");
+    button.click();
+    await app.until(() => app.text("level-title") === name, "the explored folder");
+  }
+}
+
+function hide(app, hidden) {
+  Object.defineProperty(app.doc, "hidden", {configurable: true, value: hidden});
+  app.doc.dispatchEvent(new app.frame.contentWindow.Event("visibilitychange"));
+}
+
+// Picks the files, presses `Upload <n> animations`, does what the settings ask while the run
+// lasts, and gives the rows' states, the line's words as they changed, and what the other
+// forms said meanwhile.
+async function running(app) {
+  const settings = app.settings;
+  await shown(app, settings.rows);
+  await browse(app, settings.path);
+  app.press("Upload");
+  await app.until(() => /^Internal storage: Free [0-9]/.test(app.raw("upload-space")), "the storage's capacity");
+  await pick(app, "ready-file", settings.files);
+  await app.until(() => app.text("batch-sum") !== null && !app.byId("batch-upload").disabled, "the list ready");
+  if (settings.store !== undefined) {
+    const select = app.byId("batch-storage");
+    select.value = settings.store;
+    select.dispatchEvent(new app.frame.contentWindow.Event("change", {bubbles: true}));
+  }
+  const batch = await app.frame.contentWindow.eval('import("/batch.js")');
+  const client = await app.frame.contentWindow.eval('import("/client.js")');
+  const lines = [];
+  const record = () => {
+    const line = app.byId("batch-line");
+    const words = line.hidden ? null : line.textContent;
+    if (words !== null && lines[lines.length - 1] !== words) lines.push(words);
+  };
+  const recorder = setInterval(record, 10);
+  const seen = {};
+  const state = (at) => listed(app)[at].state;
+  app.byId("batch-upload").click();
+  await app.until(() => batch.running(), "the run", 15000);
+  for (const action of settings.actions ?? []) {
+    const [what, ...rest] = action;
+    if (what === "row") await app.until(() => new RegExp(rest[1]).test(state(rest[0])), `row ${rest[0]} ${rest[1]}`, rest[2] ?? 30000);
+    else if (what === "line") await app.until(() => lines.includes(rest[0]), `the line ${rest[0]}`, rest[1] ?? 30000);
+    else if (what === "step") await app.step();
+    else if (what === "hide") hide(app, true);
+    else if (what === "show") hide(app, false);
+    else if (what === "sleep") await app.sleep(rest[0]);
+    else if (what === "stop") app.byId("batch-stop").click();
+    else if (what === "target") client.begin();
+    else if (what === "elsewhere") {
+      app.press("Animations");
+      await app.until(() => app.shown() === "animations", "Animations during the run");
+      await app.until(() => app.text("batch-line") !== null, "the line on Animations");
+      seen.onAnimations = app.text("batch-line");
+      seen.deletionLocked = client.contentBusy();
+      app.press("Upload");
+      await app.until(() => app.shown() === "upload", "Upload again");
+    } else if (what === "forms") {
+      await pick(app, "ready-file", [settings.files[0]]);
+      await app.until(() => app.text("made-facts") !== null, "today's form under the list");
+      seen.single = {disabled: app.byId("upload-made").disabled, reason: app.text("upload-locked-reason"), list: app.text("batch-sum") !== null};
+      await pick(app, "ready-file", settings.files.slice(0, 2));
+      await app.until(() => app.text("message-text") !== null, "the refusal of a second list");
+      seen.second = app.text("message-text");
+      app.byId("message-close").click();
+      app.press("Make a text");
+      await app.until(() => app.text("author-locked-reason") !== null, "the text form's line");
+      seen.text = {disabled: app.byId("author-upload").disabled, reason: app.text("author-locked-reason")};
+      app.press("Close");
+    }
+  }
+  await app.until(() => !batch.running(), "the end of the run", settings.timeout ?? 90000);
+  record();
+  clearInterval(recorder);
+  seen.rows = listed(app).map((row) => row.state);
+  seen.lines = lines;
+  seen.end = app.text("batch-line");
+  seen.retry = app.text("batch-retry");
+  if (settings.retry) {
+    app.byId("batch-retry").click();
+    await app.until(() => batch.running(), "the second run", 15000);
+    await app.until(() => !batch.running(), "the end of the second run", settings.timeout ?? 90000);
+    seen.retried = listed(app).map((row) => row.state);
+    seen.retriedEnd = app.text("batch-line");
+  }
+  if (settings.tap) {
+    app.press("Settings");
+    await app.until(() => app.shown() === "settings", "Settings");
+    app.byId("batch-line").click();
+    await app.until(() => app.shown() === "upload", "Upload after the tap");
+    seen.tapped = {screen: app.shown(), line: app.text("batch-line")};
+  }
+  return seen;
+}
+
 export default async function (app) {
   if (app.settings.mode === "one") return one(app);
+  if (app.settings.mode === "run") return running(app);
   return picking(app);
 }

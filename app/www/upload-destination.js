@@ -1,5 +1,27 @@
 // A new upload keeps the browsing context it was prepared from.
+import {Refusal} from "./commands.js";
+import * as messages from "./messages.js";
+import {Failure} from "./target.js";
 import {fits} from "./upload.js";
+
+// The words of an upload that did not end with success: of a refusal or a failure of the way
+// that ended a file of `size` bytes.
+export function refusalWords(error, external, size, state) {
+  if (error instanceof Refusal && error.code === "no-space" && external) {
+    const card = state.space === null ? null : state.space.external;
+    return messages.ofNoSpace(size, card == null || card.free === null ? null : card.free, "the card");
+  }
+  if (error instanceof Refusal && error.code === "no-space") return messages.ofNoSpace(size, state.space === null ? null : state.space.free);
+  if (error instanceof Refusal && !external && ["unsupported", "stale"].includes(error.code)) {
+    return "The chosen id was taken, or the firmware cannot confirm a safe new upload. No file bytes were sent. Select the file again or update the firmware.";
+  }
+  if (error instanceof Refusal && external && ["bad-argument", "unknown-command", "no-upload", "stale"].includes(error.code)) {
+    return "The destination changed, already exists, or the firmware lacks safe folder uploads. Check the folder and filename, or update the firmware. Nothing was acknowledged as installed.";
+  }
+  if (error instanceof Refusal) return messages.ofRefusal(error, state.status === null ? null : state.status.error);
+  if (error instanceof Failure) return `${messages.ofFailure(error)} The upload was not acknowledged as installed; check the destination before retrying.`;
+  return error.message;
+}
 
 // Whether a `space` reply said a card is present.
 export function present(space) {
