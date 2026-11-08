@@ -13,7 +13,7 @@ seen failing first.
     seen failing first; the scenario that reads the pins' words changed after.
   - Requirements: 2.1–2.8.
 
-- [ ] 3. The documents
+- [x] 3. The documents
   - `docs/android-app.md`, its check on a phone and `tests/app/test_docs.py`;
     `docs/drifts.md`.
   - Requirements: 3.1.

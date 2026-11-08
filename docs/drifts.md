@@ -12805,3 +12805,20 @@ moved, as before. A store that refuses the value leaves the choice for the run a
 
 **Resolution.** `app/www/screens/mapping.js`, `tests/mapping/test_lock.py`,
 `docs/android-app.md`.
+
+## Seed 72: what a change of target does to the lock's confirmation, and typed numbers
+
+**Question.** Seed 72 asks that a change of target close a pending confirmation, and seed
+84, built first, that the dialog's answer apply across a reconnection; and which text is a
+pin's number?
+
+**Answer.** Seed 84's ruling stands, being the owner's later word on the same value: a new
+start of the link, which a change of target is, leaves the dialog open, and its answer
+applies, since the value is one for every target. Leaving Settings and hiding the app close
+it, as both seeds say. A pin's number is one to three digits, its value one of the twenty
+pins of the confirmed assignment; a sign, a point, letters and an empty field are refused
+as `Type the number of a GPIO.` The checkbox keeps the toggle's id, `mapping-lock`, so that
+the page helpers find it.
+
+**Resolution.** `app/www/screens/mapping.js`, `app/www/index.html`,
+`tests/mapping/test_lock.py`.

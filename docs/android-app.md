@@ -785,11 +785,12 @@ limit. It never leaves the phone, and each phone has its own; the Controller vie
 kept, a web view without IndexedDB, or one that refuses a write, keeps the preview for the
 run alone, and nothing of this is said. No plugin is added for it.
 
-**Mapping edit lock.** `Lock mapping edits` is a toggle, pressed by default, with the
-status `Mapping edits are locked.` Both unlocking and relocking open an "Are you sure?"
+**Mapping edit lock.** `Lock mapping edits` is a checkbox in the Mapping panel of Settings,
+checked by default, with the status `Mapping edits are locked.` A press does not change the
+box by itself. Both unlocking and relocking open an "Are you sure?"
 dialog with explicit confirm/cancel buttons. Cancel or Escape keeps the existing state.
-While locked, pin handles, held-row/keyboard moves, Restore defaults, photo Apply and
-Other reading cannot save. Their handlers also enforce the lock. Mapping reads/Reload,
+While locked, pin fields, pin handles, held-row/keyboard moves, Restore defaults, photo
+Apply and Other reading cannot save. Their handlers also enforce the lock. Mapping reads/Reload,
 photo analysis and display diagnostics remain available. The confirmed value is kept on
 the phone, `odrig.mappingLock` in the web view's storage, one value for Wi-Fi and USB
 serial, every target and every board, and only a confirmed press changes it: leaving
@@ -817,7 +818,14 @@ permutation is saved at once with the revision it was read with, while the finge
 still down, so that the LEDs follow the drag; the summary says `Saved: GPIO p drives snake
 n.`. Several quick places are saved one after another, the latest last; after the pin is
 let go the assignment is read once and shown. The arrow keys on a handle move its pin one
-place and save it the same way. When another controller changed the mapping meanwhile the
+place and save it the same way. Each pin is also a field, `GPIO` and the pin's number,
+with a numeric keyboard: a number typed into a snake's field and committed with Enter or
+by leaving the field moves that pin to that snake, the pins between moving one place, as a
+drag there does, and saves it the same way. Escape puts the pin back. Text that is not the
+number of one of the twenty pins writes nothing, the field shows its pin again, and the
+error line says `Type the number of a GPIO.` or `GPIO n is not one of the installation's
+twenty pins.` A poll that changes nothing keeps what is typed; a changed assignment,
+leaving Settings, hiding the app or another target drops it. When another controller changed the mapping meanwhile the
 save is refused, said, the drag ends and the target's assignment is shown; when no reply
 confirms a save, the drag ends, the assignment is read once again and nothing is sent
 twice. Restore defaults saves the default assignment at once, offered only when the
@@ -1142,7 +1150,11 @@ installed; the phone with mobile data on.
     and on, after the app is closed and opened again, and after the link is lost and the
     installation answers again; a pin moved then is saved. Lock it again and close the
     app: it opens locked.
-25. **Note** the phone's model, its Android version, the web view's version from the
+25. **Typed pins.** With the mapping unlocked, type the pin of snake 5 into snake 1's field
+    and press the keyboard's Enter. *Seen:* the pin moves to snake 1, the pins between move
+    one place, `Saved: GPIO p drives snake 1.`, and the LEDs follow; `99` typed into a field
+    is refused with its words and nothing changes.
+26. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1295,6 +1307,8 @@ By programs, on a Mac:
 
 ## What is open
 
+- **The mapping checkbox and typed pins on a phone.** No person has typed a pin on a phone
+  and seen the LEDs follow: step 25 above.
 - **The kept mapping lock on a phone.** No person has seen `Lock mapping edits` keep its
   value through another app, a restart and a lost link on a phone: step 24 above.
 
