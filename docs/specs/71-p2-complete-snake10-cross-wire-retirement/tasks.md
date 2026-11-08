@@ -12,7 +12,7 @@ seen failing first.
   - `odrigctl/cli.py`; `tests/mapping/test_hosts.py`, the usage error seen failing first.
   - Requirements: 2.1–2.2.
 
-- [ ] 3. The audit and the documents
+- [x] 3. The audit and the documents
   - The search of the design, its results in `docs/drifts.md`; the user-facing documents
     checked.
   - Requirements: 4.1–4.2, 5.1–5.2.
