@@ -790,11 +790,22 @@ status `Mapping edits are locked.` Both unlocking and relocking open an "Are you
 dialog with explicit confirm/cancel buttons. Cancel or Escape keeps the existing state.
 While locked, pin handles, held-row/keyboard moves, Restore defaults, photo Apply and
 Other reading cannot save. Their handlers also enforce the lock. Mapping reads/Reload,
-photo analysis and display diagnostics remain available. Unlocking applies only to
-this Settings session on this app; leaving Settings, hiding the app, losing the link
-or changing target relocks and closes a pending confirmation. Unsent queued edits are
-dropped before transport; an already-sent edit still needs its normal reconciliation.
-The lock adds no board command and does not restrict another controller or odrigctl.
+photo analysis and display diagnostics remain available. The confirmed value is kept on
+the phone, `odrig.mappingLock` in the web view's storage, one value for Wi-Fi and USB
+serial, every target and every board, and only a confirmed press changes it: leaving
+Settings, hiding the app, a lost reply, a reconnection, a change of target or of link, a
+restart of the app or of the phone, and an update of the APK keep it. A phone that never
+stored a value, or holds one of no meaning, starts locked. The control answers with or
+without a board, and waits only while a pin is held or a save is under way. Unlocked,
+edits still need a board that answers, a fresh read and an editable mapping, and the
+status says why they wait: `Mapping edits are unlocked. Edits wait until the installation
+answers.` or `... Edits wait for the mapping to be read.` When the phone refuses to store
+the value, the choice holds while the app runs and the status adds `This choice could not
+be kept on this phone; it holds until the app is closed.` Leaving Settings or hiding the
+app closes a pending confirmation, which changes nothing; leaving Settings, hiding the
+app, losing the link or changing target drops unsent queued edits before transport, and
+an already-sent edit still needs its normal reconciliation. The lock adds no board
+command and does not restrict another controller or odrigctl.
 
 **Mapping.** After confirmed unlock, the twenty snakes stand in a fixed column, `Snake n · columns a–b`, left to
 right when viewed from the front, each starting at the bottom and running up, down, up;
@@ -1125,7 +1136,13 @@ installed; the phone with mobile data on.
     Include. Check dark recovery when all faces are excluded, mode restoration, reconnect
     and another controller's changes. Repeat upright and sideways. These physical and
     phone observations remain open until actually performed.
-24. **Note** the phone's model, its Android version, the web view's version from the
+24. **The mapping lock.** In Settings, press `Lock mapping edits` and confirm the
+    unlock. *Seen:* it stays unlocked after another app is opened and the app brought
+    back, after Settings is left and opened again, after the phone's screen is turned off
+    and on, after the app is closed and opened again, and after the link is lost and the
+    installation answers again; a pin moved then is saved. Lock it again and close the
+    app: it opens locked.
+25. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1277,6 +1294,9 @@ By programs, on a Mac:
   and the rule that allows plain HTTP.
 
 ## What is open
+
+- **The kept mapping lock on a phone.** No person has seen `Lock mapping edits` keep its
+  value through another app, a restart and a lost link on a phone: step 24 above.
 
 - **Message clock modes and external inclusion on a phone and on the board.** The
   shared browser/emulator proofs do not replace physical acceptance of all seven

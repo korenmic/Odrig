@@ -12791,3 +12791,17 @@ as it is, when it has one. The page needs no change: the legs come from the core
 file from that route.
 
 **Resolution.** `emulator/httpd.py`, `docs/emulator.md`.
+
+## Seed 84: what still closes the lock's confirmation, and the counter of dropped edits
+
+**Question.** Which events close a pending "Are you sure?" now that none changes the value,
+and what guards a save queued before unsent edits are dropped?
+
+**Answer.** Leaving Settings and hiding the app close it unanswered, as seed 72 asks for
+its checkbox; a poll, a lost reply, a reconnection and a change of target leave it open, and
+its answer applies, since the value is the same for every target. The counter that relocked
+became `editEpoch`: `dropEdits()` counts it, and a save queued before is not sent when it
+moved, as before. A store that refuses the value leaves the choice for the run and says so.
+
+**Resolution.** `app/www/screens/mapping.js`, `tests/mapping/test_lock.py`,
+`docs/android-app.md`.

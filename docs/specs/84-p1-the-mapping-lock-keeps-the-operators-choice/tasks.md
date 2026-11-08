@@ -11,7 +11,7 @@ seen failing first.
     relocking expectations changed after.
   - Requirements: 1.1–1.2, 2.1–2.2, 3.1–3.2, 4.1–4.2, 5.1–5.2, 6.1–6.2, 7.1, 8.1.
 
-- [ ] 2. The documents
+- [x] 2. The documents
   - `docs/android-app.md`, its check on a phone and `tests/app/test_docs.py`; the change
     log of `docs/decisions.md`; `docs/drifts.md`.
   - Requirements: 9.1–9.2.
