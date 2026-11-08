@@ -75,7 +75,8 @@ export function reason(form, space) {
   return "The destination stays here even if you browse elsewhere.";
 }
 
-export function validate(form, fresh, name, bytes, target) {
+// A file that may replace the one of its name skips the check that nothing is there.
+export function validate(form, fresh, name, bytes, target, {replace = false} = {}) {
   if (target !== form.target) throw new Error("The target changed. Select the file again to prepare its destination.");
   const path = pathOf(form, name);
   const external = form.storage === "external";
@@ -87,7 +88,7 @@ export function validate(form, fresh, name, bytes, target) {
   if (external && (current?.state !== "ok" || current.writable !== true)) throw new Error("External storage needs a ready writable catalog before uploading.");
   if (external && form.level.id !== null && !fresh.folderValid) throw new Error("The explored folder changed or disappeared. Select the destination again.");
   const rows = external ? fresh.items : fresh.root;
-  if (rows.some(item => item.file === path && (external ? item.external === true : item.external !== true))) throw new Error("A file already exists at this destination. Choose another filename; nothing was replaced.");
+  if (!replace && rows.some(item => item.file === path && (external ? item.external === true : item.external !== true))) throw new Error("A file already exists at this destination. Choose another filename; nothing was replaced.");
   const free = external ? fresh.space.external.free : fresh.space.free;
   if (typeof free === "number" && !fits(bytes, free)) return {path, external, noSpace: free};
   return {path, external};

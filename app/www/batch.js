@@ -148,7 +148,7 @@ function gone(fresh) {
 
 // Sends a file with the app's upload job. Gives how it ended, with whether its first line
 // was answered, whether the last byte's reply came, and whether the app left the screen.
-function send(item, id, path, external) {
+function send(item, id, path, external, replace) {
   return new Promise((resolve) => {
     let begun = false;
     let atEnd = false;
@@ -159,7 +159,7 @@ function send(item, id, path, external) {
     };
     document.addEventListener("visibilitychange", look);
     const job = uploading(
-      {id, file: path, bytes: item.bytes, external, create: true, expect: external ? "00000000" : null},
+      {id, file: path, bytes: item.bytes, external, create: !replace, expect: external && !replace ? "00000000" : null},
       {
         report(part) {
           // A reply that comes after the job ended changes nothing of the row.
@@ -262,10 +262,12 @@ async function turn(item, guarded) {
       fail(item, lost);
       return "end";
     }
+    // An item with a path of its own on the card goes into its folder, not the form's.
+    const folder = item.path == null ? form.level : {path: item.path.includes("/") ? item.path.slice(0, item.path.lastIndexOf("/")) : "", id: null};
     let checked;
     try {
-      checked = destinations.validate({...form, generations: {...form.generations, [form.storage]: guarded ? form.generations[form.storage] : null}},
-        fresh, item.name, item.size, client.targetVersion());
+      checked = destinations.validate({...form, level: folder, generations: {...form.generations, [form.storage]: guarded ? form.generations[form.storage] : null}},
+        fresh, item.name, item.size, client.targetVersion(), {replace: item.replace === true});
     } catch (error) {
       fail(item, error.message);
       return null;
@@ -274,13 +276,14 @@ async function turn(item, guarded) {
       fail(item, messages.ofNoSpace(item.size, checked.noSpace, external ? "the card" : undefined));
       return null;
     }
-    const id = external ? null : freeId(new Set(fresh.root.map((row) => row.id)));
+    const there = item.replace === true && !external ? fresh.root.find((row) => row.file === checked.path && row.external !== true && typeof row.id === "number") : undefined;
+    const id = external ? null : there !== undefined ? there.id : freeId(new Set(fresh.root.map((row) => row.id)));
     if (!external && id === null) {
       fail(item, "Internal storage has no free animation id.");
       return null;
     }
     setState(item, "sending 0%");
-    const how = await send(item, id, checked.path, external);
+    const how = await send(item, id, checked.path, external, item.replace === true);
     if (how.done) {
       finish(item, "uploaded", external && how.id === null ? "uploaded to the card" : `uploaded as animation ${external ? how.id : id}`);
       await preview(item);

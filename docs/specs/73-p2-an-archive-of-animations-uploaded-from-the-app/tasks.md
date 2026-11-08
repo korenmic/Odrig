@@ -8,7 +8,7 @@ seen failing first.
     failing first.
   - Requirements: 1.1–1.4, 2.1–2.3, 3.1–3.3, 4.1–4.2, 6.1.
 
-- [ ] 2. Upload the ticked files through the run
+- [x] 2. Upload the ticked files through the run
   - The press, `Replace` in `batch.js`, `Stop`; the upload cases seen failing first; the look
     rules.
   - Requirements: 5.1–5.3.

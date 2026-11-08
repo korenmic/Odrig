@@ -34,6 +34,11 @@ export default async function (app) {
   await app.until(() => app.text("archive-name") !== null || app.text("message-text") !== null, "the archive");
   const seen = {name: app.text("archive-name"), message: app.text("message-text"), rows: rows(app), sum: app.text("archive-sum"), button: button(app)};
   if (seen.name === null) return seen;
+  if (settings.look) {
+    const {measure} = await import("./look.js");
+    app.byId("archive").scrollIntoView();
+    return {look: measure(app)};
+  }
   if (settings.store !== undefined) {
     const select = app.byId("archive-storage");
     select.value = settings.store;

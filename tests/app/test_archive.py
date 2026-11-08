@@ -158,5 +158,93 @@ class Reading(unittest.TestCase):
         self.assertEqual(found["message"], "Cannot open this archive: The file is not a zip archive.")
 
 
+class Uploading(unittest.TestCase):
+    """The ticked files sent one after another through the batch's run."""
+
+    def setUp(self):
+        self.show = entered(self, emulator_support.example_show())
+        self.hello = (self.show / "hello.odrg").read_bytes()
+        self.dvd = (self.show / "dvd.odrg").read_bytes()
+        self.media = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+
+    def archive(self, entries):
+        (self.media / "archive.png").write_bytes(bytes(zipped(entries)))
+
+    def sent(self, address, **settings):
+        return support.run("archive", address=address, media=self.media,
+                           settings={"rows": 2, "zip": ["archive.png", "set.zip"], "send": True, **settings}).seen
+
+    def test_ten_files_go_to_the_boards_storage_and_one_refused_in_the_middle_is_marked(self):
+        broken = bytearray(core_support.clip(4, 60, 6, (20,) * 3))
+        broken[len(broken) // 2:] = b"\xff" * (len(broken) - len(broken) // 2)
+        names = [f"n{number:02}.odrg" for number in range(1, 11)]
+        self.archive([(f"set/{name}", bytes(broken) if name == "n05.odrg" else self.hello, zipfile.ZIP_DEFLATED) for name in names])
+        emulator = entered(self, emulator_support.Emulator(self.show))
+        found = self.sent(f"127.0.0.1:{emulator.port}")
+        self.assertEqual(found["before"], {"disabled": False, "reason": None})
+        self.assertTrue(found["after"][4].startswith("failed: "), found["after"])
+        self.assertEqual(found["after"][:4] + found["after"][5:], [f"uploaded as animation {id}" for id in range(4, 13)])
+        self.assertEqual(found["line"], "9 of 10 uploaded, 1 failed.")
+        for name in names:
+            self.assertEqual((self.show / name).exists(), name != "n05.odrg")
+
+    def test_the_card_takes_each_file_at_its_path(self):
+        top = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        drive = top / "odrig"
+        (drive / "night").mkdir(parents=True)
+        (drive / "night" / "old.odrg").write_bytes(self.hello)
+        _, refused = catalog.rebuild(catalog.Storage(drive, drive=True), names=["night/old.odrg"], canvas=(60, 6))
+        self.assertEqual(refused, [])
+        self.archive([("night/star.odrg", self.hello, zipfile.ZIP_DEFLATED), ("moon.odrg", self.dvd, zipfile.ZIP_STORED)])
+        emulator = entered(self, emulator_support.Emulator(self.show, "--drive", top))
+        found = self.sent(f"127.0.0.1:{emulator.port}")
+        self.assertTrue(all(state.startswith("uploaded") for state in found["after"]), found["after"])
+        self.assertEqual((drive / "night" / "star.odrg").read_bytes(), self.hello)
+        self.assertEqual((drive / "moon.odrg").read_bytes(), self.dvd)
+
+    def test_replace_takes_the_place_of_the_file_of_that_name(self):
+        self.archive([("hello.odrg", self.dvd, zipfile.ZIP_DEFLATED)])
+        emulator = entered(self, emulator_support.Emulator(self.show))
+        found = self.sent(f"127.0.0.1:{emulator.port}", replace=[0])
+        self.assertEqual(found["after"], ["uploaded as animation 1"])
+        self.assertEqual((self.show / "hello.odrg").read_bytes(), self.dvd)
+
+    def test_stop_ends_the_run_after_the_file_in_progress(self):
+        long = core_support.clip(3, 60, 6, (20,) * 400, compressed=False)
+        self.archive([("a.odrg", long, zipfile.ZIP_STORED), ("b.odrg", self.hello, zipfile.ZIP_STORED), ("c.odrg", self.hello, zipfile.ZIP_STORED)])
+        emulator = entered(self, emulator_support.Emulator(self.show))
+        found = self.sent(f"127.0.0.1:{emulator.port}", actions=[["row", 0, "^sending [1-9]"], ["stop"]])
+        self.assertEqual(found["after"], ["uploaded as animation 4", "not sent", "not sent"])
+        self.assertEqual(found["line"], "1 of 3 uploaded, 2 not sent.")
+
+
+class Look(unittest.TestCase):
+    def test_the_panel_keeps_the_look_rules(self):
+        from .test_look import SIZES, apart, contrast
+        show = entered(self, emulator_support.example_show())
+        hello = (show / "hello.odrg").read_bytes()
+        media = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        (media / "archive.png").write_bytes(bytes(zipped([("a-very-long-name-of-more-than-32-characters.odrg", hello, zipfile.ZIP_DEFLATED),
+                                                          ("readme.txt", b"text", zipfile.ZIP_STORED), ("hello.odrg", hello, zipfile.ZIP_STORED)])))
+        for size in SIZES:
+            emulator = entered(self, emulator_support.Emulator(show))
+            found = support.run("archive", address=f"127.0.0.1:{emulator.port}", media=media, size=size,
+                                settings={"rows": 2, "zip": ["archive.png", "set.zip"], "look": True}).seen
+            screen = found["look"]
+            where = f"{size[0]} wide"
+            self.assertLessEqual(screen["scrollWidth"], screen["width"], where)
+            controls = [control for control in screen["controls"] if control["group"] == "screen"]
+            for control in controls:
+                self.assertGreaterEqual(control["bottom"] - control["top"], 44 - 0.01, f"{where}: {control['what']}")
+                self.assertGreaterEqual(control["right"] - control["left"], 44 - 0.01, f"{where}: {control['what']}")
+            for position, first in enumerate(controls):
+                for second in controls[position + 1:]:
+                    self.assertGreaterEqual(apart(first, second), 8 - 0.01, f"{where}: {first['what']} and {second['what']}")
+            for text in screen["texts"]:
+                if not text["stale"]:
+                    self.assertGreaterEqual(contrast(text["colour"], text["behind"]), 7, f"{where}: {text['what']}")
+                    self.assertGreaterEqual(text["size"], 14, f"{where}: {text['what']}")
+
+
 if __name__ == "__main__":
     unittest.main()
