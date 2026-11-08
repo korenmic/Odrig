@@ -13544,3 +13544,35 @@ the Only line of `app/www/screens/show.js`, and `docs/android-app.md`. The recov
 model evaluates `takeStatus`, where status handling now lives; the native reconnect test
 checks the files and the keys by content and the row on the screen by identity, not the
 list's identity or its version.
+
+## Seed 79: the measurement in Chrome against the emulator
+
+**Question.** How long does it take, in Chrome against the emulator, from the press of
+`Upload to the installation` to the preview in the row, for a converted GIF and for the two
+compressed ready-made files of `odrig archive/seed-79/` on the Drive?
+
+**Answer.** Measured on 2026-11-08 on Windows 11 (Intel Core i7-14700, 32 GB) in headless
+Chrome 156 at 360 x 740, three runs of each against a fresh emulator, with the app suite's
+driver and a scenario that works the app as an operator does: pick the file, or make the
+animation from the GIF, and press `Upload to the installation` as soon as it is enabled.
+The emulator played a 60 x 60 show of `mapping/legs-20.json` with no items; its internal
+storage held 5,111,808 bytes, the spare's, and its catalog was `none`; the card's catalog
+was `ok`. The two ready-made files were made by the converter's library from
+`collection/card/space/space-scan-10x.odrg`: the large one of every frame record but the
+last, the small one of its first records.
+
+| File | Bytes | Key | Storage | To the success message, ms | To the preview in the row, ms |
+|---|---:|---|---|---|---|
+| `space-scan-10x.odrg`, made by the app from `space-scan-10x.gif` (31,035 bytes) | 29,052 | `eba96049-29052` | internal | 1,129; 884; 907 | 1,139; 896; 919 |
+| `space-scan-small.odrg`, 2,357 records | 3,950,719 | `7d2fe68d-3950719` | internal | 47,621; 45,872; 46,275 | 47,634; 45,901; 46,300 |
+| `space-scan-large.odrg`, 18,003 records, 720,120 ms | 34,408,936 | `53c6b7ce-34408936` | the card | 391,392; 375,561; 372,403 | 391,404; 375,572; 372,414 |
+
+Every preview was in its row 10 to 29 ms after the success message. The phone had made it
+before the upload ended: 0.04 s, about 1 s and 7 to 10 s after the press. The time to
+success is the sending over the computer's own network and then the installation's check
+after the last byte, paced as the board paces it: about 41 s for the small file and 5 min
+46 s for the large one. Some of the runs shared the computer with the test suites. A board
+over Wi-Fi sends more slowly; the preview's delay after success does not depend on that.
+
+**Resolution.** The Definition of Done's measurement is made; the owner's check on a phone
+stays open. No file of the repository changed for it.

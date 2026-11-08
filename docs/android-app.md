@@ -1655,8 +1655,7 @@ physical acceptance are in [verification.md](specs/64-p2-board-time-and-daily-on
 - **The kept mapping lock on a phone.** No person has seen `Lock mapping edits` keep its
   value through another app, a restart and a lost link on a phone: step 26 above.
 - **Previews made on this phone, on a phone.** No person has seen a preview this phone made
-  in a row of a storage without a catalog: the step `Previews made on this phone` above, and
-  the measurement of seed 79 in Chrome with the Drive's files.
+  in a row of a storage without a catalog: the step `Previews made on this phone` above.
 - **An archive on a phone.** No person has opened a zip on a phone and uploaded its
   animations from it: step 30 above.
 
