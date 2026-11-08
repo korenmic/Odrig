@@ -842,6 +842,19 @@ python -m odrigctl --tcp localhost:8766 guard emu-000000000000000000000000 time
 python -m odrigctl --http http://4.3.2.1 guard esp32-000000000000 schedule
 ```
 
+Folders of the card and what is saved for an animation are asked the same way:
+
+```
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] saved ID
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] folder make external PATH
+python -m odrigctl --port NAME saved 1
+python -m odrigctl --port NAME folder make external night
+python -m odrigctl --tcp localhost:8766 saved 1
+python -m odrigctl --tcp localhost:8766 folder make external night
+python -m odrigctl --http http://4.3.2.1 saved 1
+python -m odrigctl --http http://4.3.2.1 folder make external night
+```
+
 Use `guard BOARD time` or `guard BOARD schedule` to bind a request to the ID from `time`; longer timing forms use the same prefix.
 Use `time zone BASE64`, `time set UTC ZONE-CRC32`, `schedule set REV ON OFF on|off`
 and `schedule resume REV` as [commands.md](commands.md#daily-schedule-and-manual-control)
