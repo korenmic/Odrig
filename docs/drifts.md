@@ -12791,3 +12791,24 @@ as it is, when it has one. The page needs no change: the legs come from the core
 file from that route.
 
 **Resolution.** `emulator/httpd.py`, `docs/emulator.md`.
+
+## Seed 80: what the batch decides beyond its seed
+
+**Question.** What does a pick of one file do to a list, when are names made, how is a lost
+link taken back, and how is the run tested?
+
+**Answer.** A pick of one file closes a list that was not sent and opens the form; during a
+run the list stays and the form opens under it. Names are made when rows are added and when
+the storage changes, never when another row's name is edited, so that an edit cannot rename
+the others; the same file is known by its name and size. After a lost reply before the last
+byte's reply, the run sends `upload cancel` once the installation answers, so that an
+upload it may still hold open does not answer the next begin `busy` until it is dropped a
+minute later. A reply of a job that comes after the job ended changes no row. The run's
+cases are tested in Chrome against the emulator and against a stand-in that hands each line
+to the emulator and answers some itself: `busy`, `stale`, nothing, or a card gone from
+`space` once the first file is in. "In the background" is the app open on any of its
+screens; with another app in front or the phone locked the run waits, and no service,
+wake lock or permission is added.
+
+**Resolution.** `app/www/batch.js`, `app/www/screens/batch-list.js`,
+`tests/app/test_batch.py`.

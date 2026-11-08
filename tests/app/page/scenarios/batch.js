@@ -196,7 +196,29 @@ async function running(app) {
   return seen;
 }
 
+// The measures of the list before its run and after it, and where the line stands while
+// Animations scrolls.
+async function look(app) {
+  const {measure} = await import("./look.js");
+  await upload(app, app.settings.rows);
+  await pick(app, "ready-file", app.settings.files);
+  await app.until(() => app.text("batch-sum") !== null && listed(app).length === app.settings.files.length, "the list");
+  const before = measure(app);
+  const batch = await app.frame.contentWindow.eval('import("/batch.js")');
+  app.byId("batch-upload").click();
+  await app.until(() => batch.running(), "the run");
+  await app.until(() => !batch.running(), "the end of the run", 60000);
+  const after = measure(app);
+  app.press("Animations");
+  await app.until(() => app.shown() === "animations", "Animations");
+  app.frame.contentWindow.scrollTo(0, app.doc.documentElement.scrollHeight);
+  await app.sleep(100);
+  const line = app.byId("batch-line").getBoundingClientRect();
+  return {before, after, line: {top: line.top, bottom: line.bottom, shown: line.height > 0}, scrolled: app.frame.contentWindow.scrollY};
+}
+
 export default async function (app) {
+  if (app.settings.mode === "look") return look(app);
   if (app.settings.mode === "one") return one(app);
   if (app.settings.mode === "run") return running(app);
   return picking(app);

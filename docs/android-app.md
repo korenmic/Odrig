@@ -591,7 +591,8 @@ colours do. A video is drawn at most 1,280 pixels wide or high before it is fitt
 
 ### Ready-made files and upload destinations
 
-`Choose a ready-made animation` accepts `.odrg` and `.odrgx`. Actual headers identify
+`Choose ready-made animations` accepts `.odrg` and `.odrgx`, one file or several; one
+file opens the form below, several the batch list of the next section. Actual headers identify
 the format. Wrong/unsupported headers, damaged bounded containers and another canvas
 are refused in words. The exact encoded bytes are uploaded, without conversion,
 resizing or timing changes. Compressed frame bodies never inflate on the phone for
@@ -628,6 +629,55 @@ manual attempt can use the visibly updated fallback. Cancellation, failed checks
 and uncertain completion are distinct from an acknowledged installed file. After
 success the destination catalog/list/preview refresh normally. Authored texts and
 clocks remain in Internal; ready-made containers can use either selected storage.
+
+### A batch of ready-made files
+
+Two or more files picked at once, where the phone's file app lets several be ticked,
+open a list in place of the form; `Add more` picks more into it, and `Remove` takes a row
+out. A list left with one row stays a list; one left with none closes, and a pick of one
+file closes a list that has not been sent and opens the form. A file picked twice, by
+name and size, is listed once, and at most 512 are listed: of more, the app says `At most
+512 animations are listed; <k> were left out.` At the pick each file is checked by its
+start, its ending, its header, its canvas and a container's payload size; a file that
+fails is listed `refused: <reason>` in the words of a single file and is never sent.
+
+Each row is named as a converted file is, its name in lower case with every other
+character a `-`, and `-2`, `-3` and so on when the destination's list or a row above has
+the name; the destination's list is the root's of the board's storage, the browsed
+folder's on the card. Unedited names are made again when the storage changes. A name
+stays editable until the press; one that breaks the rule, makes a path of more than 100
+bytes, or repeats another row's says why under it, and `Upload <n> animations` is
+disabled with `Mend the names marked in the list.` The list shows `<n> animations, <a>
+KB.` and the destination's capacity; while the sum does not fit the known free space the
+button says `These animations need <a> KB and the installation has <b> KB free.`, or the
+card. The batch takes the storage and folder the form would take, with the same choice,
+and holds them for every file; a fallback the press's preflight finds moves the list and
+needs another press.
+
+One press sends the files one after another through the app's upload, each with its own
+preflight, its lowest free id and today's refusals; the first file sent after the press
+is guarded by the catalog generation of the pick, the others by their own preflight.
+Each file is read whole only at its turn and checked again; one damaged in its body fails
+there. A row says `waiting`, `checking`, `sending 45%`, `waiting: the installation is busy
+(try <k> of 30)`, `uploaded as animation <id>` or `uploaded to the card`, `failed:
+<reason>` or `not sent`. A file that fails is marked and the run goes on: `busy` is tried
+again every 2 seconds on the screen, 30 times; a `stale` begin of the board's storage, a
+drop while the app was away, and a lost link before the last byte's reply start the file
+again once; an `upload end` without a reply fails it. A card gone, read-only or without a
+ready catalog, a folder changed, or a change of target ends the run, the rest `not sent`.
+`Stop` lets the file in progress end and sends no more; `Try the failed again` sends the
+failed and the unsent once more with their names and destination.
+
+While the run lasts the content is locked as during one upload: deleting and moving on
+Animations wait, and the form's `Upload to the installation` and the text or clock form's
+upload are disabled, saying `A batch upload is under way.`; play, brightness, browsing and
+Settings work. A line under the top of every screen, staying there while the screen
+scrolls, says `Uploading 3 of 12: sunrise.odrg, 45%`, `Waiting for the installation to
+answer.` or `Paused while the app was not on the screen.`; a tap opens Upload. At the end
+it says `<a> of <n> uploaded`, with the failed and the unsent where there are any, until it
+is tapped or another upload starts. The run goes on while the app is open on any screen,
+with the phone's screen kept on as always; another app, the phone locked, or the app
+closed pauses or ends it, since no service runs it outside the app.
 
 While `Upload to the installation` is disabled, a line under it says why, one reason at a
 time: `The installation has not answered yet.` or `The installation does not answer.`
@@ -1144,7 +1194,13 @@ installed; the phone with mobile data on.
     <file>. It plays in the playlist.`; then switch the installation off: within five
     seconds the button is gray and the line under it says `The installation does not
     answer.` with the failure's kind in brackets.
-25. **Note** the phone's model, its Android version, the web view's version from the
+25. **A batch of ready-made files.** On Upload, `Choose ready-made animations` and tick ten
+    files in the phone's file app. *Seen:* the list of ten, `Upload 10 animations`; after
+    the press, Animations opened shows the line `Uploading <k> of 10: ...` and all ten play
+    after `10 of 10 uploaded.`; the same into a folder of the card; another app opened for
+    two minutes during a run, and the app brought back: the line said `Paused while the app
+    was not on the screen.`, and the run went on to its end.
+26. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1305,6 +1361,9 @@ By programs, on a Mac:
   and the rule that allows plain HTTP.
 
 ## What is open
+
+- **A batch of ready-made files on a phone.** No person has ticked several files in a
+  phone's file app, nor watched a run on the installation and the card: step 25 above.
 
 - **Message clock modes and external inclusion on a phone and on the board.** The
   shared browser/emulator proofs do not replace physical acceptance of all seven

@@ -15,7 +15,7 @@ seen failing first.
     cases seen failing first.
   - Requirements: 2.2–2.3, 3.4, 4.4, 4.6, 5.1–5.15, 6.1–6.4, 7.1.
 
-- [ ] 3. The look and the documents
+- [x] 3. The look and the documents
   - The look rules at 320, 360 and 740 pixels; `docs/android-app.md`, its check on a phone
     and `tests/app/test_docs.py`; `docs/drifts.md`.
   - Requirements: 8.1.

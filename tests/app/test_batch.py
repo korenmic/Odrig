@@ -93,6 +93,46 @@ class Picking(unittest.TestCase):
         self.assertEqual(found["button"], "Upload to the installation")
 
 
+class Look(unittest.TestCase):
+    """The list before and after its run, and its line on a scrolled screen, at the sizes
+    of test_look."""
+
+    def test_the_list_and_its_line_keep_the_look_rules(self):
+        from .test_look import SIZES, apart, contrast
+        show = entered(self, emulator_support.example_show())
+        hello = (show / "hello.odrg").read_bytes()
+        media = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        (media / "hello.odrg").write_bytes(hello)
+        broken = bytearray(core_support.clip(4, 60, 6, (20,) * 3))
+        broken[len(broken) // 2:] = b"\xff" * (len(broken) - len(broken) // 2)
+        (media / "broken.odrg").write_bytes(bytes(broken))
+        (media / "big.odrg").write_bytes(core_support.clip(1, 60, 60, (20, 20)))
+        files = [["hello.odrg", "a-file-name-of-twenty-seven-x.odrg"], ["broken.odrg", "broken.odrg"], ["big.odrg", "big.odrg"], ["hello.odrg", "short.odrg"]]
+        for size in SIZES:
+            fresh = entered(self, emulator_support.example_show())
+            emulator = entered(self, emulator_support.Emulator(fresh))
+            found = support.run("batch", address=f"127.0.0.1:{emulator.port}", media=media, size=size, settings={"mode": "look", "rows": 2, "files": files}).seen
+            for name in ("before", "after"):
+                screen = found[name]
+                where = f"{size[0]} wide, {name}"
+                self.assertLessEqual(screen["scrollWidth"], screen["width"], where)
+                controls = [control for control in screen["controls"] if control["group"] == "screen"]
+                for control in controls:
+                    self.assertGreaterEqual(control["bottom"] - control["top"], 44 - 0.01, f"{where}: {control['what']}")
+                    self.assertGreaterEqual(control["right"] - control["left"], 44 - 0.01, f"{where}: {control['what']}")
+                for position, first in enumerate(controls):
+                    for second in controls[position + 1:]:
+                        self.assertGreaterEqual(apart(first, second), 8 - 0.01, f"{where}: {first['what']} and {second['what']}")
+                for text in screen["texts"]:
+                    if not text["stale"]:
+                        self.assertGreaterEqual(contrast(text["colour"], text["behind"]), 7, f"{where}: {text['what']}")
+                        self.assertGreaterEqual(text["size"], 14, f"{where}: {text['what']}")
+            self.assertTrue(found["line"]["shown"], size)
+            self.assertGreater(found["scrolled"], 0, size)
+            self.assertGreaterEqual(found["line"]["top"], 0, size)
+            self.assertLess(found["line"]["bottom"], 120, size)
+
+
 BUSY = (200, '{"ok":false,"error":"busy"}\n')
 STALE = (200, '{"ok":false,"error":"stale"}\n')
 WAITING = "Waiting for the installation to answer."
