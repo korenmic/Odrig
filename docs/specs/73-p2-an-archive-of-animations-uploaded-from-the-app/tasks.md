@@ -18,7 +18,7 @@ seen failing first.
     `agent/vocabulary.md`; `docs/drifts.md`.
   - Requirements: 7.1.
 
-- [ ] 4. Deliver
+- [x] 4. Deliver
   - Every suite that runs here; the pull request; the APK built from the branch that joins
     every unmerged seed, and its place on the Drive in `verification.md`.
   - Requirements: 6.1.
