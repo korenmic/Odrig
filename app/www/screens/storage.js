@@ -1,6 +1,7 @@
 // New animations: converted media or original ready-made bytes, with a visible destination.
 
 import * as batch from "../batch.js";
+import * as archivePanel from "./archive.js";
 import * as batchList from "./batch-list.js";
 import * as capacity from "../capacity.js";
 import * as client from "../client.js";
@@ -99,6 +100,7 @@ function draw(state) {
   byId("upload-space").classList.toggle("stale", state.link === "no-answer");
   byId("upload-card-space").classList.toggle("stale", state.link === "no-answer");
   batchList.draw(state, lockReason(state));
+  archivePanel.draw(state, lockReason(state));
 }
 
 // Milliseconds of a field, or null for an empty field where `empty` allows it. A text
@@ -397,6 +399,7 @@ export function start(options) {
   byId("batch-stop").addEventListener("click", () => batch.stop());
   byId("batch-retry").addEventListener("click", () => batchList.retry());
   batch.watch(() => draw(client.state));
+  archivePanel.start({message});
   for (const name of Object.keys(FITS)) {
     byId(`fit-${name}`).addEventListener("click", () => chooseFit(name));
   }

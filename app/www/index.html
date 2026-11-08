@@ -162,6 +162,25 @@
 </div>
 </div>
 </div>
+<div id="archive" class="panel">
+<h2>Archive</h2>
+<label class="button" for="archive-file">Choose an archive</label>
+<input id="archive-file" type="file" accept=".zip,application/zip" hidden>
+<div id="archive-list" hidden>
+<p id="archive-name" role="status"></p>
+<div class="pair">
+<button id="archive-all" type="button">Tick all</button>
+<button id="archive-none" type="button">Tick none</button>
+</div>
+<label for="archive-storage">Storage</label>
+<select id="archive-storage"><option value="external">External storage</option><option value="internal">Internal storage</option></select>
+<p id="archive-sum" role="status"></p>
+<ol id="archive-rows"></ol>
+<button id="archive-upload" type="button" class="primary" aria-describedby="archive-locked-reason">Upload ticked</button>
+<p id="archive-locked-reason" class="small" hidden></p>
+<button id="archive-stop" type="button" hidden>Stop</button>
+</div>
+</div>
 <div class="pair">
 <button id="make-text" type="button">Make a text</button>
 <button id="make-clock" type="button">Make a clock</button>

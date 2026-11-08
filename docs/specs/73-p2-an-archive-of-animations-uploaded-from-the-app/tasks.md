@@ -3,7 +3,7 @@
 Each task is one proof commit with only its own checkbox ticked. A test for a fault is
 seen failing first.
 
-- [ ] 1. Read a zip and list its animations
+- [x] 1. Read a zip and list its animations
   - `zip.js`; the panel, its rows, names, ticks, destination and sum; the reading cases seen
     failing first.
   - Requirements: 1.1–1.4, 2.1–2.3, 3.1–3.3, 4.1–4.2, 6.1.
