@@ -552,7 +552,8 @@ class ChangedBetweenTheReadings(unittest.TestCase):
     def read_twice(self, first, second):
         files = {"mapping.json": json.dumps(first), "second.json": json.dumps(second)}
         run = support.start(files, ["error", "poll 0"], ["--swap-after", "mapping.json", "1", "second.json", "--trace-files"])
-        self.assertEqual([opened for opened in run.opened if not opened[0].startswith("catalog")][:2], [("mapping.json", 1), ("mapping.json", 1)])
+        self.assertEqual(run.opened[0], ("schedule.txt", 0))
+        self.assertEqual([opened for opened in run.opened if not opened[0].startswith("catalog") and opened[0] != "schedule.txt"][:2], [("mapping.json", 1), ("mapping.json", 1)])
         self.assertEqual(run.core, "ok")
         return run
 

@@ -12791,3 +12791,105 @@ as it is, when it has one. The page needs no change: the legs come from the core
 file from that route.
 
 **Resolution.** `emulator/httpd.py`, `docs/emulator.md`.
+## Seed 64: civil-time wire forms and offline phone zones
+
+**Question.** How can the board follow phone time-zone rules offline without a
+platform time API, a new host callback or a second unbounded memory buffer?
+
+**Answer.** Use a boot-local UTC anchor and a validated compact phone-zone snapshot
+in the existing chunk. The supported civil range is2000..2099; the snapshot holds
+up to8 offsets and276 exact transitions, each five bytes. The phone supplies rules
+from its own Intl data. `time`, `time zone DATA` and `time set UTC REVISION` use
+shared dispatch. The owner's autonomous implementation instruction authorizes
+these protocol choices without another permission question.
+
+**Resolution.** The spec design, commands.md and core.md define the format, strict
+validation, revision guard, atomic publication, reset invalidation and memory bound.
+
+## Seed64: persistent manual precedence and scheduling publication
+
+**Question.** What happens to a manual On/Off if internal settings cannot be saved
+while the owner requires manual control always to win?
+
+**Answer.** Apply visibility and manual mode immediately. Preserve that volatile
+control on a failed save, report storage-error/busy, and expose saved:false plus
+manual-not-saved. Read-only hosts retain their ordinary successful manual control.
+A successful save retains manual mode across reset; only explicit resume releases
+it. Ordinary clock/zone/times edits never release it. The daily pair/enabled flag
+are one atomic publication, never partial field writes or writes at boundaries.
+
+**Resolution.** civil_time.cpp and commands.md define schedule set/resume, file
+grammar, validation/readback, startup and failed-persistence behavior.
+
+## Seed 64: physical timing identity and host feedback
+
+**Question.** Can an address or host build text identify a board for cooldowns and
+stale-write guards, and can show installs discard the timing metadata?
+
+**Answer.** Different boards share4.3.2.1. A bounded optional identity callback and
+atomic `guard BOARD ...` prefix are required plumbing for existing requirement5.4;
+address-only preflight is insufficient. Timing files are retained/replaced/read back
+like other operator metadata; an epoch is never persisted. Firmware mirrors effective
+visibility into volatile WLED power state without a command/callback, and forwards
+external explicit power requests or power transitions to ordinary core On/Off.
+Initialization and the mirror itself never establish a manual override.
+
+**Resolution.** `design.md`, `odrig_core.h`, `civil_time.cpp`, `commands.cpp`, the
+native binding/host, firmware adapter and `fwtool/storage.py` carry this contract.
+The earlier no-new-callback design assumption is replaced; seed scope is unchanged.
+
+## Seed 64: connection generations and confirmation boundaries
+
+**Question.** What counts as a reconnect, and can a timing failure trigger another
+automatic sync merely by making the next status reply look like a recovery?
+
+**Answer.** A fresh successful status after begin, foreground or a failed status
+creates a connection generation. Ordinary polls and a timing-operation failure do
+not create one. This prevents self-induced retries. Target/connection/preference
+guards are checked when queued operations are sent and after every await; physical
+identity is also checked by firmware. Backgrounding cancels unfinished preparation.
+Clock confirmation and physical-ID cooldown are independent of schedule readback:
+if UTC was confirmed but a later settings read fails, that confirmed UTC remains a
+successful sync, while the later error is reported. New connections clear old-board
+metadata immediately; current attempts never display a previous attempt as success.
+
+**Resolution.** `app/www/client.js`, `timing.js`, `time-zone.js`, `commands.js`, the
+browser tests and the automatic-phone-time section of `android-app.md` carry it.
+
+A phone zone change while the app remains connected is checked on ordinary client
+observations. It can publish changed zone rules, but cannot set UTC or move the
+last-confirmed UTC time. The observation is remembered even when its initial read
+fails, so later status polls do not silently retry it. A zone that changes during
+preparation invalidates that preparation before any write.
+
+## Seed64: Settings drafts and confirmation
+
+**Question.** Can background reads or a lost save reply discard typed hours or
+present an unconfirmed pair as saved?
+
+**Answer.** Keep a dirty draft with its original physical board and revision through
+polls, sync and reconnect to that same board. A successful explicit Refresh reloads
+the saved pair; a failed Refresh retains the draft. Another board/target clears it.
+Save and Resume use the shared serialized guard and readback path. Saving hours
+never releases manual mode. A lost reply remains an error even while disconnected,
+and no reconnect replays the mutation. Corrupt metadata disables edits rather than
+repairing it with defaults; unsaved manual mode is explained as temporary.
+
+**Resolution.** `screens/time.js`, `timing.js`, the guarded command validators and
+native/stand-in browser scenarios implement and verify these choices.
+
+## Seed64: initial inventory before authoring
+
+**Question.** Can the added connection-time reads expose authoring before the
+initial root-name inventory has arrived, causing an existing id to be chosen?
+
+**Answer.** Integration testing observed a new text uploaded as id1 instead of the
+free id3. Unknown names must keep new-authoring Upload disabled with a readable
+waiting explanation. A new text/clock also uses the existing internal creation-only
+begin guard, so a later id claim is refused atomically. Existing-file editing keeps
+its read CRC. This restores the intended free-id/no-replacement behavior under
+the shared queue's delayed initial inventory.
+
+**Resolution.** `screens/author.js` and native preview/authoring regression cases
+verify both missing inventory and an id claimed since the inventory. Both failed
+before the fix; no new command or file format is introduced.

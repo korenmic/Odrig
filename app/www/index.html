@@ -196,6 +196,7 @@
 </div>
 <canvas id="author-preview"></canvas>
 <p id="author-says" role="status" aria-live="polite"></p>
+<p id="author-names" class="small" role="status" hidden>Reading installed animation names before choosing a new name.</p>
 <button id="author-upload" type="button" class="primary">Upload to the installation</button>
 <p id="author-uploading" hidden></p>
 <button id="author-cancel" type="button" hidden>Cancel</button>
@@ -215,6 +216,23 @@
 <label class="check" for="clock-message"><input id="clock-message" type="checkbox"><span><span class="title">The message after each clock</span><span class="small">One complete animation from clocks/message plays after each clock in either enabled mode.</span></span></label>
 <p id="clocks-state" role="status" hidden></p>
 <p id="clocks-said" role="status" aria-live="polite" hidden></p>
+</div>
+<div id="time-panel" class="panel">
+<h2>Time and schedule</h2>
+<p id="time-reading" role="status">Waiting for the board's time.</p>
+<label class="check" for="time-auto"><input id="time-auto" type="checkbox" checked><span><span class="title">Set time automatically from this phone</span><span class="small">On a connection, sync if the last confirmed sync was at least 15 minutes ago, or the board lost its clock. Follow this phone's time zone and daylight saving.</span></span></label>
+<div class="pair"><button id="time-refresh" type="button" disabled>Refresh</button><button id="time-sync" type="button" disabled>Sync now</button></div>
+<p id="time-state" role="status" aria-live="polite">Waiting for the board.</p>
+<label class="check" for="schedule-enabled"><input id="schedule-enabled" type="checkbox" disabled><span><span class="title">Use scheduled hours</span><span class="small">The LEDs are on between these hours, including overnight.</span></span></label>
+<div class="pair">
+<div><label for="schedule-on">On at</label><input id="schedule-on" type="time" step="60" disabled></div>
+<div><label for="schedule-off">Off at</label><input id="schedule-off" type="time" step="60" disabled></div>
+</div>
+<button id="schedule-save" type="button" disabled>Save scheduled hours</button>
+<p class="small">On and Off must differ. Refresh reloads the saved hours. Reset or power loss ignores the schedule until the time is set again.</p>
+<p id="schedule-state" role="status" aria-live="polite">Waiting for the board's schedule.</p>
+<button id="schedule-resume" type="button" disabled>Resume schedule</button>
+<p class="small">Manual On or Off takes priority and stays in force across restarts until you resume the schedule.</p>
 </div>
 <div id="mini-panel" class="panel">
 <h2>Miniature display</h2>

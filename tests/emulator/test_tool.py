@@ -111,6 +111,25 @@ class AgainstTheEmulator(unittest.TestCase):
                 self.assertEqual((result.status, result.out, result.err),
                                  (1, '{"ok":false,"error":"unsupported"}\n', ""))
 
+    def test_timing_reads_edits_and_resume_use_each_existing_transport(self):
+        for target in self.targets.values():
+            clock = json.loads(support.run_tool(*target, "time").out)
+            self.assertTrue(clock["ok"])
+            self.assertFalse(clock["valid"])
+            state = json.loads(support.run_tool(*target, "schedule").out)
+            self.assertTrue(state["ok"])
+            result = support.run_tool(*target, "schedule", "set", state["revision"],
+                                      "09:00", "17:00", "on")
+            self.assertEqual((result.status, result.out, result.err), (0, OK, ""))
+            state = json.loads(support.run_tool(*target, "schedule").out)
+            self.assertEqual((state["on"], state["off"]), ("09:00", "17:00"))
+            self.assertEqual(support.run_tool(*target, "off").status, 0)
+            state = json.loads(support.run_tool(*target, "schedule").out)
+            self.assertEqual(state["override"], "off")
+            result = support.run_tool(*target, "schedule", "resume", state["revision"])
+            self.assertEqual((result.status, result.out, result.err), (0, OK, ""))
+            self.assertIsNone(json.loads(support.run_tool(*target, "schedule").out)["override"])
+
     def test_saved_brightness_uses_each_transport_without_changing_content_or_default(self):
         before = support.files_of(self.folder)
         for target in self.targets.values():
@@ -226,8 +245,8 @@ class Session(unittest.TestCase):
         self.assertEqual(replies[support.LINES], replies["http"])
         codes = [json.loads(reply).get("error") for reply in replies["http"]]
         self.assertEqual(codes[-10:-1], ["unknown-id", "bad-argument", "bad-argument", "line-too-long", None, None, "unknown-id", "unknown-id", "unknown-id"])
-        # Uploads and miniature output have their own transport scenarios.
-        self.assertEqual({words[0] for words in SESSION}, set(cli.COMMANDS) - {"upload", "debug"})
+        # Uploads, miniature output and timing have their own transport scenarios.
+        self.assertEqual({words[0] for words in SESSION}, set(cli.COMMANDS) - {"upload", "debug", "time", "schedule", "guard"})
 
 
 class Unreachable(unittest.TestCase):
@@ -355,16 +374,16 @@ class Usage(unittest.TestCase):
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
         table = text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "brightness <id> <n> save", "brightness <id> default", "status", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save",
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "brightness <id> <n> save", "brightness <id> default", "status", "schedule", "schedule set <revision> <on-HH:MM> <off-HH:MM> <on-or-off>", "schedule resume <revision>", "time", "time zone <base64>", "time set <utc-seconds> <zone-crc32>", "guard <board-id> <timing-command>", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save",
                                       "repeat <id> default", "clocks on", "clocks off", "clocks only", "clocks message on", "clocks message off", "upload begin <id> <file> <bytes>", "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel", "debug mini on", "debug mini off"])
         # `play all` is `play` with the word in the place of the id.
-        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog", "repeat ", "clocks ", "debug ", "brightness <id> ")) and command not in ("play all", "remove many <ids>", "list in <folder-id>")]
-        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog", "repeat", "clocks", "debug")],
+        one_line = [command for command in documented if not command.startswith(("time", "schedule", "guard", "upload ", "mapping ", "order ", "catalog", "repeat ", "clocks ", "debug ", "brightness <id> ")) and command not in ("play all", "remove many <ids>", "list in <folder-id>")]
+        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("time", "schedule", "guard", "upload", "mapping", "order", "catalog", "repeat", "clocks", "debug")],
                          [command.replace("<id>", "<x>").replace("<n>", "<x>").replace("<value>", "<x>").replace("<offset>", "<x>") for command in one_line])
         self.assertEqual(list(cli.COMMANDS)[-1], "upload")
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
-                         {"play": ("ID",), "brightness": ("N",), "read": ("ID", "OFFSET"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "repeat": ("ID", "N", "[save]"),
+                          {"play": ("ID",), "brightness": ("N",), "schedule": ("[OPERATION]",), "time": ("[OPERATION]",), "guard": ("TARGET-ID", "TIMING-COMMAND"), "read": ("ID", "OFFSET"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "repeat": ("ID", "N", "[save]"),
                           "clocks": ("OPERATION",), "debug": ("mini", "on|off"), "upload": ("ID", "FILE")})
 
     def test_a_usage_error_says_what_the_command_takes(self):

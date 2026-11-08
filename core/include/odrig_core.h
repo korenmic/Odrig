@@ -119,6 +119,11 @@ typedef struct odrig_host {
     /* Optional: 1 when the core may change the files of this drive with the storage
        functions, 0 otherwise. A host without it has a drive that is read only. */
     int (*drive_writable)(void *ctx, uint32_t drive);
+
+    /* Optional stable identity of this board, independent of its address and build.
+       Returns 1 with a complete NUL-terminated 1..31 byte ASCII word (letters,
+       digits, '-' or '_'), or 0 when unavailable. Never truncate the identity. */
+    int (*identity)(void *ctx, char *buffer, size_t capacity);
 } odrig_host;
 
 /* One leg, as the mapping file lists it, and its LED data from the last refresh:
@@ -140,6 +145,9 @@ odrig_core *odrig_core_begin(const odrig_host *host);
 
 /* Asks for a refresh. Returns 1 when new LED data was produced, 0 when none was due. */
 int odrig_core_poll(odrig_core *core, uint64_t now_ms);
+
+/* Effective LED visibility after the latest poll or command. No state is changed. */
+int odrig_core_power(const odrig_core *core);
 
 /* The legs. Valid from odrig_core_begin on; rgb changes at every refresh. */
 uint32_t odrig_core_leg_count(const odrig_core *core);

@@ -55,6 +55,7 @@ class HostRecord(Structure):
         ("space", SPACE), ("read_at", READ_AT), ("drive", DRIVE), ("drive_name", DRIVE_NAME), ("drive_space", DRIVE_SPACE),
         ("about", ABOUT),
         ("drive_list", DRIVE_LIST), ("drive_bind", DRIVE_BIND), ("drive_writable", DRIVE_WRITABLE),
+        ("identity", ABOUT),
     ]
 
 
@@ -76,6 +77,7 @@ class MiniRecord(Structure):
 FUNCTIONS = {
     "odrig_core_begin": (c_void_p, [POINTER(HostRecord)]),
     "odrig_core_poll": (c_int, [c_void_p, c_uint64]),
+    "odrig_core_power": (c_int, [c_void_p]),
     "odrig_core_leg_count": (c_uint32, [c_void_p]),
     "odrig_core_leg": (c_int, [c_void_p, c_uint32, POINTER(LegRecord)]),
     "odrig_core_mini_support": (None, [c_void_p]),
@@ -144,6 +146,7 @@ class Core:
             self._functions += (DRIVE_LIST(self._drive_list), DRIVE_BIND(self._drive_bind), DRIVE_WRITABLE(self._drive_writable))
         else:
             self._functions += (DRIVE_LIST(), DRIVE_BIND(), DRIVE_WRITABLE())
+        self._functions += (ABOUT(self._identity) if callable(getattr(host, "identity", None)) else ABOUT(),)
         self._on_reply = REPLY(self._collect)
         self._record = HostRecord(None, *self._functions)
         self._reply = ctypes.create_string_buffer(REPLY_MAX)
@@ -233,6 +236,15 @@ class Core:
         if text is None or capacity == 0:
             return 0
         data = text.encode("ascii", "replace")[:capacity - 1] + b"\0"
+        ctypes.memmove(buffer, data, len(data))
+        return 1
+
+    def _identity(self, _ctx, buffer, capacity):
+        text = self._host.identity()
+        if (not isinstance(text, str) or not 1 <= len(text) <= 31 or capacity <= len(text)
+                or any(not (c.isascii() and (c.isalnum() or c in '-_')) for c in text)):
+            return 0
+        data = text.encode('ascii') + b'\0'
         ctypes.memmove(buffer, data, len(data))
         return 1
     def _drive_list(self, _ctx, drive):

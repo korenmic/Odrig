@@ -150,6 +150,9 @@ maps its actions to command lines, each sent as `POST /odrig` to the address tha
 | Nothing: after `catalog` showed a storage's catalog of another generation or number of entries than the one the app read, every page of it from offset 0 to its end, one request after the other | `catalog page <storage> <page> <offset>` |
 | Presses `Rebuild the board's catalog` or `Rebuild the card's catalog`, and then `Rebuild` | `catalog rebuild internal`, `catalog rebuild external` |
 | Presses `Cancel the rebuild` | `catalog cancel` |
+| Connects with timing-capable firmware; reads time, then follows the phone's zone and sets UTC when due | `time`, `guard <board-id> time`, `guard <board-id> time zone <base64>`, `guard <board-id> time set <utc-seconds> <zone-crc32>`, `guard <board-id> schedule` |
+| Saves the daily hours and whether to use them | `guard <board-id> schedule set <revision> <on-HH:MM> <off-HH:MM> <on-or-off>` |
+| Ends manual On/Off and returns to the saved hours | `guard <board-id> schedule resume <revision>` |
 
 It uses the shared command protocol and shows only what a reply said. Mapping saves
 require firmware that supports the mapping commands; an older target gives a readable
@@ -653,6 +656,12 @@ turn of it on the installation chooses them; `New random time` shows another. A 
 `One loop takes 30.00 seconds.`, or names a number that is out of its range. It is
 uploaded as a text is, as `clock-<kind>.odrgx`, `clock-analog.odrgx` for one with hands.
 
+New texts and clocks wait for the installed animation names before choosing the
+lowest free id and a filename. The form explains that wait and disables Upload.
+New uploads use the existing creation-only begin form, so a place taken by another
+controller is refused without replacing an installed animation. Editing retains
+its separate existing-file CRC guard.
+
 A text or a clock of the board's own storage has `Edit` in its row's menu. The app reads its
 file back from the installation, opens its form on Upload, titled with its id and its
 file, as `Animation 5 hello.odrgx`, and fills it with what the file holds. `Save` sends
@@ -896,6 +905,58 @@ app reads the target once to reconcile, preserves the draft and asks for Reload 
 new attempt. Storage failures, busy/invalid shows, stale revisions and unsupported targets
 have readable messages in Settings.
 
+### Automatic phone time
+
+On a successful connection, the shared app reads the board's time and daily settings.
+Automatic phone-time synchronization is on by default and kept on the phone. Each
+physical board has its own last confirmed sync: a valid clock is set only after at
+least15 minutes, on the next connection. Expiry and ordinary status polls do not
+send a time set. An invalid clock bypasses the cooldown; a backwards phone clock
+also makes a sync due. A deliberate sync shares the same confirmation record.
+
+The phone's current time zone always supplies the offline rules, including DST.
+Preparation runs in a worker, leaving playback controls responsive. A zone-only
+update does not reset the UTC cooldown. Limits are checked explicitly: unsupported
+rules are reported, never truncated or guessed. The board's rules survive reset;
+its UTC validity does not. Manual LED On/Off remains in force until Resume schedule.
+
+Time operations share the ordinary serialized request queue. Every mutation and
+follow-up read binds to the physical board ID, in addition to address/connection
+generations, protecting boards with the same Wi-Fi address. Failed or unconfirmed
+time writes do not start a cooldown; a matching valid readback confirms a set.
+Older firmware keeps its ordinary controls without receiving unsupported timing
+writes. No APK-only web code or extra USB transport is introduced.
+
+Browser fixtures explicitly turn auto-sync off when testing unrelated behavior,
+so the real time of day cannot change their expected LED visibility. Timing tests
+also run the real app with the preference absent and prove the product default-on
+behavior against the native core. Phone/board acceptance remains separate.
+
+### Time and schedule controls
+
+Settings has a Time and schedule card after Clocks. Board time shows the confirmed
+local date, time and phone-supplied zone at the last refresh. An unset clock explains
+that the schedule is ignored. Sync now follows the phone even with automatic sync
+off. The automatic-sync choice is kept on the phone; a storage failure explains
+that the choice applies only for this session. Refresh reads the board again and,
+only after a successful read, reloads its saved hours.
+
+Use scheduled hours and the On at / Off at fields are saved together by Save scheduled
+hours. The default is enabled,18:00 to06:00. Equal, empty or invalid times cannot be
+saved. Edited hours say Save to apply; pending and refused writes never claim success.
+The app confirms the saved pair and enabled flag with a guarded read. A lost reply
+keeps its error visible, preserves the draft and never replays the save on reconnect.
+Another controller's revision requires Refresh before trying again.
+
+Manual On or Off takes priority across restarts until Resume schedule. Saving hours
+or setting time does not release it. The card says when manual mode is temporary
+because it could not be saved. Resume confirms that manual mode ended. Save or refresh
+edited hours before resuming. Ordinary reads, syncs and reconnects to the same board
+preserve typed values; changing target or reading a different board clears them.
+Unsupported firmware leaves ordinary app controls working and timing controls
+disabled. Unreadable schedule metadata is shown explicitly and cannot be overwritten
+by guessed defaults. Every control has a label and at least a48-pixel touch target.
+
 ## Messages
 
 The shared message panel gives each failure as a sentence with its code in brackets at
@@ -922,6 +983,7 @@ it is dismissed with `OK` or another takes its place.
 | `read-only` | An upload to the card while the installation cannot write it. | The card cannot be written now. Choose Internal storage to store the animation on the board. |
 | `read-only` | A rebuild of the catalog of a storage the installation cannot write. | That storage cannot be written now, so its catalog cannot be rebuilt. |
 | `storage-error` | The installation could not read or write its storage. | The installation could not use its storage. |
+| `zone-unset` | Time was set before usable time-zone rules were supplied. | Set the board's time from this phone first. |
 | `in-use` | An upload whose id or file name another item took meanwhile. | That name or id is in use on the installation. The list is asked for again; upload again. |
 | `in-use` | `Save` or `Restore default` of the bar for a cycle or a folder of the card. | That is a cycle or a folder, which keeps no repeat. |
 | `no-space` | An upload that does not fit, before it is sent or as the installation judges it. | The animation needs `<size>` KB, and the installation has `<free>` KB free. |
@@ -1009,7 +1071,7 @@ installed; the phone with mobile data on.
 1. **Install.** `python3 app/app.py install` with the phone on USB, or copy
    `build/app/odrig-debug.apk` to the phone and open it. *Seen:* the app `odrig` is on the
    phone and starts on the target screen with the address `4.3.2.1`.
-2. **The emulator.** On the Mac: `python -m emulator build/demo-20/show --lan`; allow
+2. **The emulator.** On the computer: `python -m emulator build/demo-20/show --lan`; allow
    incoming connections if macOS asks. Phone and Mac on the same Wi-Fi network. Give the
    app the address of the emulator's `lan:` line. *Seen:* `Answers`, `Sent over Wi-Fi.`,
    and then the show screen.
@@ -1125,7 +1187,16 @@ installed; the phone with mobile data on.
     Include. Check dark recovery when all faces are excluded, mode restoration, reconnect
     and another controller's changes. Repeat upright and sideways. These physical and
     phone observations remain open until actually performed.
-24. **Note** the phone's model, its Android version, the web view's version from the
+24. **Time and scheduled hours.** Keep board brightness at40 or less. In Settings,
+    *Seen:* the confirmed time/zone matches the phone, automatic sync starts on, and
+    disabling it survives reopening. Set a short daily interval excluding now, save,
+    and see the LEDs off while playback progresses. Manual On wins through a restart;
+    Resume schedule returns to the saved hours. With automatic sync off, reset and
+    see that invalid time ignores the schedule; Sync now restores it. Check a changed
+    phone zone/DST, a due reconnection after15 minutes, and no periodic time writes
+    while connected. Restore the original hours, auto-sync choice and manual mode.
+    These physical phone/LED observations remain unperformed.
+25. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1136,8 +1207,9 @@ python3 -m unittest discover -s tests/apk -t .
 ```
 
 The first runs the web code in Chrome without a window against an emulator and against
-stand-in targets of its own, and takes about two minutes. It needs the core's library,
-`make -C core shared`, and Chrome: the one in `/Applications`, or the program the
+stand-in targets of its own. Duration depends on the host; the parallel runner bounds
+the app to four workers. It needs the core's library (`python core/build.py shared`
+on Windows, `make -C core shared` on macOS) and installed Chrome, or the program the
 variable `ODRIG_CHROME` names. Nothing it does reaches another computer: what the app
 would send to the installation's address ends at the suite's own server.
 
@@ -1150,7 +1222,12 @@ Neither needs a phone.
 
 ## What is verified
 
-By programs, on a Mac:
+By programs, on macOS and Windows:
+
+Board-time and Settings tests cover real native scheduling blackout, sticky manual
+On/Off and Resume, clock loss, named-zone DST, guarded target changes, confirmation,
+lost replies, preserved edits and phone-size controls. Release evidence and remaining
+physical acceptance are in [verification.md](specs/64-p2-board-time-and-daily-on-off-schedule/verification.md).
 
 - The four tabs and every action of the web code, in Chrome against the emulator:
   the address, the status, the list for shows of up to 40 animations, `play`,
@@ -1278,6 +1355,10 @@ By programs, on a Mac:
 
 ## What is open
 
+- **Board time and scheduled hours on the owner's phone and board.** Step24 above
+  remains unperformed. Browser/native and Android virtual-device evidence cannot
+  observe real LEDs, real power loss or the phone's network behavior.
+
 - **Message clock modes and external inclusion on a phone and on the board.** The
   shared browser/emulator proofs do not replace physical acceptance of all seven
   sequences, Only boundaries, inherited exclusions, restarts and complete turns.
@@ -1331,7 +1412,9 @@ By programs, on a Mac:
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.
-- The build is verified on one system, macOS on Apple Silicon. `app/toolchain.json` has
-  no entry for another.
+- Automatic toolchain setup remains pinned to macOS on Apple Silicon in
+  `app/toolchain.json`. Windows packaging has also been verified with the existing
+  Android Studio JDK/SDK and the persistent dedicated signing key. That does not
+  claim automatic setup support for another entry in the toolchain file.
 - `npm audit` names three advisories of moderate severity in a package that Capacitor's
   command line uses at build time. Nothing of it is in the APK.
