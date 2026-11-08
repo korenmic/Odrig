@@ -13,13 +13,14 @@
 - `relock()` becomes `dropEdits()`: it drops the held move (`cancel()`), the unsent wanted
   assignment, and the saving state when no call is out. It no longer writes `editLocked`.
 - `showing(false)`: `dropEdits()` and `closePrompt()`.
-- `visibilitychange` to hidden: `dropEdits()`; the prompt stays open.
+- `visibilitychange` to hidden: `dropEdits()` and `closePrompt()`; the value stays.
 - `client.watch`: a new `client.targetVersion()` runs `reset()`, which calls `dropEdits()`
   and leaves the prompt; a link that is not `answers` runs `dropEdits()` while a move or an
   edit is under way.
 - `confirmLock()` applies its request whatever happened meanwhile: `editLocked` takes the
-  asked value, `keepLock` stores it, and a lock also runs `dropEdits()`. `lockEpoch` and the
-  request's version are no longer needed and go.
+  asked value, `keepLock` stores it, and a lock also runs `dropEdits()`. The request keeps no
+  version. `lockEpoch` becomes `editEpoch`, which `dropEdits()` counts and a queued save
+  checks before it is sent.
 - `requestLock()` returns only while `live !== null` or `press !== null`, or Settings is
   not shown. The button's `disabled` follows the same two.
 

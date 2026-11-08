@@ -3,7 +3,7 @@
 Each task is one proof commit with only its own checkbox ticked. A test for a fault is
 seen failing first.
 
-- [ ] 1. Keep the lock's value on the phone, changed only by a confirmed press
+- [x] 1. Keep the lock's value on the phone, changed only by a confirmed press
   - `mapping.js`: the stored value, `dropEdits()` in place of `relock()`, the dialog that
     survives, the control without a board, the status line's reasons and the refused
     store.

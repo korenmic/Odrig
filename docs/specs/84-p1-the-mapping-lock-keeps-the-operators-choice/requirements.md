@@ -46,7 +46,8 @@ wait; edits come back by themselves.
 6.1 Leaving Settings, hiding the page, a lost link or a change of target drop a held move,
 an unsent queued edit and an open photo apply, as today. An already-sent save is
 reconciled against its own target.
-6.2 Leaving Settings closes a pending confirmation, which changes nothing.
+6.2 Leaving Settings or hiding the page closes a pending confirmation, which changes
+nothing.
 
 ## 7. When the phone cannot keep it
 
