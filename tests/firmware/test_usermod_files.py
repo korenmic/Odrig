@@ -34,6 +34,13 @@ def text_of(path):
     return path.read_text(encoding="utf-8")
 
 
+def logic_of(path):
+    text = text_of(path)
+    if path.name == "odrig_bootstrap.h":
+        text = re.sub(r'const char kMapping\[\] =[\s\S]*?;\nconst char kShow\[\] =[^\n]*;\n', '', text)
+    return text
+
+
 def included(path):
     return re.findall(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]', text_of(path), re.M)
 
@@ -357,7 +364,7 @@ class TheCore(unittest.TestCase):
 
     def test_the_usermod_has_no_decoder_mapping_show_or_command_code_of_its_own(self):
         for path in SOURCES:
-            self.assertNotRegex(text_of(path), r"inflate|first_led|\bcycle\b|\"play\"|\"brightness\"|unknown-command", path.name)
+            self.assertNotRegex(logic_of(path), r"inflate|first_led|\bcycle\b|\"play\"|\"brightness\"|unknown-command", path.name)
 
 
 class Host(unittest.TestCase):
@@ -392,10 +399,15 @@ class Host(unittest.TestCase):
         self.assertEqual(users, {"odrig_files.cpp"})
         for path in SOURCES:
             text = text_of(path)
-            self.assertNotRegex(text, r"ODRIG_FS\.(rmdir|format)\b", path.name)
-            self.assertEqual(re.findall(r"ODRIG_FS\.mkdir\(([^)]*)\)", text),
-                             ["FOLDER_PATH"] if path.name == "odrig_files.cpp" else [], path.name)
+            self.assertNotRegex(text, r"ODRIG_FS\.format\b", path.name)
+            if path.name != "odrig_files.cpp":
+                self.assertNotRegex(text, r"ODRIG_FS\.(mkdir|rmdir)\b", path.name)
             self.assertNotRegex(text, r"serializeConfig|writeObjectToFile|doSerializeConfig|configNeedsWrite", path.name)
+
+    def test_fresh_initialization_runs_before_capacity_is_cached(self):
+        body = self.files[self.files.index("odrig_host OdrigFiles::host() {"):]
+        self.assertLess(body.index("OdrigBootstrap::initialize(store);"), body.index("if (!spaceKnown) askSpace();"))
+        self.assertIn('#include "odrig_bootstrap.h"', self.files)
 
     def test_every_path_given_to_the_file_system_is_in_the_shows_folder(self):
         calls = re.findall(r"ODRIG_FS\.(open|exists|remove|rename)\(([^)]*)\)", self.files)
@@ -432,7 +444,7 @@ class Host(unittest.TestCase):
         body = body[:body.index("\n}\n")]
         self.assertEqual(body.count("writtenFile.write(bytes, length)"), 1)
         self.assertIn("return taken == length ? 1 : -1;", body)
-        self.assertEqual(self.files.count(".write("), 1)
+        self.assertEqual(body.count(".write("), 1)
 
     def test_a_file_is_whole_when_storage_holds_the_bytes_that_were_given(self):
         body = self.files[self.files.index("int endFile(void *) {"):]
@@ -457,7 +469,7 @@ class Host(unittest.TestCase):
         for expected in ("ODRIG_FS.totalBytes()", "ODRIG_FS.usedBytes() / BLOCK_BYTES", "spaceKnown = true;"):
             self.assertIn(expected, asked)
         self.assertEqual(self.files.count("askSpace();"), 1)
-        self.assertIn("odrig_host OdrigFiles::host() {\n  if (!spaceKnown) askSpace();", self.files)
+        self.assertIn("OdrigBootstrap::initialize(store);\n  if (!spaceKnown) askSpace();", self.files)
         told = self.files[self.files.index("int tellSpace(void *"):]
         told = told[:told.index("\n}\n")]
         self.assertNotIn("ODRIG_FS", told)
@@ -592,7 +604,7 @@ class Pacing(unittest.TestCase):
     def test_only_the_external_power_adapter_holds_manual_command_words(self):
         words = r'"(play|on|off|brightness|status|space|list|remove|upload|begin|data|end|cancel)[ "\\]'
         for path in SOURCES:
-            text = text_of(path)
+            text = logic_of(path)
             if path.name == 'odrig_usermod.cpp':
                 start = text.index('void manualPower(uint8_t mode) {')
                 end = text.index('\n}\n', start) + 3

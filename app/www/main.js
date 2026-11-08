@@ -11,6 +11,7 @@ import * as catalogs from "./screens/catalogs.js";
 import * as clocksScreen from "./screens/clocks.js";
 import * as miniScreen from "./screens/mini.js";
 import * as timeScreen from "./screens/time.js";
+import * as rotationScreen from "./screens/rotation.js";
 import * as animationsScreen from "./screens/show.js";
 import * as uploadScreen from "./screens/storage.js";
 import * as settingsScreen from "./screens/mapping.js";
@@ -44,6 +45,7 @@ function show(name) {
   photomap.showing(name === "settings");
   catalogs.showing(name === "settings");
   timeScreen.showing(name === "settings");
+  rotationScreen.showing(name === "settings");
   animationsScreen.showing(name === "animations");
   targetScreen.showing(name === "target");
 }
@@ -149,6 +151,7 @@ settingsScreen.start();
 clocksScreen.start({go});
 miniScreen.start();
 timeScreen.start();
+rotationScreen.start();
 photomap.start();
 catalogs.start({message});
 // The line of a batch's run, on every screen: a tap opens Upload, and takes away the line's

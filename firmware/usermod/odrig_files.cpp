@@ -1,5 +1,6 @@
 #include "odrig_files.h"
 
+#include "odrig_bootstrap.h"
 #include "odrig_platform.h"
 
 namespace {
@@ -143,6 +144,105 @@ bool pathOf(const char *name, char *path) {
   strcat(path, name);
   return true;
 }
+
+// Initialization owns only an empty installation folder, or its own unfinished
+// marker directory. All paths still go through the same bounded folder adapter.
+struct BootstrapStore {
+  bool pathFor(const char *name, char *path) {
+    if (name[0] != 0) return pathOf(name, path);
+    strcpy(path, FOLDER);
+    path[sizeof(FOLDER) - 2] = 0;
+    return true;
+  }
+
+  int kind(const char *name) {
+    char path[sizeof(FOLDER) + LONGEST_NAME];
+    if (!pathFor(name, path)) return -1;
+    if (!ODRIG_FS.exists(path)) return 0;
+    File file = ODRIG_FS.open(path, "r");
+    if (!file) return -1;
+    const int result = file.isDirectory() ? 2 : 1;
+    file.close();
+    return result;
+  }
+
+  bool only(const char *const *names, size_t count) {
+    char path[sizeof(FOLDER) + LONGEST_NAME];
+    pathFor("", path);
+    File folder = ODRIG_FS.open(path, "r");
+    if (!folder || !folder.isDirectory()) { folder.close(); return false; }
+    bool result = true;
+    for (File entry = folder.openNextFile(); entry; entry = folder.openNextFile()) {
+      const char *name = entry.name();
+      const char *slash = strrchr(name, '/');
+      if (slash != nullptr) name = slash + 1;
+      bool found = false;
+      for (size_t i = 0; i < count; ++i) if (strcmp(name, names[i]) == 0) found = true;
+      entry.close();
+      if (!found) { result = false; break; }
+    }
+    folder.close();
+    return result;
+  }
+
+  bool empty(const char *name) {
+    char path[sizeof(FOLDER) + LONGEST_NAME];
+    if (!pathFor(name, path)) return false;
+    File folder = ODRIG_FS.open(path, "r");
+    if (!folder || !folder.isDirectory()) { folder.close(); return false; }
+    File entry = folder.openNextFile();
+    const bool result = !entry;
+    entry.close();
+    folder.close();
+    return result;
+  }
+
+  bool mkdir(const char *name) {
+    char path[sizeof(FOLDER) + LONGEST_NAME];
+    return pathFor(name, path) && ODRIG_FS.mkdir(path);
+  }
+
+  bool equals(const char *name, const char *text, size_t length) {
+    char path[sizeof(FOLDER) + LONGEST_NAME];
+    if (!pathFor(name, path)) return false;
+    File file = ODRIG_FS.open(path, "r");
+    if (!file || file.isDirectory() || file.size() != length) { file.close(); return false; }
+    uint8_t bytes[128];
+    bool result = true;
+    for (size_t offset = 0; offset < length;) {
+      const size_t take = std::min(sizeof bytes, length - offset);
+      if (file.read(bytes, take) != take || memcmp(bytes, text + offset, take) != 0) { result = false; break; }
+      offset += take;
+    }
+    file.close();
+    return result;
+  }
+
+  bool write(const char *name, const char *text, size_t length) {
+    char path[sizeof(FOLDER) + LONGEST_NAME];
+    if (!pathFor(name, path)) return false;
+    File file = ODRIG_FS.open(path, "w");
+    if (!file) return false;
+    const bool result = file.write(reinterpret_cast<const uint8_t *>(text), length) == length;
+    file.close();
+    return result;
+  }
+
+  bool rename(const char *from, const char *to) {
+    char pathFrom[sizeof(FOLDER) + LONGEST_NAME], pathTo[sizeof(FOLDER) + LONGEST_NAME];
+    return pathOf(from, pathFrom) && pathOf(to, pathTo) && !ODRIG_FS.exists(pathTo) && ODRIG_FS.rename(pathFrom, pathTo);
+  }
+
+  bool remove(const char *name) {
+    char path[sizeof(FOLDER) + LONGEST_NAME];
+    return pathFor(name, path) && ODRIG_FS.remove(path);
+  }
+
+  bool rmdir(const char *name) {
+    char path[sizeof(FOLDER) + LONGEST_NAME];
+    return pathFor(name, path) && ODRIG_FS.rmdir(path);
+  }
+};
 
 int openNamed(void *, const char *name) {
   char path[sizeof(FOLDER) + LONGEST_NAME];
@@ -302,6 +402,8 @@ int32_t readAt(void *, const char *name, uint32_t offset, uint8_t *buffer, size_
 }  // namespace
 
 odrig_host OdrigFiles::host() {
+  BootstrapStore store;
+  OdrigBootstrap::initialize(store);
   if (!spaceKnown) askSpace();
   odrig_host made;
   made.ctx = nullptr;

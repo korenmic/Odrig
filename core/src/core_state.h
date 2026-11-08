@@ -729,6 +729,8 @@ struct Core {
     uint8_t turn_manual : 1;
     uint8_t break_manual : 1;
     uint8_t only_dirty : 1;
+    uint8_t rotation : 2;
+    uint8_t rotation_error : 1;
 
     // Whether the saved repeats of a drive without a catalog are to be read before its files
     // are checked.

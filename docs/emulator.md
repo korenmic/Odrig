@@ -1162,6 +1162,22 @@ python -m odrigctl --tcp 127.0.0.1:8601 mapping get
 python -m odrigctl --http 127.0.0.1:8600 mapping get
 ```
 
+### Output rotation
+
+The emulator runs the same square output permutation as the firmware. Query and set
+the confirmed installation orientation through any existing command route:
+
+```
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] rotation [OPERATION]
+python -m odrigctl --port NAME rotation
+python -m odrigctl --tcp localhost:8766 rotation
+python -m odrigctl --http http://4.3.2.1 rotation
+python -m odrigctl --http http://4.3.2.1 rotation set REVISION 90
+```
+
+Use the revision from `rotation`; degrees are exactly0,90,180 or270 clockwise.
+Read actual orientation after a lost reply; do not replay an uncertain write.
+
 ## Previewing one animation
 
 ```

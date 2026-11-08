@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "scope": "Accurate unavailable rotation feedback and content-independent Settings controls",
+  "sourceParent": "9d7aa6a453763eb270403ebb9345e465f8d94fd0",
+  "fullAppRun": "20261102-121106-149884",
+  "fullAppSuite": {
+    "tests": "457 tests",
+    "seconds": 1373.1,
+    "outcome": "FAILED (failures=1)"
+  },
+  "originalFullRunClean": false,
+  "qualifiedFailures": [
+    {
+      "suite": "app",
+      "id": "tests.app.test_order.TheSavedOrder.test_the_first_row_cannot_move_up_nor_the_last_down",
+      "seconds": 16.466,
+      "outcome": "fail"
+    }
+  ],
+  "orderScopeRecheckPassed": true,
+  "orderScopeRecheckCases": 12,
+  "appCases": 457,
+  "outcomes": {
+    "ok": 456,
+    "fail": 1
+  },
+  "rotationCases": 11,
+  "focusedFinalCases": 11,
+  "focusedFinalSeconds": 24.754,
+  "red": {
+    "cases": 10,
+    "failures": 3,
+    "seconds": 21.548,
+    "cause": "Missing/malformed configuration and unknown canvas were labeled unsupported"
+  },
+  "capabilityRefusalRed": {
+    "cases": 11,
+    "failures": 2,
+    "seconds": 36.99,
+    "expectedFailure": "Fresh legacy refusal was hidden by older configuration diagnosis",
+    "incidentalFailure": "Existing queued-cancellation timing case reached its stand-in timeout",
+    "finalFocusedRecheckPassed": true
+  },
+  "supersededFullRun": {
+    "run": "20261102-120652-51764",
+    "completed": false,
+    "reason": "Stopped to verify the final stale-capability correction with a complete new run",
+    "orphanWorkerTreeTerminated": true,
+    "lastWrittenRows": 257
+  },
+  "nativeCoreCases": [
+    "Missing mapping and show",
+    "Malformed show with square mapping"
+  ],
+  "nativeCoreAssertions": [
+    "Recovery status and show error",
+    "Rotation selector enabled",
+    "Save 90 acknowledged",
+    "Exact persistent file bytes",
+    "App reload retains 90"
+  ],
+  "sharedClientOrProtocolChanged": false,
+  "physicalAcceptance": false,
+  "logHashes": {
+    "task5-red": "837163a17a0061bb1d29c3bcdab804261dee87a8b704ba8d29648a6bab07007b",
+    "task5-focused-green": "43462964bc898c75327c2dfbb4d6978e0e96a6ce6b02ff72e5e3d9b4c0d2dd0c",
+    "task5-refusal-red": "63500542ae689d3d2b877e4f58046a56ff3e653df7ca8ccd1e0de9a7fdbbc9d0",
+    "task5-final-focused-green": "0d18f14ca9def2c578f736ebb01e0658e89b18483200466dbff38769bb80ddb5",
+    "task5-app-full": "716b378b1ee217404434a5ce43446d01f5d9e31fb4115a63321ede9c5547a3b2",
+    "task5-app-full-final": "17f3eaa1ee2fffe7a1aa6d922d6f22c06e75d3df112ed901c79267829920bc5a",
+    "task5-order-recheck": "254e008ffb26d8ba7c4d3641b26589d40f6ef5aa2a822f9342a72adf5860b97e"
+  }
+}
