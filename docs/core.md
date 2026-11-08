@@ -98,6 +98,7 @@ Every function receives `ctx` as its first argument.
 | `drive_bind` | `int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name)`: optional; gives the place to the file of the drive's folder with this name, so that `drive_name` gives the name and `drive/<place>` opens it. Returns 1, or 0 when that drive is not plugged in any more or the name is not one of the drive. Without it every drive is listed. |
 | `identity` | `int identity(void *ctx, char *buffer, size_t capacity)`: optional stable board ID, complete NUL-terminated1..31 ASCII letters/digits/hyphen/underscore. Returns1 or0 unavailable; never truncate. |
 | `drive_writable` | `int drive_writable(void *ctx, uint32_t drive)`: optional; 1 when the core may change the files of that drive with the storage functions, by the names `drive/<name>`, 0 otherwise. Without it the drive is read only. |
+| `make_folder` | `int make_folder(void *ctx, const char *name)`: optional; makes the folder `drive/<path>` of the drive's folder `odrig`, a path of folders alone whose parent is there; 1 when the folder is there afterwards, made now or before, -1 on failure and when a file has that name. Without it `folder make` answers `unsupported`. Before an upload into a folder the core asks for each folder of its path, so that a folder of the index removed from the drive while it was empty is there again. |
 
 Capacity callbacks must meet the 50 ms per-call budget and must not start or wait
 for an allocation-table scan under a lock playback needs. The microSD firmware
@@ -1149,6 +1150,7 @@ leg; and `ready`.
 | `--command-read-fails FILE OFFSET` | `read_at` returns -1 for that file at or after that offset when it is called inside a command, as `read` and `upload expect` call it; the checks read the file whole. |
 | `--drive-read-fails NAME OFFSET` | With `--drive`: `read` fails at that offset of the drive's file of that name. `read_at` is not touched, so the check finds the file sound and the player meets the fault. |
 | `--drive-read-only` | With `--drive`: `drive_writable` says 0, and every storage call on a name of the drive fails. |
+| `--no-folders` | With `--drive`: the host has no `make_folder`. |
 | `--trace-drive` | With `--drive`: prints `drive list <count>` for every `drive_list` and `drive bind <place> <name>` for every `drive_bind`. |
 | `--trace-read-at` | Prints `read_at <name> <offset> <count>` for every `read_at`: the name, where it read from and how many bytes it gave. |
 

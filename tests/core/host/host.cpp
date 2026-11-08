@@ -76,7 +76,7 @@ int usage() {
         "       --storage BYTES  --no-storage  --only-space  --space-unknown\n"
         "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
         "       --read-back-fails OFFSET  --read-back-differs OFFSET\n"
-        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --drive-read-only  --trace-drive  --trace-read-at  --about TEXT\n"
+        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --drive-read-only  --no-folders  --trace-drive  --trace-read-at  --about TEXT\n"
         "       --command-read-fails FILE OFFSET  --trace-check\n",
         stderr);
     return kUsage;
@@ -166,6 +166,7 @@ struct Options {
     std::string command_read_fails_file;    // the file whose reading with `read_at` inside a
     long command_read_fails_offset = 0;     // command fails at this offset
     bool drive_read_only = false;   // the drive cannot be written
+    bool no_folders = false;        // the host has no `make_folder`
     bool trace_drive = false;       // print `drive list <count>` and `drive bind <place> <name>`
     bool trace_read_at = false;     // print `read_at <name> <offset> <count>` for every `read_at`
     bool trace_calls = false;       // print `call <bytes>` after every poll and command: what `read` and `read_at` gave in it
@@ -234,6 +235,7 @@ public:
         functions.drive_bind = drive ? drive_bind : nullptr;
         functions.drive_writable = drive ? drive_writable : nullptr;
         functions.identity = nullptr;
+        functions.make_folder = drive && !options_.no_folders ? make_folder : nullptr;
         if (drive && !options_.drive_pulled) {
             plug();
         }
@@ -705,6 +707,29 @@ private:
             result = host.rename_file(from, to) ? 1 : -1;
         }
         host.trace("rename", std::string(from) + " " + to, result);
+        return result;
+    }
+
+    // Makes a folder of the drive: a storage call, as `write_open` is.
+    static int make_folder(void *ctx, const char *name) {
+        guard::InHost lowered;
+        Host &host = *static_cast<Host *>(ctx);
+        if (!host.of_the_drive(name) || std::strlen(name) <= 6) {
+            stop("file misuse", kFileMisuse);
+        }
+        int result = -1;
+        if (host.store_call() && host.may_change(name)) {
+            const std::string path = host.path_of(name);
+            struct stat status;
+#ifdef _WIN32
+            std::error_code failure;
+            const bool made = std::filesystem::create_directory(path, failure);
+#else
+            const bool made = ::mkdir(path.c_str(), 0777) == 0;
+#endif
+            result = made || (stat(path.c_str(), &status) == 0 && S_ISDIR(status.st_mode)) ? 1 : -1;
+        }
+        host.trace("make_folder", name, result);
         return result;
     }
 
@@ -1854,6 +1879,9 @@ int main(int argc, char **argv) {
                 at += 2;
             } else if (arguments[at] == "--drive-pulled") {
                 options.drive_pulled = true;
+                ++at;
+            } else if (arguments[at] == "--no-folders") {
+                options.no_folders = true;
                 ++at;
             } else if (arguments[at] == "--drive-read-only") {
                 options.drive_read_only = true;

@@ -43,6 +43,7 @@ ABOUT = CFUNCTYPE(c_int, c_void_p, POINTER(c_char), c_size_t)
 DRIVE_LIST = CFUNCTYPE(c_int32, c_void_p, c_uint32)
 DRIVE_BIND = CFUNCTYPE(c_int, c_void_p, c_uint32, c_uint32, c_char_p)
 DRIVE_WRITABLE = CFUNCTYPE(c_int, c_void_p, c_uint32)
+MAKE_FOLDER = CFUNCTYPE(c_int, c_void_p, c_char_p)
 REPLY = CFUNCTYPE(None, c_void_p, POINTER(c_char), c_size_t, POINTER(c_char), c_size_t)
 
 
@@ -56,6 +57,7 @@ class HostRecord(Structure):
         ("about", ABOUT),
         ("drive_list", DRIVE_LIST), ("drive_bind", DRIVE_BIND), ("drive_writable", DRIVE_WRITABLE),
         ("identity", ABOUT),
+        ("make_folder", MAKE_FOLDER),
     ]
 
 
@@ -147,6 +149,10 @@ class Core:
         else:
             self._functions += (DRIVE_LIST(), DRIVE_BIND(), DRIVE_WRITABLE())
         self._functions += (ABOUT(self._identity) if callable(getattr(host, "identity", None)) else ABOUT(),)
+        if hasattr(host, "write_open") and getattr(host, "drive", None) is not None and hasattr(host, "make_folder"):
+            self._functions += (MAKE_FOLDER(self._make_folder),)
+        else:
+            self._functions += (MAKE_FOLDER(),)
         self._on_reply = REPLY(self._collect)
         self._record = HostRecord(None, *self._functions)
         self._reply = ctypes.create_string_buffer(REPLY_MAX)
@@ -203,6 +209,9 @@ class Core:
 
     def _remove(self, _ctx, name):
         return self._host.remove(name.decode("utf-8", "replace"))
+
+    def _make_folder(self, _ctx, name):
+        return self._host.make_folder(name.decode("utf-8", "replace"))
 
     def _space(self, _ctx, free_bytes, total_bytes):
         told = self._host.space()

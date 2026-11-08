@@ -1,6 +1,8 @@
-// The selection of internal animations in the list, and the removal of one animation or
-// of the selected ones, each asked about first.
+// The selection of the files of both storages in the list, the removal of one animation
+// or of the selected internal ones, each asked about first, and the move of the selected
+// ones.
 
+import * as capacity from "../capacity.js";
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
 import * as messages from "../messages.js";
@@ -26,10 +28,22 @@ function byId(id) {
   return document.getElementById(id);
 }
 
-// Whether an animation can be selected: an internal one of a target that reports its
-// inclusion, in the level the screen shows, which the filters show.
+// Whether an animation can be selected: a file of the board's storage, or of a card the
+// target may write, of a target that reports its inclusion, in the level the screen shows,
+// which the filters show.
 function selectable(item) {
-  return typeof item.ignored === "boolean" && item.external !== true && visible(item) && filters.matches(item);
+  return typeof item.file === "string" && typeof item.ignored === "boolean" && (item.external !== true || capacity.cardWritable(client.state.space)) &&
+    visible(item) && filters.matches(item);
+}
+
+// The selected rows, as the list has them.
+export function rows() {
+  return (client.state.animations || []).filter((item) => selected.has(item.id));
+}
+
+// Ends the selection mode after a run that changed the list.
+export function finished() {
+  leave();
 }
 
 // Whether a deletion, a refresh after one, an upload or the link keeps the list's
@@ -152,7 +166,13 @@ export function draw(state) {
   }
   byId("select-all").disabled = locked() || !canSelect;
   byId("clear-selection").disabled = locked() || selected.size === 0;
-  byId("delete-selected").disabled = locked() || selected.size === 0;
+  const chosen = rows();
+  const external = chosen.filter((item) => item.external === true).length;
+  byId("delete-selected").disabled = locked() || selected.size === 0 || external > 0;
+  byId("delete-selected").title = external > 0 ? "Delete selected removes internal animations; clear the external ones from the selection." : "";
+  byId("move-selected").disabled = locked() || selected.size === 0;
+  byId("selection-summary").textContent = selected.size === 0 ? "" :
+    `${selected.size} selected: ${selected.size - external} in Internal storage, ${external} in External storage.`;
   byId("selection-done").disabled = deleting;
 }
 

@@ -290,7 +290,7 @@ export async function list(from = 0, folder = null) {
       ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist, ...(item.files === undefined ? {} : {files: item.files}),
       ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
       ...(item.inherited_ignored === undefined ? {} : {inheritedIgnored: item.inherited_ignored})} :
-      {id: item.id, cycle: true})),
+      {id: item.id, cycle: true, members: item.cycle.filter((member) => whole(member, 1, MOST_ID))})),
     next: reply.next,
   };
 }
@@ -317,6 +317,28 @@ export async function space() {
 // Removes the item with this id from the show.
 export async function remove(id) {
   await carriedOut(`remove ${id}`);
+}
+
+// Makes a folder of the card with this path, its parent there already. Gives `{id, made}`,
+// `made` false for a folder that was there.
+export async function folderMake(path) {
+  const encoded = path.split("/").map(encodeURIComponent).join("/");
+  const reply = await carriedOut(`folder make external ${encoded}`);
+  if (!whole(reply.id, 1, MOST_ID) || typeof reply.made !== "boolean") {
+    throw new Failure("bad-reply", address());
+  }
+  return {id: reply.id, made: reply.made};
+}
+
+// What the board keeps for an animation: its saved brightness and saved repeat, null for
+// none, and whether it is the show's start item.
+export async function saved(id) {
+  const reply = await carriedOut(`saved ${id}`);
+  const value = (given, most) => given === null || whole(given, 0, most);
+  if (!value(reply.brightness, 255) || !value(reply.repeat, 65535) || typeof reply.start !== "boolean") {
+    throw new Failure("bad-reply", address());
+  }
+  return {brightness: reply.brightness, repeat: reply.repeat, start: reply.start};
 }
 
 // Opens the upload of a file of some bytes as the item with this id. Gives the most bytes
