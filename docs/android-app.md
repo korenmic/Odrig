@@ -630,6 +630,31 @@ and uncertain completion are distinct from an acknowledged installed file. After
 success the destination catalog/list/preview refresh normally. Authored texts and
 clocks remain in Internal; ready-made containers can use either selected storage.
 
+### An archive of animations
+
+The panel `Archive` on Upload opens one zip from the phone's chooser with `Choose an
+archive`. The zip is read in the page, where it stays until the page reloads or another
+is chosen: its directory, and each entry stored or deflated, the deflated ones through the
+converter's inflate, each checked against its size and CRC-32. An entry encrypted, packed
+another way, in zip64 or damaged is listed `unreadable:` with its reason; at most 512
+entries and 64 MB unpacked are read, and the app says so of more. The `.odrg` and `.odrgx`
+entries, in any folder, are the animations, each checked as a ready-made file is and listed
+with its size, its kind and its length, or `refused:` with the reason; the other entries
+are `passed over: not an animation`. The animations start ticked; `Tick all` and `Tick
+none` change every row.
+
+A file goes to the board's storage under the last part of its path, and to the card under
+its path from the archive's root, into a folder the card has; each name can be changed in
+its row before the upload. A name the destination cannot take, or one ticked twice, is
+said under it; a name the destination's list has says `A file of this name is there.`, and
+the file replaces it only when `Replace` beside it is ticked. Under the list the sum of the
+ticked files stands with the destination's capacity, and `Upload ticked` is disabled with
+its reason while nothing is ticked, a name must be mended or allowed to replace, or the
+sum does not fit. The press sends the ticked files one after another as the run of a batch
+of ready-made files does, with its row states, its line on every screen and `Stop`; each
+file is extracted and checked again at its turn. The room for items is not shown, since no
+reply gives it.
+
 ### A batch of ready-made files
 
 Two or more files picked at once, where the phone's file app lets several be ticked,
@@ -1200,7 +1225,11 @@ installed; the phone with mobile data on.
     after `10 of 10 uploaded.`; the same into a folder of the card; another app opened for
     two minutes during a run, and the app brought back: the line said `Paused while the app
     was not on the screen.`, and the run went on to its end.
-26. **Note** the phone's model, its Android version, the web view's version from the
+26. **An archive.** On Upload, `Choose an archive` and pick `clocks_rotated_right.zip`.
+    *Seen:* its 113 animations listed and ticked; `Tick none`, then a dozen ticked, and
+    `Upload ticked` to the board's storage: the line on every screen shows the run, and the
+    clocks play.
+27. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1361,6 +1390,9 @@ By programs, on a Mac:
   and the rule that allows plain HTTP.
 
 ## What is open
+
+- **An archive on a phone.** No person has opened a zip on a phone and uploaded its
+  animations from it: step 26 above.
 
 - **A batch of ready-made files on a phone.** No person has ticked several files in a
   phone's file app, nor watched a run on the installation and the card: step 25 above.

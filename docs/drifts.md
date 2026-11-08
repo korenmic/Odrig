@@ -12812,3 +12812,21 @@ wake lock or permission is added.
 
 **Resolution.** `app/www/batch.js`, `app/www/screens/batch-list.js`,
 `tests/app/test_batch.py`.
+
+## Seed 73: where the panel stands, and what an archive's upload decides
+
+**Question.** Where is the panel `Archive`, does it show the room for items, and how do a
+folder of the card and a replaced file go?
+
+**Answer.** On Upload, beside the upload, where the batch of seed 80 runs; the seed's
+words "the Animations screen, beside the upload" named the upload as the place. The room
+for items is not shown: seed 80, the later of the two, found that no reply gives it, and a
+`no-space` of the board's storage says so in words. A file of the card goes to its path from
+the archive's root; a folder the card does not have is refused by the board, as for a single
+upload, and the run goes on. A file ticked `Replace` is sent to the board's storage by the
+id of the root's item of its name, with no creation guard, and to the card without `upload
+expect`; the batch's run takes both from the item. The archive's rows start ticked when
+they can be sent, and a name the destination's list has needs `Replace` or another name.
+
+**Resolution.** `app/www/screens/archive.js`, `app/www/zip.js`, `app/www/batch.js`,
+`tests/app/test_archive.py`.

@@ -13,7 +13,7 @@ seen failing first.
     rules.
   - Requirements: 5.1–5.3.
 
-- [ ] 3. The documents
+- [x] 3. The documents
   - `docs/android-app.md`, its check on a phone and `tests/app/test_docs.py`;
     `agent/vocabulary.md`; `docs/drifts.md`.
   - Requirements: 7.1.
