@@ -1040,9 +1040,13 @@ changing targets clears pending state and ignores replies belonging to the old t
 
 Selecting Only opens the resolved Clocks folder on Animations. Browsing stays inside
 that folder and its descendants; Back stops at Clocks. Direct navigation uses the same
-guard as the visible controls. Missing media or uncertain status retains the boundary,
-with an unavailable Clocks view when its folder is unresolved. Confirmed Off or Between
-releases the boundary; Settings and Target remain available. `Restart clocks`
+guard as the visible controls. Later status reconciles the folder's current ID while
+preserving valid Clocks descendants. If automatic recovery cannot resolve that location,
+the app shows an unavailable Clocks view and retries its ancestry without publishing
+Root. Unknown mode metadata preserves the confirmed Only context; confirmed Off or
+Between, or a target change, releases the boundary. Settings and Target remain
+available. An unresolved ID keeps `Restart clocks` disabled and is not sent by a direct
+restart. `Restart clocks`
 targets the currently resolved Clocks folder ID;
 the raw `play all` command remains refused by the core. Inside files and folders remain
 manually playable when ignored or when automatic messages are off. Display tests require

@@ -66,7 +66,7 @@ class ValidShow(unittest.TestCase):
         run = support.start(example(), options=["--trace-files"])
         self.assertEqual(
             run.opened,
-            (("schedule.txt", 0), ("catalog.do", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 1), ("show.json", 1), ("pending.txt", 0), ("catalog.txt", 0), ("hello.odrg", 1), ("dvd.odrg", 1)),
+            (("schedule.txt", 0), ("catalog.do", 0), ("clocks.txt", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 1), ("show.json", 1), ("pending.txt", 0), ("catalog.txt", 0), ("hello.odrg", 1), ("dvd.odrg", 1)),
         )
 
     def test_a_file_named_twice_is_opened_for_checking_once(self):
@@ -171,13 +171,13 @@ class EachReason(unittest.TestCase):
         status = support.without_readiness(json.loads(run.lines[1][len("reply "):]))
         self.assertEqual(status, {"ok": True, "on": True, "brightness": 128, "playing": None, "animation": None, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None})
         self.assertEqual(json.loads(run.lines[2][len("reply "):]), {"ok": True, "items": [], "next": None})
-        self.assertEqual(run.opened, (("schedule.txt", 0), ("catalog.do", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 0), ("pending.txt", 0), ("catalog.txt", 0)))
+        self.assertEqual(run.opened, (("schedule.txt", 0), ("catalog.do", 0), ("clocks.txt", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 0), ("pending.txt", 0), ("catalog.txt", 0)))
 
     def test_a_file_set_with_no_file_opens_these_and_writes_nothing(self):
         run, left = support.start_and_keep({}, [support.line(T0, "status")], ["--trace-files", "--trace-store"])
         self.assertIsNone(run.error)
         self.assertEqual(len(run.legs), 20)
-        self.assertEqual(run.opened, (("schedule.txt", 0), ("catalog.do", 0), ("mapping.json", 0), ("show.json", 0), ("pending.txt", 0), ("catalog.txt", 0), ("rotation.txt", 0)))
+        self.assertEqual(run.opened, (("schedule.txt", 0), ("catalog.do", 0), ("clocks.txt", 0), ("mapping.json", 0), ("show.json", 0), ("pending.txt", 0), ("catalog.txt", 0), ("rotation.txt", 0)))
         self.assertEqual(run.stored, ("remove upload.part 0", "remove show.part 0"))
         self.assertFalse(any(line.startswith("store ") for line in run.lines))
         self.assertEqual(left, {})
@@ -352,11 +352,11 @@ class OrderOfTheChecks(unittest.TestCase):
         # Without a show file the start goes on with the empty show: the file is asked for
         # once, and there is no file of the show to open.
         run = support.start(example(show_json=None), options=["--trace-files"])
-        self.assertEqual(run.opened, (("schedule.txt", 0), ("catalog.do", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 0), ("pending.txt", 0), ("catalog.txt", 0)))
+        self.assertEqual(run.opened, (("schedule.txt", 0), ("catalog.do", 0), ("clocks.txt", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 0), ("pending.txt", 0), ("catalog.txt", 0)))
         # Without a mapping file the start goes on with the built-in mapping: the file is
         # asked for once, and the show's files are opened and found of another canvas.
         run = support.start(example(mapping_json=None), options=["--trace-files"])
-        self.assertEqual(run.opened, (("schedule.txt", 0), ("catalog.do", 0), ("mapping.json", 0), ("show.json", 1), ("show.json", 1), ("pending.txt", 0), ("catalog.txt", 0), ("hello.odrg", 1), ("dvd.odrg", 1), ("rotation.txt", 0)))
+        self.assertEqual(run.opened, (("schedule.txt", 0), ("catalog.do", 0), ("clocks.txt", 0), ("mapping.json", 0), ("show.json", 1), ("show.json", 1), ("pending.txt", 0), ("catalog.txt", 0), ("hello.odrg", 1), ("dvd.odrg", 1), ("rotation.txt", 0)))
 
     def test_a_show_with_wrong_ids_asks_for_no_file(self):
         run = support.start(example(show_json=show(start=9)), options=["--trace-files"])
@@ -388,7 +388,7 @@ class Leftovers(unittest.TestCase):
             self.assertEqual(run.stored, ("remove upload.part 0", "remove show.part 0"))
             self.assertEqual(run.opened.count(("pending.txt", 0)), 1)
             self.assertEqual(run.opened[0], ("schedule.txt", 0))
-            self.assertEqual(run.opened.index(("pending.txt", 0)), 6)
+            self.assertEqual(run.opened.index(("pending.txt", 0)), 7)
             self.assertFalse(any(line.startswith("store ") for line in run.lines))
             self.assertEqual(left, {name: content if isinstance(content, bytes) else content.encode() for name, content in files.items()})
 

@@ -1,0 +1,83 @@
+{
+  "baseCommit": "56e2d58bbe7d6d9977d89cc37c148946a0a918b2",
+  "scope": "saved-policy fail-closed recovery only; original global-inventory feature deferred",
+  "nativeRegression": {
+    "methods": 5,
+    "observedBeforeSubtestFailures": 12,
+    "observedFailure": "normal root frame at 0 ms; failed open case at100ms",
+    "afterPassed": true
+  },
+  "broadRun": {
+    "id": "20261101-225625-4432",
+    "fullRunPassed": false,
+    "stoppedToAvoidDuplicateAppPass": true,
+    "counts": {
+      "core": {
+        "completedCases": 1050,
+        "outcomes": {
+          "ok": 1042,
+          "skip": 7,
+          "fail": 1
+        },
+        "fullSuiteCompleted": true
+      },
+      "emulator": {
+        "completedCases": 299,
+        "outcomes": {
+          "ok": 289,
+          "skip": 9,
+          "error": 1
+        },
+        "fullSuiteCompleted": false
+      },
+      "app": {
+        "completedCases": 44,
+        "outcomes": {
+          "ok": 44
+        },
+        "fullSuiteCompleted": false
+      }
+    }
+  },
+  "rechecks": {
+    "coreDocumentationAndUnchangedHttpCases": 13,
+    "passed": true,
+    "originalHttpError": "Windows WinError10055 insufficient socket buffers; no HTTP code change",
+    "focusedDiscoveredSettingsCases": 1,
+    "settingsPassed": true
+  },
+  "memory": {
+    "coreObject": 3720,
+    "target": 125185,
+    "targetDrive": 130973,
+    "targetDriveBlocks": 21,
+    "example": 88474,
+    "targetNoStorage": 77645,
+    "arenaLimit": 131072,
+    "coreLimit": 4096
+  },
+  "logs": {
+    "policy-before.log": {
+      "bytes": 14965,
+      "sha256": "9ff4b4fdd644e7592819a0a29fa31cceb745bcde8857b5dd0d3d65421c2f6c14"
+    },
+    "policy-after.log": {
+      "bytes": 1063,
+      "sha256": "e0a9cdc3647d6b8b2c773577f8286b48376970b5adac17e46584b1803f8dfa4b"
+    },
+    "policy-suites.log": {
+      "bytes": 904,
+      "sha256": "053773f7ca7bf225207f8e873f0cf2b6fba9b1f96fa2cb82aac3c0f13c58914c"
+    },
+    "policy-rechecks.log": {
+      "bytes": 2232,
+      "sha256": "24469efa883b077997b3e0b7ec054c6b4c6896104037bae8cdba14c57ea7b7e7"
+    },
+    "policy-ui.log": {
+      "bytes": 278,
+      "sha256": "cdd36e9c208047d28bbb997884f0bc0d677a8e55cddc06c7aa069d154b32ea8a"
+    }
+  },
+  "physicalBoardAcceptance": false,
+  "incidentBootCauseOrRepairConfirmed": false
+}
