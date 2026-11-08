@@ -4,6 +4,7 @@
 
 #include "brightness.h"
 #include "drive.h"
+#include "folders.h"
 #include "order.h"
 #include "player.h"
 #include "show.h"
@@ -58,7 +59,7 @@ bool parse(char *text, uint32_t length, Line *line) {
     line->length = length - at - 3;
     if (line->kind == 'f') {
         text[length] = '\0';
-        return is_file_name(line->name);
+        return is_stored_name(line->name);
     }
     if (line->kind != 'x' || line->length == 0 || line->length > kNameMost) {
         return false;
@@ -294,7 +295,7 @@ uint32_t animation_with(const Core &core, uint32_t id, bool *in_use) {
             return kDriveBase + value;
         }
     }
-    *in_use = kind == 'd';
+    *in_use = kind == 'd' || (kind == 0 && internal_folder_id(core, id));
     return kNothing;
 }
 

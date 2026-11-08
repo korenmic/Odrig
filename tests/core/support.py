@@ -23,6 +23,10 @@ from odrig.generators import dense, dvd_bounce, hello_world
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CONVERTER = ROOT / "converter" / "odrig.js"
 
+# The name of a file an upload gives, and a name of a folder of its path.
+UPLOAD_NAME = re.compile(r"[a-z0-9._-]{1,32}")
+FOLDER_PART = re.compile(r"[^\x00-\x1f\x7f-\uffff\\:*?\"<>|/ .](?:[^\x00-\x1f\x7f-\uffff\\:*?\"<>|/]*[^\x00-\x1f\x7f-\uffff\\:*?\"<>|/ .])?")
+
 
 def pack_with_the_converter(show_file, mapping_file, sources, out, compressed=True):
     """Packs a show into the folder `out` with the converter, `node converter/odrig.js pack`.
@@ -1453,6 +1457,7 @@ class ReferencePlayer:
     LINE_MAX = 2048
     COMMANDS = {b"repeat": (2, 3), b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"fault": (0,), b"space": (0,), b"list": (0, 1, 2, 3), b"remove": (1,), b"upload": range(0, 2048), b"read": range(0, 2048), b"clocks": range(0, 2048)}
     READ_MOST = 600
+    READ_COUNT_MOST = 720
     EXPECT_LARGEST = 16384
     RANGES = {b"play": (1, 4294967295), b"brightness": (0, 255), b"list": (0, 4294967295), b"remove": (1, 4294967295)}
     REPLY_MAX = 1024
@@ -1698,10 +1703,12 @@ class ReferencePlayer:
 
     def _read(self, arguments):
         """`read <id> <offset>`: up to 600 bytes of the file of an animation, from an offset,
-        with its size. Returns an error code or the reply."""
-        number = self._number(arguments[0], 1, 4294967295) if len(arguments) == 2 else None
-        offset = self._number(arguments[1], 0, 4294967295) if len(arguments) == 2 else None
-        if number is None or offset is None:
+        with its size; `read <id> <offset> <count>`: up to `count` bytes, 1 to 720. Returns an
+        error code or the reply."""
+        number = self._number(arguments[0], 1, 4294967295) if len(arguments) in (2, 3) else None
+        offset = self._number(arguments[1], 0, 4294967295) if len(arguments) in (2, 3) else None
+        count = self._number(arguments[2], 1, self.READ_COUNT_MOST) if len(arguments) == 3 else self.READ_MOST
+        if number is None or offset is None or count is None:
             return "bad-argument"
         if self.error is not None:
             return "show-invalid"
@@ -1718,8 +1725,24 @@ class ReferencePlayer:
             return "bad-argument"
         if not self.changeable:
             return "storage-error"
-        piece = base64.urlsafe_b64encode(data[offset:offset + self.READ_MOST]).rstrip(b"=")
+        piece = base64.urlsafe_b64encode(data[offset:offset + count]).rstrip(b"=")
         return b'{"ok":true,"bytes":%d,"data":"%s"}\n' % (len(data), piece)
+
+    @staticmethod
+    def _upload_path(word):
+        """The path of `upload begin`, decoded once from URI escapes: `(folder, name)`, the
+        folder empty for a name at the root, or None for a path out of form."""
+        decoded = re.sub(rb"%([0-9A-Fa-f]{2})", lambda found: bytes([int(found.group(1), 16)]), word)
+        if b"%" in re.sub(rb"%[0-9A-Fa-f]{2}", b"", word) or len(decoded) > 100 or any(byte < 32 or byte > 126 for byte in decoded):
+            return None
+        folder, _, name = decoded.decode("ascii").rpartition("/")
+        if not UPLOAD_NAME.fullmatch(name) or not name.endswith(show.ENDINGS):
+            return None
+        if folder:
+            parts = folder.split("/")
+            if len(folder) > 93 or len(parts) > 3 or any(not FOLDER_PART.fullmatch(part) for part in parts) or parts[-1].lower().endswith(show.ENDINGS):
+                return None
+        return folder, name
 
     def _upload(self, arguments):
         """The `upload` commands. Returns an error code, a reply, or None."""
@@ -1727,11 +1750,15 @@ class ReferencePlayer:
         if verb == b"begin":
             number = self._number(arguments[1], 1, 65535) if len(arguments) == 4 else None
             size = self._number(arguments[3], 1, 4294967295) if len(arguments) == 4 else None
-            name = arguments[2].decode("latin-1") if len(arguments) == 4 else ""
-            if number is None or size is None or not show.FILE_NAME.fullmatch(name) or not name.endswith(show.ENDINGS):
+            path = self._upload_path(arguments[2]) if len(arguments) == 4 else None
+            if number is None or size is None or path is None:
                 return "bad-argument"
             if self.error is not None:
                 return "show-invalid"
+            folder, name = path
+            if folder:
+                # The reference keeps no folders of the board's storage.
+                return "unknown-id"
             if self.upload is not None:
                 return "busy"
             item = self.items.get(number)

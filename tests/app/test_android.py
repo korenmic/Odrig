@@ -16,9 +16,9 @@ class TheSender(unittest.TestCase):
         cls.activity = (JAVA / "MainActivity.java").read_text(encoding="utf-8")
         cls.manifest = (MAIN / "AndroidManifest.xml").read_text(encoding="utf-8")
 
-    def test_native_classes_are_the_shell_wifi_sender_and_usb_capture(self):
+    def test_native_classes_are_the_shell_wifi_sender_usb_capture_and_saver(self):
         self.assertEqual(sorted(path.name for path in JAVA.iterdir()),
-                         ["MainActivity.java", "TargetPlugin.java", "UsbCapture.java", "UsbDiagnosticsPlugin.java"])
+                         ["MainActivity.java", "SavePlugin.java", "TargetPlugin.java", "UsbCapture.java", "UsbDiagnosticsPlugin.java"])
 
     def test_the_web_code_calls_the_sender_by_the_names_it_has(self):
         self.assertIn('@CapacitorPlugin(name = "Target")', self.sender)
@@ -94,9 +94,11 @@ class TheSender(unittest.TestCase):
 
     def test_the_activity_registers_the_sender_first_and_keeps_the_screen_on(self):
         register = self.activity.index("registerPlugin(TargetPlugin.class);")
+        saver = self.activity.index("registerPlugin(SavePlugin.class);")
         create = self.activity.index("super.onCreate(savedInstanceState);")
         keep = self.activity.index("getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);")
-        self.assertLess(register, create)
+        self.assertLess(register, saver)
+        self.assertLess(saver, create)
         self.assertLess(create, keep)
 
     def test_the_manifest_asks_for_three_permissions_and_allows_plain_http(self):
@@ -107,6 +109,39 @@ class TheSender(unittest.TestCase):
         config = (MAIN / "res" / "xml" / "network_security_config.xml").read_text(encoding="utf-8")
         self.assertIn('<base-config cleartextTrafficPermitted="true" />', config)
         self.assertNotIn("usesCleartextTraffic", self.manifest)
+
+
+class TheSaver(unittest.TestCase):
+    """What the plugin that saves a download or a backup says. No test runs it: it needs a
+    phone, on which the owner's check of `Download` and `Download selected` is made."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.saver = (JAVA / "SavePlugin.java").read_text(encoding="utf-8")
+        cls.save = (support.WWW / "save.js").read_text(encoding="utf-8")
+
+    def test_the_web_code_calls_the_saver_by_the_names_it_has(self):
+        self.assertIn('@CapacitorPlugin(name = "Save")', self.saver)
+        self.assertEqual(re.findall(r"@PluginMethod\s+public void ([a-z]+)\(", self.saver), ["begin", "append", "abandon", "finish"])
+        self.assertEqual(sorted(set(re.findall(r'nativePromise\("([A-Za-z]+)", "([a-z]+)"', self.save))), [("Save", "abandon"), ("Save", "append"), ("Save", "begin"), ("Save", "finish")])
+        for member in ("name", "type", "data"):
+            self.assertIn(f'call.getString("{member}"', self.saver)
+            self.assertRegex(self.save, rf"\b{member}\b")
+        for member in ("saved", "name"):
+            self.assertIn(f'.put("{member}"', self.saver)
+            self.assertRegex(self.save, rf"\.{member}\b")
+        # Only the file of the target knows the native shell; the saver reaches it from there.
+        self.assertIn('import {shell} from "./target.js";', self.save)
+
+    def test_it_writes_into_the_apps_cache_and_lets_the_operator_choose_the_place(self):
+        for expected in ("new Intent(Intent.ACTION_CREATE_DOCUMENT)", ".addCategory(Intent.CATEGORY_OPENABLE)", ".putExtra(Intent.EXTRA_TITLE, name)",
+                         'new File(getContext().getCacheDir(), FOLDER)', 'startActivityForResult(call, intent, "chosen");', "@ActivityCallback",
+                         "getContext().getContentResolver().openOutputStream(place)", "Base64.decode(data, Base64.DEFAULT)", "getBridge().releaseCall(call);",
+                         "getBridge().executeOnMainThread(() -> getBridge().releaseCall(call));"):
+            self.assertIn(expected, self.saver)
+        # It asks for no permission and reaches no network: the manifest's three stay.
+        for word in ("getExternalStorage", "Environment", "MediaStore", "Permission", "openConnection", "Network", "URL"):
+            self.assertNotIn(word, self.saver, word)
 
 
 if __name__ == "__main__":

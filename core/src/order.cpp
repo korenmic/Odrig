@@ -7,6 +7,8 @@
 #include "crc32.h"
 #include "drive.h"
 #include "breaks.h"
+#include "folders.h"
+#include "show.h"
 #include "repeats.h"
 #include "brightness.h"
 #include "ignored.h"
@@ -186,9 +188,12 @@ bool order_begin(Core &core) {
 void tree_clear(Core &core) {
     core.folder_count = 0;
     core.tree_known = 0;
-    core.current = 0;
-    core.current_folder.ordinal = 0;
-    core.current_folder.id = 0;
+    if ((core.current & kInternalLevel) == 0) {
+        // An internal playlist stays current whatever becomes of the drive.
+        core.current = 0;
+        core.current_folder.ordinal = 0;
+        core.current_folder.id = 0;
+    }
     breaks_tree(core);
     if (core.folders == nullptr) {
         return;
@@ -252,6 +257,20 @@ void tree_build(Core &core) {
 }
 
 void tree_find_current(Core &core) {
+    if (core.playlist_path != nullptr && core.playlist_path[0] == ':') {
+        // The path of an internal folder.
+        FolderLine line;
+        bool twin = false;
+        const char *path = core.playlist_path + 1;
+        uint32_t length = 0;
+        while (path[length] != '\0') {
+            ++length;
+        }
+        if (folder_by_path(core, path, length, line, &twin) == 1 && internal_choose(core, line.id)) {
+            breaks_tree(core);
+            return;
+        }
+    }
     core.current = 0;
     if (core.playlist_path != nullptr && core.playlist_path[0] != '\0') {
         const uint32_t found = drive_folder_with_path(core, core.playlist_path);
@@ -280,7 +299,9 @@ void tree_choose(Core &core, uint32_t folder) {
 
 uint32_t level_of(const Core &core, uint32_t position) {
     if (!is_drive(position)) {
-        return 0;
+        const ItemInfo &item = core.items[position];
+        const FileInfo &file = core.files[item.first];
+        return item.is_cycle || file.rank == 0 ? 0 : kInternalLevel | stored_folder(file.name);
     }
     const uint32_t folder = drive_folder_of(core, position - kDriveBase);
     return folder == kNoFolder ? 0 : folder;
@@ -335,12 +356,13 @@ bool item_listed(const Core &core, uint32_t position) {
     return position < core.item_count && !core.items[position].is_cycle;
 }
 
-// The show's animation with the smallest key above `after`, or kNothing.
-uint32_t item_after(const Core &core, uint32_t after, bool any) {
+// The show's animation of a level, the root or an internal folder, with the smallest key
+// above `after`, or kNothing.
+uint32_t item_after(const Core &core, uint32_t level, uint32_t after, bool any) {
     uint32_t best = kNothing;
     uint32_t best_key = 0;
     for (uint32_t position = 0; position < core.item_count; ++position) {
-        if (!item_listed(core, position)) {
+        if (!item_listed(core, position) || level_of(core, position) != level) {
             continue;
         }
         const uint32_t key = order_key(core, position);
@@ -353,14 +375,15 @@ uint32_t item_after(const Core &core, uint32_t after, bool any) {
 }
 
 // Hands each listed animation of a level to `visit`, in the saved order, until it gives
-// false: at the root the show's animations by their keys and then the root's files of the
-// drive, at a folder its own files, in the order of the drive's walk. Gives the count.
+// false: at the root the show's animations at the root by their keys and then the root's
+// files of the drive, at an internal folder its own animations by their keys, at a folder
+// of the drive its own files, in the order of the drive's walk. Gives the count.
 template <typename Visit>
 uint32_t each_listed(const Core &core, uint32_t level, Visit visit) {
     uint32_t count = 0;
-    if (level == 0) {
+    if (level == 0 || (level & kInternalLevel) != 0) {
         uint32_t key = 0;
-        for (uint32_t at = item_after(core, 0, true); at != kNothing; at = item_after(core, key, false)) {
+        for (uint32_t at = item_after(core, level, 0, true); at != kNothing; at = item_after(core, level, key, false)) {
             key = order_key(core, at);
             if (!visit(at, core.items[at].id)) {
                 return count;
@@ -369,7 +392,7 @@ uint32_t each_listed(const Core &core, uint32_t level, Visit visit) {
         }
     }
     IndexFolder folder;
-    if (!drive_folder(core, level, folder)) {
+    if ((level & kInternalLevel) != 0 || !drive_folder(core, level, folder)) {
         return count;
     }
     for (uint32_t position = folder.first; position < folder.first + folder.files; ++position) {
@@ -413,7 +436,7 @@ uint32_t animation_with(const Core &core, uint32_t id, bool *cycle_or_folder) {
     }
     uint32_t value = 0;
     const uint8_t kind = drive_find(core, id, &value);
-    if (kind == 'd') {
+    if (kind == 'd' || (kind == 0 && internal_folder_id(core, id))) {
         *cycle_or_folder = true;
     }
     if (kind == 'f') {
@@ -667,7 +690,7 @@ uint32_t order_move(Core &core, uint32_t revision, uint32_t id, uint32_t before,
         target = kNothing;
     }
     // Nothing changes when the animation already stands where it is to go among the show's.
-    const uint32_t next = item_after(core, order_key(core, moved), false);
+    const uint32_t next = item_after(core, level, order_key(core, moved), false);
     if (moved == target || next == target) {
         return succeed(reply);
     }

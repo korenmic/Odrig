@@ -107,6 +107,16 @@ void player_file_replaced(Core &core, uint32_t item);
 // its turn comes. When nothing plays, the playlist starts from its first animation.
 void player_item_added(Core &core);
 void player_inclusion_changed(Core &core, uint32_t item);
+
+// The Ignore of an internal folder changed: the turn of an animation that no longer plays
+// gives way to the next, and the playlist starts when nothing played.
+void player_internal_inclusion_changed(Core &core);
+
+// Whether the current playlist is a folder: an internal folder, or a folder of the drive's
+// tree while the tree is known.
+inline bool playlist_is_folder(const Core &core) {
+    return (core.current & kInternalLevel) != 0 || (core.tree_known && core.current != 0);
+}
 void player_external_inclusion_changed(Core &core);
 void player_clock_mode_changed(Core &core, uint8_t previous);
 void player_only_restart(Core &core);

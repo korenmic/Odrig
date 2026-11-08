@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(TargetPlugin.class);
         registerPlugin(UsbDiagnosticsPlugin.class);
+        registerPlugin(SavePlugin.class);
         super.onCreate(savedInstanceState);
         // The screen stays on while the app is in front.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);

@@ -786,13 +786,15 @@ input[type="range"] {
   border-radius: 16px;
 }
 
-.row .pick {
+.row .pick,
+.folder-row .pick {
   display: none;
   flex: 0 0 auto;
   margin: 0;
 }
 
-.selecting .row .pick {
+.selecting .row .pick,
+.selecting .folder-row .pick {
   display: flex;
   align-items: center;
   min-height: 44px;

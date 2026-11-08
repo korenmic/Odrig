@@ -149,7 +149,8 @@ class Core:
         else:
             self._functions += (DRIVE_LIST(), DRIVE_BIND(), DRIVE_WRITABLE())
         self._functions += (ABOUT(self._identity) if callable(getattr(host, "identity", None)) else ABOUT(),)
-        if hasattr(host, "write_open") and getattr(host, "drive", None) is not None and hasattr(host, "make_folder"):
+        if hasattr(host, "write_open") and hasattr(host, "make_folder"):
+            # Folders of the storage, and of the drive when there is one.
             self._functions += (MAKE_FOLDER(self._make_folder),)
         else:
             self._functions += (MAKE_FOLDER(),)

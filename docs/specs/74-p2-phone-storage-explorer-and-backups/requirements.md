@@ -109,7 +109,9 @@ the destination folders made first.
 
 ### 6. Downloads and backups
 
-6.1 `read <id> <offset> <count>` reads up to 1,536 bytes at a time.
+6.1 `read <id> <offset> <count>` reads up to 720 bytes at a time: a reply holds 1,024
+bytes, and the reply's frame around the data, with a size of 10 digits, leaves room for
+737.
 6.2 `Download` saves one file's original bytes under its name; `Download selected`
 saves one ZIP of the selection of one storage, relative to the level shown, with a
 manifest `odrig-backup.json` of version 1: `sourceStorage`, `base`, and for each file

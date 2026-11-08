@@ -280,7 +280,7 @@ async function turn(item, guarded) {
       return null;
     }
     const there = item.replace === true && !external ? fresh.root.find((row) => row.file === checked.path && row.external !== true && typeof row.id === "number") : undefined;
-    const id = external ? null : there !== undefined ? there.id : freeId(new Set(fresh.root.map((row) => row.id)));
+    const id = external ? null : there !== undefined ? there.id : freeId(new Set(fresh.ids ?? fresh.root.map((row) => row.id)));
     if (!external && id === null) {
       fail(item, "Internal storage has no free animation id.");
       return null;

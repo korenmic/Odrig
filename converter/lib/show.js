@@ -19,7 +19,9 @@ export const LONGEST_TURN = 65535;
 export const MOST_LOOPS = 65535;
 // How long an animation without a repeat count plays at least, in a show that does not say.
 export const MIN_SECONDS = 30;
-export const FILE_NAME = /^[a-z0-9._-]{1,32}$/;
+// The stored name of a file: its name, alone or in a numbered folder of the board's storage,
+// `<n>/`, 1 to 255 without a leading zero.
+export const FILE_NAME = /^(?:(?:[1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\/)?[a-z0-9._-]{1,32}$/;
 export const ENDING = ".odrg";
 // The endings a file of a show may have: an ODRG file or an ODRGX container.
 export const ENDINGS = [".odrg", ".odrgx"];

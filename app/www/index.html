@@ -83,6 +83,7 @@
 <button id="move-selected" type="button" disabled>Move to&hellip;</button>
 </div>
 <div class="pair">
+<button id="download-selected" type="button" disabled>Download selected</button>
 <button id="selection-done" type="button">Done</button>
 </div>
 <p id="selection-summary" class="small" role="status" aria-live="polite"></p>
@@ -410,6 +411,8 @@
 </div>
 <div id="folder-dialog" class="explorer-dialog" role="dialog" aria-labelledby="folder-dialog-title" hidden>
 <h2 id="folder-dialog-title">New folder</h2>
+<label id="folder-storage-label" for="folder-storage">Storage</label>
+<select id="folder-storage"><option value="internal">Internal</option><option value="external">External</option></select>
 <p id="folder-where" class="small"></p>
 <label for="folder-name">Name</label>
 <input id="folder-name" type="text" autocomplete="off" spellcheck="false">
@@ -433,6 +436,22 @@
 <button id="move-go" type="button" disabled>Move</button>
 <button id="move-stop" type="button" hidden>Stop</button>
 <button id="move-cancel" type="button">Cancel</button>
+</div>
+</div>
+<div id="download-dialog" class="explorer-dialog" role="dialog" aria-labelledby="download-dialog-title" hidden>
+<h2 id="download-dialog-title">Download selected</h2>
+<p id="download-source" class="small"></p>
+<div id="download-choice" hidden>
+<label for="download-storage">Storage</label>
+<select id="download-storage" aria-describedby="download-choice-reason"></select>
+<p id="download-choice-reason" class="small"></p>
+</div>
+<p id="download-what" class="small"></p>
+<p id="download-progress" role="status" aria-live="polite"></p>
+<div class="pair">
+<button id="download-go" type="button">Save the backup</button>
+<button id="download-stop" type="button" hidden>Stop</button>
+<button id="download-cancel" type="button">Cancel</button>
 </div>
 </div>
 <div id="confirm" hidden>
