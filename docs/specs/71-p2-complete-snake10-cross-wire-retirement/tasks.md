@@ -3,7 +3,7 @@
 Each task is one proof commit with only its own checkbox ticked. A test for a fault is
 seen failing first.
 
-- [ ] 1. Remove the emulator's count of the retired command
+- [x] 1. Remove the emulator's count of the retired command
   - `emulator/binding.py` and `emulator/engine.py`; the emulator's tests of the routing and
     of the refused command, seen failing first.
   - Requirements: 1.1–1.2, 3.1.
