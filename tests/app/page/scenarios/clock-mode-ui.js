@@ -63,7 +63,7 @@ export default async function(app) {
     if (act.target) {
       app.press('Target');
       app.fill('address', act.target);
-      app.press('Use');
+      app.press("Connect over Wi-Fi");
     }
     if (act.reload) await app.reload();
     if (act.until) await settled(app, act.until);

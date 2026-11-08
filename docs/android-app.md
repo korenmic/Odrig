@@ -702,10 +702,14 @@ pulled out, when the app asks for the list again. Besides Upload's choice and a 
 `Delete` while the installation can write the card, the app has no code of its own for
 them.
 
-To point the app at an emulator, write the emulator's address on the target screen and
-press `Use`; `Board` puts `4.3.2.1` back. An address is a host name or an IPv4 address,
+The target screen has a switch of two links, `Wi-Fi` and `USB serial`, which the phone
+keeps, `Wi-Fi` until the operator chooses otherwise; choosing the other is a change of
+target. On `Wi-Fi`, write the address and press `Connect over Wi-Fi`; a field left empty
+connects to `4.3.2.1`, the board. To point the app at an emulator, write the emulator's
+address there. An address is a host name or an IPv4 address,
 alone or with a port, as in `192.168.1.23:8600`. For a phone to reach an emulator, start
-it with `--lan`; see [emulator.md](emulator.md#from-a-phone).
+it with `--lan`; see [emulator.md](emulator.md#from-a-phone). In a browser, the emulator's
+Controller among them, `USB serial` is disabled: only the Android app has the port.
 
 A long press marks text, and opens the phone's menu of copying and pasting, only in a
 field one types into: the brightness on Animations, the address on the target screen, and
@@ -978,6 +982,9 @@ it is dismissed with `OK` or another takes its place.
 | `bad-address` | The text written as the address is none. | That is not an address. Write it like 4.3.2.1 or 192.168.1.23:8600. |
 | `no-wifi` | The phone is on no Wi-Fi network. | This phone is not on a Wi-Fi network. Join the network odrig in the phone's Wi-Fi settings. |
 | `no-answer` | No reply came within five seconds. | No answer from `<address>`. Check that the phone is on the installation's Wi-Fi network and that the installation has power. |
+| `no-answer`, over USB serial | No reply came over the cable within five seconds. | No answer over USB serial. Check the cable to the board's USB port and that the installation has power. |
+| `no-usb` | The link is USB serial and no board is connected by USB, or it was unplugged. | No board is connected by USB. Connect the phone to the board's USB port with a cable, then press Connect over USB. |
+| `usb-refused` | Android did not give the app the USB device. | Android did not let the app use the board's USB port. Press Connect over USB and allow it. |
 | `bad-reply` | Something answered that is not an installation. | Something answered at `<address>`, but it is not an odrig installation. |
 | `line-too-long`, `unknown-command`, `bad-argument` | The installation's software is older or newer than the app. | The installation did not understand the app. Its software and this app do not match. |
 | `show-invalid` | The installed show cannot be played. | The installed show is invalid: `<reason>`. Nothing can be played until a show is installed over USB. |
@@ -1066,6 +1073,16 @@ The target screen says how requests travel:
 | `The phone offers to sign in to it. That is not needed.` | Added when the phone takes the network for one with a sign-in page. |
 | `This phone is not on a Wi-Fi network.` | Join `odrig` in the phone's Wi-Fi settings. |
 | `Sent from this browser.` | The web code runs in a browser and not in the app. |
+| `Sent over USB serial.` | The link is `USB serial`: the lines go over the cable to the board's USB port. |
+
+On `USB serial` the app sends every line it sends over Wi-Fi over the board's USB serial
+port, the port the command tool uses from a computer, with the same replies, so that every
+screen works as on Wi-Fi. The APK finds the board by the ids of the ESP32-S3's USB serial
+port, `303a:1001`, asks Android for it once, and opens it at 115,200 baud with both modem
+lines low, which never resets the chip. Before a line the app drops what the port holds;
+after it, it passes over the board's log, lines beginning with `#`, until the reply. Android
+offers the app when the board is plugged in. Installing firmware stays with the existing
+ways.
 
 The app allows plain HTTP, because the installation speaks nothing else, and it sends to
 no address but the one that is set. Anyone on the network can send the same commands with
@@ -1103,7 +1120,8 @@ installed; the phone with mobile data on.
    nothing answers, in words. Start it again: the app recovers by itself.
 6. **The installation's network.** Power the board. In the phone's Wi-Fi settings join
    `odrig` with the password. Leave mobile data on. Note what the phone says about the
-   network and what you answered. In the app press `Board`. *Seen:* `Answers`, and a line
+   network and what you answered. In the app empty the address and press
+   `Connect over Wi-Fi`. *Seen:* `Answers`, and a line
    that says the Wi-Fi network has no internet.
 7. **Mobile data at the same time.** Open a web page in the phone's browser. *Seen:* it
    loads, and the app still shows the board's status.
@@ -1206,7 +1224,14 @@ installed; the phone with mobile data on.
     phone zone/DST, a due reconnection after15 minutes, and no periodic time writes
     while connected. Restore the original hours, auto-sync choice and manual mode.
     These physical phone/LED observations remain unperformed.
-25. **Note** the phone's model, its Android version, the web view's version from the
+25. **USB serial.** Connect the phone to the board's USB port with a USB-C cable or an
+   OTG adapter. On the target screen choose `USB serial` and press `Connect over USB`;
+   allow the app when Android asks. *Seen:* `Answers`, `Sent over USB serial.`, the list,
+   and every action of steps 3, 4 and 12 on the LEDs, with the board not reset by the
+   connection. Pull the cable: the app says that no board is connected by USB; plug it in
+   and press `Connect over USB`: the app answers again. Choose `Wi-Fi`: the app answers over
+   Wi-Fi.
+26. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites

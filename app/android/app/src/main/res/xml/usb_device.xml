@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The ESP32-S3's USB serial port: vendor 0x303a, product 0x1001. -->
+    <usb-device vendor-id="12346" product-id="4097" />
+</resources>

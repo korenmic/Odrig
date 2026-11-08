@@ -296,12 +296,20 @@
 <section id="target">
 <h1>Target</h1>
 <div class="panel">
+<div id="wifi-link">
 <label for="address">Address of the installation</label>
 <input id="address" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false">
-<div class="pair">
-<button id="use" type="button" class="primary">Use</button>
-<button id="board" type="button">Board</button>
+<button id="connect-wifi" type="button" class="primary">Connect over Wi-Fi</button>
 </div>
+<div id="usb-link" hidden>
+<p id="usb-state"></p>
+<button id="connect-usb" type="button" class="primary">Connect over USB</button>
+</div>
+<div id="link-choice" role="radiogroup" aria-label="Connection" aria-describedby="link-why">
+<label><input type="radio" name="link" value="wifi"> Wi-Fi</label>
+<label><input type="radio" name="link" value="usb"> USB serial</label>
+</div>
+<p id="link-why" class="small" hidden></p>
 <p id="link" class="state">Checking</p>
 <p id="link-failure" hidden></p>
 <p id="invalid" hidden></p>
