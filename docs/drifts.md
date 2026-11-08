@@ -13293,6 +13293,29 @@ part B. Replacing a file of the destination is not offered: the card's upload ha
 of the content it would replace, so the operator removes it first.
 
 **Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`.
+## Seed 79: the stream's units, where the batch's preview starts, and the measurement
+
+**Question.** How does a DEFLATE reader fed in parts keep `inflateRaw`'s verdicts, where do
+the previews of a batch and an archive start, and what was measured?
+
+**Answer.** `inflateStream` decodes the same blocks in units: a block's header and codes, a
+literal, a length with its distance, an end of block, a part of a stored block. A unit that
+runs out of input is undone and read again when more comes, so it reads the same bits in the
+same order as `inflateRaw` and reaches every verdict at the same bit; once the end is told,
+running out is `truncated`. Its output goes through a ring of 131,072 bytes whose last 32,768
+are the window. The maker's first pass also takes the bytes after the stream and a palette
+cut short, in `odrg.reader`'s order, and sums only the records whose bytes all came, as
+`loopMs` does. A batch's or an archive's file starts its preview when its bytes are sent, and
+the run still waits for the preview of the file before, so that at most two files are held.
+The converter's test makes the preview of a compressed file whose body inflates to 17.3 MB
+with at most 32,768 bytes of output held, the same bytes as its uncompressed twin's. The
+measurement of the seed's Definition of Done in Chrome against the emulator, with the two
+files of `space-scan-10x.odrg` on the Drive under `odrig archive/seed-79/`, was not made in
+this run; it stays open with the owner's check.
+
+**Resolution.** `converter/lib/inflate.js`, `converter/lib/odrg.js`,
+`converter/lib/thumbnail.js`, `app/www/previews.js`, `app/www/client.js`,
+`converter/tests/inflatestream.test.js`, `tests/app/test_phone_previews.py`.
 
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 

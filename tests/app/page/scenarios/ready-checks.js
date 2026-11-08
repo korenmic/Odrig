@@ -53,7 +53,7 @@ export default async function () {
   bytes.set([79,68,82,71,1,1,60,0,6,0,0,0,255,255,255,255]);
   const file = new File([bytes], "compressed.odrg");
   const prepared = await ready.prepare(file, {width: 60, height: 6});
-  equal("no_inflate_compressed_body", [prepared.previewSafe, [...prepared.bytes]], [false, [...bytes]]);
+  equal("no_inflate_compressed_body", [prepared.previewSafe, [...prepared.bytes]], [true, [...bytes]]);
   let bodyRead = false;
   const wrongCanvas = {name: file.name, size: file.size, slice: (...args) => file.slice(...args), arrayBuffer() {bodyRead=true; throw new Error("body should not be loaded");}};
   try { await ready.prepare(wrongCanvas, {width: 60, height: 60}); throw new Error("accepted wrong canvas"); } catch (error) {

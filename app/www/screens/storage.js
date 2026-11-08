@@ -34,6 +34,8 @@ let made = null;
 let previewTimer = null;
 // The upload under way, or null.
 let sending = null;
+// The making of the preview of a ready-made file the form holds, or null.
+let readyMaking = null;
 // The captured destination and the serialized preflight, before a job owns the transfer.
 let form = null;
 let preparing = false;
@@ -164,7 +166,7 @@ function showMade() {
   if (made.ready) {
     const header = made.header;
     byId("made-facts").textContent = `Ready-made animation, ${header.width} \u00d7 ${header.height}, ${kilobytes(made.bytes.length)} KB. Original bytes, without conversion.`;
-    if (made.previewSafe) previews.makeOwn(made.bytes);
+    readyMaking = previews.makeOwn(made.bytes);
     readyPreview();
     draw(client.state);
     return;
@@ -185,7 +187,8 @@ function readyPreview() {
   if (source !== null) image.src = source;
   byId("ready-preview-note").textContent = source === null
     ? "No preview available yet. The original bytes are kept; the target checks the complete animation before installing."
-    : "Preview from the animation catalog. The original animation bytes are kept.";
+    : previews.inDefaults(made.key) ? "Preview from the animation catalog. The original animation bytes are kept."
+    : "Preview made on this phone. The original animation bytes are kept.";
 }
 
 function forget() {
@@ -194,6 +197,8 @@ function forget() {
   }
   stopPreview();
   made = null;
+  readyMaking?.release();
+  readyMaking = null;
   byId("upload-name").value = "";
   byId("made").hidden = true;
   byId("uploading").hidden = true;
@@ -231,6 +236,8 @@ async function upload(message) {
   byId("upload-made").hidden = true;
   byId("cancel-upload").hidden = false;
   let stopChecking = () => {};
+  // The preview of the bytes is made as they are sent, and kept when they are installed.
+  const making = previews.makeOwn(bytes);
   sending = uploading(
     {id, file, bytes, external, create: true, expect: external ? "00000000" : null},
     {
@@ -248,10 +255,14 @@ async function upload(message) {
         if (how.done) {
           shown.hidden = true;
           message(messages.ofUploaded(external ? how.id : id, file, external));
-          if (!prepared.ready || prepared.previewSafe) previews.makeOwn(bytes);
+          previews.keep(making);
+          client.uploadedTo(external ? "external" : "internal", file, making.key);
+          making.release();
         } else if (how.cancelled) {
+          making.release();
           shown.textContent = "Cancelled.";
         } else {
+          making.release();
           shown.hidden = true;
           const error = how.error;
           if (error instanceof Refusal || error instanceof Failure) message(destinations.refusalWords(error, external, bytes.length, client.state));
