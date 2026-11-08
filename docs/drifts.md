@@ -12846,3 +12846,37 @@ part B. Replacing a file of the destination is not offered: the card's upload ha
 of the content it would replace, so the operator removes it first.
 
 **Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`.
+
+## Seed 74: part B at no core memory
+
+**Question.** The owner asked that part B cost the core no memory. The spec's first sketch
+of part B gave the board's storage names that hold folder paths, items of `show.json` that
+name such paths, and reads of 1,536 bytes. A path kept for each file between refreshes needs
+101 bytes the arena does not have, and 1,536 bytes do not fit a reply. How is part B built
+at no memory, and what changes with it?
+
+**Answer.** Each file of the board's storage keeps a stored name of 36 characters at most,
+its base name or `<n>/<base>` in the numbered LittleFS directory `/odrig/<n>/`, in the 48
+bytes of `FileInfo`: `total_ms` saturates at 32 bits, as the card's lengths do, and
+`checked` and `type` take 2 bits each. The folders' paths are in one file, `folders.txt`,
+read on demand into the stack. `Core` gains one byte inside its end padding, which is 6
+bytes on the test host on this branch and on the branch that fuses the seeds not yet
+merged, so every figure of the memory table stays as it is. With it these were decided and
+told to the owner. `read <id> <offset> <count>` reads 720 bytes at most: a reply holds 1,024
+bytes, and around the data it has 41 bytes with a size of 10 digits, which leaves 983
+base64url characters, 737 bytes; 744 would fit only with a size of one digit, and 720 leaves
+23 bytes of the reply to spare. Requirement 6.1's 1,536 becomes 720. `show.json` stores the
+stored name `<n>/<base>`, not the path the operator sees, which refines requirement 4.1's
+item that "may name a path". An internal folder's Ignore goes through the existing form
+`ignore <id> 0|1` with the folder's id, and is kept in `folders.txt`. `fwtool` refuses an
+install that would remove the files of folders, with `folders-present`, unless it is given
+`--replace-folders`. An APK older than part B refuses a `list` with an internal folder, so
+the new APK ships with or before the firmware that makes internal folders. The tasks are
+done in the order 5, 7, 6, 8, since task 6 moves folders between the storages and needs task
+7's folders. The first sketch of part B in the design is replaced. Two points of task 6 need
+the owner and are not decided here: whether moved folders go last, against the catalog's
+order of sub-folders by their names, and a job of the app in place of the folder job if that
+proves too large.
+
+**Resolution.** `docs/specs/74-p2-phone-storage-explorer-and-backups/requirements.md`,
+`design.md` and `tasks.md`.
