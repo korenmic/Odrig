@@ -1,7 +1,7 @@
 // A zip archive read in the page: its central directory, and each entry stored or deflated,
-// the deflated ones through the converter's inflate. Nothing of it leaves the page.
+// the deflated ones inflated as the conversion inflates. Nothing of it leaves the page.
 
-import {inflate} from "./converter/index.js";
+import {inflated} from "./convert.js";
 import {crc32} from "./crc32.js";
 
 // The most entries read, and the most bytes they unpack to.
@@ -98,7 +98,7 @@ export function extract(bytes, entry) {
     data = packed;
   } else {
     try {
-      data = inflate.inflateRaw(packed).data;
+      data = inflated(packed);
     } catch (error) {
       throw new Error(`The entry is damaged: ${error.message}.`);
     }
