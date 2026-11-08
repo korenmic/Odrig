@@ -850,7 +850,8 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         return save ? repeats_save(core, id, loops, now, reply) : repeats_restore(core, id, now, reply);
     }
     if (words.is(0, "upload")) {
-        if (core.mapping_test || (catalog_rebuilding(core) && words.count >= 2 && words.is(1, "begin"))) return refuse(reply, "busy");
+        // An upload already open goes on under a test; a new one waits for its end.
+        if (words.count >= 2 && words.is(1, "begin") && (core.mapping_test || catalog_rebuilding(core))) return refuse(reply, "busy");
         return upload(core, now, words, reply);
     }
     return refuse(reply, "unknown-command");

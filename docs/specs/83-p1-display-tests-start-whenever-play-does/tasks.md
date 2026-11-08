@@ -3,7 +3,7 @@
 Each task is one proof commit with only its own checkbox ticked. A test for a fault is
 seen failing first.
 
-- [ ] 1. Let the tests start whenever play does, and an open upload end under them
+- [x] 1. Let the tests start whenever play does, and an open upload end under them
   - `mapping_control.cpp`: the test's gate on the check and the upload gone, `mapping
     set`'s gate on the check gone; `commands.cpp`: a test refuses `upload begin` alone;
     `player.cpp`: `player_item_added` waits for the test's end.
