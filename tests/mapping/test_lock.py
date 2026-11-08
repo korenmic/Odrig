@@ -52,6 +52,18 @@ class MappingLock(unittest.TestCase):
             port = unused.getsockname()[1]
         self.assertEqual(browser.run('mapping-lock', address=f'127.0.0.1:{port}', settings=dict(mode='checkbox', noBoard=True)).seen, want)
 
+    def test_each_pin_is_a_typed_field_that_moves_its_pin_as_a_drag_does(self):
+        target = self.opened()
+        seen = browser.run('mapping-lock', address=f'127.0.0.1:{target.port}', settings=dict(mode='typed')).seen
+        entered = [PINS[4], *PINS[:4], *PINS[5:]]
+        left = [PINS[0], PINS[1], PINS[4], PINS[2], PINS[3], *PINS[5:]]
+        which = "Type the number of a GPIO."
+        self.assertEqual(seen, dict(fields=20, numeric=True, labelled=True, values=PINS, lockedDisabled=True, entered=entered, left=left, escaped=True,
+                                    refused=[['abc', True, which, False], ['2.5', True, which, False], ['-3', True, which, False], ['', True, which, False],
+                                             ['99', True, "GPIO 99 is not one of the installation's twenty pins.", False]],
+                                    sameNothing=True, draftKept=True, hiddenDropped=True, final=left))
+        self.assertEqual(json.loads(target.command('mapping get'))['pins'], left)
+
     def test_default_lock_blocks_accidental_edits_and_photo_save_handler(self):
         target = self.opened(PINS[::-1])
         seen = browser.run('mapping-lock-default', address=f'127.0.0.1:{target.port}').seen

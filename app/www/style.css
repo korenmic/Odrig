@@ -1012,6 +1012,14 @@ label.button {
   cursor: grab;
 }
 
+.map-pin .pin-field {
+  width: 4.5em;
+  min-height: 40px;
+  margin: 0 0 0 4px;
+  padding: 4px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
 .map-pin.lifted {
   position: fixed;
   z-index: 5;

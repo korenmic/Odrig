@@ -8,7 +8,7 @@ seen failing first.
     helpers that read `aria-pressed` changed after.
   - Requirements: 1.1–1.5.
 
-- [ ] 2. Make each pin a typed field
+- [x] 2. Make each pin a typed field
   - `mapping.js`'s fields, their commit, Escape, drafts and refusals; the scenario `typed`
     seen failing first; the scenario that reads the pins' words changed after.
   - Requirements: 2.1–2.8.

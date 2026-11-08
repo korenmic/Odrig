@@ -136,7 +136,65 @@ async function checkbox(app) {
   return seen;
 }
 
+async function typed(app) {
+  await shown(app, 2);
+  const mapping = await settings(app);
+  await app.until(() => app.doc.querySelectorAll('#mapping-pins > .map-pin').length === 20 && mapping.mapping() !== null, 'mapping ready');
+  const view = app.frame.contentWindow;
+  const field = (snake) => app.doc.querySelectorAll('#mapping-pins .pin-field')[snake - 1] ?? null;
+  const pins = () => [...mapping.mapping().pins];
+  const type = (snake, text) => {
+    const box = field(snake);
+    box.focus();
+    box.value = text;
+    box.dispatchEvent(new view.Event('input', {bubbles: true}));
+    return box;
+  };
+  const key = (box, name) => box.dispatchEvent(new view.KeyboardEvent('keydown', {key: name, bubbles: true, cancelable: true}));
+  const seen = {fields: app.doc.querySelectorAll('#mapping-pins .pin-field').length};
+  if (seen.fields !== 20) return seen;
+  seen.numeric = field(1).inputMode === 'numeric' && field(1).type === 'text';
+  seen.labelled = field(1).getAttribute('aria-label') === 'GPIO of snake 1' && field(1).closest('label')?.textContent.trim() === 'GPIO';
+  seen.values = [...app.doc.querySelectorAll('#mapping-pins .pin-field')].map((box) => Number(box.value));
+  seen.lockedDisabled = field(1).disabled;
+  await unlockMapping(app);
+  await app.until(() => !field(1).disabled, 'the fields enabled');
+  const start = pins();
+  key(type(1, String(start[4])), 'Enter');
+  await app.until(() => !mapping.saving() && pins()[0] === start[4] && mapping.canEdit(), 'the typed pin saved');
+  seen.entered = pins();
+  const now = pins();
+  const left = type(3, String(now[0]));
+  left.dispatchEvent(new view.Event('change', {bubbles: true}));
+  await app.until(() => !mapping.saving() && pins()[2] === now[0] && mapping.canEdit(), 'the pin saved on leaving the field');
+  seen.left = pins();
+  const before = pins();
+  const escaped = type(2, '7');
+  key(escaped, 'Escape');
+  seen.escaped = field(2).value === String(before[1]);
+  seen.refused = [];
+  for (const text of ['abc', '2.5', '-3', '', '99']) {
+    key(type(4, text), 'Enter');
+    await app.sleep(150);
+    seen.refused.push([text, field(4).value === String(before[3]), app.raw('mapping-error'), mapping.saving()]);
+  }
+  key(type(4, String(before[3])), 'Enter');
+  await app.sleep(150);
+  seen.sameNothing = !mapping.saving() && pins().join() === before.join();
+  type(6, '1');
+  await app.sleep(2600);
+  seen.draftKept = field(6).value === '1' && app.doc.activeElement === field(6);
+  Object.defineProperty(app.doc, 'hidden', {configurable: true, value: true});
+  app.doc.dispatchEvent(new view.Event('visibilitychange'));
+  Object.defineProperty(app.doc, 'hidden', {configurable: true, value: false});
+  app.doc.dispatchEvent(new view.Event('visibilitychange'));
+  seen.hiddenDropped = field(6).value === String(before[5]);
+  seen.final = pins();
+  return seen;
+}
+
 export default async function(app) {
+  if (app.settings.mode === 'typed') return typed(app);
   if (app.settings.mode === 'checkbox') return checkbox(app);
   if (app.settings.mode === 'kept') return kept(app);
   if (app.settings.mode === 'noboard') return noBoard(app);

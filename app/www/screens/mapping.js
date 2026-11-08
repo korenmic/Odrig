@@ -102,6 +102,7 @@ function closePrompt() {
 // out, the saving. The lock's value stays.
 function dropEdits() {
   editEpoch += 1;
+  dropDrafts();
   if (live !== null) {
     live.wanted = null;
     if (!live.sending) live = null;
@@ -156,11 +157,46 @@ function card(pin, snake) {
   handle.className = "handle";
   handle.textContent = "\u2261";
   handle.setAttribute("aria-label", `Move GPIO ${pin}, now driving snake ${snake}; the arrow keys move it one place`);
-  const words = document.createElement("span");
+  // The pin is a field too: a number typed into it moves that pin to this snake.
+  const words = document.createElement("label");
   words.className = "words";
-  words.textContent = `GPIO ${pin}`;
+  const field = document.createElement("input");
+  field.className = "pin-field";
+  field.type = "text";
+  field.inputMode = "numeric";
+  field.autocomplete = "off";
+  field.value = String(pin);
+  field.dataset.pin = String(pin);
+  field.setAttribute("aria-label", `GPIO of snake ${snake}`);
+  words.append("GPIO ", field);
   item.append(handle, words);
   return item;
+}
+
+// Commits what a pin's field holds: a number that names one of the twenty pins moves that
+// pin to the field's snake, as a drag there does. Anything else writes nothing and says why;
+// the field shows its confirmed pin again either way.
+function commitTyped(field) {
+  const fields = [...byId("mapping-rows").querySelectorAll(".pin-field")];
+  const snake = fields.indexOf(field);
+  const confirmed = field.dataset.pin;
+  const text = field.value.trim();
+  field.value = confirmed;
+  if (snake < 0 || text === confirmed || locked() || live !== null) return;
+  if (!/^[0-9]{1,3}$/.test(text)) {
+    problem = "Type the number of a GPIO.";
+  } else if (!shownPins().includes(Number(text))) {
+    problem = `GPIO ${Number(text)} is not one of the installation's twenty pins.`;
+  } else {
+    problem = "";
+    moveTo(Number(text), snake);
+  }
+  draw();
+}
+
+// Puts every pin's field back to its confirmed pin: a typed draft is not kept.
+function dropDrafts() {
+  for (const field of document.querySelectorAll("#mapping-rows .pin-field")) field.value = field.dataset.pin;
 }
 
 function rows() {
@@ -175,6 +211,9 @@ function rows() {
   const pins = shownPins();
   const key = pins.join(",");
   if (column.dataset.key !== key) {
+    // A field that had the focus has it again, with its new confirmed pin.
+    const typing = document.activeElement instanceof Element && document.activeElement.classList.contains("pin-field") && column.contains(document.activeElement) ?
+      [...column.querySelectorAll(".pin-field")].indexOf(document.activeElement) : -1;
     column.dataset.key = key;
     const snakes = document.createElement("ol");
     snakes.className = "map-snakes";
@@ -191,12 +230,14 @@ function rows() {
     if (focused !== null) {
       column.querySelector(`.map-pin[data-pin="${focused}"] .handle`)?.focus();
     }
+    if (typing >= 0) column.querySelectorAll(".pin-field")[typing]?.focus();
   }
   // While moves are saved after a pin is let go no pin can be taken, but the handles stay
   // enabled: a disabled one would lose the focus.
   column.dataset.locked = String(locked() || (live !== null && press === null));
   const off = permissionLocked() || !fresh || !editable();
   for (const handle of column.querySelectorAll(".handle")) setDisabled(handle, off);
+  for (const field of column.querySelectorAll(".pin-field")) setDisabled(field, off);
 }
 
 // What the lock's line says: its value, why edits wait while it is unlocked, and when the
@@ -540,6 +581,8 @@ export function start() {
   ready = true;
   const column = byId("mapping-rows");
   column.addEventListener("pointerdown", (event) => {
+    // A press on a pin's field types into it: it takes no pin.
+    if (event.target instanceof Element && event.target.closest(".pin-field") !== null) return;
     const item = event.target instanceof Element ? event.target.closest("#mapping-pins > .map-pin") : null;
     if (item === null || press !== null || locked() || live !== null || (event.pointerType === "mouse" && event.button !== 0)) return;
     note = "";
@@ -607,6 +650,23 @@ export function start() {
     const at = shownPins().indexOf(pin);
     focused = pin;
     moveTo(pin, at + (event.key === "ArrowUp" ? -1 : 1));
+  });
+  // A pin's field commits on Enter and when it is left; Escape puts its pin back.
+  column.addEventListener("keydown", (event) => {
+    const field = event.target instanceof Element ? event.target.closest(".pin-field") : null;
+    if (field === null) return;
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitTyped(field);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      field.value = field.dataset.pin;
+    }
+  });
+  column.addEventListener("change", (event) => {
+    const field = event.target instanceof Element ? event.target.closest(".pin-field") : null;
+    if (field !== null) commitTyped(field);
   });
   column.addEventListener("focusout", () => {
     setTimeout(() => {
