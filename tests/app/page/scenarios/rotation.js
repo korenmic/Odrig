@@ -25,7 +25,7 @@ export default async function(app) {
     if (act.screen) app.press(act.screen);
     if (act.reload) { await app.reload(); await shown(app, app.settings.rows ?? 2); app.press('Settings'); }
     if (act.target) {
-      app.press('Target'); app.fill('address', act.target); app.press('Use');
+      app.press('Target'); app.fill('address', act.target); app.press('Connect over Wi-Fi');
       seen.changed = look(app);
       await shown(app, 2); app.press('Settings');
     }
