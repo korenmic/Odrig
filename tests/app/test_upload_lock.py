@@ -1,6 +1,8 @@
 """The Upload screen's destination line speaks of the destination only, and its button
 says why it is disabled."""
 
+import base64
+import json
 import pathlib
 import tempfile
 import time
@@ -85,6 +87,22 @@ class TheUploadScreen(unittest.TestCase):
         found = self.run_flow(replies, "deletion")
         deleting, after = found["deleting"], found["after"]
         self.assertEqual((deleting["enabled"], deleting["lock"]), (False, "A deletion is under way on Animations."))
+        self.assertEqual((after["enabled"], after["lock"]), (True, None))
+
+    def test_a_download_on_animations_is_named_under_the_button(self):
+        data = bytes(range(256)) * 4 + bytes(114)
+
+        def slow_read(line):
+            words = line.split(b" ")
+            offset, count = int(words[2]), int(words[3]) if len(words) > 3 else 600
+            time.sleep(1.5)
+            piece = base64.urlsafe_b64encode(data[offset:offset + count]).rstrip(b"=").decode("ascii")
+            return (200, json.dumps({"ok": True, "bytes": len(data), "data": piece}, separators=(",", ":")) + "\n")
+
+        replies = dict(target(begin=begun, data=taken), read=slow_read)
+        found = self.run_flow(replies, "download")
+        downloading, after = found["downloading"], found["after"]
+        self.assertEqual((downloading["enabled"], downloading["lock"]), (False, "A download is under way on Animations."))
         self.assertEqual((after["enabled"], after["lock"]), (True, None))
 
     def test_the_preflight_is_named_while_the_installation_is_slow_to_tell_its_space(self):

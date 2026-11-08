@@ -330,6 +330,23 @@ class Playing(unittest.TestCase):
         status = replies(again)[0]
         self.assertEqual((status["playing"], status["animation"], status["playlist"]), (6, 12, "shows/night"))
 
+    def test_a_boot_that_cannot_read_the_folders_plays_the_root_and_keeps_the_chosen_folder_for_the_next(self):
+        with a_drive({}) as top, support.installed(foldered()) as folder:
+            support.session(folder, asked(0, "play 6") + asked(20), ["--drive", top])
+            playlist = pathlib.Path(folder, "playlist.txt")
+            folders = pathlib.Path(folder, "folders.txt")
+            sound = folders.read_bytes()
+            folders.write_bytes(sound.replace(b"3 6 0 shows/night", b"3 6 0 night/shows"))
+            damaged = support.session(folder, asked(20, "status") + asked(40) + asked(60) + asked(1_000_000), ["--drive", top])
+            kept = playlist.read_text(encoding="ascii").splitlines()[:2]
+            folders.write_bytes(sound)
+            again = support.session(folder, asked(20, "status"), ["--drive", top])
+        self.assertIn("folders unreadable", logged(damaged))
+        self.assertEqual(replies(damaged)[0]["playing"], "all")
+        self.assertEqual(kept, ["odrig-playlist 1", ":shows/night"])
+        status = replies(again)[0]
+        self.assertEqual((status["playing"], status["animation"], status["playlist"]), (6, 12, "shows/night"))
+
     def test_the_rotation_goes_root_then_the_internal_folders_by_rank_then_the_root(self):
         times = (WINDOW + 20_000, 2 * WINDOW + 20_000, 3 * WINDOW + 20_000, 4 * WINDOW + 20_000)
         with a_drive({}) as top:

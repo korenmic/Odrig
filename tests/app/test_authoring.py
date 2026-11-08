@@ -185,6 +185,36 @@ class TheLineWhileTheInstallationChecks(unittest.TestCase):
         self.assertTrue(found["lineHidden"])
 
 
+class SavingWhileTheNamesAreRead(unittest.TestCase):
+    def test_an_edited_clock_is_saved_while_the_roots_names_are_read_again(self):
+        clock = encoded({**CLOCK, "width": 60, "height": 6})
+        item = {"id": 7, "file": "clock-analog.odrgx", "bytes": len(clock), "ignored": False, "external": False, "type": "widget"}
+        listed = (200, json.dumps({"ok": True, "items": [item], "next": None}, separators=(",", ":")) + "\n")
+        answered = [True]
+
+        def listing(line):
+            return listed if answered[0] else (200, '{"ok":false,"error":"busy"}\n')
+
+        def read(line):
+            words = line.split(b" ")
+            offset = int(words[2])
+            count = int(words[3]) if len(words) > 3 else 600
+            data = base64.urlsafe_b64encode(clock[offset:offset + count]).rstrip(b"=").decode("ascii")
+            return (200, json.dumps({"ok": True, "bytes": len(clock), "data": data}, separators=(",", ":")) + "\n")
+
+        def busy_from_now():
+            answered[0] = False
+
+        target = {**stand_in_of(60, 6, begin=begun, data=taken), "list": listing, "read": read}
+        with support.StandIn(target) as stand_in:
+            found = support.run("author-edit", address=stand_in.address, settings={"rows": 1, "edit": 7, "fields": [["clock-seconds", "20"]], "beginAgain": True},
+                                steps=[busy_from_now]).seen
+            sent = [line for _, line in stand_in.lines if line.startswith(b"upload begin")]
+        self.assertIsNone(found["namesWhileSaving"])
+        self.assertEqual(found["message"], "Saved animation 7 clock-analog.odrgx.")
+        self.assertEqual([line.split(b" ")[2:4] for line in sent], [[b"7", b"clock-analog.odrgx"]])
+
+
 class EditingAnInstalledOne(unittest.TestCase):
     """A show on the two-leg mapping, 60 x 6: frames, a text the playlist ignores, frames, a
     clock."""

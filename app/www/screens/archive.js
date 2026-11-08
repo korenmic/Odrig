@@ -57,7 +57,7 @@ function why(row) {
   if (part.length > 32 || !/^[a-z0-9_-][a-z0-9._-]*\.(odrg|odrgx)$/.test(part)) {
     return "Use a filename of at most 32 lowercase letters, digits, dots, - or _, ending in .odrg or .odrgx.";
   }
-  if (storage() === "internal" && name.includes("/")) return "The board's storage has no folders: use a name without /.";
+  if (storage() === "internal" && name.includes("/")) return "An archive's files go to the root of the board's storage: use a name without /.";
   if (new TextEncoder().encode(name).length > LONGEST_PATH) return "The path on the card is longer than 100 bytes; use a shorter name.";
   if (name.split("/").length - 1 > DEEPEST) return "The card takes at most three folders in a path.";
   const twice = archive.rows.some((other) => other !== row && other.ticked && other.name === name);

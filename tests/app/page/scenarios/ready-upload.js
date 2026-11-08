@@ -49,6 +49,7 @@ export default async function (app) {
     seen.afterNavigation = app.text("upload-destination");
   }
   if (settings.send === false) return seen;
+  if (settings.stepBeforeSend === true) await app.step();
   app.press("Upload to the installation");
   await app.until(() => app.text("message-text") !== null, "upload acknowledgement", settings.timeout ?? 30000);
   seen.message = app.text("message-text");

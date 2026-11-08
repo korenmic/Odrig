@@ -135,10 +135,12 @@ async function ready() {
 }
 
 // Whether the destination still holds: the card there and writable, its catalog ready, and
-// the browsed folder the same. The reason when it does not, else null.
+// the browsed folder the same, of either storage. The reason when it does not, else null.
 function gone(fresh) {
   const form = run.form;
-  if (form.storage !== "external") return null;
+  if (form.storage !== "external") {
+    return destinations.folderOf(form) !== "" && form.level.id !== null && !fresh.folderValid ? "The explored folder changed or disappeared." : null;
+  }
   if (!destinations.present(fresh.space) || fresh.space.external.read_only !== false) return "External storage is absent or read-only. Check the displayed destination before retrying.";
   const catalog = fresh.catalog?.external;
   if (catalog != null && (catalog.state !== "ok" || catalog.writable !== true)) return "External storage needs a ready writable catalog before uploading.";
@@ -238,7 +240,7 @@ async function turn(item, guarded) {
     }
     let fresh;
     try {
-      fresh = await client.uploadSnapshot(external ? form.level : {path: "", id: null});
+      fresh = await client.uploadSnapshot(destinations.snapshotLevel(form));
     } catch (error) {
       if (error instanceof Refusal && error.code === "busy") {
         if (await busy()) continue;
@@ -318,6 +320,11 @@ async function turn(item, guarded) {
     if (error instanceof Refusal && error.code === "no-space" && !external && typeof fresh.space?.free === "number" && fits(item.size, fresh.space.free)) {
       fail(item, ROOM);
       return null;
+    }
+    // A folder of the board's own storage gone since the check: the run ends with the file.
+    if (error instanceof Refusal && error.code === "unknown-id" && !external && !how.begun && destinations.folderOf(form) !== "") {
+      fail(item, destinations.refusalWords(error, external, item.size, client.state));
+      return "end";
     }
     fail(item, destinations.refusalWords(error, external, item.size, client.state));
     return null;

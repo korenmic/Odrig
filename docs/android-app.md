@@ -876,7 +876,9 @@ time: `The installation has not answered yet.` or `The installation does not ans
 with the failure's sentence and its kind, as the target screen words it; `Checking the
 destination with the installation.` while the press is being checked; `An upload is under
 way.` while this screen, a text or a clock sends; `A deletion is under way on Animations.`
-while the selection deletes. The sentence about the card, `External storage is
+while the selection deletes; `A download is under way on Animations.` while files are read
+back to be saved; `A move is under way on Animations.` while files are moved. The sentence
+about the card, `External storage is
 disconnected or not detected. Using Internal /.`, waits for a reply of `space` that names
 no card: until the first reply the destination line says `Storage not known yet: the
 installation has not answered.` and the form keeps its storage, Internal chosen and

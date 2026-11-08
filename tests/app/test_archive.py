@@ -133,6 +133,10 @@ class Reading(unittest.TestCase):
         self.assertEqual(found["none"]["button"], {"disabled": True, "reason": "Tick the animations to upload."})
         self.assertEqual(found["all"], [True, True, False, False, True, False, False, False, True])
 
+    def test_a_name_with_a_folder_is_refused_for_the_boards_storage_whose_root_takes_the_archive(self):
+        found = self.opened(renames=[[0, "clips/a.odrg"]])
+        self.assertEqual(found["renamed"]["rows"][0], "An archive's files go to the root of the board's storage: use a name without /.")
+
     def test_a_name_that_is_there_waits_for_replace(self):
         found = self.opened(renames=[[4, "short-name.odrg"]])
         self.assertEqual(found["renamed"]["button"], {"disabled": True, "reason": "Tick Replace beside a name that is there, or rename the file."})

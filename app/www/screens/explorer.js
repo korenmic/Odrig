@@ -309,7 +309,7 @@ async function runMove() {
   const moved = [];
   const failed = [];
   let unstarted = 0;
-  client.setContentBusy(true);
+  client.setContentBusy("move");
   drawPlan();
   byId("move-stop").hidden = false;
   const context = {
@@ -358,7 +358,7 @@ async function reconcile(state) {
   reconciledFor = address;
   if (moves.pending(address).length === 0) return;
   running = {stop: false};
-  client.setContentBusy(true);
+  client.setContentBusy("move");
   try {
     const {finished, notMoved} = await moves.reconcile({client, address, report: () => {}, stopped: () => false});
     const words = [];
