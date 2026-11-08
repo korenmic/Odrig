@@ -535,7 +535,7 @@ character boundary, so expanded status remains within the fixed reply limit.
 | `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
-| `busy` | `repeat <id> <n> save`, `repeat <id> default` and the four lines of `clocks` until the player has read every installed animation after a start, while an upload is open and while a rebuild runs; `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read. |
+| `busy` | `repeat <id> <n> save`, `repeat <id> default` and the four lines of `clocks` until the player has read every installed animation after a start, while an upload is open and while a rebuild runs; `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `mapping set` while an upload is open; `upload begin`, `ignore`, `remove` and `remove many` while a test of the mapping shows; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read. |
 | `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation or a folder of a USB drive or the card; `repeat <id> <n> save` or `repeat <id> default` names one of nothing `list` lists; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. A folder's id is unknown while the card is out. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
 | `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file. |
@@ -590,17 +590,23 @@ mapping is durably committed and ready for output routing. An identical assignme
 performs no storage writes. Re-read after any uncertain reply.
 
 A stale revision gives `mapping-conflict`; malformed or unsupported assignments give
-`bad-argument`. Invalid shows give `show-invalid`; startup checking or an open upload
-makes writes `busy`; failed or unavailable writable storage gives `storage-error`.
+`bad-argument`. Invalid shows give `show-invalid`; an open upload makes writes `busy`,
+while the check after a start does not; failed or unavailable writable storage gives
+`storage-error`.
 
 The retired cross-wiring operation is not supported; its forms return `bad-argument` without changing the mapping.
 
 `mapping test on` displays the built-in diagonal until `mapping test off` or a valid
 ordinary play command. Both test commands are idempotent. Entry requires the valid
-60 x 60 target mapping and a completed startup check with no open upload. During the
-test status reports no ordinary playing item or animation; `mapping get` identifies
-the active test. Upload and remove return `busy`, but mapping saves, list, space,
-status, power and brightness remain available. The test changes no show entry.
+60 x 60 target mapping, and is taken whenever play is: while the check after a start
+goes on, and while an upload is open. During the test status reports no ordinary
+playing item or animation, and the check after a start, the card's check and the
+loading of its catalog go on; `mapping get` identifies the active test. `upload begin`,
+`ignore`, `remove`, `remove many` and `catalog rebuild` return `busy`, but mapping saves,
+list, space, status, power and brightness remain available. An upload that was open
+when the test started goes on: its `upload data`, `upload expect`, `upload end` and
+`upload cancel` are taken, and an `upload end` that succeeds changes the show, while
+nothing plays until the test ends. The test changes no show entry.
 
 `mapping test snake <n>` shows the test of snake n, n from 1 to 20, until
 `mapping test off` or a valid ordinary play command: one white block of 3 x 3 pixels that

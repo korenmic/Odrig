@@ -1186,7 +1186,8 @@ void player_file_replaced(Core &core, uint32_t item) {
 
 void player_item_added(Core &core) {
     if (core.clocks_on == kClocksOnly) { core.only_dirty = 1; return; }
-    if (core.playing == kNothing) {
+    // Under a test nothing plays: its end plays the playlist.
+    if (core.playing == kNothing && !core.mapping_test) {
         const uint32_t first = player_first_in_playlist(core);
         if (first != kNothing) player_play_all(core, first);
     }
