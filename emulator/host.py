@@ -416,6 +416,20 @@ class FolderHost:
             return -1
         return 1
 
+    def make_folder(self, name):
+        """Makes a folder of the drive, `drive/<path>`, whose parent is there: 1 when the
+        folder is there afterwards, -1 on a failure and when a file has that name."""
+        path = self._path(name) if self._of_the_drive(name) else None
+        if path is None:
+            return -1
+        try:
+            os.mkdir(path)
+        except FileExistsError:
+            pass
+        except OSError:
+            return -1
+        return 1 if os.path.isdir(path) else -1
+
     def remove(self, name):
         """Removes a file: 1 when it removed one, 0 when there was none, -1 on a failure. A
         file being written under the name is given up."""

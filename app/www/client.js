@@ -1245,6 +1245,11 @@ export function removeMany(ids) {
   return requestOperation("remove", () => commands.removeMany(ids));
 }
 
+// Sends one request of a job of the app, such as a move, in its turn among the operator's.
+export function operation(kind, carry) {
+  return requestOperation(kind, carry);
+}
+
 // The catalogs of the target, the rebuild of one of them and its cancel.
 export function catalog() {
   // A question that waited its turn behind the answer that the installation keeps no

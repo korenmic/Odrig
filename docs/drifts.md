@@ -13238,3 +13238,58 @@ they can be sent, and a name the destination's list has needs `Replace` or anoth
 
 **Resolution.** `app/www/screens/archive.js`, `app/www/zip.js`, `app/www/batch.js`,
 `tests/app/test_archive.py`.
+
+## Seed 74: how a folder of the card is made
+
+**Question.** Does `folder make` make the folders of a path that are missing, how long may
+a folder's path be, and where does the new folder stand?
+
+**Answer.** One level at a time: the parent is the root or a folder of the index, as an
+upload's folder is, and a client makes `clocks` before `clocks/message`. The path leaves room
+for a file, `<path>/a.odrg` being a name the catalog takes, and its last name does not end in
+`.odrg` or `.odrgx`, which the card would list as a file. The folder takes its place among its
+parent's sub-folders by the bytes of their names, the order a rebuild gives, and the lowest
+free id. A name the parent has in another case is `in-use`, since FAT tells no case apart. A
+folder the index has already answers `made:false`, so that a resent line after a lost reply
+changes nothing.
+
+**Resolution.** `core/src/catalog.cpp`, `core/src/commands.cpp`, `docs/commands.md`.
+
+## Seed 74: an empty folder removed from the card
+
+**Question.** What happens when an operator removes an empty folder of the index from the
+card on a computer, and then uploads into it?
+
+**Answer.** Before an upload into a folder the core asks the host to make each folder of its
+path, which is nothing for one that is there; a missing one is made again, so that the
+commit's `move upload.part` finds its folder and no commit record is left behind. A rebuild
+lists files only, so it keeps no empty folder; that is said where the rebuild is described.
+
+**Resolution.** `core/src/upload.cpp`, `docs/core.md`, `docs/commands.md`.
+
+## Seed 74: how the app reads the settings it carries in a move
+
+**Question.** The app gives a moved file the saved brightness and repeat of the old one, but
+`list` does not report them; how does it read them, and how does it know the show's start?
+
+**Answer.** With `saved <id>`, which reports both and whether the animation is the show's
+`start` item, under the owner's approval of 2026-11-06. It is refused `busy` as `repeat <id>
+default` is, since the saved repeats are read from the board's file then. A move of the start
+item is refused before anything is sent, as the seed asks.
+
+**Resolution.** `core/src/repeats.cpp`, `core/src/commands.cpp`, `docs/commands.md`.
+
+## Seed 74: moves made by the app
+
+**Question.** Does the board move a file between the storages by itself, or does the app?
+
+**Answer.** The app, with the commands the board has: `read`, the guarded upload, `ignore`,
+`brightness`, `repeat`, `saved` and `remove`, one file at a time, as a job the phone keeps
+until it is done. The seed asks to reuse the commands where they suffice, and they do for a
+file: nothing is removed before the new file is installed and its settings given, and an
+interrupted job is finished or ended from what the target lists. The new file gets a new id
+in its storage. Moves of folders and renaming moves inside the card are the board's, in
+part B. Replacing a file of the destination is not offered: the card's upload has no guard
+of the content it would replace, so the operator removes it first.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`.
