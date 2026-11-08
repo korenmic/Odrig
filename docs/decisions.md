@@ -903,3 +903,15 @@ the app is not changed.
   stays as it is. `status` names in its host text the external memory the board found
   and the internal memory free when the core started, which the app shows unchanged. No
   new command; no APK; nothing of the wiring, the power or the LEDs is touched.
+
+### Seed 83: the display tests start whenever play does
+
+The owner ruled on 2026-11-07, after the board answered `busy` to the diagonal and the
+snake tests while it read its animations after a start over USB serial, and played
+ordinary animations at the same time: "If there is no slowdown in deciding to play
+non-test animations, there is no reason why there should be a slowdown in selecting test
+animations." The tests are therefore taken whenever play is: while the check after a start
+goes on, and while an upload is open, which goes on under the test to its end. `mapping
+set` no longer waits for the check after a start and still waits for an open upload. A
+test still refuses `upload begin`, `ignore`, `remove`, `remove many` and `catalog
+rebuild`. No command, reply or error code changes.

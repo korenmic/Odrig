@@ -1147,6 +1147,11 @@ existing pixel memory. Poll uses the normal palette, brightness and LED mapping
 on that picture while ordinary show progression is paused. Exit restarts the
 saved animation; cycles retain the current entry as their first resumed turn.
 The mode is transient and no show file changes. There is no runtime allocation.
+Entry waits neither for the check after a start nor for an open upload: the diagonal
+is decoded through playback's own file and decoder and a snake is drawn, while both
+checks use the checker's. An open upload goes on under the test; an item it adds or a
+file it replaces changes the show, and `player_item_added` plays nothing until the
+test's end, which plays the saved selection, else the playlist's first animation.
 
 The test of a snake is drawn, not decoded, as a clock is: at each refresh the core clears
 the pixel buffer, three bytes a pixel and no palette, and lights a white block of 3 x 3
