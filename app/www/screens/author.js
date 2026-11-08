@@ -322,6 +322,8 @@ function upload(message) {
   shown.textContent = "Sending: 0%";
   byId("author-upload").hidden = true;
   byId("author-cancel").hidden = false;
+  // The preview of the bytes is made as they are sent, and kept when they are installed.
+  const making = previews.makeOwn(bytes);
   sending = uploading(
     {id, file, bytes, expect: saving === null ? null : saving.crc},
     {
@@ -337,12 +339,17 @@ function upload(message) {
           // What is on the target now is what was saved.
           saving.crc = crc32(bytes);
           message(messages.ofSaved(id, file));
-          previews.makeOwn(bytes);
+          previews.keep(making);
+          client.uploadedTo("internal", file, making.key);
+          making.release();
         } else if (how.done) {
           shown.hidden = true;
           message(messages.ofUploaded(id, file));
-          previews.makeOwn(bytes);
+          previews.keep(making);
+          client.uploadedTo("internal", file, making.key);
+          making.release();
         } else if (how.cancelled) {
+          making.release();
           shown.textContent = "Cancelled.";
         } else {
           shown.hidden = true;

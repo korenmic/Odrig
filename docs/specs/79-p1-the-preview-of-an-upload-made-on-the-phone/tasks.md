@@ -8,7 +8,7 @@ seen failing first.
     failing first, the count of steps changed after.
   - Requirements: 4.1–4.4.
 
-- [ ] 2. Make the preview as the upload starts, and keep its place
+- [x] 2. Make the preview as the upload starts, and keep its place
   - `previews.js`'s queue, store `uploads` and places; `client.js`'s order; the uploads of
     every form and the batch; `previewSafe`; the form's note; the app's tests seen failing
     first.

@@ -94,7 +94,7 @@ let pageWait = null;
 // Where the keys of the catalogs are kept between two starts of the app, the address they are
 // kept under, and whether those of earlier starts have been taken: no page of a catalog is
 // asked before.
-let keeper = {kept: () => null, keep: () => {}, forget: () => {}};
+let keeper = {kept: () => null, keep: () => {}, forget: () => {}, placed: () => null, place: () => {}, unplace: () => {}, unlisted: () => {}};
 let keptUnder = null;
 let keptTaken = false;
 // Counts the targets: a reply that belongs to an earlier address is dropped.
@@ -321,7 +321,7 @@ async function recoverLevel(asked, level) {
 async function askListPart() {
   const asked = target;
   const level = state.level;
-  const part = listing === null ? {items: [], from: 0} : listing;
+  const part = listing === null ? {items: [], from: 0, began: performance.now()} : listing;
   listing = null;
   try {
     const reply = await commands.list(part.from, level.id);
@@ -331,8 +331,13 @@ async function askListPart() {
     heard();
     const items = part.items.concat(reply.items);
     if (reply.next !== null) {
-      listing = {items, from: reply.next};
+      listing = {items, from: reply.next, began: part.began};
     } else {
+      // The places this phone uploaded to that the complete list of their folder does not
+      // name are dropped.
+      const files = items.filter((item) => typeof item.file === "string");
+      if (level.id === null) keeper.unlisted(keptUnder, "internal", "", new Set(files.filter((item) => item.external !== true).map((item) => item.file)), part.began);
+      keeper.unlisted(keptUnder, "external", level.path, new Set(files.filter((item) => item.external === true).map((item) => item.file)), part.began);
       state.listVersion += 1;
       state.listBusy = false;
       state.animations = items.filter((item) => typeof item.file === "string");
@@ -627,7 +632,25 @@ export function keyOf(animation) {
   const read = reads.find((one) => one.storage === storage);
   const kept = state.keys[storage];
   const key = (read === undefined ? undefined : read.byName.get(animation.file)) ?? (kept === null ? undefined : kept.byName.get(animation.file));
-  return key !== undefined && key.endsWith(`-${animation.bytes}`) ? key : null;
+  if (key !== undefined && key.endsWith(`-${animation.bytes}`)) {
+    return key;
+  }
+  // Else the key this phone kept for the place it uploaded the file to.
+  const placed = keeper.placed(keptUnder, storage, animation.file);
+  return placed !== null && placed.endsWith(`-${animation.bytes}`) ? placed : null;
+}
+
+// An upload of this phone ended with success: the place keeps the key of its bytes, and the
+// keys an earlier read of the storage gave the name are not taken until a page read after
+// it names it again.
+export function uploadedTo(storage, name, key) {
+  for (const read of reads) {
+    if (read.storage === storage) read.byName.delete(name);
+  }
+  state.keys[storage]?.byName.delete(name);
+  keeper.place(keptUnder, storage, name, key);
+  state.keysVersion += 1;
+  changed();
 }
 
 // Sends what the operator asked for, once. A status is due at once after its reply, and
@@ -947,7 +970,10 @@ export function wake() {
 
 // Removes an animation from the show. `done` is called when the target has removed it.
 export function remove(animation, done) {
-  want("remove", () => commands.remove(animation.id), () => done(animation));
+  want("remove", () => commands.remove(animation.id), () => {
+    keeper.unplace(keptUnder, animation.external === true ? "external" : "internal", animation.file);
+    done(animation);
+  });
 }
 
 export function inClockFolder(item) {
