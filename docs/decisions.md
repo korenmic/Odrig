@@ -951,3 +951,14 @@ goes on, and while an upload is open, which goes on under the test to its end. `
 set` no longer waits for the check after a start and still waits for an open upload. A
 test still refuses `upload begin`, `ignore`, `remove`, `remove many` and `catalog
 rebuild`. No command, reply or error code changes.
+
+### Seed 84: the mapping lock keeps the operator's choice
+
+The owner ruled on 2026-11-07, after the APK over USB serial locked mapping edits again by
+itself: "Locking versus unlocking should be persistent forever and never fall back into
+some defaults. It can only change when I manually change it." The lock is "an APK
+individual setting and should be unaffected by the medium used forever". This replaces seed
+69's rule that an unlock holds for one Settings session: the app keeps one value on the
+phone for every link, target and board, changed only by a confirmed press, and locked only
+on a phone that never stored one. Unsent edits are still dropped when Settings is left, the
+app hidden, the link lost or the target changed. No command is added.

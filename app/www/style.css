@@ -920,10 +920,6 @@ nav button[aria-current="true"] {
   background: rgba(0, 0, 0, 0.7);
 }
 
-#mapping-lock[aria-pressed="true"] {
-  border-color: var(--teal);
-}
-
 /* Upload. */
 label.button {
   display: block;
@@ -1014,6 +1010,14 @@ label.button {
   line-height: 1;
   touch-action: none;
   cursor: grab;
+}
+
+.map-pin .pin-field {
+  width: 4.5em;
+  min-height: 40px;
+  margin: 0 0 0 4px;
+  padding: 4px 8px;
+  font-variant-numeric: tabular-nums;
 }
 
 .map-pin.lifted {

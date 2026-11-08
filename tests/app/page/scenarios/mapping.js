@@ -54,7 +54,7 @@ export default async function(app) {
   const seen = {
     before: pins(app),
     snakes: [...app.doc.querySelectorAll("#mapping-rows .map-snakes li")].map((item) => item.textContent),
-    words: [...app.doc.querySelectorAll("#mapping-pins .words")].map((item) => item.textContent),
+    words: [...app.doc.querySelectorAll("#mapping-pins .words")].map((item) => `${item.textContent.trim()} ${item.querySelector(".pin-field").value}`),
     buttons: [...app.doc.querySelectorAll("#mapping button")].filter((button) => button.getClientRects().length > 0).map((button) => button.textContent.trim()).filter((text) => text !== "≡"),
   };
   if (app.settings.layoutOnly) {
