@@ -195,7 +195,13 @@ uint32_t content_space(const Core &core, Reply &reply) {
     return reply.length;
 }
 
-uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply) {
+// The bytes of `read` are gathered in the chunk buffer, before the part a rebuild of a catalog
+// keeps there between its steps, and its reply is `{"ok":true,"bytes":`, a size of ten digits
+// at most, `,"data":"`, the bytes in base64 without padding, `"}` and a newline.
+static_assert(kReadMost <= kKeptPages && kReadCountMost <= kKeptPages, "the bytes of a read leave the pages a rebuild keeps");
+static_assert(19 + 10 + 9 + (4 * kReadCountMost + 2) / 3 + 2 + 1 <= ODRIG_REPLY_MAX, "the reply of a read fits");
+
+uint32_t content_read(Core &core, uint32_t id, uint32_t offset, uint32_t count, Reply &reply) {
     char drive_name[kDriveOpenRoom];
     const char *name = nullptr;
     uint32_t size = 0;
@@ -239,20 +245,20 @@ uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply) {
         // Only the second source reads a file beside the one that plays.
         return refuse(reply, "storage-error");
     }
-    // The bytes are read into the chunk buffer, which holds nothing between commands.
+    // The bytes are read into the chunk buffer, before the part a rebuild keeps there.
     const odrig_host &host = core.host;
-    const uint32_t wanted = size - offset < kReadMost ? size - offset : kReadMost;
+    const uint32_t wanted = size - offset < count ? size - offset : count;
     uint32_t got = 0;
     while (got < wanted) {
         const uint32_t piece = wanted - got < kFileBufferSize ? wanted - got : kFileBufferSize;
-        const int32_t count = host.read_at(host.ctx, name, offset + got, core.chunk + got, piece);
-        if (count < 0) {
+        const int32_t taken = host.read_at(host.ctx, name, offset + got, core.chunk + got, piece);
+        if (taken < 0) {
             return refuse(reply, "storage-error");
         }
-        if (count == 0) {
+        if (taken == 0) {
             break;
         }
-        got += static_cast<uint32_t>(count);
+        got += static_cast<uint32_t>(taken);
     }
     reply.text("{\"ok\":true,\"bytes\":");
     reply.number(size);

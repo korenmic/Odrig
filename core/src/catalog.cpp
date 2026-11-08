@@ -2144,9 +2144,6 @@ uint32_t catalog_folder_make(Core &core, const char *path, Reply &reply) {
 
 namespace {
 
-// Where each page's count and CRC-32 wait while a rebuild runs: six bytes a page.
-const uint32_t kKeptPages = 1400;
-
 void keep_page(Core &core, uint32_t page, uint16_t count, uint32_t crc) {
     uint8_t *at = core.chunk + kKeptPages + 6 * page;
     at[0] = static_cast<uint8_t>(count);

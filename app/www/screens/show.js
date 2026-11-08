@@ -13,6 +13,7 @@ import * as previews from "../previews.js";
 import * as reorder from "./reorder.js";
 import * as selection from "./selection.js";
 import * as explorer from "./explorer.js";
+import * as downloads from "./downloads.js";
 import * as tests from "./tests.js";
 
 // The inclusion changes under way, by id, each with the target it was sent to.
@@ -181,7 +182,8 @@ function moreButton(id, label) {
 }
 
 // The row of a sub-folder of the level: its name, the count of its own files, and a way
-// in. It is no row of an animation: the filters, the moves and the selection pass it by.
+// in. It is no row of an animation: the filters and the moves pass it by; the selection
+// takes it, for a download, with what it holds.
 function folderRow(entry) {
   const managed = canIgnore(entry);
   const made = document.createElement(managed ? "div" : "button");
@@ -191,6 +193,17 @@ function folderRow(entry) {
   made.dataset.path = entry.path;
   made.dataset.id = String(entry.id);
   made.dataset.managed = String(managed);
+  if (managed) {
+    const pick = document.createElement("label");
+    pick.className = "pick";
+    pick.addEventListener("click", (event) => event.stopPropagation());
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.setAttribute("aria-label", `Select folder ${entry.path}`);
+    check.addEventListener("change", () => selection.choose(entry.id, check.checked));
+    pick.append(check);
+    made.append(pick);
+  }
   const open = managed ? document.createElement("button") : made;
   if (managed) { open.type = "button"; open.className = "folder-open"; }
   open.setAttribute("aria-label", `Open folder ${entry.path}`);
@@ -272,9 +285,9 @@ function barWords(label, animation) {
   return {short: first, named: [first, `${animation.id} ${animation.file}`, ...rest].join(" ")};
 }
 
-// The actions of the row menu that the bar has: every one but the moves.
+// The actions of the row menu that the bar has: every one but the moves and the download.
 function barActions(animation) {
-  return actions(animation).filter((item) => item.label !== "Move up" && item.label !== "Move down");
+  return actions(animation).filter((item) => item.label !== "Move up" && item.label !== "Move down" && item.label !== "Download");
 }
 
 function barButton(label, named, act) {
@@ -507,7 +520,7 @@ function row(animation) {
   made.dataset.editable = String(isEditable(animation));
   made.dataset.writable = String(onWritableCard(animation));
   made.dataset.fault = animation.fault ?? "";
-  if (isEditable(animation) || (typeof animation.ignored === "boolean" && onWritableCard(animation))) {
+  if (typeof animation.ignored === "boolean") {
     const pick = document.createElement("label");
     pick.className = "pick";
     const check = document.createElement("input");
@@ -630,6 +643,11 @@ function rowsState(state, animations, here) {
     note.hidden = note.textContent === "";
     const more = made.querySelector(".more");
     if (more) more.disabled = !answers() || saving;
+    const check = made.querySelector(".pick input");
+    if (check) {
+      check.checked = selection.has(entry.id);
+      check.disabled = selection.locked();
+    }
     made.setAttribute("aria-current", String(marked !== null && (marked === entry.path || marked.startsWith(`${entry.path}/`))));
   }
   for (const made of byId("animations-list").querySelectorAll(":scope > .row")) {
@@ -763,6 +781,8 @@ function actions(animation) {
     items.push({label: "Select", act: () => selection.enter(animation.id), disabled: !free});
     items.push({label: "Delete", act: () => selection.askOne(animation), disabled: !free, danger: true});
   } else if (isExternal(animation)) {
+    // A file of a card the target may not write is selected for a download.
+    if (canIgnore(animation)) items.push({label: "Select", act: () => selection.enter(animation.id), disabled: !free});
     items.push({note: canIgnore(animation) ? "External storage is read-only: this animation cannot be deleted. Inclusion is saved on the target." :
       "External storage is read-only: this animation cannot be ignored or deleted from the app."});
   } else {
@@ -784,6 +804,7 @@ function fillMenu() {
     {label: animation.ignored ? "Include folder" : "Ignore folder", act: () => include(animation, animation.ignored === true),
       disabled: !answers() || selection.locked() || saving},
     ...(animation.inheritedIgnored ? [{note: "Excluded by a parent folder. Including this folder does not override that ancestor."}] : []),
+    ...(selection.folderSelectable(animation) ? [{label: "Select", act: () => selection.enter(animation.id), disabled: !answers() || selection.locked()}] : []),
   ] : actions(animation);
   const key = JSON.stringify(items.map((item) => [item.label, item.note, item.disabled]));
   if (menu.dataset.key === key) {
@@ -885,6 +906,8 @@ export function start(options) {
   extend({draw: explorer.draw});
   reorder.start({message, redraw, shownOrder, groupOf: folderOf, levelRows: shownOrder});
   extend({menu: reorder.menu, draw: reorder.draw, order: reorder.order});
+  downloads.start({message, redraw, chosen: () => ({files: selection.rows(), folders: selection.folders()})});
+  extend({menu: downloads.menu, draw: downloads.draw});
   tests.start({message, isVisible});
   extend({draw: tests.draw});
   byId("on").addEventListener("click", () => client.switchOn());

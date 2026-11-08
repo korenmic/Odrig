@@ -29,7 +29,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `space` | Reports the free and the total storage and the number of animations. |
 | `list`, `list <from>` | Lists the items of the show and the root's level of a USB drive or a card: the playlists of its folders and its own animations. |
 | `list in <folder-id>`, `list in <folder-id> <from>` | Lists one level of the card: the playlists of a folder's sub-folders and its own animations. |
-| `read <id> <offset>` | Reads up to 600 bytes of the file of an animation back. |
+| `read <id> <offset>`, `read <id> <offset> <count>` | Reads up to 600 bytes of the file of an animation back, or up to `<count>`, 1 to 720. |
 | `catalog` | Reports the catalog of the board's own storage and of the drive. |
 | `catalog page <storage> <page> <offset>` | Reads up to 512 bytes of a page of the catalog of the board's own storage, `internal`, or of the drive, `external`. |
 | `catalog rebuild <storage>` | Reads every animation of the board's own storage, `internal`, or of the drive, `external`, and writes its catalog anew. |
@@ -258,17 +258,27 @@ read 2 0
 {"ok":true,"bytes":40,"data":"T0RSWAEDAQA8ADwAMHUAABQAAAADAB4A9OzQICAg1KAXAAAAPABYAg"}
 read 2 40
 {"ok":true,"bytes":40,"data":""}
+read 2 0 4
+{"ok":true,"bytes":40,"data":"T0RSWA"}
 ```
 
 `read <id> <offset>` gives up to 600 bytes of the file of an animation, of the show or of
 a USB drive, from `<offset>`, so that a text or a clock can be read back and edited.
-`bytes` is the size of the file, and `data` its bytes from the offset in base64 as
-`upload data` takes it; at the end of the file it is empty. `<id>` is 1 to 65,535 and
-`<offset>` 0 to 4,294,967,295, both in decimal digits.
+`read <id> <offset> <count>` gives up to `<count>` bytes, so that a whole file is read
+back, for a download or a backup, in fewer replies. `bytes` is the size of the file, and
+`data` its bytes from the offset in base64 as `upload data` takes it; at the end of the
+file it is empty. `<id>` is 1 to 65,535 and `<offset>` 0 to 4,294,967,295, both in decimal
+digits; `<count>` is 1 to 720, in decimal digits too. 720 bytes are 960 characters of
+base64, and with a size of ten digits they make a reply of 1,001 bytes: the 1,024 bytes of
+a reply would hold 737 at most. The form with a count was added under the owner's approval
+of 2026-11-06. An installation from before it refuses the four words with `bad-argument`;
+a client sends `read <id> 0 1` once to find out, and reads such an installation with the
+form without a count.
 
-- An offset above the size of the file is refused with `bad-argument`.
+- An offset above the size of the file, and a count of 0 or above 720, are refused with
+  `bad-argument`.
 - An id that is no animation of the show or of the drive, a cycle's too, is refused with
-  `unknown-id`.
+  `unknown-id`; a folder of the card, which is a playlist, with `in-use`.
 - A file the player has not read whole since the start is refused with `busy`: ask again
   a moment later. An animation that is unavailable, as its file had a fault, is refused
   with `unavailable`; while the show is invalid, `read` is refused with `show-invalid`; and

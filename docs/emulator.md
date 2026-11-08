@@ -840,17 +840,19 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] fault
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] space
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] list
-python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] read ID OFFSET
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] read ID OFFSET [COUNT]
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] catalog [OPERATION]
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] remove ID
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] ignore ID VALUE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] mapping OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] order OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] repeat ID N [save]
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] saved ID
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] clocks OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] debug mini on|off
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload --external FILE
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] folder make external PATH
 ```
 
 Through the serial port, here the emulator's; for the board the name is its USB serial
@@ -879,8 +881,10 @@ python -m odrigctl --port build/emulator/serial order move 2805384113 9 1
 python -m odrigctl --port build/emulator/serial repeat 1 8
 python -m odrigctl --port build/emulator/serial repeat 1 8 save
 python -m odrigctl --port build/emulator/serial repeat 1 default
+python -m odrigctl --port build/emulator/serial saved 1
 python -m odrigctl --port build/emulator/serial clocks on
 python -m odrigctl --port build/emulator/serial clocks message on
+python -m odrigctl --port build/emulator/serial folder make external clocks
 ```
 
 Over TCP, to the emulator's [line port](#the-line-port), which is how the emulator takes
@@ -896,6 +900,7 @@ python -m odrigctl --tcp 127.0.0.1:8601 fault
 python -m odrigctl --tcp 127.0.0.1:8601 space
 python -m odrigctl --tcp 127.0.0.1:8601 list
 python -m odrigctl --tcp 127.0.0.1:8601 read 1 0
+python -m odrigctl --tcp 127.0.0.1:8601 read 1 720 720
 python -m odrigctl --tcp 127.0.0.1:8601 catalog
 python -m odrigctl --tcp 127.0.0.1:8601 catalog cancel
 python -m odrigctl --tcp 127.0.0.1:8601 catalog page external 3 0
@@ -909,8 +914,10 @@ python -m odrigctl --tcp 127.0.0.1:8601 order move 2805384113 9 1
 python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 8
 python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 8 save
 python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 default
+python -m odrigctl --tcp 127.0.0.1:8601 saved 1
 python -m odrigctl --tcp 127.0.0.1:8601 clocks on
 python -m odrigctl --tcp 127.0.0.1:8601 clocks message off
+python -m odrigctl --tcp 127.0.0.1:8601 folder make external clocks/message
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -926,6 +933,7 @@ python -m odrigctl --http 127.0.0.1:8600 fault
 python -m odrigctl --http 127.0.0.1:8600 space
 python -m odrigctl --http 127.0.0.1:8600 list
 python -m odrigctl --http 127.0.0.1:8600 read 1 0
+python -m odrigctl --http 127.0.0.1:8600 read 1 720 720
 python -m odrigctl --http 127.0.0.1:8600 catalog
 python -m odrigctl --http 127.0.0.1:8600 catalog rebuild external
 python -m odrigctl --http 127.0.0.1:8600 catalog page external 3 512
@@ -939,8 +947,10 @@ python -m odrigctl --http 127.0.0.1:8600 order move 2805384113 9 1
 python -m odrigctl --http 127.0.0.1:8600 repeat 1 8
 python -m odrigctl --http 127.0.0.1:8600 repeat 1 8 save
 python -m odrigctl --http 127.0.0.1:8600 repeat 1 default
+python -m odrigctl --http 127.0.0.1:8600 saved 1
 python -m odrigctl --http 127.0.0.1:8600 clocks off
 python -m odrigctl --http 127.0.0.1:8600 clocks message off
+python -m odrigctl --http 127.0.0.1:8600 folder make external "night/old songs"
 ```
 
 The temporary miniature command is submitted through the same routes; status reports
@@ -978,6 +988,9 @@ The tool prints the reply line to standard output:
   card's folder with that id, and `order get` and `order get in ID` for the saved order of
   a level; with a position after them, `list in ID FROM` and `order get in ID FROM` send
   that one line.
+- `read ID OFFSET` sends `read <ID> <OFFSET>`, and `read ID OFFSET COUNT` sends
+  `read <ID> <OFFSET> <COUNT>`: one reply with up to 600 bytes of the file, or up to COUNT,
+  1 to 720, in base64. The tool prints that one reply; the next piece is a second command.
 - `--timeout SECONDS` is how long the tool waits for a reply; 2 seconds without it.
 - `--port NAME`: the tool opens the port without resetting the board. It sets 115200 baud,
   8 data bits and no parity, lowers RTS before it lowers DTR, waits 0.2 seconds, discards

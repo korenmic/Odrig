@@ -913,3 +913,11 @@ answer the core gets `folder make external <path>`, which makes a real folder of
 and keeps it in the card's index while it is empty, and the host interface gets the optional
 `make_folder`. The decision of the catalog that a folder without a file is in no line of the
 index narrows: a folder made by `folder make` is listed empty until a rebuild.
+
+On 2026-11-08, under the same answer, `read` gets a count: `read <id> <offset> <count>` gives
+1 to 720 bytes of a file from an offset, through the chunk buffer, at no memory of the core,
+and `read <id> <offset>` keeps its 600. A reply holds 1,024 bytes, which with a size of ten
+digits leave room for 737; 720 make a reply of 1,001. The app downloads a file under its name
+and backs up a selection of one storage as one zip with the manifest `odrig-backup.json` of
+version 1, and the APK gets a second plugin of its own, `Save`, which keeps a download or a
+backup where the operator chooses in the system's dialog.

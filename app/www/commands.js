@@ -215,7 +215,7 @@ export async function list(from = 0, folder = null) {
     items: reply.items.map((item) => (typeof item.file === "string" ? {id: item.id, file: item.file, bytes: item.bytes, ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
       ...(item.inherited_ignored === undefined ? {} : {inheritedIgnored: item.inherited_ignored}),
       ...(item.external === undefined ? {} : {external: item.external}), ...(item.type === undefined ? {} : {type: item.type}),
-      ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist, ...(item.files === undefined ? {} : {files: item.files}),
+      ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist, external: item.external, ...(item.files === undefined ? {} : {files: item.files}),
       ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
       ...(item.inherited_ignored === undefined ? {} : {inheritedIgnored: item.inherited_ignored})} :
       {id: item.id, cycle: true, members: item.cycle.filter((member) => whole(member, 1, MOST_ID))})),
@@ -313,11 +313,15 @@ export async function uploadExpect(crc) {
   await carriedOut(`upload expect ${crc}`);
 }
 
-// Up to 600 bytes of the file of an animation, from an offset, as given in base64, and
-// the size of the file.
-export async function read(id, offset) {
-  const reply = await carriedOut(`read ${id} ${offset}`);
-  if (!whole(reply.bytes, 0, MOST_BYTES) || typeof reply.data !== "string" || !/^[A-Za-z0-9_-]*$/.test(reply.data) || reply.data.length % 4 === 1) {
+// The most bytes one `read` with a count asks for.
+export const READ_COUNT = 720;
+
+// Up to 600 bytes of the file of an animation, from an offset, or up to `count` bytes, 1 to
+// 720, as given in base64, and the size of the file.
+export async function read(id, offset, count = null) {
+  const reply = count === null ? await carriedOut(`read ${id} ${offset}`) : await carriedOut(`read ${id} ${offset} ${count}`);
+  if (!whole(reply.bytes, 0, MOST_BYTES) || typeof reply.data !== "string" || !/^[A-Za-z0-9_-]*$/.test(reply.data) || reply.data.length % 4 === 1 ||
+      reply.data.length > Math.ceil(((count ?? READ_COUNT) * 4) / 3)) {
     throw new Failure("bad-reply", address());
   }
   const text = atob(reply.data.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (reply.data.length % 4)) % 4));

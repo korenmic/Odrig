@@ -19,6 +19,10 @@ const char kPending[] = "pending.txt";      // the `.odrg` names a change makes 
 // it gathers them in.
 const uint32_t kChunkSize = 1500;
 
+// Where each page's count and CRC-32 wait in the chunk buffer while a rebuild of a catalog
+// runs, six bytes a page. A command between two steps of a rebuild may use the bytes before.
+const uint32_t kKeptPages = 1400;
+
 // The most bytes of `pending.txt` the core reads at its start.
 const uint32_t kPendingSize = 1500;
 

@@ -1234,6 +1234,7 @@ class ReferencePlayer:
     LINE_MAX = 2048
     COMMANDS = {b"repeat": (2, 3), b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"fault": (0,), b"space": (0,), b"list": (0, 1, 2, 3), b"remove": (1,), b"upload": range(0, 2048), b"read": range(0, 2048), b"clocks": range(0, 2048)}
     READ_MOST = 600
+    READ_COUNT_MOST = 720
     EXPECT_LARGEST = 16384
     RANGES = {b"play": (1, 4294967295), b"brightness": (0, 255), b"list": (0, 4294967295), b"remove": (1, 4294967295)}
     REPLY_MAX = 1024
@@ -1474,10 +1475,12 @@ class ReferencePlayer:
 
     def _read(self, arguments):
         """`read <id> <offset>`: up to 600 bytes of the file of an animation, from an offset,
-        with its size. Returns an error code or the reply."""
-        number = self._number(arguments[0], 1, 4294967295) if len(arguments) == 2 else None
-        offset = self._number(arguments[1], 0, 4294967295) if len(arguments) == 2 else None
-        if number is None or offset is None:
+        with its size; `read <id> <offset> <count>`: up to `count` bytes, 1 to 720. Returns an
+        error code or the reply."""
+        number = self._number(arguments[0], 1, 4294967295) if len(arguments) in (2, 3) else None
+        offset = self._number(arguments[1], 0, 4294967295) if len(arguments) in (2, 3) else None
+        count = self._number(arguments[2], 1, self.READ_COUNT_MOST) if len(arguments) == 3 else self.READ_MOST
+        if number is None or offset is None or count is None:
             return "bad-argument"
         if self.error is not None:
             return "show-invalid"
@@ -1494,7 +1497,7 @@ class ReferencePlayer:
             return "bad-argument"
         if not self.changeable:
             return "storage-error"
-        piece = base64.urlsafe_b64encode(data[offset:offset + self.READ_MOST]).rstrip(b"=")
+        piece = base64.urlsafe_b64encode(data[offset:offset + count]).rstrip(b"=")
         return b'{"ok":true,"bytes":%d,"data":"%s"}\n' % (len(data), piece)
 
     def _upload(self, arguments):

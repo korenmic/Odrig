@@ -17,3 +17,12 @@ export function crc32(bytes) {
   }
   return ((crc ^ 0xffffffff) >>> 0).toString(16).padStart(8, "0");
 }
+
+// The CRC-32 of bytes that follow bytes whose CRC-32 is `crc`, as a number: 0 to begin with.
+export function crc32More(crc, bytes) {
+  let value = (crc ^ 0xffffffff) >>> 0;
+  for (let at = 0; at < bytes.length; at += 1) {
+    value = TABLE[(value ^ bytes[at]) & 0xff] ^ (value >>> 8);
+  }
+  return (value ^ 0xffffffff) >>> 0;
+}

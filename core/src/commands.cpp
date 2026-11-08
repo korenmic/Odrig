@@ -822,13 +822,15 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
     if (words.is(0, "read")) {
         uint32_t id;
         uint32_t offset;
-        if (words.count != 3 || !number_word(words, 1, 1, 0xFFFFFFFFu, &id) || !number_word(words, 2, 0, 0xFFFFFFFFu, &offset)) {
+        uint32_t count = kReadMost;
+        if ((words.count != 3 && words.count != 4) || !number_word(words, 1, 1, 0xFFFFFFFFu, &id) || !number_word(words, 2, 0, 0xFFFFFFFFu, &offset) ||
+            (words.count == 4 && !number_word(words, 3, 1, kReadCountMost, &count))) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        return content_read(core, id, offset, reply);
+        return content_read(core, id, offset, count, reply);
     }
     if (words.is(0, "ignore")) {
         uint32_t id, value;

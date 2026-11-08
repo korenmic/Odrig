@@ -133,7 +133,8 @@ maps its actions to command lines, each sent as `POST /odrig` to the address tha
 | Presses `Upload to the installation` for a new internal file | `upload begin <id> <file> <bytes> <crc32>`, confirm replacing is false, then `upload data <offset> <base64>` for each piece and `upload end <crc32>`, sent again while the installation checks it |
 | Presses `Upload to the installation` with `External storage` chosen | `upload begin external <file> <bytes>`, `upload expect 00000000`, then the pieces and the end as for an upload |
 | Presses `Cancel` while it uploads | `upload cancel` |
-| Chooses Edit in the menu of a text's or a clock's row | `read <id> <offset>`, from offset 0 until the whole file is read |
+| Chooses Edit in the menu of a text's or a clock's row, or Download in any row's menu | `read <id> 0 1` once for each target, then `read <id> <offset> <count>` from offset 0 until the whole file is read, 720 bytes at a time, or `read <id> <offset>` from an installation that refused the first with `bad-argument` |
+| Presses `Save the backup` after `Download selected` | `list in <id>` for each selected folder and every folder below it; `catalog`; for each file `saved <id>` and its reads as for Download, with `list <from>` or `list in <id> <from>` from the position of its row before and after them |
 | Presses `Save` for a text or a clock it edits | `upload begin <id> <file> <bytes>`, then `upload expect <crc32>` with the CRC-32 of the file it read, then the pieces and the end as for an upload |
 | Opens Settings, reloads, or waits two seconds while Settings is visible; on Animations every two seconds while nothing plays, which is so during a test, and after a test is started or stopped | `mapping get` |
 | Drags a pin of the mapping into another place, presses an arrow key on its handle, or presses Restore defaults | `mapping set <revision> <pins>` |
@@ -167,9 +168,10 @@ replies cannot change the new target's screen. Leaving the app stops unsent batc
 Uploads and deletions disable conflicting controls until their operation has ended.
 
 The web code, `app/www/`, is plain JavaScript, HTML and CSS: a browser runs the files as
-they are. Capacitor wraps them into the Android app. One class of Java, the sender,
-carries each line to the target; see [The phone and the installation's
-network](#the-phone-and-the-installations-network).
+they are. Capacitor wraps them into the Android app. Two classes of Java are the app's own:
+the sender, which carries each line to the target, see [The phone and the installation's
+network](#the-phone-and-the-installations-network); and `Save`, which saves a download or a
+backup where the operator chooses, see [Downloads and backups](#downloads-and-backups).
 
 ## What you need
 
@@ -487,12 +489,14 @@ show is invalid is said on the target screen, and in the message of a refused pl
 A tap on an available row plays its animation within the active mode's boundary.
 Its `...` button opens its menu and plays nothing. Files whose target reports inclusion
 have `Ignore in playlist` or `Restore to playlist`, including external files on read-only
-media: their preference is saved on the target, not on the card. Internal animations
-also have `Select` and `Delete`; external deletion requires a writable card. Moves keep
-their existing rules. Older targets without the inclusion flag expose no inclusion action.
+media: their preference is saved on the target, not on the card. Every animation's menu has
+`Download`, disabled while it is unavailable or its size is not known yet, and every one whose
+target reports inclusion has `Select`; internal animations also have `Delete`, and external deletion
+requires a writable card. Moves keep their existing rules. Older targets without the
+inclusion flag expose no inclusion action and no `Select`.
 
 A folder whose inclusion is reported has its own `...` menu with `Ignore folder` or
-`Include folder`. Ignored files and folders stay browsable, with muted names and an
+`Include folder`, and `Select`. Ignored files and folders stay browsable, with muted names and an
 `Ignored` note. An inherited exclusion says `Excluded by a parent folder`; when both
 apply it says so. The menu explains that changing the child's own choice does not
 override an ignored ancestor. A change says `Saving…` until acknowledgement, refreshes
@@ -506,9 +510,10 @@ removes it, and `Keep it` sends nothing. Afterwards the app says `Removed animat
 plays, or that a USB stick or a card the installation cannot write holds, cannot be
 removed: the installation refuses it, and the app says why. A file of a card the
 installation can write that has a fault is deleted from its menu, or uploaded again under
-its name, which keeps its id. `Select`, in an internal row's menu or on the bar of the
-animation playing now, starts the selection mode with that row ticked: a checkbox on
-each internal row, `Select all`, `Clear selection`, `Delete selected` and `Done`. The list
+its name, which keeps its id. `Select`, in a row's menu or on the bar of the animation
+playing now, starts the selection mode with that row ticked: a checkbox on each row of an
+animation and of a folder, `Select all`, `Clear selection`, `Delete selected`, `Move to…`,
+`Download selected` and `Done`. The list
 has no `Select` of its own, so while nothing plays the selection starts from a row's menu.
 The question names the count and the files before anything is sent; the deletion goes in
 batches of at most 32, and a refusal or a lost reply says how many were deleted. The back
@@ -591,9 +596,14 @@ colours do. A video is drawn at most 1,280 pixels wide or high before it is fitt
 
 ### Folders of the card, and moves
 
-In the selection mode a row of either storage can be selected; a line under the bar says how
-many are selected in Internal storage and in External storage. `Delete selected` removes
-internal animations only, and is disabled while an external one is selected.
+In the selection mode a row of either storage can be selected, also one of a card the board
+may not write, and so can a folder of the card, by the checkbox on its row or `Select` in its
+menu; a line under the bar says how many are selected in Internal storage and in External
+storage, and how many folders of each. `Select all` takes the files the filters show of the
+board's storage and of a card the board may write: not the files of a read-only card, which
+are selected by hand, nor the folders. `Delete selected` removes internal animations only, and is disabled while an
+external one or a folder is selected; `Move to…` moves files, and is disabled while a folder
+or a file of a read-only card is selected.
 
 At a level of the card that the board may write, `New folder` and `New playlist folder` ask
 for a name and make that folder there with `folder make external`: both make the same real
@@ -621,6 +631,54 @@ while the app is hidden and ends with a change of target.
 A move cut by a lost reply, a lost link or a restart of the app is found again the next time
 the list of the same target answers: with the new file there it is finished; without it the
 old file was never touched and the move ends as not moved.
+
+### Downloads and backups
+
+`Download` in the menu of an animation's row, of either storage and of a read-only card too,
+saves its file's bytes as the installation keeps them, under its own name. `Download
+selected` in the selection bar saves one zip of the selected files and folders of one
+storage. Its dialog shows, before anything is read, the storage and the level its entries
+are named from, `From External /night/`, and what is selected; a selection of both storages
+is backed up one storage at a time, the dialog's `Storage` choosing which. `Save the backup`
+then reads the selected folders whole, every folder below them too, and saves the zip:
+entries are paths from the level shown, so that `night/x.odrg` backed up from
+`External /night` is `x.odrg`, and a selected folder keeps its name, `deep/old.odrg`. A
+folder with no file and no folder in it is an entry of its own. The manifest
+`odrig-backup.json`, version 1, comes last: `sourceStorage`, `base`, the target's address,
+the moment, the generation of the storage's catalog, `partial`, and for each file its full
+path, its entry, its id, `stored` for a file of the board's storage, its size, its CRC-32,
+its saved settings from `saved` with its own and inherited ignore, and `savedUnknown`, null
+when `saved` answered, else why its saved settings are not known: the code of the refusal,
+`busy` after five tries half a second apart, or `not-asked` for a file that was not read; its
+fault and its outcome:
+`saved`, `failed` with the reason, `stopped`, or `not-started` after `Stop`; and for each
+folder its path, its entry and its ignore. A backup with any file not saved says
+`partial: true`, and the message says it is a partial backup and names each failed file.
+
+The app reads with `read <id> <offset> <count>`, 720 bytes at a time, after `read <id> 0 1`
+has shown once for each target that the installation takes a count; one that answers
+`bad-argument` is read 600 bytes at a time. Each file is read whole before its entry is
+written, one file at a time: its row is looked for before and after it in the part of its
+level's list from the position the row was last seen at, one request, and in the whole level
+when it is not there; the part after a file serves before the next when it holds that file's
+row. A file whose id no longer names the same path and size, whose size changes between two
+pieces, or whose bytes are not the ones its storage's catalog names, fails and has no entry.
+The pieces go in their turn among the app's other requests, a status still once a second.
+`Stop` ends the run between two pieces, or as the piece under way ends, whatever its reply:
+a backup is saved with the files read whole before, as a partial backup, and a download saves
+nothing. A change of target ends either with nothing saved; while the app is hidden it waits.
+The app makes no other change while one runs. Nothing on the installation is changed. Each
+file, once read whole and checked, is written as one entry, stored as it is with its CRC-32
+in a data descriptor after it, and without zip64: a selection of 65,535 entries or more, or
+of 4 GiB or more, is refused before anything is read. A sink that cannot be written ends the
+run with nothing saved.
+
+In a browser, the emulator's Controller, the file is saved as a download. The app saves it
+through its own plugin `Save`: the bytes are written to one file of the app's cache, and the
+system's dialog of where to save a file asks for the place and the name, its own dialog of
+the Storage Access Framework; the file is copied there and removed from the cache. A dialog
+closed without a place saves nothing, and the message says so. A run that ends without saving,
+after a failure or a change of target, has the plugin remove the cache's file at once.
 
 ### Ready-made files and upload destinations
 
@@ -1300,6 +1358,14 @@ By programs, on a Mac:
   `This board` chosen instead, each refusal in words, and no choice for a card it cannot
   write; `Delete` of a card's animation, one with a fault among them, and none on a card
   that cannot be written; the storage lines and the badges of both kinds of card.
+- Downloads and backups, in Chrome against the emulator and against stand-in targets: an
+  animation of the board and one of a read-only card's folder downloaded byte for byte under
+  its name; a zip of a card's level with a file, a folder and an empty folder, read back by
+  Python's own reader, its entries named from the level shown and its manifest last; a
+  selection of both storages backed up one storage at a time; a partial backup with a
+  damaged file; a file whose size changes while it is read, left out; the probe `read <id>
+  0 1`, then 720 bytes at a time, and 600 at a time from an installation without the count;
+  the zip writer's data descriptors, folders, names and limits.
 - That the web code uses the documented protocol and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
@@ -1361,6 +1427,10 @@ By programs, on a Mac:
 - **Seed 47 on a phone.** Nobody has typed a brightness into the field on a phone: the
   owner's check is to type 8, press Done, and see the installation at 8 and the slider at 8,
   and to see the field show the slider's number while it moves.
+- **Downloads and backups on a phone.** No phone has saved a download or a backup yet: the
+  plugin `Save`, the system's dialog of where to keep a file and the file it writes there are
+  untried. The owner's check is to press `Download` in a row's menu and `Download selected`
+  for a folder of the card on the phone, choose a place, and open the file and the zip there.
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.

@@ -317,6 +317,13 @@ five words at most, and a line with more is no valid command. Every line gets ex
 reply, an empty line too: one JSON object on one line of at most 1,024 bytes, ended by a
 newline, without a zero after it. The reply is written into the room the caller gives.
 
+`read` gathers the bytes it gives in the chunk buffer, before byte 1,400, from which a
+rebuild of a catalog keeps the counts and the CRC-32s of its pages between its steps, and
+`read` is not refused while one runs: 600 without a count, and as many as its count asks
+for, 720 at most. 720 bytes in base64 and a size of ten digits make a reply of 1,001 bytes.
+Two `static_assert`s of `content.cpp` hold both bounds, the 1,400 bytes before the kept
+pages and the reply's 1,024, so the count takes no memory of its own.
+
 `odrig_core_feed` is for a transport that delivers bytes, such as a serial port. Every
 newline ends a line. The core keeps an unfinished line of up to 2,048 characters, and a
 carriage return after them, from one call to the next, and of a line without end it keeps

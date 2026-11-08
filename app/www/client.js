@@ -98,6 +98,9 @@ let keptTaken = false;
 // Counts the targets: a reply that belongs to an earlier address is dropped.
 let target = 0;
 let contentLocked = false;
+// Whether the target takes `read <id> <offset> <count>`, as `{target, counts}` of the target
+// that told it, or null until a read found out.
+let readForm = null;
 
 // Calls a function now and whenever the state changes.
 export function watch(watcher) {
@@ -624,8 +627,9 @@ export function keyOf(animation) {
   return key !== undefined && key.endsWith(`-${animation.bytes}`) ? key : null;
 }
 
-// Sends what the operator asked for, once. A status is due at once after its reply, and
-// after a removal the list and the space are due too.
+// Sends what the operator asked for, once. A status is due at once after its reply, but
+// for a request of a long job in the background, between which a status comes at its own
+// time; after a removal the list and the space are due too.
 async function give(request) {
   if (request.allowed && !request.allowed()) {
     request.resolve?.(false);
@@ -671,8 +675,10 @@ async function give(request) {
     spaceDue = true;
   }
   // The status that shows what the command did goes before a list that waits.
-  statusDue = true;
-  listWaited = false;
+  if (!request.background) {
+    statusDue = true;
+    listWaited = false;
+  }
   changed();
 }
 
@@ -715,7 +721,8 @@ function due() {
   if (document.hidden) {
     return null;
   }
-  if (wanted.length > 0) {
+  // A request of a long job in the background lets a status that is due go first.
+  if (wanted.length > 0 && !(wanted[0].background && statusDue)) {
     const request = wanted.shift();
     return () => give(request);
   }
@@ -785,6 +792,7 @@ export function begin() {
   target += 1;
   keptUnder = address();
   contentLocked = false;
+  readForm = null;
   state.listVersion = 0;
   if (job !== null) {
     job.failed(new Error("the address changed"));
@@ -1105,16 +1113,19 @@ export function uploadSnapshot(level) {
   });
 }
 
-function requestOperation(kind, carry, confirm, allowed) {
+function requestOperation(kind, carry, confirm, allowed, background = false) {
   return new Promise((resolve, reject) => {
-    wanted.push({kind, carry, confirm, allowed, resolve, reject});
+    wanted.push({kind, carry, confirm, allowed, resolve, reject, background});
     next();
   });
 }
 
+// A request that was not sent: the app was hidden, or another target was chosen.
+export class Withdrawn extends Error {}
+
 function cancelWaiting() {
   for (const request of wanted) {
-    request.reject?.(new Error("the request was cancelled"));
+    request.reject?.(new Withdrawn("the request was cancelled"));
     request.settle?.(false);
   }
   wanted.length = 0;
@@ -1174,27 +1185,91 @@ export function ignore(id, ignored) {
   });
 }
 
-// The whole file of an animation, read from the target in pieces, as bytes.
-export function readFile(id) {
+// Whether the target takes `read <id> <offset> <count>`, which `read <id> 0 1` shows: it is
+// refused with `bad-argument` by one that does not. The answer is kept for the target.
+async function probeReadCount(id, asked) {
+  let counts = true;
+  try {
+    await commands.read(id, 0, 1);
+  } catch (error) {
+    if (!(error instanceof commands.Refusal && error.code === "bad-argument")) throw error;
+    counts = false;
+  }
+  if (asked === target) readForm = {target: asked, counts};
+  return counts;
+}
+
+// One piece of the file of an animation from an offset, `{bytes, data}`: 720 bytes at most
+// from a target that takes a count, which `read <id> 0 1` finds out once for each target,
+// else 600 at most. A count refused with `bad-argument` is asked about again, as another
+// installation may answer at the same address. It goes in its turn as a request in the
+// background.
+export function readPiece(id, offset) {
   return requestOperation("read", async () => {
-    const parts = [];
-    let offset = 0;
-    for (;;) {
-      const {bytes, data} = await commands.read(id, offset);
-      parts.push(data);
-      offset += data.length;
-      if (data.length === 0 || offset >= bytes) {
-        break;
+    const asked = target;
+    const known = readForm !== null && readForm.target === asked ? readForm.counts : await probeReadCount(id, asked);
+    if (!known) return commands.read(id, offset);
+    try {
+      return await commands.read(id, offset, commands.READ_COUNT);
+    } catch (error) {
+      if (!(error instanceof commands.Refusal && error.code === "bad-argument") || await probeReadCount(id, asked)) throw error;
+      return commands.read(id, offset);
+    }
+  }, undefined, undefined, true);
+}
+
+// Waits until the app is on the screen.
+function onTheScreen() {
+  return new Promise((resolve) => {
+    if (!document.hidden) {
+      resolve();
+      return;
+    }
+    const seen = () => {
+      if (!document.hidden) {
+        document.removeEventListener("visibilitychange", seen);
+        resolve();
       }
-    }
-    const whole = new Uint8Array(offset);
-    let at = 0;
-    for (const part of parts) {
-      whole.set(part, at);
-      at += part.length;
-    }
-    return whole;
+    };
+    document.addEventListener("visibilitychange", seen);
   });
+}
+
+// The whole file of an animation, read from the target piece by piece, as bytes, each piece
+// in its turn among the other requests; a piece withdrawn while the app was hidden is asked
+// again once it is shown, from the same target. `progress(read, size)` is told after each
+// piece. A file whose size changes between two pieces is not the one whose reading began.
+export async function readFile(id, progress = () => {}) {
+  const asked = target;
+  const parts = [];
+  let offset = 0;
+  let size = null;
+  for (;;) {
+    let piece;
+    try {
+      piece = await readPiece(id, offset);
+    } catch (error) {
+      if (!(error instanceof Withdrawn) || asked !== target) throw error;
+      await onTheScreen();
+      continue;
+    }
+    const {bytes, data} = piece;
+    if (size !== null && bytes !== size) throw new Error("The file changed while it was read.");
+    size = bytes;
+    parts.push(data);
+    offset += data.length;
+    progress(offset, size);
+    if (data.length === 0 || offset >= bytes) {
+      break;
+    }
+  }
+  const whole = new Uint8Array(offset);
+  let at = 0;
+  for (const part of parts) {
+    whole.set(part, at);
+    at += part.length;
+  }
+  return whole;
 }
 
 export function removeMany(ids) {
@@ -1204,6 +1279,12 @@ export function removeMany(ids) {
 // Sends one request of a job of the app, such as a move, in its turn among the operator's.
 export function operation(kind, carry) {
   return requestOperation(kind, carry);
+}
+
+// Sends one request of a long job of the app, such as a backup, in its turn, letting a
+// status that is due go before it.
+export function background(kind, carry) {
+  return requestOperation(kind, carry, undefined, undefined, true);
 }
 
 // The catalogs of the target, the rebuild of one of them and its cancel.

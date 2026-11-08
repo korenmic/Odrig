@@ -152,9 +152,11 @@ class CommandsDocument(unittest.TestCase):
         self.assertEqual(limits, {"ODRIG_LINE_MAX": "2048", "ODRIG_REPLY_MAX": "1024"})
         for phrase in ("A line is at most 2,048 characters.", "a JSON object on one line of at most 1,024 bytes.", "| `line-too-long` | The line is longer than 2,048 characters. |",
                        '{"ok":true,"chunk":1500}', "`<id>` is 1 to 65,535.", "`<bytes>` is the size of the file, 1 to 4,294,967,295.", "`<from>` is 0 to 4,294,967,295.",
-                       "An upload on which nothing has moved for 60\nseconds is discarded too"):
+                       "An upload on which nothing has moved for 60\nseconds is discarded too", "`<count>` is 1 to 720", "a reply of 1,001 bytes"):
             self.assertIn(phrase, self.text)
         self.assertIn("const uint32_t kChunkSize = 1500;", self.sources)
+        self.assertIn("const uint32_t kReadMost = 600;", self.sources)
+        self.assertIn("const uint32_t kReadCountMost = 720;", self.sources)
         self.assertIn("const uint64_t kUploadQuietMs = 60000;", self.sources)
         self.assertIn("const uint32_t kUploadReserve = 16384;", self.sources)
 

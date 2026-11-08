@@ -12880,3 +12880,158 @@ proves too large.
 
 **Resolution.** `docs/specs/74-p2-phone-storage-explorer-and-backups/requirements.md`,
 `design.md` and `tasks.md`.
+
+## Seed 74: where Download and Download selected are, and what can be selected
+
+**Question.** The seed asks for `Download` of a selected animation and `Download selected`
+of a batch or a subtree, and the design lets folders and a read-only card be selected for a
+download, but neither says where the actions stand, nor what `Select all`, `Delete selected`
+and `Move to…` do once folders and read-only files can be selected.
+
+**Answer.** `Download` is in the menu of every animation's row, of either storage, and not
+on the bar of the animation playing now, whose three lines stay as they were. `Download
+selected` is in the selection bar. A file of a read-only card gets a checkbox and `Select` in
+its menu; a folder of the card gets a checkbox and `Select` in its menu. `Select all` takes
+the files the filters show of the board's storage and of a card the board may write, as
+before, and neither a file of a read-only card, which is selected by hand, nor a folder.
+`Delete selected` is disabled while a file of the card or a folder is selected, and `Move to…`
+while a folder or a file of a read-only card is: folders move in task 6. A selected folder
+belongs to the storage its row names, so that a folder of the board's own storage is backed
+up with that storage's files and counted under it in the line under the bar.
+
+**Resolution.** `app/www/screens/show.js`, `app/www/screens/selection.js`,
+`app/www/screens/downloads.js`, `docs/android-app.md`.
+
+## Seed 74: the zip writer, its name and its limits
+
+**Question.** The design names the writer `zip-writer.js` and limits it to "above 4 GiB or
+65,535 entries"; the task that ordered this run named `app/www/zip.js`. Which file, and where
+do the limits fall exactly?
+
+**Answer.** `app/www/zip-writer.js`, as the design says: seed 73's reader of a zip is
+`app/www/zip.js` on its branch, and two files of one name would meet when the branches are
+merged. A count of 65,535 entries and a size or an offset of 4,294,967,295 are the values
+that tell a reader to look for zip64, and seed 73's reader refuses them, so the writer takes
+65,534 entries and 4,294,967,294 bytes at most and refuses more before anything is written.
+A folder is an entry of its own only when nothing in the selection lies in it, since the
+paths of its files make it otherwise. The entries' times are the local time the backup
+began.
+
+**Resolution.** `app/www/zip-writer.js`, `docs/android-app.md`.
+
+## Seed 74: one file in flight, and what the manifest holds
+
+**Question.** The design streams each file's CRC-32 into the zip piece by piece, checks each
+source before and after its file, and lists the manifest's members. Is a file written while
+it is read, and what does the manifest say beyond the list?
+
+**Answer.** Each file is read whole into the phone's memory, one at a time, and checked
+before its entry is written: its row, by id, path and size, before and after the read, in a
+fresh part of its level's list from the position the row was last seen at, one request, and
+in the whole level only when the row is not there, the part after a file serving before the
+next when it holds that row, so that a level of N files costs about N requests of `list` and
+not N²/9; its size in every piece; and its bytes against the key of its storage's catalog,
+when the app knows it. A file that fails leaves no entry, and the zip
+holds only checked files; the writer still counts the CRC-32 as the pieces pass. The
+manifest has, beside the design's members, `format` `odrig-backup`, the target's address,
+the moment, the generation of the storage's catalog, and for each file its entry, its id and
+a reason when it failed; `settings` holds the file's own and inherited ignore and `start`
+with `saved`'s brightness and repeat, and `savedUnknown`: null when `saved` answered, else why
+those three are null, the code of its refusal, `busy` after five tries half a second apart,
+or `not-asked` for a file that was not read, so that a restore does not take an unknown
+setting for none; `outcome` is `saved`, `failed`, `stopped` or
+`not-started`; and each folder of the selection is listed with its entry and its ignore. A
+file whose read is refused, a quarantined one among them, fails with its fault, since
+`read` answers `unavailable` for it.
+
+**Resolution.** `app/www/backups.js`, `docs/android-app.md`.
+
+## Seed 74: a selection of both storages, Stop, a change of target
+
+**Question.** A selection at the root may hold files of both storages, and a backup holds
+one. What does `Download selected` do then, and what do `Stop`, a change of target and a
+hidden app do to a backup?
+
+**Answer.** The dialog names the storage and the level the entries are named from before
+anything is read; for a selection of both storages it has a `Storage` choice and says that
+each storage is backed up in its turn, so that nothing is merged. `Stop` ends the run between
+two pieces of a file, or as the piece under way ends, whatever its reply, a lost link too:
+the zip is saved with the files read whole before, and says it is partial; a single
+`Download` saves nothing then. A sink that cannot be written ends the run with nothing
+saved. A change of target ends a run with nothing
+saved, since the files after it would be another target's. While the app is hidden nothing
+is sent, and a request withdrawn then is sent again when it is shown. The app makes no
+other change while a run goes on.
+
+**Resolution.** `app/www/screens/downloads.js`, `app/www/backups.js`, `docs/android-app.md`.
+
+## Seed 74: reads of a download among the app's other requests
+
+**Question.** The app sends one request at a time, and what the operator asks for goes before
+a status; a backup of many files is thousands of reads. How does the status go on, and where
+is the probe of the count made?
+
+**Answer.** The reads and the lists of a download or a backup are requests in the background:
+a status that is due goes before them, once a second, and they do not make a status due
+themselves, as an operator's request does. Each piece of a file is a request of its own, the
+reads of `Edit` and of a move too. The client sends `read <id> 0 1` once for each target
+before the first piece; `bad-argument` means an installation without the count, which is then
+read 600 bytes at a time. The answer is kept for the target, and the address may name another
+installation later: a read with the count refused with `bad-argument` sends `read <id> 0 1`
+again, and when that is refused too the read and the ones after it go without the count.
+
+**Resolution.** `app/www/client.js`, `docs/android-app.md`.
+
+## Seed 74: the APK's plugin that saves a file
+
+**Question.** The design gives the APK a plugin `begin`/`append(base64)`/`finish` that saves
+through the Storage Access Framework. What is its name, what does it keep, and how does the
+web code reach it while only `target.js` knows the native shell?
+
+**Answer.** `SavePlugin.java`, the plugin `Save`: `begin` opens one file in the app's cache,
+`append` adds bytes given in base64, `finish` closes it and opens the system's dialog of
+creating a document with the name and the media type; the file is copied to the place chosen
+and removed from the cache, and a dialog closed without a place resolves `saved: false`.
+`abandon` removes the file of a run that ends without saving; the next `begin` and the
+plugin's start remove what one that did not arrive left. The call of `finish` is released on
+the main thread, as the bridge keeps its calls there. It asks for no permission. `target.js` gives the shell to `save.js` through `shell()`, and stays the
+one file that names Capacitor. In a browser the file is a download of a Blob, the pieces
+folded into it every megabyte.
+
+**Resolution.** `app/android/app/src/main/java/app/odrig/operators/SavePlugin.java`,
+`app/www/save.js`, `app/www/target.js`, `docs/android-app.md`.
+
+## Seed 74: the refusals of a read's count
+
+**Question.** Is a count judged before the id, and does the form without a count change?
+
+**Answer.** The count is judged with the other words, so a count of 0 or above 720 is
+`bad-argument` whatever the id, and `read 1 0 0` stays `bad-argument` as before. The form of
+three words keeps its 600 bytes. Every other refusal is the form's without a count, and a
+folder of the card is `in-use`, as it was.
+
+**Resolution.** `core/src/commands.cpp`, `docs/commands.md`.
+
+## Seed 74: the command tool's examples of `saved` and `folder`
+
+**Question.** Part A added `saved ID` and `folder make external PATH` to the command tool, but
+the page of the emulator gave neither a synopsis nor an example, and its test of the tool's
+commands by each transport failed. Is that mended here, where `read`'s line changes?
+
+**Answer.** Yes: the page gives both, with an example by each transport, beside `read ID
+OFFSET [COUNT]`.
+
+**Resolution.** `docs/emulator.md`.
+
+## Seed 74: the bound of a read's count in the chunk buffer
+
+**Question.** The bytes of `read` pass through the chunk buffer of 1,500 bytes, but a rebuild
+of a catalog keeps its pages' counts and CRC-32s there from byte 1,400 between its steps, and
+`read` is not refused while one runs. Which bound does a count meet?
+
+**Answer.** 1,400: the offset of the kept pages, `kKeptPages`, moves from `catalog.cpp` to
+`storage.h` beside `kChunkSize`, and the `static_assert` of `content.cpp` holds both forms of
+`read` under it. 720 is far below; no rebuild's pages are touched by a read.
+
+**Resolution.** `core/src/storage.h`, `core/src/content.cpp`, `core/src/catalog.cpp`,
+`docs/core.md`.
