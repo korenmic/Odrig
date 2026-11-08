@@ -352,9 +352,9 @@ class OdrigUsermod : public Usermod {
     // What the player logged last before a reset goes to the log before it starts again.
     OdrigLog::retained();
     odrig_host host = OdrigLog::withLog(OdrigDrive::withDrive(OdrigFiles::host()));
+    host.identity = identityHost;
     host.about = aboutHost;
     internalFreeAtStart = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    host.identity = identityHost;
     core = odrig_core_begin(&host);
     startMs = (uint32_t)(OdrigFiles::nowMs() - before);
 #ifdef ODRIG_PROBE

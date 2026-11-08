@@ -68,8 +68,8 @@ changing the file changes no board.
 
 Flashing an application `.bin` at0x10000 with a phone flasher updates only the
 program. It does not perform `install-firmware` or `set-wifi`, so a new board can
-retain WLED's hotspot name and password. Fresh Odrig player initialization does not
-alter those saved Wi-Fi settings. They can also be changed in WLED's Wi-Fi settings
+retain WLED's hotspot name and password. The player writes nothing at its start, so a
+fresh board keeps those saved Wi-Fi settings. They can also be changed in WLED's Wi-Fi settings
 page, as described below.
 
 ## What else changes them
