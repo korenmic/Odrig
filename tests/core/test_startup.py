@@ -171,13 +171,13 @@ class EachReason(unittest.TestCase):
         status = support.without_readiness(json.loads(run.lines[1][len("reply "):]))
         self.assertEqual(status, {"ok": True, "on": True, "brightness": 128, "playing": None, "animation": None, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None})
         self.assertEqual(json.loads(run.lines[2][len("reply "):]), {"ok": True, "items": [], "next": None})
-        self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 0), ("pending.txt", 0), ("catalog.txt", 0)))
+        self.assertEqual(run.opened, (("schedule.txt", 0), ("catalog.do", 0), ("mapping.json", 1), ("mapping.json", 1), ("show.json", 0), ("pending.txt", 0), ("catalog.txt", 0)))
 
     def test_a_file_set_with_no_file_opens_these_and_writes_nothing(self):
         run, left = support.start_and_keep({}, [support.line(T0, "status")], ["--trace-files", "--trace-store"])
         self.assertIsNone(run.error)
         self.assertEqual(len(run.legs), 20)
-        self.assertEqual(run.opened, (("catalog.do", 0), ("mapping.json", 0), ("show.json", 0), ("pending.txt", 0), ("catalog.txt", 0)))
+        self.assertEqual(run.opened, (("schedule.txt", 0), ("catalog.do", 0), ("mapping.json", 0), ("show.json", 0), ("pending.txt", 0), ("catalog.txt", 0)))
         self.assertEqual(run.stored, ("remove upload.part 0", "remove show.part 0"))
         self.assertFalse(any(line.startswith("store ") for line in run.lines))
         self.assertEqual(left, {})
