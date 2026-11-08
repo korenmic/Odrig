@@ -190,11 +190,14 @@ async function cancelOpen() {
   }
 }
 
-// The preview of a file that was uploaded, as a single ready-made file's: made on the phone
-// when it can be, the run waiting for the one before it.
-async function preview(item) {
+// A file that was uploaded keeps its preview and its place; the run waits for the preview of
+// the file before it, so that the phone holds at most two files of the batch.
+async function preview(item, making, storage, path) {
+  previews.keep(making);
+  client.uploadedTo(storage, path, making.key);
+  making.release();
   if (run.preview !== null) await run.preview;
-  run.preview = item.facts?.previewSafe ? previews.makeOwn(item.bytes) : null;
+  run.preview = making.done;
 }
 
 // One file's turn. Gives "end" when the run ends with it.
@@ -283,13 +286,15 @@ async function turn(item, guarded) {
       return null;
     }
     setState(item, "sending 0%");
+    const making = previews.makeOwn(item.bytes);
     const how = await send(item, id, checked.path, external, item.replace === true);
     if (how.done) {
       finish(item, "uploaded", external && how.id === null ? "uploaded to the card" : `uploaded as animation ${external ? how.id : id}`);
-      await preview(item);
+      await preview(item, making, form.storage, checked.path);
       item.bytes = undefined;
       return null;
     }
+    making.release();
     const error = how.error;
     if (error instanceof Error && error.message === "the address changed") {
       fail(item, TARGET);

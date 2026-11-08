@@ -29,7 +29,8 @@ export async function prepareReady(file, canvas) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (bytes.length !== file.size) throw new Error("The selected animation changed while it was read.");
   if (!frames) odrgx.decode(bytes);
-  const previewSafe = !frames || (!frameHeader.compressed && bytes.length <= 65536 && frameHeader.frameCount <= 256 && frameHeader.n * frameHeader.frameCount <= 262144);
+  // Every file the checks take gets a preview: the maker reads a compressed body as a stream.
+  const previewSafe = true;
   return {bytes, header, ready: true, previewSafe, ending: container ? ".odrgx" : ".odrg", file};
 }
 

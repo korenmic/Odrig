@@ -10,9 +10,10 @@ import {crc32} from "./crc32.js";
 import defaults from "./thumbnails/catalog.js";
 
 const DATABASE = "odrig-previews";
-const VERSION = 2;
+const VERSION = 3;
 const STORE = "previews";
 const KEYS = "keys";
+const UPLOADS = "uploads";
 
 // The phone's own previews by key, each as the address of its GIF in this run; the open
 // database, or null when the web view keeps none; and who is told when one is added.
@@ -25,6 +26,17 @@ const watchers = new Set();
 const kept = new Map();
 // The starts so far: only the latest keeps the database it opens.
 let starts = 0;
+// The places this phone uploaded to, by `${address} ${storage}`, each the file names it put
+// there with their keys, kept in the store `uploads` as the pairs; and when in this run each
+// name was put there.
+const places = new Map();
+const placedAt = new Map();
+// The previews being made, by key, one at a time in the order they were asked for; and the
+// GIFs this phone made in this run, kept to be written when an upload of their bytes ends.
+const jobs = new Map();
+const queue = [];
+let making = null;
+const gifs = new Map();
 
 // The keys of the default catalog by each of the names it gives them.
 const named = new Map();
@@ -93,7 +105,7 @@ function done(request) {
 function opened(factory) {
   const request = factory.open(DATABASE, VERSION);
   request.onupgradeneeded = () => {
-    for (const name of [STORE, KEYS]) {
+    for (const name of [STORE, KEYS, UPLOADS]) {
       if (!request.result.objectStoreNames.contains(name)) {
         request.result.createObjectStore(name);
       }
@@ -148,8 +160,57 @@ function writeKeys(write) {
   }
 }
 
-// Where the client keeps the keys of the catalogs between two starts of the app.
+function writePlaces(name) {
+  if (database === null) {
+    return;
+  }
+  try {
+    const store = database.transaction(UPLOADS, "readwrite").objectStore(UPLOADS);
+    const named = places.get(name);
+    if (named === undefined || named.size === 0) store.delete(name);
+    else store.put([...named], name);
+  } catch {
+    // The places stay for this run.
+  }
+}
+
+// The folder of a name of a storage: the part before its last `/`, "" for the root.
+function folderOf(name) {
+  return name.includes("/") ? name.slice(0, name.lastIndexOf("/")) : "";
+}
+
+// Where the client keeps the keys of the catalogs between two starts of the app, and the
+// places this phone uploaded to.
 export const keeper = {
+  placed(address, storage, name) {
+    return places.get(keptName(address, storage))?.get(name) ?? null;
+  },
+  place(address, storage, name, key) {
+    const record = keptName(address, storage);
+    if (!places.has(record)) places.set(record, new Map());
+    places.get(record).set(name, key);
+    placedAt.set(`${record}\u0000${name}`, performance.now());
+    writePlaces(record);
+  },
+  unplace(address, storage, name) {
+    const record = keptName(address, storage);
+    if (places.get(record)?.delete(name)) writePlaces(record);
+  },
+  // A complete list of a folder of a storage, asked from its first part at `began`, drops the
+  // places of that folder it does not name that were kept before it was asked.
+  unlisted(address, storage, folder, listed, began) {
+    const record = keptName(address, storage);
+    const named = places.get(record);
+    if (named === undefined) return;
+    let dropped = false;
+    for (const name of [...named.keys()]) {
+      if (folderOf(name) === folder && !listed.has(name) && (placedAt.get(`${record}\u0000${name}`) ?? -Infinity) < began) {
+        named.delete(name);
+        dropped = true;
+      }
+    }
+    if (dropped) writePlaces(record);
+  },
   kept(address, storage) {
     return kept.get(keptName(address, storage)) ?? null;
   },
@@ -184,7 +245,7 @@ export async function start(factory = typeof indexedDB === "undefined" ? null : 
         database = null;
       }
     };
-    const writing = found.transaction([STORE, KEYS], "readwrite");
+    const writing = found.transaction([STORE, KEYS, UPLOADS], "readwrite");
     const previews = writing.objectStore(STORE);
     const keys = await done(previews.getAllKeys());
     const gifs = await done(previews.getAll());
@@ -209,6 +270,21 @@ export async function start(factory = typeof indexedDB === "undefined" ? null : 
       const keys = kept.get(name);
       store.put({generation: keys.generation, entries: keys.entries, names: [...keys.byName]}, name);
     }
+    // The places kept at an earlier start, under those of this run.
+    const uploads = writing.objectStore(UPLOADS);
+    const placeNames = await done(uploads.getAllKeys());
+    const placePairs = await done(uploads.getAll());
+    placeNames.forEach((record, at) => {
+      if (typeof record !== "string" || !Array.isArray(placePairs[at])) return;
+      const earlier = new Map(placePairs[at].filter((pair) => Array.isArray(pair) && pair.length === 2 && typeof pair[0] === "string" && typeof pair[1] === "string"));
+      for (const [name, key] of places.get(record) ?? []) earlier.set(name, key);
+      places.set(record, earlier);
+    });
+    for (const [record, named] of places) uploads.put([...named], record);
+    // The previews made in this run that an upload asked to keep.
+    for (const [key, gif] of gifs) {
+      if (gif.kept) previews.put(gif.blob, key);
+    }
     // A later start replaces this one: the database it opened is left.
     if (mine !== starts) {
       found.close();
@@ -223,49 +299,117 @@ export async function start(factory = typeof indexedDB === "undefined" ? null : 
   }
 }
 
-// Makes the preview of bytes this phone uploaded, a step at a time between the app's other
-// work, and keeps it by their key, in the phone's own catalog and for this run. A key that
-// either catalog has, and bytes that make no preview, are left as they are, and nothing is
-// said. Gives a promise that settles when the preview is made or refused.
-export function makeOwn(bytes) {
-  const key = `${crc32(bytes)}-${bytes.length}`;
-  if (inDefaults(key) || own.has(key)) {
-    return Promise.resolve();
+function writeGif(key, blob) {
+  if (database === null) {
+    return;
   }
-  let making;
   try {
-    making = previewMaker(bytes);
+    database.transaction(STORE, "readwrite").objectStore(STORE).put(blob, key);
   } catch {
-    return Promise.resolve();
+    // The preview stays for this run.
   }
-  let settle;
-  const made = new Promise((resolve) => {
-    settle = resolve;
-  });
+}
+
+// Makes the next preview asked for, a step at a time between the app's other work.
+function nextMaking() {
+  if (making !== null) return;
+  while (queue.length > 0 && queue[0].stopped) queue.shift();
+  if (queue.length === 0) return;
+  making = queue.shift();
+  const job = making;
+  const finish = (preview) => {
+    making = null;
+    jobs.delete(job.key);
+    job.bytes = null;
+    if (preview !== null) {
+      const blob = new Blob([preview], {type: "image/gif"});
+      gifs.set(job.key, {blob, kept: job.kept});
+      own.set(job.key, URL.createObjectURL(blob));
+      if (job.kept) writeGif(job.key, blob);
+      told();
+    }
+    job.settle();
+    setTimeout(nextMaking, 0);
+  };
+  let maker;
+  try {
+    maker = previewMaker(job.bytes);
+  } catch {
+    finish(null);
+    return;
+  }
   const step = () => {
+    if (job.stopped) {
+      finish(null);
+      return;
+    }
     try {
-      if (!making.step()) {
+      if (!maker.step()) {
         setTimeout(step, 0);
         return;
       }
     } catch {
-      settle();
+      finish(null);
       return;
     }
-    const gif = new Blob([making.preview], {type: "image/gif"});
-    own.set(key, URL.createObjectURL(gif));
-    told();
-    if (database !== null) {
-      try {
-        database.transaction(STORE, "readwrite").objectStore(STORE).put(gif, key);
-      } catch {
-        // The preview stays for this run.
-      }
-    }
-    settle();
+    finish(maker.preview);
   };
   setTimeout(step, 0);
-  return made;
+}
+
+// Makes the preview of bytes this phone sends, or is about to: one at a time, in the order
+// they were asked for, the preview this run's at once when it is made. A key that either
+// catalog has, and bytes that make no preview, are left as they are, and nothing is said.
+// Gives a handle: `key`, `done`, a promise that settles when the preview is made or refused,
+// and `release()`, which stops a making that no other handle waits for. `keep(handle)` writes
+// the preview into the phone's own catalog, now or when it is made.
+export function makeOwn(bytes) {
+  const key = `${crc32(bytes)}-${bytes.length}`;
+  let job = jobs.get(key);
+  if (job === undefined) {
+    if (inDefaults(key) || own.has(key)) {
+      return {key, done: Promise.resolve(), release() {}};
+    }
+    let settle;
+    const done = new Promise((resolve) => {
+      settle = resolve;
+    });
+    job = {key, bytes, waiting: 0, kept: false, stopped: false, done, settle};
+    jobs.set(key, job);
+    queue.push(job);
+    nextMaking();
+  }
+  job.waiting += 1;
+  let released = false;
+  return {
+    key,
+    done: job.done,
+    release() {
+      if (released) return;
+      released = true;
+      job.waiting -= 1;
+      if (job.waiting === 0 && jobs.get(key) === job) {
+        job.stopped = true;
+        jobs.delete(key);
+        job.settle();
+      }
+    },
+  };
+}
+
+// The upload of a handle's bytes ended with success: its preview is written into the phone's
+// own catalog, now or when it is made.
+export function keep(handle) {
+  const job = jobs.get(handle.key);
+  if (job !== undefined) {
+    job.kept = true;
+    return;
+  }
+  const gif = gifs.get(handle.key);
+  if (gif !== undefined && !gif.kept) {
+    gif.kept = true;
+    writeGif(handle.key, gif.blob);
+  }
 }
 
 // Shows a preview in a square, or nothing: the image is made, changed or taken out only when
