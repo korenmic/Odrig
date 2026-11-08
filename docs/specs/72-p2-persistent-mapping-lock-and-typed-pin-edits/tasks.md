@@ -18,7 +18,7 @@ seen failing first.
     `docs/drifts.md`.
   - Requirements: 3.1.
 
-- [ ] 4. Deliver
+- [x] 4. Deliver
   - Every suite that runs here; the pull request; the APK built from the branch that joins
     every unmerged seed, and its place on the Drive in `verification.md`.
   - Requirements: 1.1, 2.1.
