@@ -13576,3 +13576,36 @@ over Wi-Fi sends more slowly; the preview's delay after success does not depend 
 
 **Resolution.** The Definition of Done's measurement is made; the owner's check on a phone
 stays open. No file of the repository changed for it.
+
+## Seed 65: the fresh board's files, beside seeds 76 and 78
+
+**Question.** Seed 65 installs on a board whose `/odrig` folder is absent or empty, at
+the start and before the core, the installation's mapping and an empty show of
+brightness 32, through a `fresh-init` folder that it makes and removes again
+(`firmware/usermod/odrig_bootstrap.h`, called from `OdrigFiles::host()`). Seed 76 has the
+core play such a board on the mapping it holds and an empty show of brightness 128 and
+write nothing at the start; seed 78 has the firmware write nothing at the start, make no
+folder in `setup()`, call `ODRIG_FS.mkdir` once, in `write_open`, and never `rmdir`. With
+all three, which one makes a fresh board usable?
+
+**Answer.** Seeds 76 and 78, and seed 65's start-time installation goes. What seed 65
+requires of a fresh store, its requirement 1.5, holds without it: the canvas is 60 x 60,
+nothing plays and every LED is dark, `rotation` is supported, read and saved whatever
+content there is (seed 65's own core change), `write_open` makes the folder for
+`rotation.part` as for any file, the first upload is accepted, and no operator file is
+replaced because nothing is written at the start. Keeping the installation would break
+seed 78's requirements 2.1, 2.4 and 4.1, which its tests pin (the host fixture of
+`test_usermod_files_host.py` sees no folder, no `mkdir` and no write at the start, and
+the text rule forbids `rmdir`), and seed 76's rule that nothing is written at the start;
+and a board and the emulator would start the same empty folder with two different
+shows. The first show file of a fresh board therefore has brightness 128, seed 76's
+value, not 32. Seed 65's specification keeps its record of task 4 as it was built.
+
+**Resolution.** `firmware/usermod/odrig_files.cpp` (no `BootstrapStore`, no call before
+`askSpace()`), `firmware/usermod/odrig_bootstrap.h` and
+`tests/firmware/test_fresh_board.py` removed, `tests/firmware/test_usermod_files.py` with
+seed 78's rules again,
+`tests/core/test_rotation.py`, whose upload and four rotations now start from an empty
+folder, `docs/firmware.md`, "What the firmware does", and `docs/wifi.md`. This entry
+supersedes the bootstrap part of the entry "Seed 65: fresh storage and content-independent
+orientation"; its content-independent orientation stands.

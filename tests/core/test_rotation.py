@@ -38,20 +38,20 @@ def picture(run, files):
 
 
 class Rotation(unittest.TestCase):
-    def test_fresh_production_bootstrap_accepts_an_upload_and_all_rotations(self):
-        from tests.firmware.test_fresh_board import initialize
+    def test_an_empty_folder_accepts_an_upload_and_all_rotations(self):
         from .test_upload import Script
 
-        fresh = initialize()['files']
         payload = files_for()['picture.odrg']
-        with support.installed(fresh) as folder:
+        with support.installed({}) as folder:
             initial = support.session(folder, [support.line(0, 'status'), support.line(0, 'rotation')])
             self.assertIsNone(initial.error)
             self.assertTrue(replies(initial)[-1]['supported'])
             uploaded = support.session(folder, Script().upload(1, 'probe.odrg', payload).lines)
             self.assertTrue(all(value['ok'] for value in replies(uploaded)))
-            self.assertEqual(support.folder_files(folder)['probe.odrg'], payload)
-            files = {'mapping.json': fresh['mapping.json'].decode('utf-8')}
+            written = support.folder_files(folder)
+            self.assertEqual(written['probe.odrg'], payload)
+            self.assertEqual(written['mapping.json'], support.TARGET_MAPPING.read_bytes())
+            files = {'mapping.json': written['mapping.json'].decode('utf-8')}
             baseline = picture(support.session(folder, ['poll 0']), files)
             before = 0
             for degrees in (90, 180, 270, 0):
