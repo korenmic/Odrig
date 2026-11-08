@@ -201,7 +201,7 @@ async function upload(message) {
     message(messages.ofNoSpace(bytes.length, checked.noSpace, external ? "the card" : undefined));
     return;
   }
-  const id = external ? null : freeId(new Set(fresh.root.map(item => item.id)));
+  const id = external ? null : freeId(new Set(fresh.ids ?? fresh.root.map(item => item.id)));
   if (!external && id === null) throw new Error("Internal storage has no free animation id.");
   const shown = byId("uploading");
   shown.hidden = false;

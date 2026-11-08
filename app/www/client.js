@@ -20,14 +20,16 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 // with the Failure in `failure`. `status` is the newest reply to `status`, `heardAt` the
 // time of the newest reply of any kind, `since` the time the app began with this address,
 // and `answered` whether the target of this address has answered at least once. `level` is
-// the level of the card's folders the list is of, `{path, id}`, "" and null for the root,
-// which holds the show's items too; nothing of another level is kept. `animations` is the
+// the level of the folders the list is of, `{path, id, storage}`, "", null and null for the
+// root, which holds the show's items too, `storage` "internal" for a folder of the board's
+// own storage and "external" for one of the card; nothing of another level is kept. `animations` is the
 // animation items of the level's newest complete list, in its order, each as
 // `{id, file, bytes}` with optional `ignored`, or null while there is none; `cycles` is the
 // ids of its cycles, and `folders` its folders of the card, each `{id, playlist, files}` with
 // its path and the number of its own files, in the order they play. `rootNames` holds what
 // the root's newest list named, `{ids, files}`, the ids and the file names of the show's
-// items and of the root's files, which an upload chooses its id and its name against, or
+// items, of the root's folders and of the root's files, which an upload chooses its id and
+// its name against, and whether the board's own storage has folders, or
 // null while none is known. `space` holds internal and external capacity from the newest reply, or null.
 // `listBusy` says whether the newest `list` request was answered `busy`. `order` is the
 // saved playlist order that goes with the newest list, `{ids, revision}`, or null while
@@ -39,7 +41,7 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 // from before either. `statusCount` counts the replies to `status`, so that a screen can wait
 // for the first one after a command. `statusFresh` requires a valid status after the
 // latest communication failure; replies to other commands cannot restore it.
-export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, level: {path: "", id: null}, rootNames: null,
+export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, level: {path: "", id: null, storage: null}, rootNames: null,
   animations: null, cycles: [], folders: [], space: null,
   listVersion: 0, listBusy: false, order: null, orderVersion: 0, orderKnown: true, catalog: null, keys: {internal: null, external: null}, keysVersion: 0,
   catalogNone: false, pagesRefused: false, statusCount: 0, statusFresh: false};
@@ -58,7 +60,7 @@ let listTimer = null;
 // The list that is being asked for in parts: the items so far and the position to ask
 // for next. Null when none is.
 let listing = null;
-// The folders entered from the root down to the level shown, each `{path, id}`.
+// The folders entered from the root down to the level shown, each `{path, id, storage}`.
 const trail = [];
 let onlyOpened = false;
 // Whether the root's names are due while another level is shown, and the root's list that
@@ -253,8 +255,33 @@ function parentOf(path) {
 
 // What an upload chooses its id and its name against, from the items of the root's list.
 function namesOf(items) {
-  const named = items.filter((item) => typeof item.playlist !== "string");
-  return {ids: named.map((item) => item.id), files: named.filter((item) => typeof item.file === "string").map((item) => item.file)};
+  return {ids: items.map((item) => item.id), files: items.filter((item) => typeof item.file === "string").map((item) => item.file),
+    internal: items.some((item) => typeof item.playlist === "string" && item.external === false)};
+}
+
+// The storage of a folder's row: "internal" for one of the board's own storage.
+function storageOf(row) {
+  return row.external === false ? "internal" : "external";
+}
+
+// Every id of the board's own storage: those of the root's rows, and those of the rows of
+// each of its folders, walked level by level through `list`.
+async function idsWithin(root, list) {
+  const ids = root.map((row) => row.id);
+  const pending = root.filter((row) => typeof row.playlist === "string" && row.external === false).map((row) => row.id);
+  while (pending.length > 0) {
+    const folder = pending.shift();
+    let from = 0;
+    do {
+      const reply = await list(from, folder);
+      for (const row of reply.items) {
+        ids.push(row.id);
+        if (typeof row.playlist === "string" && row.external === false) pending.push(row.id);
+      }
+      from = reply.next;
+    } while (from !== null);
+  }
+  return ids;
 }
 
 // Resolve the captured path without changing the visible level. A failed lookup
@@ -272,7 +299,7 @@ async function recoverLevel(asked, level) {
       do {
         const reply = await commands.list(from, parent);
         if (!current()) return;
-        folder = reply.items.find(item => item.playlist === path) ?? null;
+        folder = reply.items.find(item => typeof item.playlist === "string" && item.playlist === path && storageOf(item) === (level.storage ?? "external")) ?? null;
         from = reply.next;
       } while (folder === null && from !== null);
       if (folder === null) {
@@ -281,7 +308,7 @@ async function recoverLevel(asked, level) {
           if (!(error instanceof commands.Refusal && ["unknown-command", "bad-argument"].includes(error.code))) throw error;
         }
         if (!current()) return;
-        if (catalog === null || ["ok", "absent", "none"].includes(catalog.external.state)) {
+        if (level.storage === "internal" || catalog === null || ["ok", "absent", "none"].includes(catalog.external.state)) {
           heard();
           trail.length = 0;
           toLevel();
@@ -289,7 +316,7 @@ async function recoverLevel(asked, level) {
         }
         break;
       }
-      found.push({path, id: folder.id});
+      found.push({path, id: folder.id, storage: level.storage ?? "external"});
       parent = folder.id;
     }
     if (found.length === level.path.split("/").length) {
@@ -621,9 +648,11 @@ export function keyOf(animation) {
   if (typeof animation.bytes !== "number") {
     return null;
   }
+  // A file of a folder of the board's own storage is named in its catalog by its stored name.
+  const name = typeof animation.stored === "string" ? animation.stored : animation.file;
   const read = reads.find((one) => one.storage === storage);
   const kept = state.keys[storage];
-  const key = (read === undefined ? undefined : read.byName.get(animation.file)) ?? (kept === null ? undefined : kept.byName.get(animation.file));
+  const key = (read === undefined ? undefined : read.byName.get(name)) ?? (kept === null ? undefined : kept.byName.get(name));
   return key !== undefined && key.endsWith(`-${animation.bytes}`) ? key : null;
 }
 
@@ -807,7 +836,7 @@ export function begin() {
   state.answered = false;
   trail.length = 0;
   onlyOpened = false;
-  state.level = {path: "", id: null};
+  state.level = {path: "", id: null, storage: null};
   state.rootNames = null;
   rootDue = false;
   rooting = null;
@@ -860,11 +889,11 @@ export function showing(name) {
   next();
 }
 
-// Shows another level of the card's folders: `folder`, `{id, playlist}`, a folder of the
+// Shows another level of the folders: `folder`, `{id, playlist, external}`, a folder of the
 // level shown, entered; or with `back` the level above. Its list is read at once, and
 // nothing of the level left is kept.
 export function enter(folder) {
-  trail.push({path: folder.playlist, id: folder.id});
+  trail.push({path: folder.playlist, id: folder.id, storage: storageOf(folder)});
   toLevel();
 }
 
@@ -875,7 +904,7 @@ export function back() {
 
 function toLevel() {
   const top = trail[trail.length - 1];
-  state.level = top === undefined ? {path: "", id: null} : {path: top.path, id: top.id};
+  state.level = top === undefined ? {path: "", id: null, storage: null} : {path: top.path, id: top.id, storage: top.storage};
   state.animations = null;
   state.folders = [];
   state.cycles = [];
@@ -1094,11 +1123,11 @@ export function uploadSnapshot(level) {
     const root = await all(null);
     let items = root;
     let folderValid = level.id === null;
-    if (level.id !== null && space.external?.present === true) {
+    if (level.id !== null && (level.storage === "internal" || space.external?.present === true)) {
       let path = "";
       for (const part of level.path.split("/")) {
         path += (path ? "/" : "") + part;
-        const folder = items.find(row => row.playlist === path);
+        const folder = items.find(row => typeof row.playlist === "string" && row.playlist === path && storageOf(row) === (level.storage ?? "external"));
         if (!folder) break;
         if (path === level.path) folderValid = folder.id === level.id;
         items = await all(folder.id);
@@ -1109,7 +1138,31 @@ export function uploadSnapshot(level) {
       unchanged();
       if (["internal", "external"].some(storage => after[storage].generation !== catalog[storage].generation)) throw new commands.Refusal("stale", "upload preflight");
     }
-    return {space, catalog, root, items, folderValid};
+    const ids = await idsWithin(root, async (from, folder) => {
+      const reply = await commands.list(from, folder);
+      unchanged();
+      return reply;
+    });
+    return {space, catalog, root, items, folderValid, ids};
+  });
+}
+
+// Every id of the board's own storage, its root's and its folders', that a new item's id is
+// chosen against.
+export function takenIds() {
+  return requestOperation("ids", async () => {
+    const asked = target;
+    return idsWithin(await (async () => {
+      const rows = [];
+      let from = 0;
+      do {
+        const reply = await commands.list(from, null);
+        if (asked !== target) throw new Error("the target changed");
+        rows.push(...reply.items);
+        from = reply.next;
+      } while (from !== null);
+      return rows;
+    })(), (from, folder) => commands.list(from, folder));
   });
 }
 

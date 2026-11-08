@@ -17,7 +17,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 
 | Command | Effect |
 |---|---|
-| `play <id>` | Plays the animation with that id, from its first frame, and then goes on with the playlist; plays the cycle with that id; makes the playlist of the card's folder with that id current and plays its first animation. An unavailable animation is refused. |
+| `play <id>` | Plays the animation with that id, from its first frame, and then goes on with the playlist; plays the cycle with that id; makes the playlist of the folder of the board's own storage or of the card with that id current and plays its first animation. An unavailable animation is refused. |
 | `play all` | Plays the playlist, from its first animation, and makes the root playlist current. |
 | `on` | Switches the LEDs on. |
 | `off` | Switches the LEDs off: every LED is dark. Playback time keeps running. |
@@ -27,8 +27,8 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `status` | Reports the current state. |
 | `fault` | Reports the latest fault of a file since the start. |
 | `space` | Reports the free and the total storage and the number of animations. |
-| `list`, `list <from>` | Lists the items of the show and the root's level of a USB drive or a card: the playlists of its folders and its own animations. |
-| `list in <folder-id>`, `list in <folder-id> <from>` | Lists one level of the card: the playlists of a folder's sub-folders and its own animations. |
+| `list`, `list <from>` | Lists the items of the show at the root, the playlists of the folders of the board's own storage, and the root's level of a USB drive or a card: the playlists of its folders and its own animations. |
+| `list in <folder-id>`, `list in <folder-id> <from>` | Lists one level of the board's own storage or of the card: the playlists of a folder's sub-folders and its own animations. |
 | `read <id> <offset>`, `read <id> <offset> <count>` | Reads up to 600 bytes of the file of an animation back, or up to `<count>`, 1 to 720. |
 | `catalog` | Reports the catalog of the board's own storage and of the drive. |
 | `catalog page <storage> <page> <offset>` | Reads up to 512 bytes of a page of the catalog of the board's own storage, `internal`, or of the drive, `external`. |
@@ -36,7 +36,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `catalog cancel` | Ends a rebuild; the catalog stays as it was. |
 | `remove <id>` | Removes an item from the show. |
 | `remove many <ids>` | Atomically removes 1–32 distinct installed animations. |
-| `ignore <id> <value>` | Excludes or includes an animation or external folder in automatic playback. |
+| `ignore <id> <value>` | Excludes or includes an animation, a folder of the board's own storage or an external folder in automatic playback. |
 | `mapping get` | Reports saved pin assignments, their revision and diagnostic state. |
 | `mapping set <revision> <pins>` | Atomically saves a complete comma-separated pin permutation. |
 | `mapping test on` | Shows the built-in diagonal until stopped. |
@@ -54,12 +54,13 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `clocks only` | Plays only the resolved Clocks subtree, and saves the mode. |
 | `clocks message on` | Switches the message after each clock on, and saves it. |
 | `clocks message off` | Switches it off, and saves it. |
-| `upload begin <id> <file> <bytes>` | Opens an upload of an animation; with the file's CRC-32 after `<bytes>`, answers `unchanged` when the last upload installed that file. |
+| `upload begin <id> <file> <bytes>` | Opens an upload of an animation, `<file>` its name or the path of a folder of the board's own storage and its name; with the file's CRC-32 after `<bytes>`, answers `unchanged` when the last upload installed that file. |
 | `upload begin external <file> <bytes>` | Opens an upload of an animation to the drive, when the core may write it. |
 | `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
 | `upload expect <crc32>` | Lets the open upload replace its item's file only while that file is the one the client read. |
 | `upload end <crc32>` | Closes the upload and installs the animation. |
 | `upload cancel` | Discards the open upload. |
+| `folder make internal <path>` | Makes a folder of the board's own storage, listed while it is empty. |
 | `folder make external <path>` | Makes a folder of the card, listed while it is empty. |
 | `debug mini on` | Requests temporary miniature output; status reports host acknowledgement. |
 | `debug mini off` | Requests restoration of normal output. |
@@ -138,7 +139,7 @@ file's override or latest default without restarting its timing. Missing/null
 | `on` | Whether the LEDs are switched on. |
 | `brightness` | Runtime default brightness, 0 to 255, initialized from the show. An animation override does not change this value. |
 | `dimming` | Selected animation brightness before blackout/mini cap as `value`, nullable saved override as `saved` (zero is valid), and nullable settings `error`. `null` when persistence is unsupported; absent in older firmware. A damaged settings file reports `settings-unreadable`. |
-| `playing` | What is being played: `"all"` for the root playlist, the id of the card's folder whose playlist is current while the card is in and holds it, the id of a cycle, or `null`. |
+| `playing` | What is being played: `"all"` for the root playlist, the id of the folder of the board's own storage whose playlist is current, the id of the card's folder whose playlist is current while the card is in and holds it, the id of a cycle, or `null`. |
 | `animation` | The id of the animation item, or of the drive's animation, on the LEDs right now, or `null`. |
 | `fps` | LED refreshes in the last full second. |
 | `error` | `null`, or the reason the show is invalid. |
@@ -147,14 +148,14 @@ file's override or latest default without restarting its timing. Missing/null
 | `checked` | The files the player has read to their end, or found a fault in, since its start: those of the show, each once however many items name it, and those of a drive. While a rebuild runs, the files it has read. |
 | `to_check` | The files it has still to read, or that a rebuild has still to read. No time is given for them. |
 | `unavailable` | The animations unavailable now: the show's whose file had a fault, and the drive's files left out. |
-| `checking` | The name of the file the player reads now, or that a rebuild reads; `catalog` while a drive's catalog is read; or `null`. |
+| `checking` | The name of the file the player reads now, or that a rebuild reads, a file of a folder of the board's own storage by its path, `shows/night/stars.odrg`, each cut to its first 32 characters as a drive's names are; `catalog` while a drive's catalog is read; or `null`. |
 | `host` | The name the board or the emulator gives itself: on the board its build, its storage, the external memory it found and the internal memory free when the core started, and the reason of its last start, at most 127 characters; `null` when it gives none. |
 | `seed` | The seed of the clock on the LEDs, 1 to 4,294,967,295: the number its turn chose when it began, from which [format.md](format.md), "The widget payload", draws every picture of the turn. `null` while the animation whose turn it is is no clock, while nothing plays, and from a `play` until the next refresh. A reply without `seed` comes from a player before it. |
 | `repeat` | The loops of the playlist's turn in progress, while it is reported: the `n` of `repeat <id> <n>`, else the count the show gives the animation, a loop cut by its `max_seconds` counting as one; at most 65,535,000. `null` while no turn is reported, and while the length of its loop is not known yet and no `repeat` gave it a count. A turn is reported while the show is valid, no test of the mapping shows, the playlist plays, `animation` names the animation whose turn it is, and the turn's first refresh was made. |
 | `loop` | The loop in progress of that turn, from 1, at most `repeat`; 1 while the length of its loop is not known yet; `null` while no turn is reported. A loop is a file's frames once, a text's pass, or a clock's `seconds`. |
 | `saved` | The saved repeat of the animation whose turn is reported, 1 to 65,535, or `null` when it has none or no turn is reported. A reply without `repeat`, `loop` and `saved` comes from a player before them. |
-| `file` | The name of the file of the animation `animation` names: an item's file, or a drive's file by its path from the card's folder `odrig`, `night/comet.odrg`; `null` while `animation` is. So a client names what plays without the list that holds it. A reply without `file` comes from a player before it. |
-| `playlist` | The path of the card's folder whose playlist is current while `playing` is its id, `night/deep`; `null` otherwise. |
+| `file` | The name of the file of the animation `animation` names: an item's file, a file of a folder of the board's own storage by its path, `shows/night/stars.odrg`, or a drive's file by its path from the card's folder `odrig`, `night/comet.odrg`; `null` while `animation` is. So a client names what plays without the list that holds it. A reply without `file` comes from a player before it. |
+| `playlist` | The path of the folder of the board's own storage or of the card's folder whose playlist is current while `playing` is its id, `night/deep`; `null` otherwise. |
 | `clocks`, `clock_message` | Compatibility booleans: `clocks` is true in either enabled mode, and `clock_message` enables the message after a clock. A reply without them comes from a player before them. |
 | `clock_mode` | `off`, `between`, or `only`. Older targets without this member support the existing boolean Off/Between interface. |
 | `clock_only` | `null` outside Only; otherwise `{"folder":ID_OR_NULL,"state":STATE}`, with state `playing`, `no-card`, `missing-folder`, or `no-clocks`. The folder is resolved from the active tree/catalog, never remembered by transient ID. In Only, `playing` names that folder and `playlist` is `clocks` while a turn plays. |
@@ -217,8 +218,9 @@ gives no items and `null`, and so does a show without items:
 `"cycle":[]`.
 
 The drive is listed one level at a time. `list` gives the root's level after the items of
-the show: the playlists of the folders right in the card's folder `odrig`, then the files of
-`odrig` itself, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"external":true,"type":"frames"}`.
+the show and the folders of the board's own storage, below: the playlists of the folders
+right in the card's folder `odrig`, then the files of `odrig` itself, each as an animation
+item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"external":true,"type":"frames"}`.
 `list in <folder-id>` and `list in <folder-id> <from>` give the level of the card's folder
 with that id: the playlists of its sub-folders, then its own files, from the position
 `<from>` of that level, with `next` as `list` has it. A file in a sub-folder has its path
@@ -454,8 +456,10 @@ orders them, and the lowest id the index does not hold.
   catalog is read; `read-only` while the core may not write the card; `no-space` when the
   index has no free id; `storage-error` when the folder or the catalog cannot be written,
   the index then as it was.
-- `folder make internal <path>` is `unsupported`: the board's own storage has no folders.
-  A host that cannot make folders answers `unsupported` too, after the form is checked.
+- A host that cannot make folders answers `unsupported`, after the form is checked, and so
+  does one whose `make_folder` answers that its card cannot make them. A board with a USB
+  stick makes folders of its own storage only and never writes the stick, so it answers
+  `read-only` there, or `busy` as above.
 
 An empty folder is a playlist with nothing to play, as a folder whose files are all
 ignored is. An upload into it works as into any folder. Before an upload into a folder the
@@ -463,6 +467,76 @@ board makes each folder of its path that is missing from the card, so that an em
 an operator removed on a computer is there again. The removal of a folder's last file takes
 the folder out of the index only when it has no sub-folder, as before. A `catalog rebuild
 external` lists the card's files, and so keeps no empty folder.
+
+### Folders of the board's own storage
+
+```
+folder make internal shows
+{"ok":true,"id":5,"made":true}
+folder make internal shows/night
+{"ok":true,"id":6,"made":true}
+upload begin 12 shows/night/stars.odrg 52340
+{"ok":true,"chunk":1500}
+list in 5
+{"ok":true,"items":[{"id":6,"playlist":"shows/night","external":false,"files":1,"ignored":false,"inherited_ignored":false}],"next":null}
+list in 6
+{"ok":true,"items":[{"id":12,"file":"shows/night/stars.odrg","bytes":52340,"ignored":false,"external":false,"type":"frames","stored":"2/stars.odrg","inherited_ignored":false}],"next":null}
+```
+
+The board's own storage has folders too, under the owner's approval of 2026-11-06. Each is a
+playlist, as a folder of the card is, with an id from the show's pool: the lowest id no
+item and no folder has, at most 60,000. A file in a folder keeps one name that stays while
+it stays there, its stored name, `<n>/<name>`, where `n`, 1 to 255, is the number of the
+folder; `show.json`, the internal catalog, `repeats.txt`, `brightness.txt` and the board's
+own folders hold that name. What an operator sees is the path: the folder's path, `/` and
+the file's name. [core.md](core.md#internal-folders) says how they are kept.
+
+`folder make internal <path>` makes the folder `<path>`: one to three names under the card's
+naming rule, 93 bytes at most, decoded once from URI escapes, the last not ending in `.odrg`
+or `.odrgx`. Folders are made one level at a time, a new one among its parent's sub-folders
+by the bytes of their names. The reply is that of `folder make external`, and a folder that
+is there at that path answers `"made":false` and writes nothing. Refusals, in this order:
+`bad-argument` for another form; `show-invalid`; `unsupported` on a host whose storage
+cannot be changed or that makes no folders; `busy` while an upload is open or a rebuild
+runs; `storage-error` while the board could not read its folders in this boot; `in-use`
+for a name a sibling has but for the case of its letters; `unknown-id` for a parent that is
+not there; `no-space` at 32 folders, without a free number or id, or with less than 8,298
+bytes free; `storage-error` when the folder or its line cannot be written, the folders then
+as they were.
+
+`upload begin <id> <path> <bytes>` puts a file into a folder: `<path>` is the folder's path,
+`/` and the file's name, 100 bytes at most, decoded once from URI escapes; a name alone is
+the root, as before. A folder that is not there is `unknown-id`, and the id of a folder is
+`in-use`. An upload under the id of an animation of another folder moves the item's file
+there.
+
+`list` gives the folders of the root after the show's items at the root and before the
+card's, each as `{"id":5,"playlist":"shows","external":false,"files":1,"ignored":false,"inherited_ignored":false}`:
+its path, the number of its own animations, its own Ignore and whether a folder above it is
+ignored. `list in <id>` of a folder gives its sub-folders, then its own animations in the
+order of the show, each with its path as `file`, its stored name as `stored`, and
+`inherited_ignored`. `order get in <id>` gives a folder's animations in the saved order,
+and `order move` moves one inside its folder; `order get` gives the root's alone.
+
+`ignore <id> <0|1>` of a folder excludes it and every folder below it from automatic
+playback, and includes it again: its files then play only by `play` of them. `play <id>`
+of a folder makes its playlist current, its own files first and then its sub-folders',
+depth first, and plays the first; a host that keeps no current playlist, one without a
+drive, answers `unsupported`. The root's playlist plays the show's animations at the root,
+then each folder's, then the card's. `read`, `remove`, `remove many`, `saved`, `repeat`
+and `brightness` of a folder's id are `in-use`, as for a folder of the card.
+
+A folder emptied of its last file, with no sub-folder, goes, and so does each folder above
+it that is left empty the same way; a folder made by `folder make internal` stays while it
+was never filled. A folder emptied while a rebuild runs or an upload is received, or by a
+removal that a power cut ended before the folder went, stays as one never filled does, and
+takes files again. No command removes a folder. A show without folders is listed, played
+and saved as before.
+
+A file is a file of its folder while its path is 100 bytes at most, as an upload makes it.
+One that a computer's tool put in a folder of a longer path is listed at the root under its
+stored name, plays with the root's animations and is named so in `status`, as a file is
+whose folder `folders.txt` does not name.
 
 ## Miniature display debug mode
 
@@ -495,22 +569,22 @@ character boundary, so expanded status remains within the fixed reply limit.
 | `unknown-command` | The first word is not a command. |
 | `bad-argument` | An argument is missing, extra, not a number, out of range, or not in its form: a file name outside the naming rule, base64 that is not as described or stands for more bytes than `chunk`, a CRC-32 that is not eight hexadecimal digits, or a word after `upload` that is not `begin`, `data`, `end` or `cancel`. |
 | `show-invalid` | `play`, `list`, `read`, `remove`, `repeat`, `clocks` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
-| `unsupported` | `debug mini` needs a supporting host and an installed60x60 canvas; `folder make internal`, and `folder make` on a host that makes no folders. Judged after syntax. |
+| `unsupported` | `debug mini` needs a supporting host and an installed60x60 canvas; `folder make` on a host that makes no folders, `folder make internal` on one whose storage cannot be changed, and `play` of a folder of the board's own storage on a host that keeps no current playlist. Judged after syntax. |
 | `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
-| `busy` | `repeat <id> <n> save`, `repeat <id> default`, `saved` and the four lines of `clocks` until the player has read every installed animation after a start, while an upload is open and while a rebuild runs; `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read; `folder make` while an upload is open, a rebuild runs, a test shows or the card's catalog is read. |
-| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation or a folder of a USB drive or the card; `repeat <id> <n> save` or `repeat <id> default` names one of nothing `list` lists; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation; `folder make` names a parent folder the card's index has not. A folder's id is unknown while the card is out. |
+| `busy` | `repeat <id> <n> save`, `repeat <id> default`, `saved` and the four lines of `clocks` until the player has read every installed animation after a start, while an upload is open and while a rebuild runs; `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read; `folder make external` while an upload is open, a rebuild runs, a test shows or the card's catalog is read; `folder make internal` while an upload is open or a rebuild runs. |
+| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation or a folder of a USB drive or the card; `repeat <id> <n> save` or `repeat <id> default` names one of nothing `list` lists; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation; `folder make` names a parent folder the card's index or the board's own storage has not; `upload begin` names a folder of the board's own storage that is not there. A folder's id is unknown while the card is out. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
-| `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file; `folder make` names a path whose last name a file or a folder of its parent has, in any case. |
+| `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file, and `remove`, `remove many`, `read`, `saved`, `repeat`, `brightness`, `order move` or `upload begin` names that of a folder of the board's own storage; `folder make` names a path whose last name a file or a folder of its parent has, in any case. |
 | `read-only` | `upload begin external`, `folder make external`, `catalog rebuild`, or `order move` of a file of the drive, while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
 | `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. `repeat <id> <n>`: no turn of that animation is reported. |
 | `order-conflict` | `order move`: the saved order or the listed animations changed since the client read the order's revision; read it again before moving. |
-| `no-space` | `repeat <id> <n> save`: no room is left for another saved repeat; `upload begin`: the file would not fit, or the show has no room for another item; `upload begin external`: the file would not fit on the drive; `folder make`: the card's index has no free id. |
+| `no-space` | `repeat <id> <n> save`: no room is left for another saved repeat; `upload begin`: the file would not fit, or the show has no room for another item; `upload begin external`: the file would not fit on the drive; `folder make external`: the card's index has no free id; `folder make internal`: the board's own storage has 32 folders, no free number or id, or too little room. |
 | `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |
 | `bad-file` | `upload end`: the file is not a valid ODRG file for the canvas. |
-| `storage-error` | The storage could not be read or written. The show is as it was. An upload that met it is discarded. A file an earlier change could not remove is removed before a change; while that fails, the change is refused with this code, and the next start removes it. |
+| `storage-error` | The storage could not be read or written. The show is as it was. An upload that met it is discarded. A file an earlier change could not remove is removed before a change; while that fails, the change is refused with this code, and the next start removes it. `folder make internal` and an upload into a folder while the board could not read its folders in this boot, when its folders' ids are not known either. |
 
 When more than one code applies, the reply has the first in the order of this table.
 
@@ -580,7 +654,7 @@ The protocol is identical over HTTP, board serial and emulator serial or TCP.
 
 ## Playlist inclusion and batch deletion
 
-`ignore <id> <0|1>` persists an animation's or external folder's automatic-playlist exclusion:
+`ignore <id> <0|1>` persists an animation's, an internal folder's or an external folder's automatic-playlist exclusion, an internal folder's in its line of `folders.txt`:
 1 excludes, 0 includes. It is idempotent and returns `{"ok":true}` after durability.
 `list` includes boolean `ignored` on installed animations. External file and folder
 rows also carry their own `ignored` choice and boolean `inherited_ignored`, derived

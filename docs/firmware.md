@@ -226,7 +226,7 @@ python3 firmware/fw.py build [--stock | --probe] [--standalone | --stick | --mic
 python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py big-storage [--port P] [--wait SECONDS]
-python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS] [--dry-run] [--keep-copies DIR]
+python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS] [--dry-run] [--keep-copies DIR] [--replace-folders]
 python3 firmware/fw.py set-wifi [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py set-limit [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py read-limit [--port P]
@@ -265,7 +265,8 @@ with that environment's Python.
 | `check-not-done` | The board answered, but was still reading its installed animations when the time of `--wait` was over. Nothing is wrong with what was written: the command gave up waiting. |
 | `verify-failed` | What is in the flash differs from what was written, or the new storage image does not hold what it should. |
 | `no-space` | The files of a show do not fit into storage. Nothing was written to the board. |
-| `not-a-show-folder` | The folder to install is no folder, holds something that is no file, or holds a file the show does not name. |
+| `not-a-show-folder` | The folder to install is no folder, holds something that is no file but a folder of the board's storage its `folders.txt` names, or holds a file the show does not name. |
+| `folders-present` | `install-show` would remove files of the board's own folders, the numbered folders of `/odrig`, and `--replace-folders` was not given. Nothing was written to the board. |
 | `output-not-empty` | The folder `read-show` is to write, or the folder of `install-show --keep-copies`, exists and is not an empty folder. |
 | `wifi-settings-missing` | The settings file to read is not there or is not a file. |
 | `wifi-settings-malformed` | The settings file is not a JSON object with exactly the strings `name` and `password`. |
@@ -592,6 +593,15 @@ whether it is sound is not known yet.
    start. A catalog the folder holds, as `read-show` copies it, is made anew. The marker
    names the generation after the board's catalog, or 1, and is the board's own when the
    board's catalog has the same pages: the same folder installed again changes nothing.
+   A folder of the board's own storage, [core.md](core.md#internal-folders), is a
+   sub-folder named by its number, `1` to `255`, that the folder's `folders.txt` names,
+   or that a file of its show is in, as `read-show` writes a file whose folder the board's
+   `folders.txt` lacks; its files are installed into `/odrig/<n>/`, and the board's
+   folders that the new `folders.txt` names are there afterwards, empty or not. A board
+   whose folders hold files that the folder does not have is refused with
+   `folders-present`, which names them: `--replace-folders` removes them, and the lines of
+   the board's `folders.txt` with them unless the folder has its own; the file keeps its
+   first line, so that the board's next folder takes the number it would have taken.
    `--no-check` installs any flat folder of files, without a catalog, for trying what the
    board does with an invalid show.
 2. The tool reads the partition table and takes the place and size of `spiffs` from it.
@@ -608,8 +618,9 @@ whether it is sound is not known yet.
    `playlist.txt` of [core.md](core.md#the-saved-playlist), the saved repeats,
    `repeats.txt` of [show.md](show.md#the-saved-repeats), and the clocks' two settings,
    `clocks.txt` of `clocks on|off` and `clocks message on|off`, and saved animation
-   brightness in `brightness.txt` and external inclusion in `ignored.txt`, described in
-   [commands.md](commands.md), may be files of the folder; a folder without them keeps the
+   brightness in `brightness.txt`, external inclusion in `ignored.txt` and the board's own
+   folders in `folders.txt`, described in [commands.md](commands.md), may be files of the
+   folder; a folder without them keeps the
    board's, as installing animations does not change the order, the playlist, the repeats
    or the clocks' settings, animation brightness and external inclusion the operator chose. An explicitly
    supplied settings file replaces that file; one omitted from the folder is kept.
@@ -788,7 +799,8 @@ python3 firmware/fw.py read-show build/show-from-board
 ```
 
 Copies the files of `/odrig` on the board into a folder that is new or empty, among them
-`order.txt`, `playlist.txt`, `repeats.txt`, `clocks.txt`, `brightness.txt` and `ignored.txt` when the board has them, prints each name with
+`order.txt`, `playlist.txt`, `repeats.txt`, `clocks.txt`, `brightness.txt`, `ignored.txt` and `folders.txt` when the board has them, the files of
+its numbered folders into sub-folders of those numbers, prints each name with
 its size, and restarts the board. The folder can then be compared with the one
 the emulator ran:
 
@@ -916,8 +928,10 @@ internal memory has none. The time the core is given is the milliseconds since t
 started, from a 64-bit clock.
 
 **Storage.** The usermod gives the core the seven storage functions of [core.md](core.md),
-on WLED's file system. Every path is `/odrig/<name>`, and a name is checked before it is
-used: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, and not dots alone. The
+on WLED's file system, and `make_folder`. Every path is `/odrig/<name>`, and a name is
+checked before it is used: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, and not
+dots alone, alone or after the number of a folder of the storage, `/odrig/<n>/<name>`, 1 to
+255 without a leading zero. The
 firmware writes, renames and deletes a file only there, and only inside one of these
 functions: nothing of the firmware decides to write. The folder itself is made by
 `write_open`, once, when a write finds it missing: a storage that WLED formatted holds
@@ -932,7 +946,8 @@ as `upload.part`, the show file, first as `show.part`, and `pending.txt`; see
 | `write` | The bytes go to the open file in one write. |
 | `write_close` | The file is closed, and it is whole when storage then holds as many bytes as were given. |
 | `rename` | The file system's rename. A file that has the new name is replaced by it. |
-| `remove` | The file is deleted; a name that has no file is told apart from a failure. |
+| `remove` | The file is deleted; a name that has no file is told apart from a failure. The number of a folder, `<n>`, removes `/odrig/<n>` while it is empty. |
+| `make_folder` | The number of a folder, `<n>`, makes `/odrig/<n>`, an existing one a success; it is never asked to make `/odrig`, which only `write_open` makes. A folder of the card is the card host's, which makes it under its guard; a USB stick answers 0, it makes no folder. |
 | `space` | The total size, and the free bytes in whole blocks of 4,096. |
 | `read_at` | A second file is read beside the one the player has open, and stays open from one call to the next while the calls go on where the last one ended. |
 
@@ -940,8 +955,8 @@ The free space is not asked from the file system at every command: the file syst
 its blocks for it, which takes 30 ms with a small show and 377 ms with 9 MB of files. The
 usermod asks once, before the core starts, and keeps the number of used blocks up from
 then on by the sizes of what it writes, replaces and removes: no block for a file of 512
-bytes or less, and for a longer file the blocks the file system needs for it, the
-pointers at the start of every block counted. `space` is answered from that number
+bytes or less, for a longer file the blocks the file system needs for it, the pointers at
+the start of every block counted, and two blocks for each numbered folder. `space` is answered from that number
 without a call to the file system. The number is taken again at every start.
 
 **Storage calls are paced.** A write to storage takes the file system up to a few hundred

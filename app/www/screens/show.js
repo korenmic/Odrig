@@ -158,7 +158,7 @@ function levelOf(state, all) {
 function enter(entry) {
   closeMenu();
   if (entry === null) client.back();
-  else client.enter({id: entry.id, playlist: entry.path});
+  else client.enter({id: entry.id, playlist: entry.path, external: entry.external});
 }
 
 function countWords(count) {
@@ -630,7 +630,7 @@ function rowsState(state, animations, here) {
   byId("level-back").hidden = here.path === "";
   byId("level-head").setAttribute("aria-current", String(marked === here.path));
   for (const made of byId("animations-list").querySelectorAll(":scope > .folder-row")) {
-    const entry = here.folders.find((item) => item.path === made.dataset.path);
+    const entry = here.folders.find((item) => String(item.id) === made.dataset.id);
     if (entry === undefined) {
       continue;
     }

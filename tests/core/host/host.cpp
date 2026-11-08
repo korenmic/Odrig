@@ -22,6 +22,7 @@
 #include <cstring>
 #include <iostream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -190,7 +191,30 @@ public:
         host.from_ = kFromFiles;
         host.files_ = files;
         host.options_ = options;
+        // A file in a numbered folder brings its folder.
+        for (const auto &file : files) {
+            const size_t slash = file.first.find('/');
+            if (slash != std::string::npos && number_of(file.first.substr(0, slash)) != 0) {
+                host.made_.insert(file.first.substr(0, slash));
+            }
+        }
         return host;
+    }
+
+    // The number of a folder of the storage, 1 to 255 without a leading zero, or 0 for a name
+    // that is no such number.
+    static int number_of(const std::string &name) {
+        if (name.empty() || name.size() > 3 || name[0] == '0' || name.find_first_not_of("0123456789") != std::string::npos) {
+            return 0;
+        }
+        const int number = std::atoi(name.c_str());
+        return number <= 255 ? number : 0;
+    }
+
+    // The folder of a stored name, `<n>/<name>`, or an empty text for a name at the root.
+    static std::string folder_of(const std::string &name) {
+        const size_t slash = name.find('/');
+        return slash != std::string::npos && number_of(name.substr(0, slash)) != 0 ? name.substr(0, slash) : std::string();
     }
 
     static Host of_memory(const std::string &bytes) {
@@ -233,7 +257,7 @@ public:
         functions.drive_list = drive ? drive_list : nullptr;
         functions.drive_bind = drive ? drive_bind : nullptr;
         functions.drive_writable = drive ? drive_writable : nullptr;
-        functions.make_folder = drive && !options_.no_folders ? make_folder : nullptr;
+        functions.make_folder = changes && !options_.no_folders ? make_folder : nullptr;
         if (drive && !options_.drive_pulled) {
             plug();
         }
@@ -708,15 +732,21 @@ private:
         return result;
     }
 
-    // Makes a folder of the drive: a storage call, as `write_open` is.
+    // Makes a folder of the drive, or a numbered folder of the storage: a storage call, as
+    // `write_open` is.
     static int make_folder(void *ctx, const char *name) {
         guard::InHost lowered;
         Host &host = *static_cast<Host *>(ctx);
-        if (!host.of_the_drive(name) || std::strlen(name) <= 6) {
+        const bool numbered = number_of(name) != 0;
+        if ((!numbered && !host.of_the_drive(name)) || (host.of_the_drive(name) && (host.options_.drive.empty() || std::strlen(name) <= 6))) {
             stop("file misuse", kFileMisuse);
         }
         int result = -1;
-        if (host.store_call() && host.may_change(name)) {
+        if (numbered) {
+            if (host.store_call()) {
+                result = host.make_numbered(name) ? 1 : -1;
+            }
+        } else if (host.store_call() && host.may_change(name)) {
             const std::string path = host.path_of(name);
             struct stat status;
 #ifdef _WIN32
@@ -734,6 +764,15 @@ private:
     static int remove(void *ctx, const char *name) {
         guard::InHost lowered;
         Host &host = *static_cast<Host *>(ctx);
+        if (number_of(name) != 0) {
+            // A numbered folder of the storage, removed when it is empty.
+            int result = -1;
+            if (host.store_call()) {
+                result = host.remove_numbered(name);
+            }
+            host.trace("remove", name, result);
+            return result;
+        }
         host.check_name(name);
         if (host.is_open_ && host.open_name_ == name) {
             stop("file misuse", kFileMisuse);
@@ -843,12 +882,14 @@ private:
 
     // Stops the program when a name the core gives is not one of its names: 1 to 32
     // characters of a-z, 0-9, `-`, `_` and `.`, and either the name of an `.odrg` or `.odrgx`
-    // file or one of the fixed names: the files of the show, of changes and of the catalog.
+    // file, alone or in a numbered folder, `<n>/`, or one of the fixed names: the files of
+    // the show, of changes, of the catalog and of the folders.
     void check_name(const char *name) const {
         if (!options_.check_names) {
             return;
         }
-        const std::string given = name;
+        const std::string folder = folder_of(name);
+        const std::string given = folder.empty() ? std::string(name) : std::string(name).substr(folder.size() + 1);
         if (!options_.drive.empty() && of_the_drive(name) && given.size() > 6 &&
             (given.find_first_not_of("0123456789", 6) == std::string::npos || drive_name_sound(name + 6))) {
             return;
@@ -864,8 +905,8 @@ private:
                            given == "show.part" || given == "pending.txt" || given == "mapping.part" ||
                            given == "order.txt" || given == "order.part" || given == "repeats.txt" || given == "repeats.part" || given == "clocks.txt" || given == "clocks.part" || given == "playlist.txt" || given == "playlist.part" || given == "catalog.txt" ||
                            given == "brightness.txt" || given == "brightness.part" || given == "ignored.txt" || given == "ignored.part" ||
-                           given == "catalog.new" || given == "catalog.do" || page;
-        if (!sound || !(animation || fixed)) {
+                           given == "folders.txt" || given == "folders.part" || given == "catalog.new" || given == "catalog.do" || page;
+        if (!sound || !(animation || fixed) || (!folder.empty() && !animation)) {
             stop("file misuse", kFileMisuse);
         }
     }
@@ -912,6 +953,9 @@ private:
             return false;
         }
         if (from_ == kFromFiles && !writing_drive_) {
+            if (!folder_of(name).empty() && made_.count(folder_of(name)) == 0) {
+                return false;
+            }
             files_[name].clear();
             return true;
         }
@@ -943,7 +987,8 @@ private:
         }
         if (from_ == kFromFiles && !of_the_drive(from)) {
             auto file = files_.find(from);
-            if (file == files_.end()) {
+            // A file goes into a numbered folder only when the folder was made.
+            if (file == files_.end() || (!folder_of(to).empty() && made_.count(folder_of(to)) == 0)) {
                 return false;
             }
             std::string content = file->second;
@@ -978,6 +1023,51 @@ private:
         return errno == ENOENT ? 0 : -1;
     }
 
+    // Makes a numbered folder of the storage: true when it is there afterwards.
+    bool make_numbered(const char *name) {
+        if (from_ == kFromFiles) {
+            if (files_.count(name) != 0) {
+                return false;
+            }
+            made_.insert(name);
+            return true;
+        }
+        const std::string path = path_of(name);
+        struct stat status;
+#ifdef _WIN32
+        std::error_code failure;
+        const bool made = std::filesystem::create_directory(path, failure);
+#else
+        const bool made = ::mkdir(path.c_str(), 0777) == 0;
+#endif
+        return made || (stat(path.c_str(), &status) == 0 && S_ISDIR(status.st_mode));
+    }
+
+    // Removes an empty numbered folder of the storage: 1 when it removed one, 0 when there was
+    // none, -1 when it holds a file or could not be removed.
+    int remove_numbered(const char *name) {
+        if (from_ == kFromFiles) {
+            const std::string prefix = std::string(name) + "/";
+            for (const auto &file : files_) {
+                if (file.first.compare(0, prefix.size(), prefix) == 0) {
+                    return -1;
+                }
+            }
+            return made_.erase(name) != 0 ? 1 : 0;
+        }
+        const std::string path = path_of(name);
+        struct stat status;
+        if (stat(path.c_str(), &status) != 0) {
+            return 0;
+        }
+#ifdef _WIN32
+        std::error_code failure;
+        return std::filesystem::remove(path, failure) ? 1 : -1;
+#else
+        return ::rmdir(path.c_str()) == 0 ? 1 : -1;
+#endif
+    }
+
     bool whole_file(const char *name, std::string *content) {
         if (from_ == kFromFiles) {
             auto file = files_.find(name);
@@ -994,42 +1084,58 @@ private:
         return loaded;
     }
 
-    // The space the files take: the size of each, rounded up to a whole block.
+    // The space the files take: the size of each, rounded up to a whole block, and two
+    // blocks for each numbered folder, with the files in it.
     uint64_t used_bytes() const {
         uint64_t used = 0;
         if (from_ == kFromFiles) {
             for (const auto &file : files_) {
                 used += (file.second.size() + kStorageBlock - 1) / kStorageBlock * kStorageBlock;
             }
-            return used;
+            return used + 2 * kStorageBlock * made_.size();
         }
+        return used_in(folder_, true);
+    }
+
+    uint64_t used_in(const std::string &folder, bool top) const {
+        uint64_t used = 0;
 #ifdef _WIN32
         std::error_code failed;
-        for (const auto &entry : std::filesystem::directory_iterator(folder_, failed)) {
+        for (const auto &entry : std::filesystem::directory_iterator(folder, failed)) {
             if (entry.is_regular_file(failed)) {
                 used += (static_cast<uint64_t>(entry.file_size(failed)) + kStorageBlock - 1) / kStorageBlock * kStorageBlock;
+            } else if (top && entry.is_directory(failed) && number_of(entry.path().filename().string()) != 0) {
+                used += 2 * kStorageBlock + used_in(entry.path().string(), false);
             }
         }
         return used;
 #else
-        DIR *folder = opendir(folder_.c_str());
-        if (folder == nullptr) {
+        DIR *opened = opendir(folder.c_str());
+        if (opened == nullptr) {
             return 0;
         }
-        while (const dirent *entry = readdir(folder)) {
+        while (const dirent *entry = readdir(opened)) {
             struct stat status;
-            if (stat(path_of(entry->d_name).c_str(), &status) == 0 && S_ISREG(status.st_mode)) {
+            const std::string path = folder + "/" + entry->d_name;
+            if (stat(path.c_str(), &status) != 0) {
+                continue;
+            }
+            if (S_ISREG(status.st_mode)) {
                 used += (static_cast<uint64_t>(status.st_size) + kStorageBlock - 1) / kStorageBlock * kStorageBlock;
+            } else if (top && S_ISDIR(status.st_mode) && number_of(entry->d_name) != 0) {
+                used += 2 * kStorageBlock + used_in(path, false);
             }
         }
-        closedir(folder);
+        closedir(opened);
         return used;
 #endif
     }
 
-    // Loads a file of the folder: 1 when loaded, 0 when there is no such file, -1 otherwise.
+    // Loads a file of the folder, or of one of its numbered folders: 1 when loaded, 0 when
+    // there is no such file, -1 otherwise.
     int load(const char *name) {
-        if (std::strchr(name, '/') != nullptr) {
+        const char *slash = std::strchr(name, '/');
+        if (slash != nullptr && (folder_of(name).empty() || std::strchr(slash + 1, '/') != nullptr)) {
             return -1;
         }
         std::string path = folder_ + "/" + name;
@@ -1081,6 +1187,7 @@ public:
     size_t offset_ = 0;
     size_t reads_ = 0;
 
+    std::set<std::string> made_;    // the numbered folders of files held in memory
     bool writing_ = false;
     std::string writing_name_;
     std::FILE *written_ = nullptr;

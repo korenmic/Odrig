@@ -46,6 +46,10 @@ void storage_settle_pending(Core &core);
 // nothing is left to clean up; a change is made only then.
 bool storage_cleanup(Core &core);
 
+// The stored name of the file of the open upload to the storage, into room for
+// kStoredNameRoom characters: its name, after its folder's number when it has one.
+void upload_stored_name(const Upload &upload, char *into);
+
 // Puts the upload whose check has passed in place: its file under its name, and its item
 // into the show in storage and then into the tables, as a new last item or in place of
 // the animation the item with its id had. What plays starts again when its file was

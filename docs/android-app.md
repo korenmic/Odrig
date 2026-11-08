@@ -610,6 +610,16 @@ for a name and make that folder there with `folder make external`: both make the
 folder, since every folder of the card is a playlist, and neither plays anything. A board
 whose firmware answers `unknown-command` is told so.
 
+The board's own storage has folders too, listed at the root among the card's, each row
+saying its storage, and entered as the card's are: its rows give each file's path,
+`Internal /shows/night/stars.odrg`, and the name the board keeps it under, by which its
+preview is found in the internal catalog. At a level of the board's storage `New folder` and
+`New playlist folder` make the folder there with `folder make internal`; at the root the
+dialog asks for the storage, `Internal` or `External`, the card only while the board may
+write it. A new animation's id is chosen free among the root's ids and those of every
+folder of the board's storage, which the app lists for that. An upload prepared at a level
+of the board's storage goes into that folder, `Internal /shows/x.odrg`.
+
 `Move to…` opens a chooser of the destination: `External storage` with every folder of the
 card, or `Internal storage`, the card disabled with its reason while it is absent, read-only
 or without a ready catalog. Before anything is sent it lists each file's new full path, and
@@ -624,7 +634,10 @@ brightness, repeat and whether it is the show's start read with `saved` (the sta
 moved); the bytes uploaded to the destination with the absence guard, the card's folders
 made again when one is missing; the new file given the old one's ignore choice, brightness
 and repeat, and the old one's brightness and repeat removed; and the old file removed only
-after a fresh listing shows its id with its path and size. `Stop` ends the run after the file
+after a fresh listing of its own level shows its id with its path and size: a file of a
+folder of the board's storage is looked for in that folder, and a folder is found by its
+path among the folders of its own storage alone, since both storages may have a folder of
+one path. `Stop` ends the run after the file
 under way; the end says what was moved, skipped, failed and left unstarted. The run waits
 while the app is hidden and ends with a change of target.
 
@@ -699,8 +712,10 @@ do not determine whether storage is present.
 
 The form captures the folder browsed when selecting the file, independent of playback.
 External in `night/deep` shows `External /night/deep/file.odrg`. Combined root uses
-the chosen storage root. Internal always shows its flat root, `Internal /file.odrg`,
-and explains that a browsed SD folder was not retained. Navigation cannot move the
+the chosen storage root. A folder of the board's own storage, `shows`, starts with
+`Internal` and shows `Internal /shows/file.odrg`. Internal chosen at a level of the card
+shows its root, `Internal /file.odrg`, and explains that a browsed SD folder was not
+retained. Navigation cannot move the
 prepared destination. The editable basename must obey the32-byte naming rule; the
 external full path obeys the100-byte/three-level catalog rule. Folders must exist.
 

@@ -178,14 +178,15 @@ export async function fault() {
 }
 
 // One part of the items of a level, in its order, from a position on: of the root, the
-// show's items and the root's folders and files of the card; of the card's folder with the
-// id `folder`, its sub-folders and its own files. Each animation as `{id, file, bytes}`
-// with the booleans `ignored` and `external` and the text `type` when the target gives
-// them and `fault`, the reason it is unavailable, when it has one, and `bytes` null while
-// the installation has not read it whole; each folder of the card as `{id, playlist}`
-// with its path, and `files`, the number of its own files, when the target gives it; each
-// cycle as `{id, cycle: true}`; and `next`, the position to ask for next, or
-// null when the part holds the last item.
+// show's items, the folders of the board's own storage and the root's folders and files of
+// the card; of a folder with the id `folder`, its sub-folders and its own files. Each
+// animation as `{id, file, bytes}` with the booleans `ignored` and `external` and the text
+// `type` when the target gives them, `stored`, the name the board's storage keeps a file of
+// one of its folders under, and `fault`, the reason it is unavailable, when it has one, and
+// `bytes` null while the installation has not read it whole; each folder as
+// `{id, playlist, external}` with its path, and `files`, the number of its own files, when
+// the target gives it; each cycle as `{id, cycle: true}`; and `next`, the position to ask
+// for next, or null when the part holds the last item.
 export async function list(from = 0, folder = null) {
   const reply = folder === null ? await carriedOut(`list ${from}`) : await carriedOut(`list in ${folder} ${from}`);
   const sound =
@@ -202,9 +203,10 @@ export async function list(from = 0, folder = null) {
         (item.external === undefined || typeof item.external === "boolean") &&
         (item.type === undefined || typeof item.type === "string") &&
         (item.fault === undefined || typeof item.fault === "string") &&
+        (item.stored === undefined || (typeof item.stored === "string" && typeof item.file === "string" && item.external === false)) &&
         ((typeof item.file === "string" && item.playlist === undefined && (item.bytes === null || whole(item.bytes, 0, MOST_BYTES))) ||
-          (typeof item.playlist === "string" && item.playlist.length > 0 && item.external === true && item.file === undefined && item.cycle === undefined &&
-            item.bytes === undefined && item.type === undefined && item.fault === undefined) ||
+          (typeof item.playlist === "string" && item.playlist.length > 0 && typeof item.external === "boolean" && item.file === undefined && item.cycle === undefined &&
+            item.bytes === undefined && item.type === undefined && item.fault === undefined && item.stored === undefined) ||
           (Array.isArray(item.cycle) && item.file === undefined && item.playlist === undefined && item.ignored === undefined && item.external === undefined &&
             item.inherited_ignored === undefined && item.type === undefined && item.fault === undefined)),
     );
@@ -215,6 +217,7 @@ export async function list(from = 0, folder = null) {
     items: reply.items.map((item) => (typeof item.file === "string" ? {id: item.id, file: item.file, bytes: item.bytes, ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
       ...(item.inherited_ignored === undefined ? {} : {inheritedIgnored: item.inherited_ignored}),
       ...(item.external === undefined ? {} : {external: item.external}), ...(item.type === undefined ? {} : {type: item.type}),
+      ...(item.stored === undefined ? {} : {stored: item.stored}),
       ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist, external: item.external, ...(item.files === undefined ? {} : {files: item.files}),
       ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
       ...(item.inherited_ignored === undefined ? {} : {inheritedIgnored: item.inherited_ignored})} :
@@ -247,11 +250,14 @@ export async function remove(id) {
   await carriedOut(`remove ${id}`);
 }
 
-// Makes a folder of the card with this path, its parent there already. Gives `{id, made}`,
-// `made` false for a folder that was there.
-export async function folderMake(path) {
+// Makes a folder of a storage, "external", the card, or "internal", the board's own, with
+// this path, its parent there already. Gives `{id, made}`, `made` false for a folder that
+// was there.
+export async function folderMake(path, storage = "external") {
   const encoded = path.split("/").map(encodeURIComponent).join("/");
-  const reply = await carriedOut(`folder make external ${encoded}`);
+  const reply = storage === "internal"
+    ? await carriedOut(`folder make internal ${encoded}`)
+    : await carriedOut(`folder make external ${encoded}`);
   if (!whole(reply.id, 1, MOST_ID) || typeof reply.made !== "boolean") {
     throw new Failure("bad-reply", address());
   }
@@ -269,13 +275,15 @@ export async function saved(id) {
   return {brightness: reply.brightness, repeat: reply.repeat, start: reply.start};
 }
 
-// Opens the upload of a file of some bytes as the item with this id. Gives the most bytes
-// one `upload data` may carry.
+// Opens the upload of a file of some bytes as the item with this id: a file name, or the
+// path of a folder of the board's own storage and a file name. Gives the most bytes one
+// `upload data` may carry.
 export async function uploadBegin(id, file, bytes, createCrc = null) {
-  const line = `upload begin ${id} ${file} ${bytes}${createCrc === null ? "" : " " + createCrc}`;
+  const encoded = file.split("/").map(encodeURIComponent).join("/");
+  const line = `upload begin ${id} ${encoded} ${bytes}${createCrc === null ? "" : " " + createCrc}`;
   const reply = createCrc === null
-    ? await carriedOut(`upload begin ${id} ${file} ${bytes}`)
-    : await carriedOut(`upload begin ${id} ${file} ${bytes} ${createCrc}`);
+    ? await carriedOut(`upload begin ${id} ${encoded} ${bytes}`)
+    : await carriedOut(`upload begin ${id} ${encoded} ${bytes} ${createCrc}`);
   if (createCrc !== null && reply.replacing !== false) {
     try { await uploadCancel(); } catch (_) { /* An unchanged upload opens no transaction. */ }
     throw new Refusal(reply.replacing === true || reply.unchanged === true ? "stale" : "unsupported", line);

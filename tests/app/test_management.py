@@ -108,7 +108,7 @@ class AnimationManagement(unittest.TestCase):
         for external in [True, False, 'true', 1, None]:
             replies.append({'command': 'list', 'reply': {'ok': True, 'items': [{'id': 60001, 'file': 'a.odrg', 'bytes': 1, 'external': external}], 'next': None}})
         replies.append({'command': 'list', 'reply': {'ok': True, 'items': [{'id': 3, 'cycle': [1], 'seconds': 1, 'external': False}], 'next': None}})
-        # A folder of the card: its id, its path and `external` true, and nothing of a file.
+        # A folder: its id, its path and `external`, true for the card's and false for the board's own, and nothing of a file.
         folders = [{'id': 60004, 'playlist': 'night', 'external': True}, {'id': 60005, 'playlist': 'night/deep', 'external': True},
                    {'id': 60004, 'playlist': '', 'external': True}, {'id': 60004, 'playlist': 7, 'external': True}, {'id': 60004, 'playlist': 'night'},
                    {'id': 60004, 'playlist': 'night', 'external': False}, {'id': 60004, 'playlist': 'night', 'external': True, 'file': 'a.odrg', 'bytes': 1},
@@ -123,7 +123,7 @@ class AnimationManagement(unittest.TestCase):
         self.assertEqual([item.get('error') for item in found['results'][7:12]], [None]*2 + ['bad-reply']*3)
         self.assertEqual([item.get('error') for item in found['results'][12:18]], [None]*2 + ['bad-reply']*4)
         self.assertEqual([item['items'][0]['external'] for item in found['results'][12:14]], [True, False])
-        self.assertEqual([item.get('error') for item in found['results'][18:27]], [None]*2 + ['bad-reply']*7)
+        self.assertEqual([item.get('error') for item in found['results'][18:27]], [None]*2 + ['bad-reply']*3 + [None] + ['bad-reply']*3)
         self.assertEqual([item['items'][0] for item in found['results'][18:20]], [{'id': 60004, 'playlist': 'night', 'external': True}, {'id': 60005, 'playlist': 'night/deep', 'external': True}])
         self.assertEqual([item.get('error') for item in found['results'][27:]], [None]*3 + ['bad-reply']*3)
         self.assertEqual([(item['playing'], item['left']) for item in found['results'][27:30]], [(60004, 86400), (60004, 0), (60004, None)])

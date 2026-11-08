@@ -118,29 +118,52 @@ async function levelRows(operation, folderId) {
   return rows;
 }
 
-// Why an internal file cannot move, from the root's rows with its cycles, or null: a cycle
-// lists it, or another item of the show names its file.
+// The name the board keeps an internal file under: its stored name in a folder, else its file.
+function keptName(row) {
+  return typeof row.stored === "string" ? row.stored : row.file;
+}
+
+// Why an internal file cannot move, from the root's rows with its cycles and the rows of its
+// own level, or null: a cycle lists it, or another item of the show names its file.
 export function heldBy(rows, file) {
   if (file.external === true) return null;
   if (rows.some((row) => Array.isArray(row.members) && row.members.includes(file.id))) return "A cycle of the show lists it; it stays where the cycle names it.";
-  if (rows.some((row) => row.id !== file.id && row.external !== true && row.file === file.file)) return "Another item of the show names the same file; it stays.";
+  if (rows.some((row) => row.id !== file.id && row.external !== true && typeof row.file === "string" && keptName(row) === keptName(file))) return "Another item of the show names the same file; it stays.";
   return null;
 }
 
-// The id of the card's folder with this path, "" being the root, or undefined.
-async function folderId(operation, path) {
+// The folder of a storage a file of a level is in, by its path, "" for the root: a file of
+// the board's own storage is in a folder only when the list gives its stored name.
+export function sourceFolder(file) {
+  if (file.external === true || typeof file.stored === "string") return folderOf(file.file);
+  return "";
+}
+
+// The id of the folder of a storage, "external" the card's, with this path, null for the
+// root "", or undefined when there is none.
+export async function folderId(operation, path, storage = "external") {
   if (!path) return null;
   let rows = await levelRows(operation, null);
   let id;
   let walked = "";
   for (const part of path.split("/")) {
     walked = walked ? `${walked}/${part}` : part;
-    const folder = rows.find((row) => row.playlist === walked);
+    const folder = rows.find((row) => typeof row.playlist === "string" && row.playlist === walked && storageOf(row) === storage);
     if (folder === undefined) return undefined;
     id = folder.id;
     if (walked !== path) rows = await levelRows(operation, id);
   }
   return id;
+}
+
+// The rows a file's move is judged against: the root's, with the show's cycles, and those
+// of the folder the file is in.
+export async function sourceRows(operation, file) {
+  const rows = await levelRows(operation, null);
+  const folder = sourceFolder(file);
+  if (!folder) return rows;
+  const level = await folderId(operation, folder, storageOf(file));
+  return level === undefined ? rows : [...rows, ...await levelRows(operation, level)];
 }
 
 // The file of a level that has this path and this storage, or undefined.
@@ -168,9 +191,10 @@ function upload(client, made, report) {
 export async function move(entry, context) {
   const {client, address} = context;
   const operation = client.operation;
-  const source = {id: entry.source.id, storage: storageOf(entry.source), path: entry.source.file, bytes: entry.source.bytes, ignored: entry.source.ignored === true};
+  const source = {id: entry.source.id, storage: storageOf(entry.source), path: entry.source.file, folder: sourceFolder(entry.source), bytes: entry.source.bytes,
+    ignored: entry.source.ignored === true};
   const job = {source, destination: {storage: entry.storage, folder: entry.folder, name: entry.name, path: entry.path}, stage: "read"};
-  const held = heldBy(await levelRows(operation, null), entry.source);
+  const held = heldBy(await sourceRows(operation, entry.source), entry.source);
   if (held !== null) throw new Error(held);
   const saved = await operation("move", () => commands.saved(source.id));
   if (saved.start) throw new Error("It is the show's start animation; it stays where the show names it.");
@@ -186,8 +210,17 @@ export async function move(entry, context) {
   record(address, job);
   let id = null;
   if (entry.storage === "internal") {
-    const root = await levelRows(operation, null);
-    id = freeId(new Set(root.map((row) => row.id)));
+    // Free among the ids of the root and of every folder of the board's own storage.
+    const taken = [];
+    const pending = [null];
+    while (pending.length > 0) {
+      const rows = await levelRows(operation, pending.shift());
+      for (const row of rows) {
+        taken.push(row.id);
+        if (typeof row.playlist === "string" && row.external === false) pending.push(row.id);
+      }
+    }
+    id = freeId(new Set(taken));
     if (id === null) throw new Error("Internal storage has no free animation id.");
   }
   const newId = await upload(client, {id, file: entry.path, bytes, external: entry.storage === "external", create: true, expect: entry.storage === "external" ? "00000000" : null},
@@ -213,7 +246,10 @@ async function finish(job, context) {
     job.stage = "carried";
     record(address, job);
   }
-  const level = source.storage === "external" ? await folderId(operation, folderOf(source.path)) : null;
+  // A job that names no folder of its source moves a file of the root of the board's own
+  // storage, or one of the card, whose folder is that of its path.
+  const folder = typeof source.folder === "string" ? source.folder : source.storage === "external" ? folderOf(source.path) : "";
+  const level = await folderId(operation, folder, source.storage);
   const rows = level === undefined ? [] : await levelRows(operation, level);
   const old = rows.find((row) => row.id === source.id);
   if (old !== undefined && old.file === source.path && old.bytes === source.bytes && storageOf(old) === source.storage) {
@@ -233,7 +269,7 @@ export async function reconcile(context) {
   const notMoved = [];
   for (const job of pending(address)) {
     if (job.stage === "read" || job.stage === "sending") {
-      const level = job.destination.storage === "external" ? await folderId(operation, job.destination.folder) : null;
+      const level = await folderId(operation, job.destination.folder, job.destination.storage);
       const rows = level === undefined ? [] : await levelRows(operation, level);
       const made = fileAt(rows, job.destination.storage, job.destination.path);
       if (made === undefined || made.bytes !== job.source.bytes) {

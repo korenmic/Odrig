@@ -47,7 +47,8 @@ void upload_discard(Core &core);
 void upload_step(Core &core, uint64_t now);
 
 // The four commands on a valid show, with their arguments read. Each writes its reply.
-// `name` ends in a zero and is a file name; `count` is what base64_size gave for the text.
+// `name` ends in a zero and is a stored name, in a folder that `folders.txt` has when it
+// has one; `count` is what base64_size gave for the text.
 uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, uint32_t bytes, Reply &reply, bool report_creation = false);
 
 // `upload begin external <file> <bytes>`: opens an upload to the drive. `busy` while an

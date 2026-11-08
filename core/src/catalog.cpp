@@ -1350,8 +1350,8 @@ bool read_internal_page(Core &core, uint32_t page, const Marker &marker, bool ap
                 break;
             }
             info.bytes = entry.bytes;
-            info.total_ms = entry.total_ms;
-            info.type = entry.type;
+            info.total_ms = kept_length(entry.total_ms);
+            info.type = stored_type(entry.type);
             if (entry.width != core.width || entry.height != core.height) {
                 quarantine_file(core, file, kSizeMismatch, kWorkStart, 0, 0);
             }
@@ -2064,10 +2064,11 @@ ODRIG_NOINLINE char place_of(const Core &core, const IndexFolder &parent, const 
 // Makes the folder on the drive and commits its line in the index: the parent's file with
 // its row, the table and the map.
 ODRIG_NOINLINE bool insert_folder(Core &core, const char *path, const IndexFolder &parent, uint32_t place, uint32_t ordinal, uint32_t first,
-                                  uint32_t id, uint32_t line_at) {
+                                  uint32_t id, uint32_t line_at, int *made) {
     char name[kDriveOpenRoom] = "drive/";
     copy_text(name + 6, path);
-    if (!catalog_settle(core, kExternal) || core.host.make_folder(core.host.ctx, name) != 1) {
+    *made = -1;
+    if (!catalog_settle(core, kExternal) || (*made = core.host.make_folder(core.host.ctx, name)) != 1) {
         return false;
     }
     IndexChange index;
@@ -2132,8 +2133,10 @@ uint32_t catalog_folder_make(Core &core, const char *path, Reply &reply) {
     if (id == 0) {
         return refuse(reply, "no-space");
     }
-    if (!insert_folder(core, path, parent, place, ordinal, first, id, line_at)) {
-        return refuse(reply, "storage-error");
+    int made = -1;
+    if (!insert_folder(core, path, parent, place, ordinal, first, id, line_at, &made)) {
+        // A host whose drive cannot make folders says so with 0.
+        return refuse(reply, made == 0 ? "unsupported" : "storage-error");
     }
     current_again(core);
     repeats_reload(core);
@@ -2738,7 +2741,7 @@ ODRIG_NOINLINE void scan_step(Core &core) {
         // A file whose name a catalog cannot hold plays now, and is not in the catalog.
         DriveEntry &entry = core.drive[at];
         entry.bytes = core.checker->file.taken;
-        entry.total_ms = drive_length(core.check_total_ms);
+        entry.total_ms = kept_length(core.check_total_ms);
         entry.type = core.check_content.type & 0x0F;
         entry.state = kDriveInPlaylist;
         player_drive_joined(core, at);
@@ -3462,10 +3465,11 @@ void catalog_rebuild_step(Core &core) {
     }
     FileInfo &info = core.files[at];
     info.bytes = core.checker->file.taken;
-    info.total_ms = core.check_total_ms;
-    info.type = core.check_content.type;
+    info.total_ms = kept_length(core.check_total_ms);
+    info.type = stored_type(core.check_content.type);
     info.checked = kCheckedFromCatalog;
-    if (!rebuild_line(core, info.name, crc_value(core.checker->file.crc), info.bytes, info.total_ms, info.type)) {
+    // The catalog keeps the exact length, which the table of files may not.
+    if (!rebuild_line(core, info.name, crc_value(core.checker->file.crc), info.bytes, core.check_total_ms, info.type)) {
         rebuild_failed(core);
     }
 }

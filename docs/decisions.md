@@ -921,3 +921,12 @@ digits leave room for 737; 720 make a reply of 1,001. The app downloads a file u
 and backs up a selection of one storage as one zip with the manifest `odrig-backup.json` of
 version 1, and the APK gets a second plugin of its own, `Save`, which keeps a download or a
 backup where the operator chooses in the system's dialog.
+
+On 2026-11-08, under the same answer, the board's own storage gets folders: `folder make
+internal <path>` makes one, a playlist as a folder of the card is, `upload begin` takes a
+folder's path before a file's name, `list` and `list in` give the folders and their files,
+and `ignore` of a folder's id holds its subtree. A file of a folder keeps the name
+`<n>/<name>`, in the storage's folder `n`, in `show.json` and the other files that name it;
+the folders' paths are in `folders.txt`. The host interface's names, `remove` and
+`make_folder` take the number of such a folder, and `make_folder` may answer 0 for a storage
+that makes no folders. The core's memory is as it was.

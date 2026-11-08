@@ -37,7 +37,8 @@ typedef struct odrig_host {
     void (*log)(void *ctx, const char *text);
 
     /* Storage that can be changed. A host without it sets write_open to NULL.
-       A name is 1 to 32 characters of a-z, 0-9, '-', '_' and '.'. */
+       A name is 1 to 32 characters of a-z, 0-9, '-', '_' and '.', alone or after
+       `<n>/`, n 1 to 255 without a leading zero: a file in the storage's folder n. */
 
     /* Begins a new, empty file of this name, in place of one that has it. A file that was
        being written is given up and removed. Returns 1, or -1 on failure. The core has at
@@ -57,7 +58,8 @@ typedef struct odrig_host {
     int (*rename)(void *ctx, const char *from, const char *to);
 
     /* Removes the file of this name. A file being written under it is given up.
-       Returns 1 when it removed one, 0 when there was none, -1 on failure. */
+       Returns 1 when it removed one, 0 when there was none, -1 on failure. Given `<n>`
+       alone it removes the storage's folder n while it is empty, -1 while it is not. */
     int (*remove)(void *ctx, const char *name);
 
     /* The free and the total bytes of the storage the files are in. A value above
@@ -78,7 +80,7 @@ typedef struct odrig_host {
        at place p of the drive's list as `drive/p` to open and read_at, and the file of the
        drive's folder `odrig` with the name n as `drive/n`, n not made of digits alone, to
        open, read_at, write_open, rename and remove; no name of the installed file set has a
-       slash. A name of the drive is the path of a file from the folder odrig: the names of
+       slash but after its folder's number. A name of the drive is the path of a file from the folder odrig: the names of
        at most three folders and the file's, joined by /, 1 to 100 bytes in all, each part
        printable ASCII other than \ : * ? " < > | that neither begins nor ends with a space
        or a dot. */
@@ -121,9 +123,11 @@ typedef struct odrig_host {
     int (*drive_writable)(void *ctx, uint32_t drive);
 
     /* Optional: makes the folder of the drive's folder odrig with this name, `drive/<path>`,
-       its path made as a drive's name is, of folders alone, whose parent is there. Returns 1
-       when the folder is there afterwards, made now or before, and -1 on failure and when a
-       file has that name. A host without it makes no folder. */
+       its path made as a drive's name is, of folders alone, whose parent is there; or the
+       storage's folder `<n>`, n 1 to 255, in the folder of the installed file set, which
+       only write_open makes. Returns 1 when the folder is there afterwards, made now or
+       before, 0 when that storage makes no folders, and -1 on failure and when a file has
+       that name. A host without it makes no folder. */
     int (*make_folder)(void *ctx, const char *name);
 } odrig_host;
 

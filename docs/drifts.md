@@ -13035,3 +13035,310 @@ of a catalog keeps its pages' counts and CRC-32s there from byte 1,400 between i
 
 **Resolution.** `core/src/storage.h`, `core/src/content.cpp`, `core/src/catalog.cpp`,
 `docs/core.md`.
+
+## Seed 74: the start opens `folders.txt`
+
+**Question.** Part B's design says a show without `folders.txt` pays nothing for folders, but
+the start has to learn whether the file is there, and `read_at` answers -1 alike for no file
+and for a failed read. A failure taken for no file would let the next `folder make internal`
+write a file of one line over the board's folders. How does the start tell them apart?
+
+**Answer.** It opens `folders.txt` with `open` after `pending.txt`, as it opens `pending.txt`
+and `catalog.txt`: 0 is no file, a flat show with nothing more read; -1 makes the boot's
+folders unreadable. A folder of no files is asked to open six names that are not there, and
+the tests of the start that list the names opened name `folders.txt` too. Nothing is written
+for a flat show.
+
+**Resolution.** `core/src/folders.cpp`, `tests/core/test_startup.py`, `docs/core.md`.
+
+## Seed 74: the start's repair writes, and seed 78's rule
+
+**Question.** Task 7 names the repair at the start of a folder's id that an item has, and also
+seed 78's rule that the start writes nothing and that only `write_open` makes the storage's
+folder. Does the repair break the rule?
+
+**Answer.** No. Seed 78's rule is the firmware's: its host makes no folder and writes nothing
+at its start, and `/odrig` is made by `write_open` alone; the files host's `make_folder` makes
+`/odrig/<n>` and never `/odrig`. The core's start already renames and removes what an
+interrupted change left. The repair writes `folders.txt` only when a line's id is an item's,
+which a computer's tool can bring and the core never does, and that file is in `/odrig`
+already. A board whose folders are sound is written nothing at its start.
+
+**Resolution.** `core/src/folders.cpp`, `firmware/usermod/odrig_files.cpp`, `docs/core.md`,
+`docs/firmware.md`.
+
+## Seed 74: the order in which a folder is made
+
+**Question.** The design makes the folder `<n>` before its line is written, but on a storage
+that never had a show `/odrig` is not there, and `mkdir` of `/odrig/<n>` fails while only
+`write_open` may make `/odrig`. In which order does `folder make internal` write?
+
+**Answer.** It writes `folders.part` first, which makes `/odrig` when it is missing, then makes
+`<n>` with `make_folder`, then renames the part onto `folders.txt`. The rename is the commit,
+so the folder is there before its line counts. A cut leaves the old file or the new one, the
+part removed at the next start, and at worst an empty numbered folder without a line, which a
+later folder of that number takes. A `make_folder` that answers 0, a storage that makes no
+folders, is known only then: the part is removed and the reply is `unsupported`.
+
+**Resolution.** `core/src/folders.cpp`, `docs/core.md`.
+
+## Seed 74: what a reading of `folders.txt` checks
+
+**Question.** The design reads `folders.txt` with a scan of about 270 bytes that checks each
+line's parent with hashes. Every function that holds one must stay under the frame of 512
+bytes. What does a scan check, and where?
+
+**Answer.** A scan is one buffer of 128 bytes, a line read where the last ended and the rest
+kept, and checks each line's form and that its depth is at most one more than the line's
+before. The start checks the whole file once more strictly: each line's parent is the line
+before it or a folder above that one, a sibling comes after the one before it by the bytes of
+its name, and no two lines have one number or one id. The core writes the file only in that
+order, so the later scans need no more. A scan that meets a line out of form at a command
+answers `storage-error`.
+
+**Resolution.** `core/src/folders.cpp`.
+
+## Seed 74: a new folder's id among the show's
+
+**Question.** The design finds a folder's id with a bitset of 21 bytes, for at most 132 items
+and 32 folders. A show of more items has a larger item table. Where is the lowest free id
+found?
+
+**Answer.** In the first 1,024 bytes of the chunk buffer, a bit for each id below 8,192, which
+`folder make internal` and the start use while the chunk holds nothing: the core's tables
+hold far fewer items than that, so the lowest free id is among them.
+
+**Resolution.** `core/src/folders.cpp`.
+
+## Seed 74: the rows of `list` of an internal folder's level
+
+**Question.** The design gives a file of a folder `inherited_ignored` as `held && !own`, where
+the card's rows give it whatever the file's own choice. Which, and in which order are the
+members?
+
+**Answer.** As the card's: `inherited_ignored` says that the folder or a folder above it is
+ignored, whatever the file's own `ignored`, so the app reads one form for both storages. A
+file's row is today's internal row with `file` its path, then `stored` and
+`inherited_ignored` after `type`, and `fault` last; a folder's row is a card folder's with
+`external` false. The root's rows of files gain nothing, and a file whose folder has no line
+is listed at the root under its stored name.
+
+**Resolution.** `core/src/folders.cpp`, `core/src/content.cpp`, `docs/commands.md`.
+
+## Seed 74: the refusals of `folder make internal`
+
+**Question.** The design refuses `in-use` for "a file of the show at that path", and `no-space`
+with less than 8,298 bytes free. A folder's last name cannot end in `.odrg` or `.odrgx`, and a
+host may not tell its space. What do these come to?
+
+**Answer.** No file of the show can have a folder's path, so `in-use` is a sibling equal but
+for case alone. The room is judged when the host tells its space; a host that cannot tell is
+not refused for it, as the write then says.
+
+**Resolution.** `core/src/folders.cpp`, `docs/commands.md`.
+
+## Seed 74: an upload's folder is found before the upload's own refusals
+
+**Question.** Where among `upload begin`'s refusals do a missing folder and an unreadable
+`folders.txt` stand?
+
+**Answer.** After `bad-argument` and `show-invalid`, before the rest: the path is resolved to a
+stored name first, `unknown-id` for a folder that is not there and `storage-error` while the
+folders cannot be read, and the upload then goes on as one of a file at the root. The
+reference player of the core's tests keeps no folders, so a path with a folder is
+`unknown-id` there.
+
+**Resolution.** `core/src/commands.cpp`, `tests/core/support.py`.
+
+## Seed 74: pruning, and the file left with no folder
+
+**Question.** When is a folder pruned, and what is left when the last one goes?
+
+**Answer.** After a removal, `remove many` and an upload that moves an item's file to another
+folder, each folder that lost a file is judged, then the folders above it, as the card's are.
+`folders.txt` stays with its header alone when every folder has gone, so that the next
+number keeps turning. The numbered folders are removed after the file is renamed.
+
+**Resolution.** `core/src/folders.cpp`, `core/src/storage.cpp`.
+
+## Seed 74: the current playlist of an internal folder needs the saved playlist
+
+**Question.** A folder's playlist is kept in `current`, the record of the current folder and
+`playlist_path`, but the path's room is in the block of the saved order, which only a host
+with a drive is given. What does a host without one do?
+
+**Answer.** It answers `play` of an internal folder with `unsupported`, as the design says,
+and plays the root's playlist, every folder in it; the rotation stays at the root. The board
+always has its card host, and the emulator has it with `--drive` or `--drive-folder`. A pulled
+or changed card leaves an internal playlist current, and its path, `:` and the folder's, is
+found again at the start.
+
+**Resolution.** `core/src/commands.cpp`, `core/src/order.cpp`, `docs/emulator.md`.
+
+## Seed 74: the test host's `make_folder`
+
+**Question.** The test host gave `make_folder` only with a drive. Internal folders need it on a
+host without one. What becomes of `folder make external` there?
+
+**Answer.** The test host gives `make_folder` whenever its storage can be changed, unless
+`--no-folders`; `folder make external` without a drive answers `read-only`, as an upload to
+the drive does, and the core never asks it for a drive's folder then. The emulator binds it
+the same way. A numbered folder is a sub-folder of the session's folder, or a set of names in
+memory, and a file goes into one only when it was made.
+
+**Resolution.** `tests/core/host/host.cpp`, `emulator/binding.py`, `docs/core.md`.
+
+## Seed 74: the name rule of the library and of the converter
+
+**Question.** `odrig/show.py` and `converter/lib/show.js` take a stored name now. Do their
+refusals' words change?
+
+**Answer.** No: the words stay those of the name, so that the answers the converter's tests
+keep stay as they are; the rule takes the name alone or after `<n>/`, 1 to 255 without a
+leading zero, in both.
+
+**Resolution.** `odrig/show.py`, `converter/lib/show.js`.
+
+## Seed 74: an internal upload path in the command tool
+
+**Question.** The design gives `odrigctl` "an upload to an internal path, %-escaped". How is
+the path given?
+
+**Answer.** With `--folder PATH` beside `upload ID FILE`: the name sent is the folder's path,
+`/` and the file's last part, each part escaped as a URI's. It goes neither with another
+command nor with `--external`, each a usage error. `folder make` takes `internal` or
+`external`.
+
+**Resolution.** `odrigctl/cli.py`, `docs/emulator.md`.
+
+## Seed 74: the app at the root and inside an internal folder
+
+**Question.** At the root `New folder` made a folder of the card. Which storage does it make
+one of now, and against what does the app choose a new item's id, when the root's list holds
+no item of the board's folders?
+
+**Answer.** Inside a folder, that folder's storage; at the root the dialog asks for the
+storage, `External` while the board may write the card and `Internal` otherwise. A new item's
+id is free among the root's rows, folders among them, and the rows of every folder of the
+board's storage, which the app lists before the upload: the upload's preflight, a move to the
+board and a text or a clock when the root has such folders. An upload prepared at a level of
+the board's storage goes into that folder.
+
+**Resolution.** `app/www/screens/explorer.js`, `app/www/client.js`,
+`app/www/upload-destination.js`, `app/www/screens/author.js`, `app/www/moves.js`,
+`docs/android-app.md`.
+
+## Seed 74: the firmware tool and the board's folders
+
+**Question.** The design keeps `folders.txt` with the board's settings, accepts the numbered
+folders it names and refuses an install that would remove their files. What of the board's
+`folders.txt` under `--replace-folders`, and of a numbered folder left empty?
+
+**Answer.** `--replace-folders` removes the board's folder files and the lines of its
+`folders.txt` too, unless the folder installed has its own, so that no line names a folder
+of no files the operator did not keep; the file keeps its first line, which names the number
+the next folder takes, so that the numbers go on turning and a saved `f <n>/` key of a
+folder that went attaches to no new folder's file soon. Every numbered folder the
+`folders.txt` installed names is there afterwards, empty or not, and an empty one is not
+removed with the other empty folders. A show folder's numbered sub-folders are accepted when
+its `folders.txt` names them or a file of its `show.json` is in them, with `--no-check` too:
+`read-show` writes them as sub-folders, a file whose folder has no line among them.
+
+**Resolution.** `firmware/fwtool/storage.py`, `firmware/fwtool/cli.py`, `docs/firmware.md`.
+
+## Seed 74: the vocabulary's entry for a command
+
+**Question.** Part A gave the command list `saved` and `folder`, and the onboarding suite's test
+that the vocabulary names every family of the list has failed since. Task 7 adds `folder make
+internal`. Is the entry mended here?
+
+**Answer.** Yes: the entry names `saved <id>` and `folder make`, and the test's list of
+families has both.
+
+**Resolution.** `agent/vocabulary.md`, `tests/onboarding/test_vocabulary.py`.
+
+## Seed 74: a folder's Ignore while `folders.txt` is damaged
+
+**Question.** The design answers a folder's Ignore with `storage-error` while the board could
+not read `folders.txt` in this boot. With the file unread, an id is not known to be a
+folder's. What does `ignore <id>` answer then?
+
+**Answer.** As for any id that nothing has: `unknown-id`. `folder make internal` and an
+upload into a folder, which name a folder by its path, answer `storage-error`.
+
+**Resolution.** `core/src/content.cpp`, `docs/commands.md`.
+
+## Seed 74: the longest reply to `status` with the board's folders
+
+**Question.** The design gives `checking` and `file` in `status` as the path of a file of a
+folder. A folder's path is 93 bytes and a name 32 characters, so a file that a computer's
+tool put in a folder has a path of up to 126 bytes, where `checking` gave 32 characters
+before; the reply has room for 1,024 bytes and nothing bounds it as it is written. What do
+the two members give?
+
+**Answer.** A file is a file of its folder while its path is 100 bytes at most, as
+`upload begin` makes it; one of a longer path has rank 0 and is listed, played and named at
+the root under its stored name, as a file whose folder has no line is. `file` gives the
+path, 100 bytes at most, as a card's file's is. `checking` gives the first 32 characters of
+the path, as it gives a card's name. With every member at its longest the reply is then at
+most 978 bytes with its line feed, as a test of the suite counts it.
+
+**Resolution.** `core/src/folders.cpp`, `core/src/commands.cpp`,
+`tests/core/test_internal_folders.py`, `docs/commands.md`, `docs/core.md`.
+
+## Seed 74: an emptied folder that is not pruned
+
+**Question.** The prune of an emptied folder is passed over while a rebuild runs or an upload
+is received, and a power cut between a removal and the prune leaves the folder's line. No
+later event prunes it, and it looks like a folder made and never filled. Is the prune
+recorded and done later?
+
+**Answer.** No: the folder stays, with its line, as a folder never filled does. It takes
+files again by an upload, `folder make internal` of its path answers `made:false`, and it
+goes when a file it is given later leaves it. A record of prunes due would be a second file
+to keep in step for a folder that does no harm.
+
+**Resolution.** `docs/commands.md`, `docs/core.md`.
+
+## Seed 74: `folder make external` on a board with a USB stick
+
+**Question.** The design keeps `unsupported` for `folder make external` on a board whose
+drive is a USB stick, through a `make_folder` that answers 0. The board's `make_folder` is
+given now for its own folders, and the core refuses a drive it may not write with `busy` or
+`read-only` before it asks the host to make a folder. What does the stick's board answer?
+
+**Answer.** `read-only`, or `busy` while an upload is open, a rebuild runs, a test of the
+mapping shows or the stick's catalog is read: the board never writes a stick, which
+`read-only` says. A host that gives no `make_folder` answers `unsupported` as before, and a
+card's host whose `make_folder` answers 0 does after the checks. The app offers `New folder`
+on a drive only while the board may write it, so its words do not change.
+
+**Resolution.** `docs/commands.md`.
+
+## Seed 74: the fault of an upload into a folder
+
+**Question.** The fault of an upload's check names the file the upload was sent as. With a
+folder that is the file's name alone, `x.odrg` for `shows/x.odrg` and for `art/x.odrg`.
+Which name does `fault` give?
+
+**Answer.** The stored name, `1/x.odrg`, as a fault at the start or in playback names the
+file, cut to 32 characters as every name of `fault` is. An upload to the drive keeps its
+name.
+
+**Resolution.** `core/src/upload.cpp`, `core/src/storage.h`.
+
+## Seed 74: moves out of a folder of the board's storage in the app
+
+**Question.** The app's moves find the folder of a file's source and of a destination by its
+path, and look for a file that another item names among the root's rows. A file of a folder
+of the board's storage is not among them, and a folder of the board's storage may have the
+path of one of the card's. How does a move find them?
+
+**Answer.** A file of the board's storage is in a folder when the list gives its stored
+name, and that folder is found by its path among the board's folders alone, a card's among
+the card's alone; another item that names the file is looked for in the file's own level
+too, by its stored name. The card's folders that `Move to…` offers are the card's alone, and
+a folder row of the list takes its count and its marks by its id.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `app/www/screens/show.js`,
+`tests/app/test_internal_folders.py`.

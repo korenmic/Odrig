@@ -39,7 +39,7 @@ The tasks are done in the order 5, 7, 6, 8, because task 6 builds on task 7's fo
 - [ ] 6. Move files and folders inside the card by renaming, and folders between storages
   - Requirements: 5.1–5.2.
 
-- [ ] 7. Give the board's own storage real folders
+- [x] 7. Give the board's own storage real folders
   - Requirements: 4.1–4.2.
 
 - [ ] 8. Deliver part B

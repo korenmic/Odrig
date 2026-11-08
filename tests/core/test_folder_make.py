@@ -75,8 +75,8 @@ class Making(unittest.TestCase):
                 answers, left, _ = made(path)
                 self.assertEqual(answers[0], {'ok': False, 'error': error})
                 self.assertEqual(left, card(FILES))
-        answers, _, _ = made('x', more=('folder make internal x', 'folder make', 'folder make external a b'))
-        self.assertEqual([answer.get('error') for answer in answers[1:]], ['unsupported', 'bad-argument', 'bad-argument'])
+        answers, _, _ = made('x', more=('folder make', 'folder make external a b'))
+        self.assertEqual([answer.get('error') for answer in answers[1:]], ['bad-argument', 'bad-argument'])
 
     def test_an_upload_into_an_empty_folder_becomes_its_first_file(self):
         data = loop_of(4, 9)

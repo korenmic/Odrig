@@ -241,6 +241,17 @@ The clocks play between the animations once `Clocks between animations` is check
 the Settings of the Controller view, or `clocks on` is sent; the core plays the breaks,
 and the emulator has no code of its own for them.
 
+### Folders of the show's folder
+
+The folders of the board's own storage, [core.md](core.md#internal-folders), are
+sub-folders of the show's folder named by their numbers, `1` to `255`, as on the board:
+`folder make internal shows` makes `1` and the line of `folders.txt` that names it, and a
+file of it is `1/stars.odrg`. The emulator makes and removes them when the core asks, a
+folder only while it is empty, and `space` counts two blocks of 4,096 bytes for each and
+the files in it. The current playlist is kept by a host with a drive: an emulator started
+without `--drive` or `--drive-folder` answers `play` of such a folder with `unsupported`
+and plays the root's playlist, its folders among it.
+
 ## The serial port
 
 The emulator creates a pseudo-terminal and a symbolic link to it, so the port has the same
@@ -852,7 +863,8 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] debug mini on|off
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload --external FILE
-python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] folder make external PATH
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] --folder PATH upload ID FILE
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] folder make internal|external PATH
 ```
 
 Through the serial port, here the emulator's; for the board the name is its USB serial
@@ -885,6 +897,8 @@ python -m odrigctl --port build/emulator/serial saved 1
 python -m odrigctl --port build/emulator/serial clocks on
 python -m odrigctl --port build/emulator/serial clocks message on
 python -m odrigctl --port build/emulator/serial folder make external clocks
+python -m odrigctl --port build/emulator/serial folder make internal shows
+python -m odrigctl --port build/emulator/serial --folder shows upload 10 build/hello-bench.odrg
 ```
 
 Over TCP, to the emulator's [line port](#the-line-port), which is how the emulator takes
@@ -918,6 +932,7 @@ python -m odrigctl --tcp 127.0.0.1:8601 saved 1
 python -m odrigctl --tcp 127.0.0.1:8601 clocks on
 python -m odrigctl --tcp 127.0.0.1:8601 clocks message off
 python -m odrigctl --tcp 127.0.0.1:8601 folder make external clocks/message
+python -m odrigctl --tcp 127.0.0.1:8601 folder make internal shows/night
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -1054,7 +1069,9 @@ here; the board's is in [firmware.md](firmware.md).
   <name> <bytes> <crc32>`, where the name is the last part of the path as it is and the
   CRC-32 is the file's, then the file in pieces of the size the reply names, each as one
   `upload data` line, and then `upload end` with the CRC-32 of the file. ID and the name
-  are not checked by the tool.
+  are not checked by the tool. With `--folder PATH` the name is the path of that folder of
+  the board's own storage, `/` and the last part, each part escaped as a URI's, so that
+  the file goes into the folder.
 - A reply `{"ok":true,"unchanged":true}` to `upload begin` ends the upload: the item holds
   this file already, and nothing more is sent. A reply `bad-argument` to it is followed by
   `upload begin <ID> <name> <bytes>` once, for a target older than the CRC-32 there.
