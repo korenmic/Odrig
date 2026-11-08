@@ -6,8 +6,9 @@
 
 import {Rejection, jsonframes, odrg, odrgx, thumbnail, timeline} from "./converter/index.js";
 
-// Inspect existing encoded files without converting or expanding compressed frames.
-export async function prepareReady(file, canvas) {
+// The checks of a ready-made file that read only its start: its ending, its size, its
+// header, its canvas against the target's, and a container's payload size and frames.
+export async function inspectReady(file, canvas) {
   if (!/\.(odrg|odrgx)$/i.test(file.name)) throw new Error("Choose an .odrg or .odrgx animation file.");
   if (!Number.isInteger(file.size) || file.size < 16 || file.size > 0xffffffff) throw new Error("The animation file size is unsupported.");
   if (canvas?.width == null || canvas?.height == null) throw new Error("The target has not reported its canvas yet.");
@@ -19,6 +20,12 @@ export async function prepareReady(file, canvas) {
   const frames = !container || header.type === odrgx.TYPES.frames;
   const frameHeader = frames ? (container ? odrg.header(prefix.subarray(20)) : header) : null;
   if (frameHeader && (frameHeader.width !== header.width || frameHeader.height !== header.height)) throw new Error("The animation container and its frames have different canvases.");
+  return {container, header, frames, frameHeader};
+}
+
+// Inspect existing encoded files without converting or expanding compressed frames.
+export async function prepareReady(file, canvas) {
+  const {container, header, frames, frameHeader} = await inspectReady(file, canvas);
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (bytes.length !== file.size) throw new Error("The selected animation changed while it was read.");
   if (!frames) odrgx.decode(bytes);

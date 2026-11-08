@@ -226,18 +226,22 @@ export async function start(factory = typeof indexedDB === "undefined" ? null : 
 // Makes the preview of bytes this phone uploaded, a step at a time between the app's other
 // work, and keeps it by their key, in the phone's own catalog and for this run. A key that
 // either catalog has, and bytes that make no preview, are left as they are, and nothing is
-// said.
+// said. Gives a promise that settles when the preview is made or refused.
 export function makeOwn(bytes) {
   const key = `${crc32(bytes)}-${bytes.length}`;
   if (inDefaults(key) || own.has(key)) {
-    return;
+    return Promise.resolve();
   }
   let making;
   try {
     making = previewMaker(bytes);
   } catch {
-    return;
+    return Promise.resolve();
   }
+  let settle;
+  const made = new Promise((resolve) => {
+    settle = resolve;
+  });
   const step = () => {
     try {
       if (!making.step()) {
@@ -245,6 +249,7 @@ export function makeOwn(bytes) {
         return;
       }
     } catch {
+      settle();
       return;
     }
     const gif = new Blob([making.preview], {type: "image/gif"});
@@ -257,8 +262,10 @@ export function makeOwn(bytes) {
         // The preview stays for this run.
       }
     }
+    settle();
   };
   setTimeout(step, 0);
+  return made;
 }
 
 // Shows a preview in a square, or nothing: the image is made, changed or taken out only when

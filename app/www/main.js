@@ -1,6 +1,7 @@
 // The start of the app: which screen is shown, the place for a message, and what the
 // system's back gesture does.
 
+import * as batch from "./batch.js";
 import * as client from "./client.js";
 import "./timing.js";
 import * as messages from "./messages.js";
@@ -150,6 +151,18 @@ miniScreen.start();
 timeScreen.start();
 photomap.start();
 catalogs.start({message});
+// The line of a batch's run, on every screen: a tap opens Upload, and takes away the line's
+// end sentence.
+batch.watch(() => {
+  const words = batch.line();
+  const line = byId("batch-line");
+  line.hidden = words === null;
+  if (words !== null && line.textContent !== words) line.textContent = words;
+});
+byId("batch-line").addEventListener("click", () => {
+  go("upload");
+  batch.seen();
+});
 client.onRefusal((refusal) => message(messages.ofRefusal(refusal, client.state.status === null ? null : client.state.status.error)));
 client.watch((state) => {
   const pill = byId("top-link");
