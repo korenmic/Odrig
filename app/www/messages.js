@@ -3,8 +3,11 @@
 const FAILURES = {
   "bad-address": () => "That is not an address. Write it like 4.3.2.1 or 192.168.1.23:8600.",
   "no-wifi": () => "This phone is not on a Wi-Fi network. Join the network odrig in the phone's Wi-Fi settings.",
-  "no-answer": (detail) => `No answer from ${detail}. Check that the phone is on the installation's Wi-Fi network and that the installation has power.`,
+  "no-answer": (detail) => detail === "USB serial" ? "No answer over USB serial. Check the cable to the board's USB port and that the installation has power." :
+    `No answer from ${detail}. Check that the phone is on the installation's Wi-Fi network and that the installation has power.`,
   "bad-reply": (detail) => `Something answered at ${detail}, but it is not an odrig installation.`,
+  "no-usb": () => "No board is connected by USB. Connect the phone to the board's USB port with a cable, then press Connect over USB.",
+  "usb-refused": () => "Android did not let the app use the board's USB port. Press Connect over USB and allow it.",
 };
 
 // The message of a Failure of the way to the target.

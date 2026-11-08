@@ -558,7 +558,7 @@ replies are the same on every transport.
 
 | Where | Serial | Network |
 |---|---|---|
-| Board | The USB serial port. | HTTP over Wi-Fi, on the board's web server. |
+| Board | The USB serial port, from a computer or from the operators' app on a phone with a cable. | HTTP over Wi-Fi, on the board's web server. |
 | Emulator | A virtual serial port on a Mac. On Windows, and on a Mac when asked, the same lines on a TCP port of 127.0.0.1. | HTTP on the emulator's page address. |
 
 **Lines that are no reply.** On the board's serial ports, a line that begins with `#` is
