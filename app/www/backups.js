@@ -70,24 +70,29 @@ function sameTarget(context) {
   if (context.changed()) throw new Changed("Another target was chosen while it was read: nothing was saved.");
 }
 
-// How many times in all a request is sent while its reply is lost.
+// How many times in all a line is sent while its reply is lost.
 const SENDS = 3;
 
 // Waits for a request the client sends in its turn. One withdrawn while the app was hidden is
 // asked again once it is shown, for the same target; one whose reply did not come is sent
-// again, up to SENDS times in all, as every request of a run only reads. A refusal is the
+// again, as every request of a run only reads, until the reply of one of its lines was lost
+// SENDS times: a request may send more than one line, the probe and a piece. A refusal is the
 // target's answer and is not asked again, nor anything after Stop or a change of target.
 async function again(context, request) {
-  for (let sent = 0; ;) {
+  const lost = new Map();
+  for (;;) {
     try {
       return await request();
     } catch (error) {
       if (context.stopped() || context.changed()) throw error;
       if (error instanceof context.client.Withdrawn) {
         await context.visible();
-      } else if (!(error instanceof Failure && error.kind === "no-answer") || ++sent >= SENDS) {
-        throw error;
+        continue;
       }
+      if (!(error instanceof Failure && error.kind === "no-answer")) throw error;
+      const times = (lost.get(error.line) ?? 0) + 1;
+      if (times >= SENDS) throw error;
+      lost.set(error.line, times);
     }
   }
 }

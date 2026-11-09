@@ -13713,3 +13713,21 @@ keys as before: only the job keeps the one of the file it reads.
 
 **Resolution.** `app/www/backups.js`, `docs/android-app.md`, `tests/app/test_downloads.py`,
 `tests/app/page/scenarios/downloads.js`.
+
+## Seed 74: lost replies are counted for each line
+
+**Question.** The entry "Seed 74: a lost reply of a download's or a backup's read is sent
+again" says that the count is for each request, so that lost replies of different requests
+do not add up. One request of the client's may send more than one line: the probe
+`read <id> 0 1` and then the first piece, or after `bad-argument` the piece, the probe again
+and the piece of 600 bytes. Their lost replies were counted together, so a probe whose reply
+was lost twice ended the download at the first lost reply of the piece, sent only once. What
+is counted?
+
+**Answer.** Each line: a request is sent again until the reply of one of its lines was lost
+three times. Each send again follows a lost reply, which adds to the count of its line, so a
+request is sent again at most twice for each of its lines before one ends it. A failure on the way
+names the line it was met for, as a refusal already does.
+
+**Resolution.** `app/www/backups.js`, `app/www/commands.js`, `app/www/target.js`,
+`docs/android-app.md`, `tests/app/test_downloads.py`.

@@ -21,9 +21,16 @@ function whole(value, low, high) {
   return Number.isInteger(value) && value >= low && value <= high;
 }
 
-// The reply to a line, when the target carried it out. A refusal throws a Refusal.
+// The reply to a line, when the target carried it out. A refusal throws a Refusal, and a
+// Failure on the way names the line.
 async function carriedOut(line) {
-  const reply = await send(line);
+  let reply;
+  try {
+    reply = await send(line);
+  } catch (error) {
+    if (error instanceof Failure) error.line = line;
+    throw error;
+  }
   if (reply.ok === false) {
     if (typeof reply.error !== "string") {
       throw new Failure("bad-reply", address());

@@ -293,6 +293,17 @@ class StandIn(unittest.TestCase):
         self.assertEqual(base64.b64decode(saved["data"]), data)
         self.assertEqual(self.read_lines(target), ["read 1 0 1", "read 1 0 1", "read 1 0 720", "read 1 720 720", "read 1 720 720", "read 1 720 720", "read 1 1440 720"])
 
+    def test_the_probe_and_the_first_piece_are_each_sent_up_to_three_times(self):
+        data = bytes(range(256)) * 7
+        target = self.target({"a.odrg": data})
+        # One request of the client sends the probe and then the first piece.
+        lose = [{"line": "^read 1 0 1$", "times": 2}, {"line": "^read 1 0 720$"}]
+        found = support.run("downloads", address=target.address, settings={"rows": 1, "one": 1, "lose": lose}).seen
+        self.assertIn(f"Saved a.odrg: {len(data)} bytes of Internal /a.odrg", found["message"])
+        (saved,) = found["files"]
+        self.assertEqual(base64.b64decode(saved["data"]), data)
+        self.assertEqual(self.read_lines(target), ["read 1 0 1", "read 1 0 1", "read 1 0 1", "read 1 0 720", "read 1 0 720", "read 1 720 720", "read 1 1440 720"])
+
     def test_a_read_whose_reply_is_lost_three_times_in_a_row_ends_the_download(self):
         data = bytes(range(256)) * 7
         target = self.target({"a.odrg": data})

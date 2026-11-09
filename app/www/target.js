@@ -9,12 +9,14 @@ const LABEL = "[a-z0-9](?:[a-z0-9-]*[a-z0-9])?";
 const ADDRESS = new RegExp(`^(${LABEL}(?:\\.${LABEL})*)(?::([0-9]{1,5}))?$`);
 
 // What went wrong on the way to the target or back. `kind` is `bad-address`, `no-wifi`,
-// `no-answer` or `bad-reply`; `detail` is the address, or the text that is no address.
+// `no-answer` or `bad-reply`; `detail` is the address, or the text that is no address;
+// `line` is the command line it was met for, once the command that sent it names it.
 export class Failure extends Error {
   constructor(kind, detail) {
     super(`${kind}: ${detail}`);
     this.kind = kind;
     this.detail = detail;
+    this.line = null;
   }
 }
 
