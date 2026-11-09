@@ -353,6 +353,17 @@ class Playing(unittest.TestCase):
             run = support.start(foldered(), asked(20) + [line for time in times for line in asked(time, "status")], ["--drive", top])
         self.assertEqual([reply["playing"] for reply in replies(run)], [7, 5, 6, "all"])
 
+    def test_a_boot_whose_folders_have_no_folder_of_the_chosen_path_makes_the_root_current_saved_as_such(self):
+        with a_drive({}) as top, support.installed(foldered()) as folder:
+            support.session(folder, asked(0, "play 6") + asked(20), ["--drive", top])
+            folders = pathlib.Path(folder, "folders.txt")
+            folders.write_bytes(folders.read_bytes().replace(b"3 6 0 shows/night", b"3 6 0 shows/nigha"))
+            run = support.session(folder, asked(20, "status") + asked(40) + asked(60), ["--drive", top])
+            saved = pathlib.Path(folder, "playlist.txt").read_text(encoding="ascii").splitlines()[:2]
+        self.assertNotIn("folders unreadable", logged(run))
+        self.assertEqual(replies(run)[0]["playing"], "all")
+        self.assertEqual(saved, ["odrig-playlist 1", ""])
+
 
 class Pruning(unittest.TestCase):
     def test_the_removal_of_a_folders_last_file_takes_its_line_and_its_folder(self):

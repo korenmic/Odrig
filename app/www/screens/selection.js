@@ -1,4 +1,4 @@
-// The selection of the files of both storages in the list and of the card's folders, the
+// The selection of the files and the folders of both storages in the list, the
 // removal of one animation or of the selected internal ones, each asked about first, the
 // move of the selected files, and their download.
 
@@ -46,7 +46,7 @@ function storageName(external) {
   return external ? "External storage" : "Internal storage";
 }
 
-// Whether a folder of the card can be selected, for a download: one of a target that
+// Whether a folder of either storage can be selected, for a download: one of a target that
 // reports its inclusion. The filters pass folders by.
 export function folderSelectable(item) {
   return typeof item.playlist === "string" && typeof item.ignored === "boolean";
@@ -194,7 +194,7 @@ export function draw(state) {
   const externalFolders = folders().filter((item) => item.external === true).length;
   const readOnly = chosen.some((item) => item.external === true) && !capacity.cardWritable(state.space);
   byId("delete-selected").disabled = locked() || selected.size === 0 || external > 0 || chosenFolders > 0;
-  byId("delete-selected").title = external > 0 || chosenFolders > 0 ? "Delete selected removes internal animations; clear the card's files and folders from the selection." : "";
+  byId("delete-selected").title = external > 0 || chosenFolders > 0 ? "Delete selected removes internal animations; clear the folders and the card's files from the selection." : "";
   byId("move-selected").disabled = locked() || chosen.length === 0 || chosenFolders > 0 || readOnly;
   byId("move-selected").title = chosenFolders > 0 ? "Move to\u2026 moves files; clear the folders from the selection." :
     readOnly ? "External storage is read-only: its files can be downloaded, not moved." : "";

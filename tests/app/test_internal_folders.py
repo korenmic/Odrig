@@ -148,6 +148,13 @@ class InternalFolders(unittest.TestCase):
         self.assertEqual((folder / 'old.odrg').read_bytes(), data)
         self.assertTrue((folder / '2' / 'deep.odrg').exists())
 
+    def test_a_selected_folder_of_the_boards_storage_is_not_called_the_cards(self):
+        folder, emulator = self.board()
+        found = support.run('downloads', address=f'127.0.0.1:{emulator.port}', settings={'rows': 1, 'folders': ['shows']}).seen
+        self.assertTrue(found['deleteDisabled'])
+        self.assertEqual(found['deleteTitle'], "Delete selected removes internal animations; clear the folders and the card's files from the selection.")
+        self.assertIn('Saved the backup', found['message'])
+
 
 if __name__ == '__main__':
     unittest.main()

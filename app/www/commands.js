@@ -73,14 +73,14 @@ function progressOf(reply) {
 }
 
 // What `status` reports: whether the LEDs are on, the brightness, what plays, which is
-// "all" for the root playlist, the id of a folder of the card whose playlist is current,
+// "all" for the root playlist, the id of a folder of either storage whose playlist is current,
 // the id of a cycle or null, the id of the animation on the LEDs or null, the refreshes
 // in the last second, the reason of an invalid show or null, the width and the height of
 // the canvas, each null when the target gives none; in `progress`, how far it has read
 // its files after its start, in `host`, the text that names it, and in `left`, the whole
 // seconds left in the window of the current playlist, each null when the target gives
-// none; in `file`, the file of the animation on the LEDs, a card's by its path, and in
-// `playlist`, the path of the card's folder whose playlist is current, each null when the
+// none; in `file`, the file of the animation on the LEDs, one of a folder or of the card by its path, and in
+// `playlist`, the path of the folder whose playlist is current, each null when the
 // target names none, and undefined from a target that does not name them; and of the
 // playlist's turn in progress the loops it plays, `repeat`, the loop in progress, `loop`,
 // and its animation's saved repeat, `saved`, each null while the target reports none, with

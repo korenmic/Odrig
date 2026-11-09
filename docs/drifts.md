@@ -13395,3 +13395,34 @@ root, whatever folders it has.
 
 **Resolution.** `app/www/upload-destination.js` (`reason`), `tests/app/test_ready_upload.py`,
 `tests/app/page/scenarios/ready-checks.js`.
+
+## Seed 74: the texts that still gave the folders and the playlists to the card alone
+
+**Question.** The board's own storage has folders, each a playlist that the rotation goes
+through before the card's, that `play`, `list in`, `order get in` and `status` take, and
+that a selection takes for a download. Texts written before still gave all this to the
+card: `docs/show.md` had the playlists, the rotation and the saved playlist of the card's
+folders alone, `With no folder on the card the root is the only playlist`; `docs/core.md`
+had a show without a card write `playlist.txt` no more than before, though it writes it
+every 900,000 ms while the board's storage has a folder; `docs/commands.md` refused
+`list in`, `order get in`, `read`, `remove`, `upload begin`, `order move`, `saved` and
+`repeat` for a folder of the card alone, and its table made the id of a folder of the
+board's own storage `unknown-id` for `play`; comments of the app and
+`docs/android-app.md` said the same; and `Delete selected`, disabled while a folder of the
+board's own storage is selected, said `clear the card's files and folders from the
+selection.` What do they say?
+
+**Answer.** What the core and the app do, as the section of `docs/commands.md` on the
+folders of the board's own storage already says: the rotation goes from the root to the
+folders of the board's own storage in the tree's order, then to the card's, which it
+passes over while the card's tree is not known, then to the root; `playlist.txt` is
+written every 900,000 ms while either storage has a folder; each refusal names a folder of
+either storage; and `Delete selected` says `clear the folders and the card's files from
+the selection.` A start whose `folders.txt` is sound and has no folder of the saved path
+makes the root current, saved as such, which a test now holds.
+
+**Resolution.** `docs/show.md`, `docs/core.md`, `docs/commands.md`,
+`docs/android-app.md`, `app/www/screens/selection.js`, the comments of
+`app/www/client.js`, `app/www/commands.js` and `app/www/screens/show.js`,
+`tests/app/test_internal_folders.py`, `tests/app/page/scenarios/downloads.js`,
+`tests/core/test_internal_folders.py`.
