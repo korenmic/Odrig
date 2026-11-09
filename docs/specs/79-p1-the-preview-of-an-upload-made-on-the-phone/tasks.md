@@ -19,7 +19,7 @@ seen failing first.
     `tests/app/test_docs.py`, `docs/drifts.md` with the times.
   - Requirements: 6.1.
 
-- [ ] 4. Deliver
+- [x] 4. Deliver
   - Every suite that runs here; the pull request; the APK built from the branch that joins
     every unmerged seed, and its place on the Drive in `verification.md`.
   - Requirements: 6.1.
