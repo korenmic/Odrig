@@ -727,3 +727,38 @@ class ThePreferredStorage(unittest.TestCase):
         self.assertEqual([(state["animation"], state["dimming"]["saved"]) for state in states_of(run)], [(11, 30)] * 2)
         run = session(source, asked(100, "ignore 11 1") + at_times(7000, 11000), card=card)
         self.assertEqual([(state["animation"] > 60000, state["dimming"]["saved"]) for state in states_of(run)], [(True, 50)] * 2)
+
+
+class FolderMovesAndRemovals(unittest.TestCase):
+    """`move internal` and `folder remove` of the board's Clocks folders: the classes of their
+    files and the state of Clocks only follow, as for a folder made at the new path."""
+
+    def test_a_move_out_of_clocks_message_and_back_makes_its_files_messages_again(self):
+        script = at_times(100) + asked(200, "move internal 21 messages") + at_times(*range(5000, 35000, 500))
+        script += asked(35100, "move internal 21 clocks/message") + at_times(*range(35200, 70200, 500))
+        run = session(board(clocks=("only", True)), script)
+        answers = [reply for reply in replies(run) if "moved" in reply]
+        self.assertEqual(answers, [{"ok": True, "id": 21, "moved": True}] * 2)
+        states = states_of(run)
+        out = [state["file"] for state in states[1:61]]
+        back = [state["file"] for state in states[61:]]
+        self.assertEqual(set(out) - {None}, FACES)
+        self.assertIn(MESSAGE, back)
+
+    def test_a_rename_of_clocks_leaves_clocks_only_without_the_boards_clocks_until_it_is_renamed_back(self):
+        script = at_times(100) + asked(200, "move internal 20 faces") + at_times(5000) + asked(5100, "move internal 20 clocks") + at_times(5200, 12000)
+        run = session(board(clocks=("only", True)), script)
+        states = states_of(run)
+        self.assertEqual(states[0]["clock_only"], {"folder": 20, "state": "playing"})
+        self.assertEqual(states[1]["clock_only"], {"folder": None, "state": "no-card"})
+        self.assertIsNone(states[1]["animation"])
+        self.assertEqual(states[-1]["clock_only"], {"folder": 20, "state": "playing"})
+        self.assertIn(states[-1]["file"], FACES | {MESSAGE})
+
+    def test_an_empty_clocks_folder_of_the_board_is_removed_and_clocks_only_says_so(self):
+        source = board([ROOT], folders="odrig-folders 1 3\n1 20 0 clocks\n2 21 0 clocks/message\n", clocks=("only", True))
+        script = at_times(100) + asked(200, "folder remove 21") + at_times(300) + asked(400, "folder remove 20") + at_times(500)
+        run = session(source, script)
+        self.assertEqual([reply for reply in replies(run) if "on" not in reply], [DONE, DONE])
+        self.assertEqual([state["clock_only"] for state in states_of(run)],
+                         [{"folder": 20, "state": "no-clocks"}] * 2 + [{"folder": None, "state": "no-card"}])
