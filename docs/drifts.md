@@ -13671,3 +13671,26 @@ old and new names and the four edits are what the move needs and stay. The figur
 server's for a request, is the board's to see, at the delivery.
 
 **Resolution.** `core/src/catalog.cpp`, `docs/core.md`.
+
+## Seed 74: a lost reply of a download's or a backup's read is sent again
+
+**Question.** On the emulated phone about one reply in ten was lost, and one lost reply
+ended a whole `Download`, which may need thousands of reads of 720 bytes: the job asked again
+only for a request withdrawn while the app was hidden. In `Download selected` it failed the
+file, and ended the backup while the selected folders or the catalog's generation were read.
+Is a request whose reply did not come sent again?
+
+**Answer.** Yes. Every request of a download or a backup only reads: `read`, the probe
+`read <id> 0 1`, `list` and `list in`, `saved` and `catalog`; one sent again changes nothing
+on the installation. One whose reply does not come, the client's `no-answer`, is sent again,
+up to three times in all, before the file fails or the run ends as it did, in the same words.
+Three, not the once of `move external`, because a download sends many more lines, each of
+which waits up to five seconds for its reply; the count is for each request, so lost replies
+of different requests do not add up. A refusal is the installation's answer and is never
+sent again; `no-wifi` and a reply that is not one are not lost replies and end as before;
+`Stop`, a change of target and a request withdrawn while the app was hidden keep their
+meaning, and the probe still falls back to 600 bytes after `bad-argument`. Whether replies
+are lost on the installation's own Wi-Fi is for the board to show.
+
+**Resolution.** `app/www/backups.js`, `docs/android-app.md`, `tests/app/test_downloads.py`,
+`tests/app/page/scenarios/downloads.js`.

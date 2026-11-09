@@ -167,17 +167,27 @@ Not shown by this check:
 
 Found, and open:
 
-- One lost reply ends a `Download`: the job asks again only for a request withdrawn while
+- One lost reply ended a `Download`: the job asked again only for a request withdrawn while
   the app was hidden (`again()` in `app/www/backups.js`). In `Download selected` a lost
-  reply marks its file failed and the zip is saved as partial; the backup ends only when the
-  reply is lost while the selected folders or the catalog's generation are read. On the
-  emulated phone about one reply in ten through the host's address 10.0.2.2 was lost (162 of
-  1,305 requests with the first APK, 6 of 93 with the second), and the `Download` of
+  reply marked its file failed and the zip was saved as partial, and the backup ended when
+  the reply was lost while the selected folders or the catalog's generation were read. On
+  the emulated phone about one reply in ten through the host's address 10.0.2.2 was lost
+  (162 of 1,305 requests with the first APK, 6 of 93 with the second), and the `Download` of
   `tenor-rainbow-17659339_fit.odrg` that way ended three times as "was not downloaded …
   (no-answer)". The board emulator's log shows one such read received and answered; where
   the reply was lost is not shown. Through `adb reverse` to `127.0.0.1:8650` none of 1,245
-  was lost, so the larger downloads and the four zips were made that way. Whether replies
-  are lost on the installation's Wi-Fi needs the board.
+  was lost, so the larger downloads and the four zips were made that way.
+  Mended by the commit "Seed 74: send a read again when its reply is lost": a request of a
+  download or a backup whose reply does not come is sent again, up to three times in all,
+  and a refusal is not. `tests/app/test_downloads.py` shows it in Chrome with the replies
+  lost on the way: `test_a_read_whose_reply_is_lost_is_sent_again_and_the_file_is_saved_whole`,
+  `test_a_backup_keeps_a_file_whose_read_lost_a_reply`,
+  `test_a_lost_reply_while_the_selected_folders_are_read_is_sent_again`,
+  `test_a_lost_reply_of_the_catalogs_generation_is_sent_again`,
+  `test_a_read_whose_reply_is_lost_three_times_in_a_row_ends_the_download` and
+  `test_a_refused_read_is_not_sent_again`. The emulated phone has not run an APK with the
+  mend. Whether, and how often, replies are lost on the installation's Wi-Fi stays open for
+  the board.
 
 The owner's check of `Download` on a phone, below, stays open: this check opened neither the
 file nor the zip in the phone's own apps.

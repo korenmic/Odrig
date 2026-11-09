@@ -8,6 +8,7 @@
 
 import * as commands from "./commands.js";
 import {crc32} from "./crc32.js";
+import {Failure} from "./target.js";
 import {ZipWriter, fits} from "./zip-writer.js";
 
 export const MANIFEST = "odrig-backup.json";
@@ -69,15 +70,24 @@ function sameTarget(context) {
   if (context.changed()) throw new Changed("Another target was chosen while it was read: nothing was saved.");
 }
 
-// Waits for a request the client sends in its turn; one withdrawn while the app was hidden
-// is asked again once it is shown, for the same target.
+// How many times in all a request is sent while its reply is lost.
+const SENDS = 3;
+
+// Waits for a request the client sends in its turn. One withdrawn while the app was hidden is
+// asked again once it is shown, for the same target; one whose reply did not come is sent
+// again, up to SENDS times in all, as every request of a run only reads. A refusal is the
+// target's answer and is not asked again, nor anything after Stop or a change of target.
 async function again(context, request) {
-  for (;;) {
+  for (let sent = 0; ;) {
     try {
       return await request();
     } catch (error) {
-      if (!(error instanceof context.client.Withdrawn) || context.stopped() || context.changed()) throw error;
-      await context.visible();
+      if (context.stopped() || context.changed()) throw error;
+      if (error instanceof context.client.Withdrawn) {
+        await context.visible();
+      } else if (!(error instanceof Failure && error.kind === "no-answer") || ++sent >= SENDS) {
+        throw error;
+      }
     }
   }
 }

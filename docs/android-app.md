@@ -722,6 +722,12 @@ when it is not there; the part after a file serves before the next when it holds
 row. A file whose id no longer names the same path and size, whose size changes between two
 pieces, or whose bytes are not the ones its storage's catalog names, fails and has no entry.
 The pieces go in their turn among the app's other requests, a status still once a second.
+Every request of a run only reads, so one whose reply does not come is sent again, up to
+three times in all: a piece, the probe, a part of a list, `saved` or `catalog`. The third
+silence of one request ends a download, as the failure of its file, and in a backup fails
+the file being read, or ends the run while the selected folders or the catalog's generation
+are read. A refusal is the installation's answer and is not asked again; an installation
+that refuses the count with `bad-argument` still has its files read 600 bytes at a time.
 `Stop` ends the run between two pieces, or as the piece under way ends, whatever its reply:
 a backup is saved with the files read whole before, as a partial backup, and a download saves
 nothing. A change of target ends either with nothing saved; while the app is hidden it waits.
@@ -1435,6 +1441,9 @@ By programs, on a Mac:
   selection of both storages backed up one storage at a time; a partial backup with a
   damaged file; a file whose size changes while it is read, left out; the probe `read <id>
   0 1`, then 720 bytes at a time, and 600 at a time from an installation without the count;
+  a probe, a piece, a folder's list and the catalog's generation whose replies are lost,
+  each sent again and the file or the zip saved whole, three lost replies in a row ending a
+  download in the words of no answer, and a refused read not sent again;
   the zip writer's data descriptors, folders, names and limits.
 - That the web code uses the documented protocol and names no address
   but `4.3.2.1`.

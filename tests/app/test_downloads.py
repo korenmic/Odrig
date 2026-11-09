@@ -1,6 +1,7 @@
 """Downloads and backups of the shared app: one file saved as it is, one zip of a selection of
 one storage with its manifest, read back by Python's own reader, a partial backup, a file
-that changes while it is read, and an installation that reads 600 bytes at a time."""
+that changes while it is read, an installation that reads 600 bytes at a time, and replies
+lost on the way back to the app."""
 
 import base64
 import io
@@ -21,6 +22,7 @@ from . import support
 from .test_target import entered
 
 MANIFEST = "odrig-backup.json"
+NO_ANSWER = "No answer from {}. Check that the phone is on the installation's Wi-Fi network and that the installation has power. (no-answer)"
 STATUS = (200, '{"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null}\n')
 
 
@@ -190,9 +192,10 @@ class Downloads(unittest.TestCase):
 class StandIn(unittest.TestCase):
     """A target of the test's own: its files, its list and its reads, which may change."""
 
-    def target(self, files, counts=True, changed=None, delay=0.0, counted=None):
+    def target(self, files, counts=True, changed=None, delay=0.0, counted=None, refused=None):
         """`counts` false refuses every read with a count, and `counted` refuses those after
-        so many, as another installation at the same address would."""
+        so many, as another installation at the same address would; `refused` maps a line of
+        `read` to the code it is refused with."""
         data = dict(files)
         state = {"reads": 0, "counted": 0}
 
@@ -202,6 +205,8 @@ class StandIn(unittest.TestCase):
             return 200, json.dumps({"ok": True, "items": items, "next": None})
 
         def read(line):
+            if refused is not None and line.decode("ascii") in refused:
+                return 200, json.dumps({"ok": False, "error": refused[line.decode("ascii")]})
             words = line.decode("ascii").split(" ")
             if len(words) == 4:
                 state["counted"] += 1
@@ -265,6 +270,46 @@ class StandIn(unittest.TestCase):
         self.assertIn("changed while it was read", changed["reason"])
         self.assertIn("Failed 1: a.odrg (It changed while it was read.", found["message"])
 
+    def test_a_read_whose_reply_is_lost_is_sent_again_and_the_file_is_saved_whole(self):
+        data = bytes(range(256)) * 7
+        target = self.target({"a.odrg": data})
+        # The probe's reply is lost once and a piece's twice: each request is sent up to three
+        # times, whatever the others met.
+        lose = [{"line": "^read 1 0 1$"}, {"line": "^read 1 720 720$", "times": 2}]
+        found = support.run("downloads", address=target.address, settings={"rows": 1, "one": 1, "lose": lose}).seen
+        self.assertIn(f"Saved a.odrg: {len(data)} bytes of Internal /a.odrg", found["message"])
+        (saved,) = found["files"]
+        self.assertEqual(base64.b64decode(saved["data"]), data)
+        self.assertEqual(self.read_lines(target), ["read 1 0 1", "read 1 0 1", "read 1 0 720", "read 1 720 720", "read 1 720 720", "read 1 720 720", "read 1 1440 720"])
+
+    def test_a_read_whose_reply_is_lost_three_times_in_a_row_ends_the_download(self):
+        data = bytes(range(256)) * 7
+        target = self.target({"a.odrg": data})
+        found = support.run("downloads", address=target.address, settings={"rows": 1, "one": 1, "lose": [{"line": "^read 1 720 720$", "times": 3}]}).seen
+        self.assertEqual(found["files"], [])
+        self.assertEqual(found["message"], "Internal /a.odrg was not downloaded. " + NO_ANSWER.format(target.address))
+        self.assertEqual(self.read_lines(target), ["read 1 0 1", "read 1 0 720", "read 1 720 720", "read 1 720 720", "read 1 720 720"])
+
+    def test_a_refused_read_is_not_sent_again(self):
+        data = bytes(range(256)) * 7
+        target = self.target({"a.odrg": data}, refused={"read 1 720 720": "storage-error"})
+        found = support.run("downloads", address=target.address, settings={"rows": 1, "one": 1}).seen
+        self.assertEqual(found["files"], [])
+        self.assertTrue(found["message"].startswith("Internal /a.odrg was not downloaded. "), found["message"])
+        self.assertTrue(found["message"].endswith("(storage-error)"), found["message"])
+        self.assertEqual(self.read_lines(target), ["read 1 0 1", "read 1 0 720", "read 1 720 720"])
+
+    def test_a_backup_keeps_a_file_whose_read_lost_a_reply(self):
+        first, second = bytes(range(256)) * 4, bytes(range(200))
+        target = self.target({"a.odrg": first, "b.odrg": second})
+        found = support.run("downloads", address=target.address, settings={"rows": 2, "selectAll": True, "lose": [{"line": "^read 1 720 720$"}]}).seen
+        self.assertIn("2 of 2 files.", found["message"])
+        made, _ = archive(found)
+        self.assertEqual(made.namelist(), ["a.odrg", "b.odrg", MANIFEST])
+        self.assertEqual((made.read("a.odrg"), made.read("b.odrg")), (first, second))
+        manifest = json.loads(made.read(MANIFEST))
+        self.assertEqual(([file["outcome"] for file in manifest["files"]], manifest["partial"]), (["saved", "saved"], False))
+
 
 def row(number, path, data, external=False):
     return {"id": number, "file": path, "bytes": len(data), "ignored": False, "external": external, "type": "frames"}
@@ -275,7 +320,9 @@ class Levels(unittest.TestCase):
     rows from the position asked for, as the board does, and whose reads of some files are
     never answered."""
 
-    def target(self, levels, contents, page=9, hang=(), saved=True, delay=0.0):
+    def target(self, levels, contents, page=9, hang=(), saved=True, delay=0.0, generation=None):
+        """`generation`, when given, is that of the card's catalog, which reads no page."""
+
         def listed(line):
             words = line.decode("ascii").split(" ")
             level = int(words[2]) if words[1:2] == ["in"] else None
@@ -299,7 +346,22 @@ class Levels(unittest.TestCase):
                    "space": (200, '{"ok":true,"free":1000000,"total":2000000,"animations":1,"external":{"present":true,"free":1000000,"total":2000000,"read_only":false}}')}
         if saved:
             replies["saved"] = (200, '{"ok":true,"brightness":null,"repeat":null,"start":false}')
+        if generation is not None:
+            catalog_reply = json.dumps({"ok": True, "internal": {"state": "none", "uncataloged": 0},
+                                        "external": {"state": "ok", "generation": generation, "entries": len(contents), "writable": True}, "rebuild": None})
+            replies["catalog"] = lambda line: (200, catalog_reply) if line == b"catalog" else (200, '{"ok":false,"error":"unknown-command"}')
         return entered(self, support.StandIn(replies, delay=delay))
+
+    def card_folder(self, count=12):
+        """The root with a file and the card's folder `big` of `count` files, its list in two
+        parts."""
+        contents = {1: b"one" * 10}
+        files = []
+        for number in range(2, 2 + count):
+            contents[number] = bytes([number]) * (10 + number)
+            files.append(row(number, f"big/f{number:02}.odrg", contents[number], external=True))
+        levels = {None: [row(1, "one.odrg", contents[1]), {"id": 100, "playlist": "big", "external": True, "files": count, "ignored": False}], 100: files}
+        return levels, contents, [f"big/f{number:02}.odrg" for number in range(2, 2 + count)]
 
     def three(self):
         contents = {1: bytes(range(100)), 2: bytes(range(200)), 3: bytes(range(50))}
@@ -340,6 +402,30 @@ class Levels(unittest.TestCase):
         self.assertEqual([(file["path"], file["outcome"]) for file in manifest["files"]], [("a.odrg", "saved"), ("b.odrg", "stopped"), ("c.odrg", "not-started")])
         self.assertIn("It is a partial backup.", found["message"])
         self.assertIn("Not read after Stop: 2.", found["message"])
+
+    def test_a_lost_reply_while_the_selected_folders_are_read_is_sent_again(self):
+        levels, contents, names = self.card_folder()
+        target = self.target(levels, contents)
+        found = support.run("downloads", address=target.address, settings={"rows": 1, "folders": ["big"], "lose": [{"line": "^list in 100 9$"}]}).seen
+        self.assertIn("12 of 12 files.", found["message"])
+        made, _ = archive(found)
+        self.assertEqual(made.namelist(), names + [MANIFEST])
+        self.assertEqual(made.read("big/f13.odrg"), contents[13])
+        lists = [line.decode("ascii") for _, line in target.lines if line.startswith(b"list in 100")]
+        self.assertEqual(lists[:3], ["list in 100 0", "list in 100 9", "list in 100 9"])
+
+    def test_a_lost_reply_of_the_catalogs_generation_is_sent_again(self):
+        levels, contents, names = self.card_folder()
+        target = self.target(levels, contents, generation=7)
+        lose = [{"line": "^catalog$", "after": "^list in 100 9$"}]
+        found = support.run("downloads", address=target.address, settings={"rows": 1, "folders": ["big"], "lose": lose}).seen
+        self.assertIn("12 of 12 files.", found["message"])
+        made, _ = archive(found)
+        self.assertEqual(made.namelist(), names + [MANIFEST])
+        self.assertEqual(json.loads(made.read(MANIFEST))["catalog"], {"generation": 7})
+        walked = [line.decode("ascii") for _, line in target.lines if line.startswith(b"list in 100") or line == b"catalog"]
+        at = walked.index("list in 100 9")
+        self.assertEqual(walked[at:at + 3], ["list in 100 9", "catalog", "catalog"])
 
     def test_another_target_chosen_during_a_backup_saves_nothing(self):
         levels, contents = self.three()
