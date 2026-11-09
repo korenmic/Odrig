@@ -96,6 +96,47 @@ function kilobytes(bytes) {
   return String(Math.ceil(bytes / 1000));
 }
 
+// The id and the folder of a line `move external <id> <path>`, and the storage and the
+// folder of a line `folder make <storage> <path>`, each folder as `/` and its path; null for
+// another line.
+function moveOf(line) {
+  const found = /^move external ([0-9]+) (.+)$/.exec(line);
+  return found === null ? null : {id: found[1], folder: found[2] === "/" ? "/" : `/${decodeURIComponent(found[2])}`};
+}
+
+function makingOf(line) {
+  const found = /^folder make (internal|external) (.+)$/.exec(line);
+  return found === null ? null : {storage: found[1], folder: `/${decodeURIComponent(found[2])}`};
+}
+
+// Whether a line is `move internal <id> <path>`.
+function movingInsideOf(line) {
+  return /^move internal [0-9]+ .+$/.test(line);
+}
+
+// The texts of the refusals of `move external` and of `folder make`, by their codes.
+const MOVES = {
+  "unknown-id": ({id, folder}) => `Animation ${id} or the folder ${folder} is not on the card any more. The list is read again.`,
+  "in-use": ({id, folder}) => `Animation ${id} cannot be moved into ${folder}: a file or a folder there has its name.`,
+  "read-only": ({id}) => `The card cannot be written now, so animation ${id} cannot be moved on it.`,
+  "bad-argument": ({id, folder}) => `Animation ${id} cannot be moved into ${folder}: its new path would pass 100 characters.`,
+};
+const MAKINGS = {
+  "unknown-id": ({folder}) => `The folder above ${folder} is not on the installation any more. The list is read again.`,
+  "in-use": ({folder}) => `The folder ${folder} cannot be made: a file or a folder there has its name.`,
+  "read-only": ({folder}) => `The card cannot be written now, so the folder ${folder} cannot be made.`,
+  "no-space": ({storage, folder}) => storage === "internal" ? `Internal storage has no room for the folder ${folder}: it keeps 32 folders at most, each with room for its files.` :
+    `The card has no free id for the folder ${folder}.`,
+  unsupported: () => "This installation cannot make folders in that storage.",
+};
+// The texts of the refusals of `move internal`, by their codes.
+const MOVINGS_INSIDE = {
+  "bad-argument": () => "A folder or an animation inside would pass the limits of 3 levels or 100 bytes.",
+  "in-use": () => "A folder there has that name.",
+  "unknown-id": () => "The folder or its new place is not on the installation any more. The list is read again.",
+  unsupported: () => "This installation cannot move folders in its storage.",
+};
+
 // The text for each error code a command of the app can get, from the line that was
 // refused, from the reason of an invalid show, when the target has said one, and from the
 // refusal itself.
@@ -106,7 +147,9 @@ const REFUSALS = {
   "bad-argument": NOT_UNDERSTOOD,
   "show-invalid": (line, reason) =>
     `${reason === null ? "The installed show is invalid." : ofInvalidShow(reason)} Nothing can be played until a show is installed over USB.`,
-  "unknown-id": (line) => line.startsWith("order ") ? "That animation is not on the installation any more. The list is read again." : line.startsWith("remove many ") ? "Some selected animations are not installed any more. Refresh the selection." : (line === "play all" ? "No animation is installed." : `Animation ${line.split(" ")[1]} is not installed any more.`),
+  "unknown-id": (line) => line.startsWith("order ") ? "That animation is not on the installation any more. The list is read again." : line.startsWith("remove many ") ? "Some selected animations are not installed any more. Refresh the selection." :
+    line.startsWith("upload begin ") ? "The folder of this upload is not on the installation any more. Select the destination again." :
+    (line === "play all" ? "No animation is installed." : `Animation ${line.split(" ")[1]} is not installed any more.`),
   unavailable: (line) => line.startsWith("read ") ? `Animation ${line.split(" ")[1]} cannot be read until it is replaced: its file has a fault. The list says which.`
     : `Animation ${line.split(" ")[1]} cannot be played until it is replaced: its file has a fault. The list says which.`,
   busy: () => "The installation is busy. Try again in a moment.",
@@ -217,6 +260,11 @@ export function ofRemoved(animation) {
 // The message of a command the target refused. A code without a text of its own gets
 // the general sentence.
 export function ofRefusal(refusal, reason = null) {
+  const moving = moveOf(refusal.line);
+  if (moving !== null && Object.prototype.hasOwnProperty.call(MOVES, refusal.code)) return `${MOVES[refusal.code](moving)} (${refusal.code})`;
+  const making = makingOf(refusal.line);
+  if (making !== null && Object.prototype.hasOwnProperty.call(MAKINGS, refusal.code)) return `${MAKINGS[refusal.code](making)} (${refusal.code})`;
+  if (movingInsideOf(refusal.line) && Object.prototype.hasOwnProperty.call(MOVINGS_INSIDE, refusal.code)) return `${MOVINGS_INSIDE[refusal.code]()} (${refusal.code})`;
   const text = Object.prototype.hasOwnProperty.call(REFUSALS, refusal.code) ? REFUSALS[refusal.code] : REFUSED;
   return `${text(refusal.line, reason, refusal)} (${refusal.code})`;
 }

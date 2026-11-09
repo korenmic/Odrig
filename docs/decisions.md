@@ -903,3 +903,53 @@ the app is not changed.
   stays as it is. `status` names in its host text the external memory the board found
   and the internal memory free when the core started, which the app shows unchanged. No
   new command; no APK; nothing of the wiring, the power or the LEDs is touched.
+
+### Seed 74: folders of the card, and moves from the app
+
+On 2026-11-06 the owner approved in advance the new board commands seed 74 needs, folder
+creation and listing, moves and readback among them, choosing "Approve fully now": the
+specification designs them and implementation follows without a second review. Under that
+answer the core gets `folder make external <path>`, which makes a real folder of the card
+and keeps it in the card's index while it is empty, and the host interface gets the optional
+`make_folder`. The decision of the catalog that a folder without a file is in no line of the
+index narrows: a folder made by `folder make` is listed empty until a rebuild.
+
+On 2026-11-08, under the same answer, `read` gets a count: `read <id> <offset> <count>` gives
+1 to 720 bytes of a file from an offset, through the chunk buffer, at no memory of the core,
+and `read <id> <offset>` keeps its 600. A reply holds 1,024 bytes, which with a size of ten
+digits leave room for 737; 720 make a reply of 1,001. The app downloads a file under its name
+and backs up a selection of one storage as one zip with the manifest `odrig-backup.json` of
+version 1, and the APK gets a second plugin of its own, `Save`, which keeps a download or a
+backup where the operator chooses in the system's dialog.
+
+On 2026-11-08, under the same answer, the board's own storage gets folders: `folder make
+internal <path>` makes one, a playlist as a folder of the card is, `upload begin` takes a
+folder's path before a file's name, `list` and `list in` give the folders and their files,
+and `ignore` of a folder's id holds its subtree. A file of a folder keeps the name
+`<n>/<name>`, in the storage's folder `n`, in `show.json` and the other files that name it;
+the folders' paths are in `folders.txt`. The host interface's names, `remove` and
+`make_folder` take the number of such a folder, and `make_folder` may answer 0 for a storage
+that makes no folders. The core's memory is as it was.
+
+On 2026-11-09, under the same answer, `move external <id> <path>` moves a file of the card
+into another of its folders, `/` for its root: the board renames it through `upload.part` in
+one commit of the card's catalog, which keeps its id and puts it last among the folder's
+files, and gives its saved brightness, repeat and Ignore to its new path through a journal
+on the card, `moving.txt`, that a mount finishes after a cut. A folder of the card is moved
+by the app, as the owner allowed on 2026-11-09 should the board's own folder move prove too
+large to build safely: its folders made with `folder make external` and its files moved one
+at a time with `move external`, each keeping its id and its saved settings, the new folder
+with an id of its own. Folders move between the board's own storage and the card as jobs of
+the app over their files, their folders made first. The core's memory is as it was.
+
+### Seed 86: moving or renaming a folder of the board's own storage
+
+On 2026-11-09 the owner approved a new seed in which `move internal <folder id> <path>` moves
+or renames a folder of the board's own storage, its sub-folders with it, by one rewrite of
+`folders.txt`, with `Rename…` and `Move to…` in the app; the approval covers the addition to
+the command list. The folder's numbers, ids, Ignore, stored names and files stay, so its
+files, their saved settings, the internal catalog and the previews on the phone stay too,
+and the current playlist's path follows the move. A moved folder takes its place among its
+new siblings by the bytes of their names, as the owner ruled the same day for the card's
+moved folders. The host interface, the format of `folders.txt`, the card's catalog and the
+Python library are as they were. The core's memory is as it was.

@@ -82,7 +82,9 @@ the entry links to it.
   `remove <id>`, `ignore` for playlist inclusion, `order` for the saved order of the
   playlist, `mapping` for assignments and the diagonal check, `repeat` for the loops of
   the turn in progress, `clocks` for the clocks between the animations,
-  `debug mini on|off` for temporary miniature output, and `upload`, which
+  `debug mini on|off` for temporary miniature output, `saved <id>` for what is saved for an
+  animation, `folder make` for the folders of the board's storage and of the card,
+  `move external` for a file moved to another folder of the card, and `upload`, which
   sends a file as several lines. Each is answered by one
   line of JSON. See
   [commands.md](../docs/commands.md).

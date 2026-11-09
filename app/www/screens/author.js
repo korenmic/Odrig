@@ -296,7 +296,7 @@ function close() {
 // Uploads the text or the clock that was made as a new item with the lowest free id and a
 // file name made from a text's first words, or `clock-<kind>`; or, for one that is edited,
 // in the place of its file, while that file is still the one that was read.
-function upload(message) {
+async function upload(message) {
   if (made === null || locked()) {
     return;
   }
@@ -308,7 +308,19 @@ function upload(message) {
   }
   const named = state.rootNames ?? {ids: [], files: []};
   const saving = editing;
-  const id = saving !== null ? saving.id : freeId(new Set(named.ids));
+  // A new item's id is free among the root's and those of the folders of the board's own
+  // storage, which the root's list holds no item of.
+  let taken = named.ids;
+  if (saving === null && named.internal === true) {
+    try {
+      taken = taken.concat(await client.takenIds());
+    } catch (error) {
+      message(error instanceof Failure ? messages.ofFailure(error) : error instanceof Refusal ? messages.ofRefusal(error, null) : error.message);
+      return;
+    }
+    if (made === null || locked() || sending !== null) return;
+  }
+  const id = saving !== null ? saving.id : freeId(new Set(taken));
   const base = kind === "text" ? textName(made.source.text) : `clock-${made.source.widget}`;
   const file = saving !== null ? saving.file : fileName(base, new Set(named.files), ENDING);
   const shown = byId("author-uploading");

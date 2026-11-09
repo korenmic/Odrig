@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "commands.h"
 
 #include "breaks.h"
@@ -5,6 +7,7 @@
 
 #include "content.h"
 #include "drive.h"
+#include "folders.h"
 #include "mapping_control.h"
 #include "odrig_core.h"
 #include "order.h"
@@ -81,15 +84,25 @@ Readiness readiness_of(const Core &core) {
     return counts;
 }
 
+// The path the operator sees of a file of the show, cut to its first 32 characters as the
+// names of a drive's files are.
+void checked_path(const Core &core, uint32_t file, char *path) {
+    logical_path(core, core.files[file].name, path);
+    path[kFaultNameSize - 1] = '\0';
+}
+
 // Writes the name of the file the check is at, as a JSON string, or null: of a rebuild the
-// file it is at, and `catalog` while a drive's catalog is read.
-void checking_of(const Core &core, Reply &reply) {
+// file it is at, and `catalog` while a drive's catalog is read. A file of the show is named
+// by the path the operator sees, each name cut to 32 characters.
+ODRIG_NOINLINE void checking_of(const Core &core, Reply &reply) {
+    char path[kDrivePathRoom];
     if (!core.invalid && catalog_rebuilding(core)) {
         const uint32_t at = core.rebuild_at;
         char name[kFaultNameSize];
         if (core.rebuild == 1 + kInternal && at < core.file_count) {
+            checked_path(core, at, path);
             reply.text("\"");
-            reply.text(core.files[at].name);
+            reply.escaped(path);
             reply.text("\"");
             return;
         }
@@ -106,8 +119,9 @@ void checking_of(const Core &core, Reply &reply) {
         return;
     }
     if (!core.invalid && !check_complete(core) && core.check_at < core.file_count) {
+        checked_path(core, core.check_at, path);
         reply.text("\"");
-        reply.text(core.files[core.check_at].name);
+        reply.escaped(path);
         reply.text("\"");
         return;
     }
@@ -184,8 +198,9 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text(",\"playing\":");
     if (core.clocks_on == kClocksOnly && core.playing == kPlaylist && core.clocks_id != 0) {
         reply.number(core.clocks_id);
-    } else if (core.playing == kPlaylist && core.tree_known && core.current != 0) {
-        // The playlist of a folder of the drive, while the drive is in and holds it.
+    } else if (core.playing == kPlaylist && playlist_is_folder(core)) {
+        // The playlist of an internal folder, or of a folder of the drive while the drive
+        // is in and holds it.
         reply.number(core.current_folder.id);
     } else {
         reply.id_or_null(core, core.playing);
@@ -276,8 +291,9 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     char name[kDriveListedName];
     reply.text(",\"file\":");
     if (shown != kNothing && !is_drive(shown) && shown < core.item_count && !core.items[shown].is_cycle) {
+        logical_path(core, core.files[core.items[shown].first].name, name);
         reply.text("\"");
-        reply.text(core.files[core.items[shown].first].name);
+        reply.escaped(name);
         reply.text("\"");
     } else if (shown != kNothing && is_drive(shown) && drive_row(core, shown - kDriveBase) != nullptr) {
         reply.text("\"");
@@ -289,6 +305,10 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text(",\"playlist\":");
     if (core.clocks_on == kClocksOnly && core.playing == kPlaylist && core.clocks_id != 0) {
         reply.text("\"clocks\"");
+    } else if (core.playing == kPlaylist && (core.current & kInternalLevel) != 0 && core.playlist_path != nullptr) {
+        reply.text("\"");
+        reply.escaped(core.playlist_path + 1);
+        reply.text("\"");
     } else if (core.playing == kPlaylist && core.tree_known && core.current != 0 && drive_folder_path(core, core.current, name, sizeof name) != 0) {
         reply.text("\"");
         reply.escaped(name);
@@ -440,7 +460,9 @@ bool level_words(const Core &core, const Words &words, uint32_t first, uint32_t 
             return false;
         }
         uint32_t value = 0;
-        *level = drive_find(core, id, &value) == 'd' ? value : kNoFolder;
+        FolderLine line;
+        const uint8_t kind = drive_find(core, id, &value);
+        *level = kind == 'd' ? value : kind == 0 && folder_by_id(core, id, line, nullptr) ? kInternalLevel | line.number : kNoFolder;
         at += 2;
     }
     if (words.count == at) {
@@ -449,8 +471,10 @@ bool level_words(const Core &core, const Words &words, uint32_t first, uint32_t 
     return words.count == at + 1 && number_word(words, at, 0, 0xFFFFFFFFu, from);
 }
 
-// Decodes a URI path argument; spaces and percent signs cannot be raw command words.
-bool external_path(const char *word, uint32_t size, char *name) {
+// Decodes a URI path argument once into `name`, with its length; spaces and percent signs
+// cannot be raw command words. False for a bad escape, a byte outside printable ASCII or a
+// path too long.
+bool decoded_path(const char *word, uint32_t size, char *name, uint32_t *decoded) {
     uint32_t length = 0;
     for (uint32_t at = 0; at < size; ++at) {
         uint32_t value = static_cast<uint8_t>(word[at]);
@@ -470,9 +494,91 @@ bool external_path(const char *word, uint32_t size, char *name) {
         name[length++] = static_cast<char>(value);
     }
     name[length] = '\0';
+    *decoded = length;
+    return true;
+}
+
+// The path of a file of the drive, decoded once and checked whole.
+bool external_path(const char *word, uint32_t size, char *name) {
+    uint32_t length = 0;
+    if (!decoded_path(word, size, name, &length)) return false;
     const char *base = name;
     for (uint32_t at = 0; at < length; ++at) if (name[at] == '/') base = name + at + 1;
     return catalog_name_allowed(name, length) && is_file_name(base);
+}
+
+// The path of a folder of the drive, decoded once: one to kCatalogDeepest names that leave
+// room for a file in it under the catalog's rule, the last not ending in `.odrg` or `.odrgx`.
+bool folder_path(const char *word, uint32_t size, char *name) {
+    uint32_t length = 0;
+    if (!decoded_path(word, size, name, &length) || length == 0 || length + 7 > kCatalogNameMost) return false;
+    char probe[kCatalogNameMost + 1];
+    memcpy(probe, name, length);
+    memcpy(probe + length, "/a.odrg", 8);
+    if (!catalog_name_allowed(probe, length + 7)) return false;
+    uint32_t parts = 1;
+    const char *base = name;
+    for (uint32_t at = 0; at < length; ++at) {
+        if (name[at] == '/') {
+            ++parts;
+            base = name + at + 1;
+        }
+    }
+    const uint32_t base_length = static_cast<uint32_t>(name + length - base);
+    const uint32_t ending = base_length > 0 && (base[base_length - 1] == 'x' || base[base_length - 1] == 'X') ? 6 : 5;
+    bool animation = base_length >= ending;
+    for (uint32_t at = 0; animation && at < ending; ++at) {
+        const char c = base[base_length - ending + at];
+        animation = (c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c) == ".odrgx"[at];
+    }
+    return parts <= kCatalogDeepest && !animation;
+}
+
+// What the path of an upload to the internal storage names: a file in a folder that is
+// there; a path out of form; a folder there is none of; a folder the core cannot read.
+const uint32_t kNamedSound = 0;
+const uint32_t kNamedBad = 1;
+const uint32_t kNamedMissing = 2;
+const uint32_t kNamedUnreadable = 3;
+
+// The stored name of the path of an upload to the internal storage, decoded once: a file
+// name, or the path of a folder of the storage, `/` and a file name, 100 bytes at most.
+ODRIG_NOINLINE uint32_t internal_path(const Core &core, const char *word, uint32_t size, char *stored) {
+    char path[kDrivePathRoom];
+    uint32_t length = 0;
+    if (!decoded_path(word, size, path, &length)) {
+        return kNamedBad;
+    }
+    uint32_t base = length;
+    while (base != 0 && path[base - 1] != '/') {
+        --base;
+    }
+    const uint32_t base_length = length - base;
+    if (base_length < 1 || base_length > 32 || !is_file_name(path + base) || (base != 0 && folder_path_depth(path, base - 1) == 0)) {
+        return kNamedBad;
+    }
+    if (base == 0) {
+        memcpy(stored, path, length + 1);
+        return kNamedSound;
+    }
+    FolderLine line;
+    bool twin = false;
+    const int32_t found = folder_by_path(core, path, base - 1, line, &twin);
+    if (found <= 0) {
+        return found == 0 ? kNamedMissing : kNamedUnreadable;
+    }
+    uint32_t at = 0;
+    char figures[3];
+    uint32_t count = 0;
+    for (uint32_t number = line.number; number != 0; number /= 10) {
+        figures[count++] = static_cast<char>('0' + number % 10);
+    }
+    while (count != 0) {
+        stored[at++] = figures[--count];
+    }
+    stored[at++] = '/';
+    memcpy(stored + at, path + base, base_length + 1);
+    return kNamedSound;
 }
 
 // Upload's words are read first, then the show is asked for.
@@ -494,25 +600,25 @@ uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
         uint32_t id;
         uint32_t bytes;
         uint32_t crc = 0;
-        char name[33];
-        if ((words.count != 5 && words.count != 6) || !number_word(words, 2, 1, 65535, &id) || words.size[3] < 1 || words.size[3] > 32 ||
+        char stored[kStoredNameRoom];
+        if ((words.count != 5 && words.count != 6) || !number_word(words, 2, 1, 65535, &id) ||
             !number_word(words, 4, 1, 0xFFFFFFFFu, &bytes) || (words.count == 6 && !crc_word(words, 5, &crc))) {
             return refuse(reply, "bad-argument");
         }
-        for (uint32_t at = 0; at < words.size[3]; ++at) {
-            name[at] = words.text[3][at];
-        }
-        name[words.size[3]] = '\0';
-        if (!is_file_name(name)) {
+        const uint32_t named = internal_path(core, words.text[3], words.size[3], stored);
+        if (named == kNamedBad) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        if (words.count == 6) {
-            return upload_begin_known(core, now, id, name, bytes, crc, reply);
+        if (named != kNamedSound) {
+            return refuse(reply, named == kNamedMissing ? "unknown-id" : "storage-error");
         }
-        return upload_begin(core, now, id, name, bytes, reply);
+        if (words.count == 6) {
+            return upload_begin_known(core, now, id, stored, bytes, crc, reply);
+        }
+        return upload_begin(core, now, id, stored, bytes, reply);
     }
     if (words.count >= 2 && words.is(1, "data")) {
         uint32_t offset;
@@ -710,6 +816,20 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
                 item = kDriveBase + value;
             }
         }
+        // An internal folder: its playlist becomes current, as a folder of the drive's
+        // does, on a host that keeps the current playlist.
+        if (!all && item == kNothing && kind == 0 && internal_folder_id(core, id)) {
+            if (core.playlist_path == nullptr) {
+                return refuse(reply, "unsupported");
+            }
+            if (!internal_choose(core, id)) {
+                return refuse(reply, "unknown-id");
+            }
+            folder = core.current;
+            player_playlist_chosen(core, core.latest);
+            playlist_changed(core);
+            item = player_first_in_playlist(core);
+        }
         // A folder of the drive's tree: its playlist becomes current, and it plays from
         // its first animation, or the root does in its place.
         if (kind == 'd') {
@@ -783,13 +903,15 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
     if (words.is(0, "read")) {
         uint32_t id;
         uint32_t offset;
-        if (words.count != 3 || !number_word(words, 1, 1, 0xFFFFFFFFu, &id) || !number_word(words, 2, 0, 0xFFFFFFFFu, &offset)) {
+        uint32_t count = kReadMost;
+        if ((words.count != 3 && words.count != 4) || !number_word(words, 1, 1, 0xFFFFFFFFu, &id) || !number_word(words, 2, 0, 0xFFFFFFFFu, &offset) ||
+            (words.count == 4 && !number_word(words, 3, 1, kReadCountMost, &count))) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        return content_read(core, id, offset, reply);
+        return content_read(core, id, offset, count, reply);
     }
     if (words.is(0, "ignore")) {
         uint32_t id, value;
@@ -848,6 +970,65 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             return refuse(reply, "busy");
         }
         return save ? repeats_save(core, id, loops, now, reply) : repeats_restore(core, id, now, reply);
+    }
+    if (words.is(0, "saved")) {
+        uint32_t id = 0;
+        if (words.count != 2 || !number_word(words, 1, 1, 0xFFFFFFFFu, &id)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        if (catalog_rebuilding(core) || !check_complete(core) || core.upload.state != kUploadNone) {
+            return refuse(reply, "busy");
+        }
+        return repeats_saved_reply(core, id, reply);
+    }
+    if (words.is(0, "folder")) {
+        char path[kDrivePathRoom];
+        if (words.count != 4 || !words.is(1, "make") || (!words.is(2, "external") && !words.is(2, "internal")) ||
+            !folder_path(words.text[3], words.size[3], path)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        if (words.is(2, "internal")) {
+            return internal_folder_make(core, path, reply);
+        }
+        if (core.host.make_folder == nullptr) {
+            return refuse(reply, "unsupported");
+        }
+        return catalog_folder_make(core, path, reply);
+    }
+    if (words.is(0, "move")) {
+        if (words.count == 4 && words.is(1, "internal")) {
+            // `move internal <folder id> <path>`: the folder's new path from the root.
+            char path[kDrivePathRoom];
+            uint32_t id = 0;
+            if (!number_word(words, 2, 1, 0xFFFFFFFFu, &id) || !folder_path(words.text[3], words.size[3], path)) {
+                return refuse(reply, "bad-argument");
+            }
+            if (core.invalid) {
+                return refuse(reply, "show-invalid");
+            }
+            return internal_folder_move(core, id, path, reply);
+        }
+        // `move external <id> <folder>`: `/` for the drive's root, else a folder's path.
+        char path[kDrivePathRoom];
+        uint32_t id = 0;
+        const bool root = words.count == 4 && words.size[3] == 1 && words.text[3][0] == '/';
+        if (root) {
+            path[0] = '\0';
+        }
+        if (words.count != 4 || !words.is(1, "external") || !number_word(words, 2, 1, 0xFFFFFFFFu, &id) ||
+            (!root && !folder_path(words.text[3], words.size[3], path))) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return catalog_move(core, id, path, reply);
     }
     if (words.is(0, "upload")) {
         if (core.mapping_test || (catalog_rebuilding(core) && words.count >= 2 && words.is(1, "begin"))) return refuse(reply, "busy");

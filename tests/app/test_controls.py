@@ -58,7 +58,7 @@ class Buttons(Controls):
         self.assertEqual(emulator.status()["playing"], "all")
         self.assertEqual(seen[0]["buttons"], ["LEDs on or off", "Collapse the panel", "Ignore 1 hello.odrg in playlist", "Select 1 hello.odrg", "Delete 1 hello.odrg", "Repeat 1 hello.odrg this turn",
                                               "Save the repeat of 1 hello.odrg for every turn", "Restore the default repeat of 1 hello.odrg", "All, 2", "Internal, 2", "External, 0", "All, 2", "Normal, 2", "Text, 0",
-                                              "Widget, 0", "Play this folder", "Play 1 hello.odrg", "Actions for 1 hello.odrg", "Play 2 dvd.odrg", "Actions for 2 dvd.odrg"])
+                                              "Widget, 0", "Play this folder", "New folder", "New playlist folder", "Play 1 hello.odrg", "Actions for 1 hello.odrg", "Play 2 dvd.odrg", "Actions for 2 dvd.odrg"])
 
 
 class TheSlider(Controls):

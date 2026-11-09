@@ -1,5 +1,5 @@
 // Animations: what the installation does, power and brightness, the capacity of each
-// storage, and the one list of animations, one level of the card's folders at a time as
+// storage, and the one list of animations, one level of the folders at a time as
 // a file explorer shows them, each row with its preview, its storage badge and its menu.
 
 import * as client from "../client.js";
@@ -12,6 +12,8 @@ import * as messages from "../messages.js";
 import * as previews from "../previews.js";
 import * as reorder from "./reorder.js";
 import * as selection from "./selection.js";
+import * as explorer from "./explorer.js";
+import * as downloads from "./downloads.js";
 import * as tests from "./tests.js";
 
 // The inclusion changes under way, by id, each with the target it was sent to.
@@ -39,7 +41,7 @@ let menuButton = null;
 let visible = false;
 let message = () => {};
 // What other parts of the screen add to a row's menu and to drawing.
-const extensions = {menu: [], draw: [], order: null};
+const extensions = {menu: [], folderMenu: [], draw: [], order: null};
 
 function byId(id) {
   return document.getElementById(id);
@@ -126,16 +128,33 @@ function playing(status, state) {
   return `Cycle ${status.playing}`;
 }
 
-// The playlist that is current: "" for the root, a folder's path, or null while a cycle
-// or nothing plays.
-function markedPath(status) {
+// The highest id of a folder of the board's own storage; the card's folders have higher ids.
+const MOST_INTERNAL_ID = 60000;
+
+// The playlist that is current: the root's, with the id null; a folder's, by the id that
+// `status` names as `playing`, with its path and whether it is the card's; or null while a
+// cycle or nothing plays. A folder of the board's own storage and one of the card may have
+// one path, never one id.
+function currentPlaylist(status) {
   if (status === null || status.playing === null) {
     return null;
   }
   if (status.playing === "all") {
-    return "";
+    return {id: null, path: "", external: null};
   }
-  return typeof status.playlist === "string" ? status.playlist : null;
+  if (typeof status.playlist !== "string") {
+    return null;
+  }
+  return {id: status.playing, path: status.playlist, external: status.playing > MOST_INTERNAL_ID};
+}
+
+// Whether a folder row leads to the current playlist: it is that folder, or a folder of the
+// same storage that holds it.
+function leadsTo(entry, current) {
+  if (current === null || current.id === null) {
+    return false;
+  }
+  return entry.id === current.id || (entry.external === current.external && current.path.startsWith(`${entry.path}/`));
 }
 
 // A folder's own name: the part of its path after its last `/`.
@@ -151,12 +170,12 @@ function levelOf(state, all) {
   return {path: state.level.path, rows: all, shown: all.filter(filters.matches), folders};
 }
 
-// Enters a folder of the card, as a tap on a folder row does, or goes up a level for null,
+// Enters a folder of either storage, as a tap on a folder row does, or goes up a level for null,
 // as Back does: the client reads the new level.
 function enter(entry) {
   closeMenu();
   if (entry === null) client.back();
-  else client.enter({id: entry.id, playlist: entry.path});
+  else client.enter({id: entry.id, playlist: entry.path, external: entry.external});
 }
 
 function countWords(count) {
@@ -180,7 +199,8 @@ function moreButton(id, label) {
 }
 
 // The row of a sub-folder of the level: its name, the count of its own files, and a way
-// in. It is no row of an animation: the filters, the moves and the selection pass it by.
+// in. It is no row of an animation: the filters and the moves pass it by; the selection
+// takes it, for a download, with what it holds.
 function folderRow(entry) {
   const managed = canIgnore(entry);
   const made = document.createElement(managed ? "div" : "button");
@@ -190,6 +210,17 @@ function folderRow(entry) {
   made.dataset.path = entry.path;
   made.dataset.id = String(entry.id);
   made.dataset.managed = String(managed);
+  if (managed) {
+    const pick = document.createElement("label");
+    pick.className = "pick";
+    pick.addEventListener("click", (event) => event.stopPropagation());
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.setAttribute("aria-label", `Select folder ${entry.path}`);
+    check.addEventListener("change", () => selection.choose(entry.id, check.checked));
+    pick.append(check);
+    made.append(pick);
+  }
   const open = managed ? document.createElement("button") : made;
   if (managed) { open.type = "button"; open.className = "folder-open"; }
   open.setAttribute("aria-label", `Open folder ${entry.path}`);
@@ -271,9 +302,9 @@ function barWords(label, animation) {
   return {short: first, named: [first, `${animation.id} ${animation.file}`, ...rest].join(" ")};
 }
 
-// The actions of the row menu that the bar has: every one but the moves.
+// The actions of the row menu that the bar has: every one but the moves and the download.
 function barActions(animation) {
-  return actions(animation).filter((item) => item.label !== "Move up" && item.label !== "Move down");
+  return actions(animation).filter((item) => item.label !== "Move up" && item.label !== "Move down" && item.label !== "Download");
 }
 
 function barButton(label, named, act) {
@@ -506,7 +537,7 @@ function row(animation) {
   made.dataset.editable = String(isEditable(animation));
   made.dataset.writable = String(onWritableCard(animation));
   made.dataset.fault = animation.fault ?? "";
-  if (isEditable(animation)) {
+  if (typeof animation.ignored === "boolean") {
     const pick = document.createElement("label");
     pick.className = "pick";
     const check = document.createElement("input");
@@ -611,12 +642,12 @@ function rowsState(state, animations, here) {
   const version = client.targetVersion();
   // The level's head: its title, Back inside a folder, and the mark while its playlist is
   // current; each folder row's count, and its mark when it leads to the current playlist.
-  const marked = markedPath(state.status);
+  const playlist = currentPlaylist(state.status);
   byId("level-title").textContent = here.path === "" ? "Root" : here.path;
   byId("level-back").hidden = here.path === "";
-  byId("level-head").setAttribute("aria-current", String(marked === here.path));
+  byId("level-head").setAttribute("aria-current", String(playlist !== null && playlist.id === state.level.id));
   for (const made of byId("animations-list").querySelectorAll(":scope > .folder-row")) {
-    const entry = here.folders.find((item) => item.path === made.dataset.path);
+    const entry = here.folders.find((item) => String(item.id) === made.dataset.id);
     if (entry === undefined) {
       continue;
     }
@@ -629,7 +660,12 @@ function rowsState(state, animations, here) {
     note.hidden = note.textContent === "";
     const more = made.querySelector(".more");
     if (more) more.disabled = !answers() || saving;
-    made.setAttribute("aria-current", String(marked !== null && (marked === entry.path || marked.startsWith(`${entry.path}/`))));
+    const check = made.querySelector(".pick input");
+    if (check) {
+      check.checked = selection.has(entry.id);
+      check.disabled = selection.locked();
+    }
+    made.setAttribute("aria-current", String(leadsTo(entry, playlist)));
   }
   for (const made of byId("animations-list").querySelectorAll(":scope > .row")) {
     const animation = animations.find((item) => String(item.id) === made.dataset.id);
@@ -759,8 +795,11 @@ function actions(animation) {
     items.push({label: "Select", act: () => selection.enter(animation.id), disabled: !free});
     items.push({label: "Delete", act: () => selection.askOne(animation), disabled: !free, danger: true});
   } else if (onWritableCard(animation)) {
+    items.push({label: "Select", act: () => selection.enter(animation.id), disabled: !free});
     items.push({label: "Delete", act: () => selection.askOne(animation), disabled: !free, danger: true});
   } else if (isExternal(animation)) {
+    // A file of a card the target may not write is selected for a download.
+    if (canIgnore(animation)) items.push({label: "Select", act: () => selection.enter(animation.id), disabled: !free});
     items.push({note: canIgnore(animation) ? "External storage is read-only: this animation cannot be deleted. Inclusion is saved on the target." :
       "External storage is read-only: this animation cannot be ignored or deleted from the app."});
   } else {
@@ -782,6 +821,8 @@ function fillMenu() {
     {label: animation.ignored ? "Include folder" : "Ignore folder", act: () => include(animation, animation.ignored === true),
       disabled: !answers() || selection.locked() || saving},
     ...(animation.inheritedIgnored ? [{note: "Excluded by a parent folder. Including this folder does not override that ancestor."}] : []),
+    ...(selection.folderSelectable(animation) ? [{label: "Select", act: () => selection.enter(animation.id), disabled: !answers() || selection.locked()}] : []),
+    ...extensions.folderMenu.flatMap((extra) => extra(animation, !answers() || selection.locked() || saving)),
   ] : actions(animation);
   const key = JSON.stringify(items.map((item) => [item.label, item.note, item.disabled]));
   if (menu.dataset.key === key) {
@@ -852,8 +893,9 @@ export function closeMenu() {
 
 // Lets another part of the screen add actions to a row's menu, draw with the screen, or
 // give the order of the rows.
-export function extend({menu, draw: drawing, order}) {
+export function extend({menu, folderMenu, draw: drawing, order}) {
   if (menu) extensions.menu.push(menu);
+  if (folderMenu) extensions.folderMenu.push(folderMenu);
   if (drawing) extensions.draw.push(drawing);
   if (order) extensions.order = order;
 }
@@ -879,8 +921,12 @@ export function start(options) {
   previews.watch(redraw);
   filters.start({redraw});
   selection.start({message, redraw, visible: () => true});
+  explorer.start({message, redraw, chosen: selection.rows, chosenFolders: selection.folders, done: selection.finished});
+  extend({draw: explorer.draw, folderMenu: explorer.folderMenu});
   reorder.start({message, redraw, shownOrder, groupOf: folderOf, levelRows: shownOrder});
   extend({menu: reorder.menu, draw: reorder.draw, order: reorder.order});
+  downloads.start({message, redraw, chosen: () => ({files: selection.rows(), folders: selection.folders()})});
+  extend({menu: downloads.menu, draw: downloads.draw});
   tests.start({message, isVisible});
   extend({draw: tests.draw});
   byId("on").addEventListener("click", () => client.switchOn());

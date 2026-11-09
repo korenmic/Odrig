@@ -77,7 +77,8 @@ class TheAppsPage(unittest.TestCase):
         lines = [span for row in table.splitlines() if row.startswith("| ") for span in re.findall(r"`([^`]+)`", row.split("|")[2])]
         self.assertEqual(lines, ["status", "list 0", "list <next>", "play <id>", "play all", "on", "off", "brightness <n>", "brightness <id> <n> save", "brightness <id> default", "space", "remove <id>", "ignore <id> <0-or-1>", "remove many <ids>",
                                  "upload begin <id> <file> <bytes> <crc32>", "upload data <offset> <base64>", "upload end <crc32>", "upload begin external <file> <bytes>", "upload expect 00000000", "upload cancel",
-                                 "read <id> <offset>", "upload begin <id> <file> <bytes>", "upload expect <crc32>", "mapping get", "mapping set <revision> <pins>",
+                                 "read <id> 0 1", "read <id> <offset> <count>", "read <id> <offset>", "bad-argument", "list in <id>", "catalog", "saved <id>", "list <from>", "list in <id> <from>",
+                                 "upload begin <id> <file> <bytes>", "upload expect <crc32>", "mapping get", "mapping set <revision> <pins>",
                                  "mapping test on",
                                  "mapping test off", "mapping test snake <n>", "order get", "order get <next>", "order move <revision> <id> <before>", "repeat <id> <n>",
                                  "repeat <id> <n> save", "repeat <id> default", "clocks off", "clocks on", "clocks only", "clocks message on", "clocks message off", "fault", "catalog",
@@ -136,8 +137,8 @@ class TheAppsPage(unittest.TestCase):
     def test_the_check_on_a_phone_is_numbered_steps_that_say_what_must_be_seen(self):
         check = section(self.text, "The check on a phone")
         steps = re.findall(r"(?m)^([0-9]+)\. \*\*([^*]+)\*\*", check)
-        self.assertEqual([int(number) for number, _ in steps], list(range(1, 25)))
-        self.assertEqual(check.count("*Seen:*"), 26)
+        self.assertEqual([int(number) for number, _ in steps], list(range(1, 27)))
+        self.assertEqual(check.count("*Seen:*"), 29)
         for expected in ("This is the owner's. No program can do it.", "python3 app/app.py install", "python -m emulator build/demo-20/show --lan", "`lan:` line",
                          "press `Board`", "Leave mobile data on", "Switch mobile data off", "**A long press.**", "in the address a word is marked",
                          "**The phone's bars.**", "wholly above Android's buttons or the line of gesture navigation", "the tabs go away and the address stays in view",

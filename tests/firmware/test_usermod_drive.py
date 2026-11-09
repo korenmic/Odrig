@@ -61,8 +61,11 @@ class TheDrive(unittest.TestCase):
         card = builds(self.drive, sd=True)
         self.assertIn("SD.begin(ODRIG_SD_CS, cardBus, ODRIG_SD_FREQUENCY, MOUNT, 3, false)", card)
         self.assertEqual(sorted(re.findall(r'fopen\([^,]+, "([^"]*)"\)', card)), ["rb", "wb"])
-        self.assertNotRegex(card, r"(?<![\w.])(fputs|fprintf|mkdir|rmdir|f_mkfs|truncate)\(")
-        for function in ("beginDriveFile", "renameDriveFile", "removeDriveFile"):
+        self.assertNotRegex(card, r"(?<![\w.])(fputs|fprintf|rmdir|f_mkfs|truncate)\(")
+        # A folder is made only by the core's name of it, in the folder odrig.
+        self.assertEqual(len(re.findall(r"(?<![\w.])mkdir\(", card)), 1)
+        self.assertIn("mkdir(path, 0777)", function_body(card, "makeDriveFolder"))
+        for function in ("beginDriveFile", "renameDriveFile", "removeDriveFile", "makeDriveFolder"):
             self.assertIn("changedPath(", function_body(card, function), function)
         self.assertIn("return cardMounted && !cardFailed && cardFolder && !namesAPlace(name) && drivePath(name, path);", function_body(card, "changedPath"))
         made = function_body(card, "drivePath")

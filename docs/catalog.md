@@ -94,8 +94,9 @@ the bytes of their names, then its sub-folders by the bytes of their names, each
 way, every file of it; only a drive without a catalog is taken as at most 256 files and 32
 sub-folders, a folder counted with its uncounted ancestors when the first file at or below
 it is kept. A name of the board's own storage follows the
-show's rule too: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, so it holds no
-folder. A reader from before paths were names finds a catalog that names a file in a
+show's rule too: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, alone or after the
+number of a folder of the storage and `/`, `2/stars.odrg`, the name the show gives the file;
+the storage's folders keep their paths in `folders.txt`, not in the catalog. A reader from before paths were names finds a catalog that names a file in a
 folder `damaged`, with `line` saying where.
 
 ### The index of a drive
@@ -123,7 +124,7 @@ A folder without a line has no file.
 
 **The table of the folders, `index-folders.txt`**: lines of 180 bytes, one for each folder
 that has an animation file at or below it, the root first and always, in the listing's
-order, depth first:
+order, depth first, and one for each empty folder made by `folder make`:
 
 ```
 0 0 0 4 0 2 2 9f00e1aa
@@ -137,8 +138,12 @@ Its ordinal, the line's number; its id, 0 for the root; its depth, 0 for the roo
 to there; the number of files of the folders before it, so that its files are the
 positions of the walk from there, the walk being the root's files and then each folder's
 in the table's order; its numbers of own files and of sub-folders; the CRC-32 of its file,
-`00000000` without one; and its path, empty for the root. A folder with no file at or
-below it is in no line of the table.
+`00000000` without one; and its path, empty for the root. A folder with no file at or below it is in no line of the table,
+but for a folder made by `folder make` ([commands.md](commands.md#making-a-folder-of-the-card)):
+its line says 0 own files and 0 sub-folders, its CRC-32 `00000000`, its first position the
+walk's position after the folders before it, and it has no file of its own; its parent's file
+has its line `<id> d 0 <path>` among the sub-folders, and the map its line. A rebuild and an
+import list files, and so make no such line.
 
 **The map of the ids, `index-ids.txt`**: lines of 36 bytes, one for each id of the drive,
 sorted by id, so that an id is found by binary search: a file's to its folder's ordinal
@@ -180,7 +185,8 @@ outcome in `cases.json`; `python -m tests.converter.build_catalog_vectors` write
 ## A change
 
 A change is a set of entries to add, replace or take out, with the file actions that go
-with it: `move <from> <to>` and `remove <name>`. Its writer:
+with it: `move <from> <to>` and `remove <name>`; on a drive also `move <name> upload.part`,
+whose name may hold spaces, the line ending in ` upload.part`. Its writer:
 
 1. writes each page the change touches whole as `catalog-NN.new`, from its old file with
    the change applied; a page left without entries gets no file, and an old
@@ -213,7 +219,17 @@ are never read.
 
 An upload adds or replaces with the action `move upload.part <name>`: the file is checked
 as `upload.part` and becomes the animation in the same commit as its entry. A removal takes
-the entry out with `remove <name>`.
+the entry out with `remove <name>`. A move of a drive's file to another of its folders,
+`move external` ([commands.md](commands.md#moving-a-file-of-the-card)), renames it through
+the part in two actions, `move <old> upload.part` then `move upload.part <new>`, each line
+at most 117 bytes where `move <old> <new>` would pass the 161 a line may have: its entry
+leaves its old page and takes its new name's with the same fields, its length exact. A line
+that ends in ` upload.part` is always the first of the two, also for a name that begins with
+`upload.part`, as no name of a catalog ends in it. A firmware or a PC tool older than this
+action reads such a record as not whole: it leaves the change undone and removes the stray
+`upload.part`, which then holds the file, so a card that a cut left in the middle of a move
+is mounted once by a board that has `move external`, or finished by this PC tool, before an
+older one takes it.
 
 ### A drive's index in a change
 
@@ -241,6 +257,8 @@ What each change writes, besides its page and the marker:
 | A replacement: its line anew, its id and place kept | the root's file, the table |
 | A removal of a file of folder k | k's file, and its parent's, whose line for k says one file less; when nothing is left at or below k, k and each ancestor left so leave the table, their files are removed and the parent of the topmost loses its line for it; the table; the map |
 | A move of a file among its folder's files, before another or last | the folder's file, the table, the map; no page, the mask `0000` |
+| A move of a file to another folder, `move external` | the old folder's file without its row, and when nothing is left at or below it, that folder and each ancestor left so out of the table as a removal takes them; the new folder's file with the row last among its files, its id kept; the rows of both folders' parents for their own files, a parent of both with both rows; the table (the files of both, the first positions of the folders after the earlier of the two up to the later one, one less or one more); the map (the id's line at its new folder and row, the rows after it in the old folder one less); the old page without its line and the new name's page with it |
+| A folder made empty, `folder make` | its parent's file with the folder's line, the table (the new line in the listing's order, every ordinal and end after it one more, the end of each ancestor one more, the parent's sub-folders one more), the map (the folder's line in id order, every ordinal at or after its own one more); no page, the mask `0000` |
 | A rebuild or an import | everything: every page, every folder's file, the table and the map, and the removal of the files of the old table's folders whose ids the new one does not have |
 
 A rebuild and an import keep the order the drive's files were moved into. For each folder of
@@ -255,6 +273,24 @@ does, a file at each step, before it writes the new one; it finds an old row's f
 scan by binary search in the listing's order, and looks a folder's other files up on their
 old pages, which stay in place until the commit.
 
+A move's saved settings follow it. The board keeps the saved brightness, the saved repeat
+and the Ignore of a drive's file by its path, in its own `brightness.txt`, `repeats.txt` and
+`ignored.txt`. Before the commit of a move the board writes on the drive the journal
+`moving.txt`, through `moving.part`:
+
+```
+odrig-moving 1 0000002b
+night/deep/old.odrg
+clocks/old.odrg
+```
+
+the generation the commit gives, the old path and the new one, 226 bytes at most. Once the
+commit is made, the lines of the old path in the three files take the new one, and lines
+of the new path that a removed file left are dropped; then the journal is removed. When the
+drive is mounted with a journal left, as after a cut, the board finishes it when the
+catalog is of its generation and has a file of its new path, and removes it otherwise; a
+stray `moving.part` is removed. The PC tool leaves both alone.
+
 ## The writers
 
 The board's core, in C++, and the PC tool, in Python (`odrig/catalog.py`), are the two
@@ -262,7 +298,8 @@ implementations of this page, the one duplicate the owner approved on 2026-10-24
 the same changes with the same calls of the storage, so that the same changes from the same
 storage leave the same files, byte for byte; the tests run both on the same storages. They
 never work on one storage at once: the board changes a card while it is in the board, a
-computer while it is mounted there.
+computer while it is mounted there. The PC tool moves no file to another folder; it finishes
+the commit record of a move that a card brings, as the board does.
 
 ## What each operation costs
 

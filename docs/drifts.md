@@ -12791,3 +12791,1003 @@ as it is, when it has one. The page needs no change: the legs come from the core
 file from that route.
 
 **Resolution.** `emulator/httpd.py`, `docs/emulator.md`.
+
+## Seed 74: how a folder of the card is made
+
+**Question.** Does `folder make` make the folders of a path that are missing, how long may
+a folder's path be, and where does the new folder stand?
+
+**Answer.** One level at a time: the parent is the root or a folder of the index, as an
+upload's folder is, and a client makes `clocks` before `clocks/message`. The path leaves room
+for a file, `<path>/a.odrg` being a name the catalog takes, and its last name does not end in
+`.odrg` or `.odrgx`, which the card would list as a file. The folder takes its place among its
+parent's sub-folders by the bytes of their names, the order a rebuild gives, and the lowest
+free id. A name the parent has in another case is `in-use`, since FAT tells no case apart. A
+folder the index has already answers `made:false`, so that a resent line after a lost reply
+changes nothing.
+
+**Resolution.** `core/src/catalog.cpp`, `core/src/commands.cpp`, `docs/commands.md`.
+
+## Seed 74: an empty folder removed from the card
+
+**Question.** What happens when an operator removes an empty folder of the index from the
+card on a computer, and then uploads into it?
+
+**Answer.** Before an upload into a folder the core asks the host to make each folder of its
+path, which is nothing for one that is there; a missing one is made again, so that the
+commit's `move upload.part` finds its folder and no commit record is left behind. A rebuild
+lists files only, so it keeps no empty folder; that is said where the rebuild is described.
+
+**Resolution.** `core/src/upload.cpp`, `docs/core.md`, `docs/commands.md`.
+
+## Seed 74: how the app reads the settings it carries in a move
+
+**Question.** The app gives a moved file the saved brightness and repeat of the old one, but
+`list` does not report them; how does it read them, and how does it know the show's start?
+
+**Answer.** With `saved <id>`, which reports both and whether the animation is the show's
+`start` item, under the owner's approval of 2026-11-06. It is refused `busy` as `repeat <id>
+default` is, since the saved repeats are read from the board's file then. A move of the start
+item is refused before anything is sent, as the seed asks.
+
+**Resolution.** `core/src/repeats.cpp`, `core/src/commands.cpp`, `docs/commands.md`.
+
+## Seed 74: moves made by the app
+
+**Question.** Does the board move a file between the storages by itself, or does the app?
+
+**Answer.** The app, with the commands the board has: `read`, the guarded upload, `ignore`,
+`brightness`, `repeat`, `saved` and `remove`, one file at a time, as a job the phone keeps
+until it is done. The seed asks to reuse the commands where they suffice, and they do for a
+file: nothing is removed before the new file is installed and its settings given, and an
+interrupted job is finished or ended from what the target lists. The new file gets a new id
+in its storage. Moves of folders and renaming moves inside the card are the board's, in
+part B. Replacing a file of the destination is not offered: the card's upload has no guard
+of the content it would replace, so the operator removes it first.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`.
+
+## Seed 74: part B at no core memory
+
+**Question.** The owner asked that part B cost the core no memory. The spec's first sketch
+of part B gave the board's storage names that hold folder paths, items of `show.json` that
+name such paths, and reads of 1,536 bytes. A path kept for each file between refreshes needs
+101 bytes the arena does not have, and 1,536 bytes do not fit a reply. How is part B built
+at no memory, and what changes with it?
+
+**Answer.** Each file of the board's storage keeps a stored name of 36 characters at most,
+its base name or `<n>/<base>` in the numbered LittleFS directory `/odrig/<n>/`, in the 48
+bytes of `FileInfo`: `total_ms` saturates at 32 bits, as the card's lengths do, and
+`checked` and `type` take 2 bits each. The folders' paths are in one file, `folders.txt`,
+read on demand into the stack. `Core` gains one byte inside its end padding, which is 6
+bytes on the test host on this branch and on the branch that fuses the seeds not yet
+merged, so every figure of the memory table stays as it is. With it these were decided and
+told to the owner. `read <id> <offset> <count>` reads 720 bytes at most: a reply holds 1,024
+bytes, and around the data it has 41 bytes with a size of 10 digits, which leaves 983
+base64url characters, 737 bytes; 744 would fit only with a size of one digit, and 720 leaves
+23 bytes of the reply to spare. Requirement 6.1's 1,536 becomes 720. `show.json` stores the
+stored name `<n>/<base>`, not the path the operator sees, which refines requirement 4.1's
+item that "may name a path". An internal folder's Ignore goes through the existing form
+`ignore <id> 0|1` with the folder's id, and is kept in `folders.txt`. `fwtool` refuses an
+install that would remove the files of folders, with `folders-present`, unless it is given
+`--replace-folders`. An APK older than part B refuses a `list` with an internal folder, so
+the new APK ships with or before the firmware that makes internal folders. The tasks are
+done in the order 5, 7, 6, 8, since task 6 moves folders between the storages and needs task
+7's folders. The first sketch of part B in the design is replaced. Two points of task 6 need
+the owner and are not decided here: whether moved folders go last, against the catalog's
+order of sub-folders by their names, and a job of the app in place of the folder job if that
+proves too large.
+
+**Resolution.** `docs/specs/74-p2-phone-storage-explorer-and-backups/requirements.md`,
+`design.md` and `tasks.md`.
+
+## Seed 74: where Download and Download selected are, and what can be selected
+
+**Question.** The seed asks for `Download` of a selected animation and `Download selected`
+of a batch or a subtree, and the design lets folders and a read-only card be selected for a
+download, but neither says where the actions stand, nor what `Select all`, `Delete selected`
+and `Move to…` do once folders and read-only files can be selected.
+
+**Answer.** `Download` is in the menu of every animation's row, of either storage, and not
+on the bar of the animation playing now, whose three lines stay as they were. `Download
+selected` is in the selection bar. A file of a read-only card gets a checkbox and `Select` in
+its menu; a folder of the card gets a checkbox and `Select` in its menu. `Select all` takes
+the files the filters show of the board's storage and of a card the board may write, as
+before, and neither a file of a read-only card, which is selected by hand, nor a folder.
+`Delete selected` is disabled while a file of the card or a folder is selected, and `Move to…`
+while a folder or a file of a read-only card is: folders move in task 6. A selected folder
+belongs to the storage its row names, so that a folder of the board's own storage is backed
+up with that storage's files and counted under it in the line under the bar.
+
+**Resolution.** `app/www/screens/show.js`, `app/www/screens/selection.js`,
+`app/www/screens/downloads.js`, `docs/android-app.md`.
+
+## Seed 74: the zip writer, its name and its limits
+
+**Question.** The design names the writer `zip-writer.js` and limits it to "above 4 GiB or
+65,535 entries"; the task that ordered this run named `app/www/zip.js`. Which file, and where
+do the limits fall exactly?
+
+**Answer.** `app/www/zip-writer.js`, as the design says: seed 73's reader of a zip is
+`app/www/zip.js` on its branch, and two files of one name would meet when the branches are
+merged. A count of 65,535 entries and a size or an offset of 4,294,967,295 are the values
+that tell a reader to look for zip64, and seed 73's reader refuses them, so the writer takes
+65,534 entries and 4,294,967,294 bytes at most and refuses more before anything is written.
+A folder is an entry of its own only when nothing in the selection lies in it, since the
+paths of its files make it otherwise. The entries' times are the local time the backup
+began.
+
+**Resolution.** `app/www/zip-writer.js`, `docs/android-app.md`.
+
+## Seed 74: one file in flight, and what the manifest holds
+
+**Question.** The design streams each file's CRC-32 into the zip piece by piece, checks each
+source before and after its file, and lists the manifest's members. Is a file written while
+it is read, and what does the manifest say beyond the list?
+
+**Answer.** Each file is read whole into the phone's memory, one at a time, and checked
+before its entry is written: its row, by id, path and size, before and after the read, in a
+fresh part of its level's list from the position the row was last seen at, one request, and
+in the whole level only when the row is not there, the part after a file serving before the
+next when it holds that row, so that a level of N files costs about N requests of `list` and
+not N²/9; its size in every piece; and its bytes against the key of its storage's catalog,
+when the app knows it. A file that fails leaves no entry, and the zip
+holds only checked files; the writer still counts the CRC-32 as the pieces pass. The
+manifest has, beside the design's members, `format` `odrig-backup`, the target's address,
+the moment, the generation of the storage's catalog, and for each file its entry, its id and
+a reason when it failed; `settings` holds the file's own and inherited ignore and `start`
+with `saved`'s brightness and repeat, and `savedUnknown`: null when `saved` answered, else why
+those three are null, the code of its refusal, `busy` after five tries half a second apart,
+or `not-asked` for a file that was not read, so that a restore does not take an unknown
+setting for none; `outcome` is `saved`, `failed`, `stopped` or
+`not-started`; and each folder of the selection is listed with its entry and its ignore. A
+file whose read is refused, a quarantined one among them, fails with its fault, since
+`read` answers `unavailable` for it.
+
+**Resolution.** `app/www/backups.js`, `docs/android-app.md`.
+
+## Seed 74: a selection of both storages, Stop, a change of target
+
+**Question.** A selection at the root may hold files of both storages, and a backup holds
+one. What does `Download selected` do then, and what do `Stop`, a change of target and a
+hidden app do to a backup?
+
+**Answer.** The dialog names the storage and the level the entries are named from before
+anything is read; for a selection of both storages it has a `Storage` choice and says that
+each storage is backed up in its turn, so that nothing is merged. `Stop` ends the run between
+two pieces of a file, or as the piece under way ends, whatever its reply, a lost link too:
+the zip is saved with the files read whole before, and says it is partial; a single
+`Download` saves nothing then. A sink that cannot be written ends the run with nothing
+saved. A change of target ends a run with nothing
+saved, since the files after it would be another target's. While the app is hidden nothing
+is sent, and a request withdrawn then is sent again when it is shown. The app makes no
+other change while a run goes on.
+
+**Resolution.** `app/www/screens/downloads.js`, `app/www/backups.js`, `docs/android-app.md`.
+
+## Seed 74: reads of a download among the app's other requests
+
+**Question.** The app sends one request at a time, and what the operator asks for goes before
+a status; a backup of many files is thousands of reads. How does the status go on, and where
+is the probe of the count made?
+
+**Answer.** The reads and the lists of a download or a backup are requests in the background:
+a status that is due goes before them, once a second, and they do not make a status due
+themselves, as an operator's request does. Each piece of a file is a request of its own, the
+reads of `Edit` and of a move too. The client sends `read <id> 0 1` once for each target
+before the first piece; `bad-argument` means an installation without the count, which is then
+read 600 bytes at a time. The answer is kept for the target, and the address may name another
+installation later: a read with the count refused with `bad-argument` sends `read <id> 0 1`
+again, and when that is refused too the read and the ones after it go without the count.
+
+**Resolution.** `app/www/client.js`, `docs/android-app.md`.
+
+## Seed 74: the APK's plugin that saves a file
+
+**Question.** The design gives the APK a plugin `begin`/`append(base64)`/`finish` that saves
+through the Storage Access Framework. What is its name, what does it keep, and how does the
+web code reach it while only `target.js` knows the native shell?
+
+**Answer.** `SavePlugin.java`, the plugin `Save`: `begin` opens one file in the app's cache,
+`append` adds bytes given in base64, `finish` closes it and opens the system's dialog of
+creating a document with the name and the media type; the file is copied to the place chosen
+and removed from the cache, and a dialog closed without a place resolves `saved: false`.
+`abandon` removes the file of a run that ends without saving; the next `begin` and the
+plugin's start remove what one that did not arrive left. The call of `finish` is released on
+the main thread, as the bridge keeps its calls there. It asks for no permission. `target.js` gives the shell to `save.js` through `shell()`, and stays the
+one file that names Capacitor. In a browser the file is a download of a Blob, the pieces
+folded into it every megabyte.
+
+**Resolution.** `app/android/app/src/main/java/app/odrig/operators/SavePlugin.java`,
+`app/www/save.js`, `app/www/target.js`, `docs/android-app.md`.
+
+## Seed 74: the refusals of a read's count
+
+**Question.** Is a count judged before the id, and does the form without a count change?
+
+**Answer.** The count is judged with the other words, so a count of 0 or above 720 is
+`bad-argument` whatever the id, and `read 1 0 0` stays `bad-argument` as before. The form of
+three words keeps its 600 bytes. Every other refusal is the form's without a count, and a
+folder of the card is `in-use`, as it was.
+
+**Resolution.** `core/src/commands.cpp`, `docs/commands.md`.
+
+## Seed 74: the command tool's examples of `saved` and `folder`
+
+**Question.** Part A added `saved ID` and `folder make external PATH` to the command tool, but
+the page of the emulator gave neither a synopsis nor an example, and its test of the tool's
+commands by each transport failed. Is that mended here, where `read`'s line changes?
+
+**Answer.** Yes: the page gives both, with an example by each transport, beside `read ID
+OFFSET [COUNT]`.
+
+**Resolution.** `docs/emulator.md`.
+
+## Seed 74: the bound of a read's count in the chunk buffer
+
+**Question.** The bytes of `read` pass through the chunk buffer of 1,500 bytes, but a rebuild
+of a catalog keeps its pages' counts and CRC-32s there from byte 1,400 between its steps, and
+`read` is not refused while one runs. Which bound does a count meet?
+
+**Answer.** 1,400: the offset of the kept pages, `kKeptPages`, moves from `catalog.cpp` to
+`storage.h` beside `kChunkSize`, and the `static_assert` of `content.cpp` holds both forms of
+`read` under it. 720 is far below; no rebuild's pages are touched by a read.
+
+**Resolution.** `core/src/storage.h`, `core/src/content.cpp`, `core/src/catalog.cpp`,
+`docs/core.md`.
+
+## Seed 74: the start opens `folders.txt`
+
+**Question.** Part B's design says a show without `folders.txt` pays nothing for folders, but
+the start has to learn whether the file is there, and `read_at` answers -1 alike for no file
+and for a failed read. A failure taken for no file would let the next `folder make internal`
+write a file of one line over the board's folders. How does the start tell them apart?
+
+**Answer.** It opens `folders.txt` with `open` after `pending.txt`, as it opens `pending.txt`
+and `catalog.txt`: 0 is no file, a flat show with nothing more read; -1 makes the boot's
+folders unreadable. A folder of no files is asked to open six names that are not there, and
+the tests of the start that list the names opened name `folders.txt` too. Nothing is written
+for a flat show.
+
+**Resolution.** `core/src/folders.cpp`, `tests/core/test_startup.py`, `docs/core.md`.
+
+## Seed 74: the start's repair writes, and seed 78's rule
+
+**Question.** Task 7 names the repair at the start of a folder's id that an item has, and also
+seed 78's rule that the start writes nothing and that only `write_open` makes the storage's
+folder. Does the repair break the rule?
+
+**Answer.** No. Seed 78's rule is the firmware's: its host makes no folder and writes nothing
+at its start, and `/odrig` is made by `write_open` alone; the files host's `make_folder` makes
+`/odrig/<n>` and never `/odrig`. The core's start already renames and removes what an
+interrupted change left. The repair writes `folders.txt` only when a line's id is an item's,
+which a computer's tool can bring and the core never does, and that file is in `/odrig`
+already. A board whose folders are sound is written nothing at its start.
+
+**Resolution.** `core/src/folders.cpp`, `firmware/usermod/odrig_files.cpp`, `docs/core.md`,
+`docs/firmware.md`.
+
+## Seed 74: the order in which a folder is made
+
+**Question.** The design makes the folder `<n>` before its line is written, but on a storage
+that never had a show `/odrig` is not there, and `mkdir` of `/odrig/<n>` fails while only
+`write_open` may make `/odrig`. In which order does `folder make internal` write?
+
+**Answer.** It writes `folders.part` first, which makes `/odrig` when it is missing, then makes
+`<n>` with `make_folder`, then renames the part onto `folders.txt`. The rename is the commit,
+so the folder is there before its line counts. A cut leaves the old file or the new one, the
+part removed at the next start, and at worst an empty numbered folder without a line, which a
+later folder of that number takes. A `make_folder` that answers 0, a storage that makes no
+folders, is known only then: the part is removed and the reply is `unsupported`.
+
+**Resolution.** `core/src/folders.cpp`, `docs/core.md`.
+
+## Seed 74: what a reading of `folders.txt` checks
+
+**Question.** The design reads `folders.txt` with a scan of about 270 bytes that checks each
+line's parent with hashes. Every function that holds one must stay under the frame of 512
+bytes. What does a scan check, and where?
+
+**Answer.** A scan is one buffer of 128 bytes, a line read where the last ended and the rest
+kept, and checks each line's form and that its depth is at most one more than the line's
+before. The start checks the whole file once more strictly: each line's parent is the line
+before it or a folder above that one, a sibling comes after the one before it by the bytes of
+its name, and no two lines have one number or one id. The core writes the file only in that
+order, so the later scans need no more. A scan that meets a line out of form at a command
+answers `storage-error`.
+
+**Resolution.** `core/src/folders.cpp`.
+
+## Seed 74: a new folder's id among the show's
+
+**Question.** The design finds a folder's id with a bitset of 21 bytes, for at most 132 items
+and 32 folders. A show of more items has a larger item table. Where is the lowest free id
+found?
+
+**Answer.** In the first 1,024 bytes of the chunk buffer, a bit for each id below 8,192, which
+`folder make internal` and the start use while the chunk holds nothing: the core's tables
+hold far fewer items than that, so the lowest free id is among them.
+
+**Resolution.** `core/src/folders.cpp`.
+
+## Seed 74: the rows of `list` of an internal folder's level
+
+**Question.** The design gives a file of a folder `inherited_ignored` as `held && !own`, where
+the card's rows give it whatever the file's own choice. Which, and in which order are the
+members?
+
+**Answer.** As the card's: `inherited_ignored` says that the folder or a folder above it is
+ignored, whatever the file's own `ignored`, so the app reads one form for both storages. A
+file's row is today's internal row with `file` its path, then `stored` and
+`inherited_ignored` after `type`, and `fault` last; a folder's row is a card folder's with
+`external` false. The root's rows of files gain nothing, and a file whose folder has no line
+is listed at the root under its stored name.
+
+**Resolution.** `core/src/folders.cpp`, `core/src/content.cpp`, `docs/commands.md`.
+
+## Seed 74: the refusals of `folder make internal`
+
+**Question.** The design refuses `in-use` for "a file of the show at that path", and `no-space`
+with less than 8,298 bytes free. A folder's last name cannot end in `.odrg` or `.odrgx`, and a
+host may not tell its space. What do these come to?
+
+**Answer.** No file of the show can have a folder's path, so `in-use` is a sibling equal but
+for case alone. The room is judged when the host tells its space; a host that cannot tell is
+not refused for it, as the write then says.
+
+**Resolution.** `core/src/folders.cpp`, `docs/commands.md`.
+
+## Seed 74: an upload's folder is found before the upload's own refusals
+
+**Question.** Where among `upload begin`'s refusals do a missing folder and an unreadable
+`folders.txt` stand?
+
+**Answer.** After `bad-argument` and `show-invalid`, before the rest: the path is resolved to a
+stored name first, `unknown-id` for a folder that is not there and `storage-error` while the
+folders cannot be read, and the upload then goes on as one of a file at the root. The
+reference player of the core's tests keeps no folders, so a path with a folder is
+`unknown-id` there.
+
+**Resolution.** `core/src/commands.cpp`, `tests/core/support.py`.
+
+## Seed 74: pruning, and the file left with no folder
+
+**Question.** When is a folder pruned, and what is left when the last one goes?
+
+**Answer.** After a removal, `remove many` and an upload that moves an item's file to another
+folder, each folder that lost a file is judged, then the folders above it, as the card's are.
+`folders.txt` stays with its header alone when every folder has gone, so that the next
+number keeps turning. The numbered folders are removed after the file is renamed.
+
+**Resolution.** `core/src/folders.cpp`, `core/src/storage.cpp`.
+
+## Seed 74: the current playlist of an internal folder needs the saved playlist
+
+**Question.** A folder's playlist is kept in `current`, the record of the current folder and
+`playlist_path`, but the path's room is in the block of the saved order, which only a host
+with a drive is given. What does a host without one do?
+
+**Answer.** It answers `play` of an internal folder with `unsupported`, as the design says,
+and plays the root's playlist, every folder in it; the rotation stays at the root. The board
+always has its card host, and the emulator has it with `--drive` or `--drive-folder`. A pulled
+or changed card leaves an internal playlist current, and its path, `:` and the folder's, is
+found again at the start.
+
+**Resolution.** `core/src/commands.cpp`, `core/src/order.cpp`, `docs/emulator.md`.
+
+## Seed 74: the test host's `make_folder`
+
+**Question.** The test host gave `make_folder` only with a drive. Internal folders need it on a
+host without one. What becomes of `folder make external` there?
+
+**Answer.** The test host gives `make_folder` whenever its storage can be changed, unless
+`--no-folders`; `folder make external` without a drive answers `read-only`, as an upload to
+the drive does, and the core never asks it for a drive's folder then. The emulator binds it
+the same way. A numbered folder is a sub-folder of the session's folder, or a set of names in
+memory, and a file goes into one only when it was made.
+
+**Resolution.** `tests/core/host/host.cpp`, `emulator/binding.py`, `docs/core.md`.
+
+## Seed 74: the name rule of the library and of the converter
+
+**Question.** `odrig/show.py` and `converter/lib/show.js` take a stored name now. Do their
+refusals' words change?
+
+**Answer.** No: the words stay those of the name, so that the answers the converter's tests
+keep stay as they are; the rule takes the name alone or after `<n>/`, 1 to 255 without a
+leading zero, in both.
+
+**Resolution.** `odrig/show.py`, `converter/lib/show.js`.
+
+## Seed 74: an internal upload path in the command tool
+
+**Question.** The design gives `odrigctl` "an upload to an internal path, %-escaped". How is
+the path given?
+
+**Answer.** With `--folder PATH` beside `upload ID FILE`: the name sent is the folder's path,
+`/` and the file's last part, each part escaped as a URI's. It goes neither with another
+command nor with `--external`, each a usage error. `folder make` takes `internal` or
+`external`.
+
+**Resolution.** `odrigctl/cli.py`, `docs/emulator.md`.
+
+## Seed 74: the app at the root and inside an internal folder
+
+**Question.** At the root `New folder` made a folder of the card. Which storage does it make
+one of now, and against what does the app choose a new item's id, when the root's list holds
+no item of the board's folders?
+
+**Answer.** Inside a folder, that folder's storage; at the root the dialog asks for the
+storage, `External` while the board may write the card and `Internal` otherwise. A new item's
+id is free among the root's rows, folders among them, and the rows of every folder of the
+board's storage, which the app lists before the upload: the upload's preflight, a move to the
+board and a text or a clock when the root has such folders. An upload prepared at a level of
+the board's storage goes into that folder.
+
+**Resolution.** `app/www/screens/explorer.js`, `app/www/client.js`,
+`app/www/upload-destination.js`, `app/www/screens/author.js`, `app/www/moves.js`,
+`docs/android-app.md`.
+
+## Seed 74: the firmware tool and the board's folders
+
+**Question.** The design keeps `folders.txt` with the board's settings, accepts the numbered
+folders it names and refuses an install that would remove their files. What of the board's
+`folders.txt` under `--replace-folders`, and of a numbered folder left empty?
+
+**Answer.** `--replace-folders` removes the board's folder files and the lines of its
+`folders.txt` too, unless the folder installed has its own, so that no line names a folder
+of no files the operator did not keep; the file keeps its first line, which names the number
+the next folder takes, so that the numbers go on turning and a saved `f <n>/` key of a
+folder that went attaches to no new folder's file soon. Every numbered folder the
+`folders.txt` installed names is there afterwards, empty or not, and an empty one is not
+removed with the other empty folders. A show folder's numbered sub-folders are accepted when
+its `folders.txt` names them or a file of its `show.json` is in them, with `--no-check` too:
+`read-show` writes them as sub-folders, a file whose folder has no line among them.
+
+**Resolution.** `firmware/fwtool/storage.py`, `firmware/fwtool/cli.py`, `docs/firmware.md`.
+
+## Seed 74: the vocabulary's entry for a command
+
+**Question.** Part A gave the command list `saved` and `folder`, and the onboarding suite's test
+that the vocabulary names every family of the list has failed since. Task 7 adds `folder make
+internal`. Is the entry mended here?
+
+**Answer.** Yes: the entry names `saved <id>` and `folder make`, and the test's list of
+families has both.
+
+**Resolution.** `agent/vocabulary.md`, `tests/onboarding/test_vocabulary.py`.
+
+## Seed 74: a folder's Ignore while `folders.txt` is damaged
+
+**Question.** The design answers a folder's Ignore with `storage-error` while the board could
+not read `folders.txt` in this boot. With the file unread, an id is not known to be a
+folder's. What does `ignore <id>` answer then?
+
+**Answer.** As for any id that nothing has: `unknown-id`. `folder make internal` and an
+upload into a folder, which name a folder by its path, answer `storage-error`.
+
+**Resolution.** `core/src/content.cpp`, `docs/commands.md`.
+
+## Seed 74: the longest reply to `status` with the board's folders
+
+**Question.** The design gives `checking` and `file` in `status` as the path of a file of a
+folder. A folder's path is 93 bytes and a name 32 characters, so a file that a computer's
+tool put in a folder has a path of up to 126 bytes, where `checking` gave 32 characters
+before; the reply has room for 1,024 bytes and nothing bounds it as it is written. What do
+the two members give?
+
+**Answer.** A file is a file of its folder while its path is 100 bytes at most, as
+`upload begin` makes it; one of a longer path has rank 0 and is listed, played and named at
+the root under its stored name, as a file whose folder has no line is. `file` gives the
+path, 100 bytes at most, as a card's file's is. `checking` gives the first 32 characters of
+the path, as it gives a card's name. With every member at its longest the reply is then at
+most 978 bytes with its line feed, as a test of the suite counts it.
+
+**Resolution.** `core/src/folders.cpp`, `core/src/commands.cpp`,
+`tests/core/test_internal_folders.py`, `docs/commands.md`, `docs/core.md`.
+
+## Seed 74: an emptied folder that is not pruned
+
+**Question.** The prune of an emptied folder is passed over while a rebuild runs or an upload
+is received, and a power cut between a removal and the prune leaves the folder's line. No
+later event prunes it, and it looks like a folder made and never filled. Is the prune
+recorded and done later?
+
+**Answer.** No: the folder stays, with its line, as a folder never filled does. It takes
+files again by an upload, `folder make internal` of its path answers `made:false`, and it
+goes when a file it is given later leaves it. A record of prunes due would be a second file
+to keep in step for a folder that does no harm.
+
+**Resolution.** `docs/commands.md`, `docs/core.md`.
+
+## Seed 74: `folder make external` on a board with a USB stick
+
+**Question.** The design keeps `unsupported` for `folder make external` on a board whose
+drive is a USB stick, through a `make_folder` that answers 0. The board's `make_folder` is
+given now for its own folders, and the core refuses a drive it may not write with `busy` or
+`read-only` before it asks the host to make a folder. What does the stick's board answer?
+
+**Answer.** `read-only`, or `busy` while an upload is open, a rebuild runs, a test of the
+mapping shows or the stick's catalog is read: the board never writes a stick, which
+`read-only` says. A host that gives no `make_folder` answers `unsupported` as before, and a
+card's host whose `make_folder` answers 0 does after the checks. The app offers `New folder`
+on a drive only while the board may write it, so its words do not change.
+
+**Resolution.** `docs/commands.md`.
+
+## Seed 74: the fault of an upload into a folder
+
+**Question.** The fault of an upload's check names the file the upload was sent as. With a
+folder that is the file's name alone, `x.odrg` for `shows/x.odrg` and for `art/x.odrg`.
+Which name does `fault` give?
+
+**Answer.** The stored name, `1/x.odrg`, as a fault at the start or in playback names the
+file, cut to 32 characters as every name of `fault` is. An upload to the drive keeps its
+name.
+
+**Resolution.** `core/src/upload.cpp`, `core/src/storage.h`.
+
+## Seed 74: moves out of a folder of the board's storage in the app
+
+**Question.** The app's moves find the folder of a file's source and of a destination by its
+path, and look for a file that another item names among the root's rows. A file of a folder
+of the board's storage is not among them, and a folder of the board's storage may have the
+path of one of the card's. How does a move find them?
+
+**Answer.** A file of the board's storage is in a folder when the list gives its stored
+name, and that folder is found by its path among the board's folders alone, a card's among
+the card's alone; another item that names the file is looked for in the file's own level
+too, by its stored name. The card's folders that `Move to…` offers are the card's alone, and
+a folder row of the list takes its count and its marks by its id.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `app/www/screens/show.js`,
+`tests/app/test_internal_folders.py`.
+
+## Seed 74: a saved playlist of a folder of the board's own storage while `folders.txt` cannot be read
+
+**Question.** A boot that cannot read `folders.txt` has no folders. The saved playlist
+names a folder of the board's own storage, `:` and its path. The core found no folder of
+that path and made the root current with a fresh window, saved as such: the operator's
+choice was lost for every later boot, while a card's saved playlist is kept as long as the
+card's tree is not known. Which holds for a folder of the board's own storage?
+
+**Answer.** The card's rule. While `folders.txt` cannot be read, the root plays in the
+folder's place and the path stays saved; the next boot that reads the file makes the folder
+current again. Only a file that was read and has no folder of that path makes the root
+current, saved as such.
+
+**Resolution.** `core/src/order.cpp` (`tree_find_current`), `docs/core.md`,
+`tests/core/test_internal_folders.py`.
+
+## Seed 74: the check of an upload into a folder of the board's own storage
+
+**Question.** An upload prepared at a folder of the board's own storage goes into it, but
+the check before it read the root: a folder gone since was not seen, and the board refused
+the file with `unknown-id`, which the app worded `Animation begin is not installed any
+more.` Its name was also checked against the root's files, not the folder's, so a name the
+folder has was sent and refused `in-use`. What does the check read?
+
+**Answer.** The folder the file goes into, as for a folder of the card: a folder gone or
+changed fails the upload with `The explored folder changed or disappeared. Select the
+destination again.`, and a name is checked against the folder's own files, `A file already
+exists at this destination.` A folder that goes between the check and `upload begin` is
+refused `unknown-id`, which the app words `The folder of this upload is not on the
+installation any more. Select the destination again.`
+
+**Resolution.** `app/www/upload-destination.js` (`snapshotLevel`),
+`app/www/screens/storage.js`, `app/www/messages.js`, `tests/app/test_internal_folders.py`,
+`tests/app/test_messages.py`.
+
+## Seed 74: the words of an upload to the root of the board's storage from a folder of the card
+
+**Question.** Requirement 2.2 of spec 63 has the board's own storage use "its existing flat
+root", and the destination line said `Internal storage has a flat root. This upload uses
+Internal / instead of the explored SD folder.` when Internal was chosen at a folder of the
+card, and `Using Internal /; internal storage has no matching subfolders.` when the card is
+not there. The board's own storage has folders now, and may have one of the same path. What
+do they say?
+
+**Answer.** What happens and why: `This upload goes to the root of Internal storage: the
+explored folder is on the card.`, and `External storage is disconnected or not detected.
+Using Internal /; the explored folder is on the card.` The rule itself is unchanged: an
+upload prepared at a folder of the card that goes to the board's own storage goes to its
+root, whatever folders it has.
+
+**Resolution.** `app/www/upload-destination.js` (`reason`), `tests/app/test_ready_upload.py`,
+`tests/app/page/scenarios/ready-checks.js`.
+
+## Seed 74: the texts that still gave the folders and the playlists to the card alone
+
+**Question.** The board's own storage has folders, each a playlist that the rotation goes
+through before the card's, that `play`, `list in`, `order get in` and `status` take, and
+that a selection takes for a download. Texts written before still gave all this to the
+card: `docs/show.md` had the playlists, the rotation and the saved playlist of the card's
+folders alone, `With no folder on the card the root is the only playlist`; `docs/core.md`
+had a show without a card write `playlist.txt` no more than before, though it writes it
+every 900,000 ms while the board's storage has a folder; `docs/commands.md` refused
+`list in`, `order get in`, `read`, `remove`, `upload begin`, `order move`, `saved` and
+`repeat` for a folder of the card alone, and its table made the id of a folder of the
+board's own storage `unknown-id` for `play`; comments of the app and
+`docs/android-app.md` said the same; and `Delete selected`, disabled while a folder of the
+board's own storage is selected, said `clear the card's files and folders from the
+selection.` What do they say?
+
+**Answer.** What the core and the app do, as the section of `docs/commands.md` on the
+folders of the board's own storage already says: the rotation goes from the root to the
+folders of the board's own storage in the tree's order, then to the card's, which it
+passes over while the card's tree is not known, then to the root; `playlist.txt` is
+written every 900,000 ms while either storage has a folder; each refusal names a folder of
+either storage; and `Delete selected` says `clear the folders and the card's files from
+the selection.` A start whose `folders.txt` is sound and has no folder of the saved path
+makes the root current, saved as such, which a test now holds.
+
+**Resolution.** `docs/show.md`, `docs/core.md`, `docs/commands.md`,
+`docs/android-app.md`, `app/www/screens/selection.js`, the comments of
+`app/www/client.js`, `app/www/commands.js` and `app/www/screens/show.js`,
+`tests/app/test_internal_folders.py`, `tests/app/page/scenarios/downloads.js`,
+`tests/core/test_internal_folders.py`.
+
+## Seed 74: the place of a moved folder, and the app's job if the board's folder move is too large
+
+**Question.** Requirement 5.1 had the entries that `move external` moves go last in the
+destination. The card's catalog orders a folder's sub-folders by the bytes of their names
+(`docs/catalog.md`), a recorded format decision that the converter and the Python library
+keep too, so a folder put last would break it. And a folder's move was designed as a
+stepped job on the board, one commit with every id kept; should that job prove too large
+to build safely, a job of the app would keep neither the folder's id nor one commit. Both
+needed the owner, and task 6 waited for them.
+
+**Answer.** The owner's answers of 2026-11-09. A moved file goes last among the
+destination's files; a moved folder takes its place among the destination's sub-folders by
+its name, and the catalog's format, the converter and the Python library stay as they are.
+The stepped folder job on the board is built first. If it proves too large to build
+safely, a job of the app is allowed instead: it makes the destination folder and moves the
+files one at a time, each keeping its id and its saved settings; the folder gets a new id,
+and a move cut short is finished at the next connection.
+
+**Resolution.** `docs/specs/74-p2-phone-storage-explorer-and-backups/requirements.md`
+(5.1), `docs/specs/74-p2-phone-storage-explorer-and-backups/design.md` (task 6 and the
+tests).
+
+## Seed 74: a folder of the card is moved by the app, not by a stepped job on the board
+
+**Question.** Task 6 was to try the stepped folder job on the board first, one commit with
+every id kept, and to take the job of the app the owner allowed on 2026-11-09 only if the
+board's job proved too large to build safely. Which is built?
+
+**Answer.** The job of the app. The board's job proved too large to build safely within
+the core's frames and the catalog's format: (1) the commit record of a folder would need a
+rename for each file of its subtree, and a line `move <old path> <new path>` takes up to
+206 bytes where a record's line may have 161 (`kCatalogLineRoom`, the arena's
+`OrderReader.line` too), so the record would need a new kind of action that is resolved
+against the new index while it is finished, a change of the record's format that the PC
+library would have to learn; (2) every file of the subtree takes a new path and so, by the
+hash of its name, another page, so the job writes every page from a pass over every old
+page, as a rebuild does, while the player and the commands go on; (3) the job would
+repeat the rebuild's eight phases with a second plan of the table and the map, kept in the
+rebuild's fields, each phase cut at every storage call in its tests; (4) the frames of the
+catalog's changes were at up to 480 bytes of the 512 before task 6 (g++ -O2 and the
+checked build), and a file's move alone, with up to four files of folders in one change,
+needed four of them split so that each stays at 480 at most. So
+`move external <id> <path>` moves one file in one commit, with its id, its saved settings
+and its place last among the destination's files; `move external` of a folder's id is
+`in-use`; and the app moves a folder of the card as the owner allowed: it makes the
+destination's folders from the top with `folder make external`, gives each the Ignore of
+the folder it stands for, and moves the files one at a time with `move external`, each
+keeping its id and its saved settings. The new folder has its own id, the move is not one
+commit, and a job cut short is finished at the next connection from the job the phone
+keeps. The source's folders go as their last files leave them, by the prune a removal
+makes. Once the folder goes, the board plays the root's playlist, as after a removal, and
+the Clocks-only boundary is judged again at each file's move, as at a removal; the app then
+plays the folder's new place when its playlist, or that of a folder below it, was current
+(see "the playlist of a moved folder follows it" below).
+
+**Resolution.** `core/src/catalog.cpp`, `core/src/moving.cpp`, `core/src/commands.cpp`,
+`app/www/moves.js`, `app/www/screens/explorer.js`, `docs/commands.md`,
+`docs/android-app.md`, `docs/catalog.md`, `tests/core/test_move_external.py`,
+`tests/app/test_moves.py`.
+
+## Seed 74: the order of the refusals of `move external`
+
+**Question.** Which refusal does `move external` give when more than one applies, and what
+does it give for an item's id, a folder's id and a file that is in the folder already?
+
+**Answer.** The order of the error table of `docs/commands.md`: `bad-argument` for the form,
+`show-invalid`, `busy`, `unknown-id` for an id that is no file of the card (an item of the
+show among them, since an item's id means the item) and for a destination the card has not,
+`in-use` for a folder's id of either storage, `bad-argument` for a new path over 100 bytes,
+`in-use` for a name of the destination that is the file's in any case, `read-only`, then
+`storage-error`. A file in that folder already answers `moved:false` before the
+destination's names are looked at, also on a card the board may not write, since nothing is
+written; a card without a catalog answers `read-only` once the id and the folder are known.
+
+**Resolution.** `core/src/catalog.cpp`, `core/src/catalog.h`, `docs/commands.md`,
+`tests/core/test_move_external.py`.
+
+## Seed 74: the journal of a move is on the card
+
+**Question.** The design put the saved settings of a moved file behind a journal
+`moving.txt` written before the commit and named no storage for it. Where does it go?
+
+**Answer.** On the card, `drive/moving.txt` through `drive/moving.part`. Its generation is
+the card catalog's, and a card may be pulled after the commit: on the card the journal
+travels with the move and is finished when that card is mounted again, while one on the
+board would be dropped by the mount of any other card, and would be a file of the board's
+folder that the firmware tool does not know. The mount finishes it when the catalog is of
+its generation and has a file of its new path, and removes it otherwise; a stray
+`moving.part` is removed at the mount as a stray `upload.part` is. The settings are given
+to the new path only while a line of the old one is there, so a journal finished again
+changes nothing, and the lines of the new path that a removed file left are dropped then.
+
+**Resolution.** `core/src/moving.cpp`, `core/src/catalog.cpp`, `docs/catalog.md`,
+`tests/core/test_move_external.py`.
+
+## Seed 74: the commit record's `move <name> upload.part`, read by the PC library too
+
+**Question.** A file's move renames it through `upload.part` in two actions, since `move
+<old> <new>` passes the 161 bytes of a record's line. A card's name may hold spaces, and the
+PC library read `move <from> <to>` with `<from>` up to the first space, so a card with a
+move's record left by a cut would be finished wrongly on a computer. The owner answered on
+2026-11-09 that the catalog's format and the Python library stay as they are, about the
+order of moved folders. Is the record's new line read on a computer?
+
+**Answer.** Yes. `parse_do` of `odrig/catalog.py` takes a line that ends in ` upload.part`
+as the move of the name before it onto the part, as the core does, so that the board and
+the PC tool finish such a record alike. No name of a catalog ends in `upload.part`, as each
+ends in `.odrg` or `.odrgx`, so the line is never the second action, also for a name that
+begins with `upload.part`, such as `upload.part.odrg` or `upload.part x.odrg`, which the
+card's naming rule allows. Nothing the PC tool writes changes, and the order of folders is
+as it was. A firmware or a PC tool older than the action reads such a record as not whole,
+leaves the change undone and removes the stray `upload.part`, which then holds the file:
+a card a cut left in the middle of a move is finished by a board that has `move external`,
+or by this PC tool, before an older one takes it, as `docs/catalog.md` says. The owner is
+told.
+
+**Resolution.** `odrig/catalog.py`, `core/src/catalog.cpp`, `docs/catalog.md`,
+`tests/core/test_move_external.py` (`Record`).
+
+## Seed 74: what a move leaves where
+
+**Question.** The design left open what stays behind a move: the card's emptied
+directories, empty folders of a moved subtree, a folder of the board's own storage moved
+inside it, a file given another name on the card, and the files a stopped folder's job did
+not reach.
+
+**Answer.** The board renames files on the card and never a folder, and no command removes
+a folder, so a directory emptied by moves stays on the card, out of the card's index. A
+folder of a moved subtree that never held a file is made at the destination and stays at
+the source, with the folders above it, and the end of the move says the source stays. A
+folder of the board's own storage is moved to the card only: a move inside the board's
+storage, with every id kept, is the approved seed of `move internal`, and the preview says
+so. A file of the card given another name in the preview is moved by the job of part A,
+since `move external` keeps a file's name, and takes a new id. `Stop` ends a folder's job
+after the file under way and forgets it: its other files stay where they are and are not
+moved at the next connection, as a stopped run of files is not.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`,
+`docs/microsd.md`, `docs/firmware.md`, `tests/app/test_moves.py`.
+
+## Seed 74: a folder's job cut short, refused or taken up again
+
+**Question.** The app's job of a folder moved its files one at a time and, whatever a file
+met, passed to the next one and forgot the job at its end. So a lost link failed every file
+left at once and forgot the job, which the owner's allowance of 2026-11-09 says is finished
+at the next connection; a folder the board refused to make left the job on the phone for
+good, and its taking up again failed and was asked again at once, without end. Which
+failures end a job, which keep it, and when is a kept job taken up?
+
+**Answer.** A failure of the way, no answer and no Wi-Fi, a request withdrawn as the app
+was hidden, and another target chosen cut the job short: the file under way and those
+after it stay in the job, the one under way first, and the end says that they move when the
+app reaches the installation again. A reply that is not a reply, and a refusal of the
+board or of the app's own checks, end the file alone, which is said, and the next file is
+moved. A refusal of `folder make` ends the folder's job, which is forgotten and said, the
+folders made before it staying empty until a folder can be removed (the approved seed of
+`folder remove`). A job is taken up again when the target answers after it did not, or
+when the app is shown again after it was hidden, never at once after it failed, and a
+job's requests are sent only while the target it began with is chosen, so none reaches a
+spare board that has the same card. Taking up a job says what it finished, what failed
+with why, what it gave up with why, and what waits again. `Stop` still forgets the job.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `app/www/messages.js`,
+`docs/android-app.md`, `tests/app/test_moves.py` (`Jobs`, and a kept job the board
+refuses), `tests/app/page/scenarios/move-jobs.js`.
+
+## Seed 74: a lost reply of `move external` is sent once more
+
+**Question.** `move external` answers `moved:false` for a file in that folder already, so
+that a line sent again changes nothing. Does the app send it again when its reply is lost?
+
+**Answer.** Once, when the reply did not come. Both answers then mean the file is in its
+new folder. A second silence fails the file, or cuts a folder's job short as above, and the
+list shows where the file is.
+
+**Resolution.** `app/www/moves.js`, `docs/android-app.md`, `tests/app/test_moves.py`.
+
+## Seed 74: a move inside the board's own storage keeps the file's id
+
+**Question.** The design (the app, and 8.15 of the design of part B) says a move inside the
+board's storage uploads under the same id, which keeps it, and that the job gives the
+settings again. The job gave such a file a new id, as a move between the storages does.
+The board keeps a file's saved brightness and repeat by its stored name, which an upload
+into another folder changes, and it leaves the old name's lines behind. In which order are
+the settings carried?
+
+**Answer.** The job uploads the file under its own id to its new path, which moves it there
+and keeps its id and its Ignore. Before the upload it takes the saved brightness and
+repeat from the file with `brightness <id> default` and `repeat <id> default`, keeping them
+in the job on the phone, and gives them to it again after the upload, so no line of the
+old stored name stays to be given to a later file of that name. A refused upload gives
+them back at once; a job cut short that the next connection finds not moved gives them
+back then. A folder of the board's own storage is still not moved inside it.
+
+**Resolution.** `app/www/moves.js`, `docs/android-app.md`,
+`tests/app/test_internal_folders.py`.
+
+## Seed 74: the playlist of a moved folder follows it
+
+**Question.** The design had the current playlist follow a folder moved inside the card.
+With the folder moved by the app, the source folder goes with its last file and the board
+plays the root's playlist. Does the playlist follow?
+
+**Answer.** Yes, by the app. When the move begins, the status says which playlist is
+current; when it is the moved folder's or one below it, of the same storage, the job keeps
+the new path. Once every file of the job has moved, the app asks for the status and plays
+the new folder's playlist with `play <id>` when the board plays the root's or still that
+folder's; when another playlist was chosen meanwhile, it is left. A refusal, such as the
+boundary of Clocks only, leaves the root's playing.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`,
+`tests/app/test_moves.py`.
+
+## Seed 74: two selected folders of one name
+
+**Question.** Two selected folders of one name, one of each storage, planned into one
+destination took the same path, and the second's files went into the first's. What does
+the preview do?
+
+**Answer.** It skips the later one, "Another selected folder takes this name", with a field
+for another name, as for a name the destination has; names compare in any case, as the
+card's do.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`,
+`tests/app/test_moves.py`.
+
+## Seed 74: the stack of `move external` on the board
+
+**Question.** The owner asked for designs that cost the core no memory. `move external`
+holds the old and the new name and two edits of folders' files while its commit runs, so
+its chain of frames is deeper than any command's before it, while the build's check sees
+each frame alone (512 bytes). How deep is it, and what is done about it?
+
+**Answer.** The checks of the move are made in a frame of their own, gone before the
+commit, and so is what follows it; the line of the record's end is a constant, not on the
+stack. With the board's compiler at `-Os` and `-fstack-usage`, the chain from
+`command_answer` to a rename of the commit is 416 + 432 (`catalog_move`) + 416
+(`move_committed`) + 208 (`commit_change`) + 208 (`finish`) + 272 (`read_record`) + 208
+(`take_action`) + 256 (`act`) = 2,416 bytes, where `folder make external`'s is 2,064; the
+old and new names and the four edits are what the move needs and stay. The figure is in
+`docs/core.md`; the margin of the task that runs the commands on the board, the web
+server's for a request, is the board's to see, at the delivery.
+
+**Resolution.** `core/src/catalog.cpp`, `docs/core.md`.
+
+## Seed 74: a lost reply of a download's or a backup's read is sent again
+
+**Question.** On the emulated phone about one reply in ten was lost, and one lost reply
+ended a whole `Download`, which may need thousands of reads of 720 bytes: the job asked again
+only for a request withdrawn while the app was hidden. In `Download selected` it failed the
+file, and ended the backup while the selected folders or the catalog's generation were read.
+Is a request whose reply did not come sent again?
+
+**Answer.** Yes. Every request of a download or a backup only reads: `read`, the probe
+`read <id> 0 1`, `list` and `list in`, `saved` and `catalog`; one sent again changes nothing
+on the installation. One whose reply does not come, the client's `no-answer`, is sent again,
+up to three times in all, before the file fails or the run ends as it did, in the same words.
+Three, not the once of `move external`, because a download sends many more lines, each of
+which waits up to five seconds for its reply; the count is for each request, so lost replies
+of different requests do not add up. A refusal is the installation's answer and is never
+sent again; `no-wifi` and a reply that is not one are not lost replies and end as before;
+`Stop`, a change of target and a request withdrawn while the app was hidden keep their
+meaning, and the probe still falls back to 600 bytes after `bad-argument`. Whether replies
+are lost on the installation's own Wi-Fi is for the board to show.
+
+**Resolution.** `app/www/backups.js`, `docs/android-app.md`, `tests/app/test_downloads.py`,
+`tests/app/page/scenarios/downloads.js`.
+
+## Seed 74: a file whose read lost a reply is still checked against its catalog's key
+
+**Question.** The entry "Seed 74: a lost reply of a download's or a backup's read is sent
+again" lets a read go on after a lost reply. The client forgets every key when the target
+answers again after a silence, and asks for `catalog` again only after the download's own
+requests that wait; a file is checked against the key the app knows at the end of its read.
+After a lost reply near the end of the file no key was known then, and a file whose bytes
+are not the ones its catalog names was saved, in a backup as `saved`. Which key is a file
+checked against?
+
+**Answer.** The key the app knows once the file is read, or, when it knows none then, the
+one it knew before the first piece. The keys are forgotten after a silence because another
+storage may answer now; a file whose pieces came from two storages is then not the file of
+the key from before, and fails, which is what the check is for. The client still forgets the
+keys as before: only the job keeps the one of the file it reads.
+
+**Resolution.** `app/www/backups.js`, `docs/android-app.md`, `tests/app/test_downloads.py`,
+`tests/app/page/scenarios/downloads.js`.
+
+## Seed 74: lost replies are counted for each line
+
+**Question.** The entry "Seed 74: a lost reply of a download's or a backup's read is sent
+again" says that the count is for each request, so that lost replies of different requests
+do not add up. One request of the client's may send more than one line: the probe
+`read <id> 0 1` and then the first piece, or after `bad-argument` the piece, the probe again
+and the piece of 600 bytes. Their lost replies were counted together, so a probe whose reply
+was lost twice ended the download at the first lost reply of the piece, sent only once. What
+is counted?
+
+**Answer.** Each line: a request is sent again until the reply of one of its lines was lost
+three times. Each send again follows a lost reply, which adds to the count of its line, so a
+request is sent again at most twice for each of its lines before one ends it. A failure on the way
+names the line it was met for, as a refusal already does.
+
+**Resolution.** `app/www/backups.js`, `app/www/commands.js`, `app/www/target.js`,
+`docs/android-app.md`, `tests/app/test_downloads.py`.
+
+## Seed 74: `saved` is still asked again after `busy` in a backup
+
+**Question.** The entry "Seed 74: a lost reply of a download's or a backup's read is sent
+again" says that a refusal is the installation's answer and is never sent again, and
+`docs/android-app.md` said it is not asked again. A backup asks `saved` again after `busy`,
+up to five times half a second apart, as the same page says. Which holds?
+
+**Answer.** Both, each for its own reason. A refusal never has a request sent again as a
+lost reply does; only `saved` is asked again, after `busy`, because the board answers `busy`
+until it has read what it keeps. `docs/android-app.md` now says so; the code is as it was.
+
+**Resolution.** `docs/android-app.md`.
+
+## Seed 86: how the core knows the current playlist is in the moved subtree
+
+**Question.** The current playlist's path follows the move when it is the moved folder or a
+folder below it. The core keeps the current internal playlist by its number; how does it
+know, without keeping the subtree's numbers, that the current one is in it?
+
+**Answer.** By its line's index, which the record of the current folder holds as its first
+rank before the move: the subtree is the lines from the folder's index to the last of its
+subtree, found by the plan's reading. After the rename `folders_derive` finds the current
+folder again by its number, which stays, and its new path is read by that number into
+`playlist_path`; `save_due` writes `playlist.txt` at the next refresh, as the seed says. A
+cut before that leaves the old path there, which the next start does not find and so plays
+the root, as for a playlist that is gone.
+
+**Resolution.** `core/src/folders.cpp`, `tests/core/test_folder_move.py`.
+
+## Seed 86: the command tool and `/` for `move internal`
+
+**Question.** `move external` takes `/` for the card's root, as its path names the
+destination folder. `move internal` takes the folder's new full path, which is never the
+root. What does the command tool do with `move internal ID /`?
+
+**Answer.** It refuses it with its usage, status 2, and sends nothing, as for any other
+form it does not take: the board would answer `bad-argument`. The emulator's sources are
+unchanged; its line reaches the core as every line does.
+
+**Resolution.** `odrigctl/cli.py`, `docs/emulator.md`, `tests/emulator/test_tool.py`,
+`tests/emulator/test_folder_move.py`.
+
+## Seed 86: the app's moves inside the board's storage, and the old skip
+
+**Question.** Seed 74's `Move to…` skipped a folder of the board's own storage with a
+destination there ("not moved inside Internal storage"). Seed 86 moves it by `move internal`.
+Which checks does the preview keep for it, and which go?
+
+**Answer.** It keeps those of the destination: into itself or below it, there already, the
+name the storage does not take, a name the destination has in any case, another selected
+folder of that name, and a folder of it past three levels or 93 characters; and it adds a
+file of it whose path would pass 100 characters, which keeps the whole folder in place, as
+the board would refuse it. The checks of a file moved alone, a cycle that lists it or a size
+not known yet, go: no file is sent, and its stored name stays. Such a move keeps no job on
+the phone, so a reply that does not come ends with the list showing where the folder is.
+`Move to…` from a folder's own menu offers Internal storage alone and shows a destination that
+cannot take the folder disabled with its reason, in the chooser itself.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`.
