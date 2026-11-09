@@ -16,7 +16,7 @@ seen failing first.
     log of `docs/decisions.md`; `docs/drifts.md`.
   - Requirements: 9.1–9.2.
 
-- [ ] 3. Deliver
+- [x] 3. Deliver
   - Every suite that runs here; the pull request; the APK built from the branch that joins
     every unmerged seed, and its place on the Drive in `verification.md`.
   - Requirements: 8.1.
