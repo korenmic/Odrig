@@ -1272,6 +1272,19 @@ export function back() {
   return true;
 }
 
+// A folder of a storage moved from one path to another: each level shown that is it or below
+// it follows it to its new path, by its id, which stays.
+export function followFolder(storage, from, to) {
+  const moved = (path) => (path === from ? to : path.startsWith(`${from}/`) ? `${to}${path.slice(from.length)}` : path);
+  for (const level of trail) {
+    if (level.storage === storage) level.path = moved(level.path);
+  }
+  if (state.level.id !== null && state.level.storage === storage && moved(state.level.path) !== state.level.path) {
+    state.level = {...state.level, path: moved(state.level.path)};
+    changed();
+  }
+}
+
 function toLevel() {
   if (onlyActive && !inClocks(trail[trail.length - 1] ?? null)) {
     trail.splice(0, trail.length, ...(onlyFolder === null ? [{path: "clocks", id: null}] : openClocks()));

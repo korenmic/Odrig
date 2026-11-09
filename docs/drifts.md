@@ -15320,6 +15320,24 @@ unchanged; its line reaches the core as every line does.
 **Resolution.** `odrigctl/cli.py`, `docs/emulator.md`, `tests/emulator/test_tool.py`,
 `tests/emulator/test_folder_move.py`.
 
+## Seed 86: the app's moves inside the board's storage, and the old skip
+
+**Question.** Seed 74's `Move to…` skipped a folder of the board's own storage with a
+destination there ("not moved inside Internal storage"). Seed 86 moves it by `move internal`.
+Which checks does the preview keep for it, and which go?
+
+**Answer.** It keeps those of the destination: into itself or below it, there already, the
+name the storage does not take, a name the destination has in any case, another selected
+folder of that name, and a folder of it past three levels or 93 characters; and it adds a
+file of it whose path would pass 100 characters, which keeps the whole folder in place, as
+the board would refuse it. The checks of a file moved alone, a cycle that lists it or a size
+not known yet, go: no file is sent, and its stored name stays. Such a move keeps no job on
+the phone, so a reply that does not come ends with the list showing where the folder is.
+`Move to…` from a folder's own menu offers Internal storage alone and shows a destination that
+cannot take the folder disabled with its reason, in the chooser itself.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

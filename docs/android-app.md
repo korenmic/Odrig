@@ -721,10 +721,30 @@ each of its files and the path it takes under the new folder. A folder is skippe
 when the destination has a folder or a file of its name, in any case, which another name
 in the preview mends; when the destination is the folder itself or a folder below it; when
 it is there already; when a folder of it would be more than three levels deep or its path
-too long; when it is a folder of the board's own storage and the destination is the
-board's own storage too, which this app does not move; and when another selected folder
+too long, or a file of it would pass 100 characters; and when another selected folder
 takes the same name there, which another name mends too. A file of it can be skipped as a
-selected file is, and stays in its folder.
+selected file is, and stays in its folder. A folder of the board's own storage moved to the
+board's own storage is not a job over its files: it is moved by one line, `move internal
+<id> <path>` ([commands.md](commands.md#moving-or-renaming-a-folder-of-the-boards-own-storage)),
+its files staying where they are with their ids, saved settings and previews; a reply that
+does not come is not sent again, and the end says so, the list then showing where the folder
+is.
+
+The menu of a folder's row of the board's own storage has `Rename…` and `Move to…`, enabled
+while the board answers and nothing changes the list; a folder of the card has neither.
+`Rename…` opens the dialog of `New folder` with the folder's name in its field, `In Internal
+/<parent>/` above it and the new full path under it, `New path: Internal /shows`; the name
+has the checks of `New folder`, and one another folder at that level has, in any case, is
+refused. `Move to…` opens the chooser with Internal storage alone: its root and each of its
+folders but the folder itself and those below it, a destination that cannot take it shown
+disabled with its reason, `It is there already.` for its own parent, `A folder there has its
+name.`, `It would pass 3 levels or 93 characters there.` and `An animation inside would pass
+100 characters there.`; the preview shows the old and the new full path before anything is
+sent. Each sends `move internal`, whose reply says `Renamed the folder Internal /a to Internal
+/b.` or `Moved the folder Internal /a/ to Internal /b/a/.`; a level shown inside the folder
+follows it. A refusal is said in words, a firmware that answers `unknown-command` cannot move
+folders inside its storage, and after a reply that did not come the app reads the folders and
+says where the folder is, never sending the line again.
 
 A file of the card that stays on the card under its name is moved by the board with
 `move external <id> <path>` ([commands.md](commands.md#moving-a-file-of-the-card)), in one
@@ -1729,7 +1749,14 @@ installed; the phone with mobile data on.
     folder, and after the board restarts neither is listed. Open the menu of a folder that
     holds an animation. *Seen:* `Remove folder` is disabled, under `Only an empty folder can
     be removed.`
-34. **Note** the phone's model, its Android version, the web view's version from the
+34. **A folder of the board's storage renamed and moved.** With firmware that has `move
+    internal`, a folder of Internal storage that holds an animation with a saved brightness,
+    and its playlist chosen. `Rename…` it, then `Move to…` under another folder of Internal
+    storage, then back to the root. *Seen:* each time the row is at its new place with its
+    new path, the animation keeps its preview, its brightness and its place in the order and
+    plays on, and the bar names the folder's new path; after the board restarts, all of it
+    holds.
+35. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1950,6 +1977,10 @@ physical acceptance are in [verification.md](specs/64-p2-board-time-and-daily-on
 
 - **Removing a folder on a phone and on the board.** No phone has removed a folder of the
   board's storage or of the card, nor seen them stay gone after a restart: step 33 above.
+
+- **Renaming and moving a folder of the board's storage on a phone.** No phone has renamed or
+  moved a folder of the board's own storage, nor seen its animations and playlist follow it
+  through a restart: step 34 above.
 
 - **Seed 33 on a phone and on the board.** Nobody has seen the line of the reading, the
   name of the board and its last fault on a phone; that belongs to the seed's board
