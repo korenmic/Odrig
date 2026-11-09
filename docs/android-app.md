@@ -730,7 +730,8 @@ its lines up to three times in all: a piece, the probe, a part of a list, `saved
 `catalog`; the probe and the first piece go in one request and each has its own count. The
 third silence of one line ends a download, as the failure of its file, and in a backup fails
 the file being read, or ends the run while the selected folders or the catalog's generation
-are read. A refusal is the installation's answer and is not asked again; an installation
+are read. A refusal is the installation's answer and is not sent again as a line whose reply
+did not come is, though `saved` is still asked again after `busy`, as above; an installation
 that refuses the count with `bad-argument` still has its files read 600 bytes at a time.
 `Stop` ends the run between two pieces, or as the piece under way ends, whatever its reply:
 a backup is saved with the files read whole before, as a partial backup, and a download saves

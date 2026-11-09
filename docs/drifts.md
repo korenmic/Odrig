@@ -13731,3 +13731,16 @@ names the line it was met for, as a refusal already does.
 
 **Resolution.** `app/www/backups.js`, `app/www/commands.js`, `app/www/target.js`,
 `docs/android-app.md`, `tests/app/test_downloads.py`.
+
+## Seed 74: `saved` is still asked again after `busy` in a backup
+
+**Question.** The entry "Seed 74: a lost reply of a download's or a backup's read is sent
+again" says that a refusal is the installation's answer and is never sent again, and
+`docs/android-app.md` said it is not asked again. A backup asks `saved` again after `busy`,
+up to five times half a second apart, as the same page says. Which holds?
+
+**Answer.** Both, each for its own reason. A refusal never has a request sent again as a
+lost reply does; only `saved` is asked again, after `busy`, because the board answers `busy`
+until it has read what it keeps. `docs/android-app.md` now says so; the code is as it was.
+
+**Resolution.** `docs/android-app.md`.
