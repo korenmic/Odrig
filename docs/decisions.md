@@ -1041,3 +1041,15 @@ listed nowhere. Only the folder named goes, and a folder that holds a file or a 
 `in-use`. The card's catalog format, its commit record and the Python library are as they
 were; the host interface's `remove` also removes an empty folder of the drive. The core's
 memory is as it was.
+
+### Seed 86: moving or renaming a folder of the board's own storage
+
+On 2026-11-09 the owner approved a new seed in which `move internal <folder id> <path>` moves
+or renames a folder of the board's own storage, its sub-folders with it, by one rewrite of
+`folders.txt`, with `Rename…` and `Move to…` in the app; the approval covers the addition to
+the command list. The folder's numbers, ids, Ignore, stored names and files stay, so its
+files, their saved settings, the internal catalog and the previews on the phone stay too,
+and the current playlist's path follows the move. A moved folder takes its place among its
+new siblings by the bytes of their names, as the owner ruled the same day for the card's
+moved folders. The host interface, the format of `folders.txt`, the card's catalog and the
+Python library are as they were. The core's memory is as it was.

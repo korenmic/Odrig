@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "catalog.h"
+#include "drive.h"
 #include "order.h"
 #include "player.h"
 #include "playlist.h"
@@ -1115,6 +1116,220 @@ ODRIG_NOINLINE uint32_t internal_folder_remove(Core &core, uint32_t id, Reply &r
         playlist_changed(core);
     }
     return succeed(reply);
+}
+
+namespace {
+
+// What `move internal` finds in one reading of `folders.txt`: the index of the folder's line
+// and of the last line of its subtree, which stand together; the index of the line before
+// which the subtree goes, kNoLine for the file's end; whether a line outside the subtree
+// has the new last name under the new parent, in bytes or in any case; whether the new
+// parent is there; whether a folder or a file of the subtree would pass the limits; the
+// header's next number and the number of lines.
+struct MovePlan {
+    uint32_t first;
+    uint32_t last;
+    uint32_t before;
+    uint32_t next;
+    uint32_t count;
+    bool taken;
+    bool parent;
+    bool over;
+};
+
+// Whether a line of the subtree, of a path of `length` bytes at a depth, would pass the limits
+// at its new place: its path, the new path followed by its own past the old one's
+// `old_length` bytes, over 93 bytes or deeper than 3; or a file of its folder, listed there
+// now, whose path would pass 100 bytes.
+bool passes_limits(const Core &core, const FolderLine &line, uint32_t length, uint32_t old_length, uint32_t new_length, uint32_t depth, uint32_t new_depth) {
+    const uint32_t moved_length = new_length + (length - old_length);
+    if (moved_length > kFolderPathMost || new_depth + (line.depth - depth) > kCatalogDeepest) {
+        return true;
+    }
+    for (uint32_t file = 0; file < core.file_count; ++file) {
+        const char *name = core.files[file].name;
+        if (stored_folder(name) == line.number && path_fits(length, name) && !path_fits(moved_length, name)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+ODRIG_NOINLINE bool plan_move(const Core &core, const FolderLine &folder, uint32_t old_length, const char *path, uint32_t length, uint32_t depth, MovePlan &plan) {
+    FolderScan scan;
+    FolderLine line;
+    if (!begin_scan(scan, core)) {
+        return false;
+    }
+    plan.first = folder.index;
+    plan.last = folder.index;
+    plan.before = kNoLine;
+    plan.taken = false;
+    plan.parent = depth == 1;
+    plan.over = false;
+    // The new last name begins at `base`; the new parent's path is the bytes before it, but
+    // its `/`.
+    uint32_t base = length;
+    while (base != 0 && path[base - 1] != '/') {
+        --base;
+    }
+    bool subtree = false;
+    bool inside = depth == 1;
+    while (next_line(scan, line)) {
+        subtree = line.index == folder.index || (subtree && line.depth > folder.depth);
+        if (subtree) {
+            plan.last = line.index;
+            plan.over = plan.over || passes_limits(core, line, scan.length, old_length, length, folder.depth, depth);
+            continue;
+        }
+        if (plan.before == kNoLine && inside &&
+            (line.depth < depth || (line.depth == depth && last_part_after(scan.path, scan.length, path, length)))) {
+            plan.before = line.index;
+        }
+        if (depth > 1 && scan.length + 1 == base && memcmp(scan.path, path, base - 1) == 0) {
+            plan.parent = true;
+            inside = true;
+        }
+        if (scan.length > base && memcmp(scan.path, path, base) == 0 && !has_slash(scan.path + base, scan.length - base) &&
+            same_any_case(scan.path + base, scan.length - base, path + base, length - base)) {
+            plan.taken = true;
+        }
+    }
+    plan.next = scan.next;
+    plan.count = scan.count;
+    return scan.state == kScanEnded;
+}
+
+// Puts the lines of `folders.txt` whose index is from `from` up to `to` into the writer: those
+// outside the subtree, or with `moved` those of the subtree, each with the new path in place
+// of the old one at its start. One reading of the file from its start, as far as it needs.
+ODRIG_NOINLINE bool copy_lines(Core &core, FolderWriter &out, const MovePlan &plan, uint32_t from, uint32_t to, const char *path, uint32_t length,
+                               uint32_t old_length, bool moved) {
+    FolderScan scan;
+    FolderLine line;
+    if (!begin_scan(scan, core)) {
+        return false;
+    }
+    while (next_line(scan, line)) {
+        if (line.index >= to) {
+            return true;
+        }
+        const bool in_subtree = line.index >= plan.first && line.index <= plan.last;
+        if (line.index < from || in_subtree != moved) {
+            continue;
+        }
+        if (!moved) {
+            out.line(line.number, line.id, line.ignored, scan.path, scan.length);
+            continue;
+        }
+        out.number(line.number);
+        out.byte(' ');
+        out.number(line.id);
+        out.byte(' ');
+        out.byte(line.ignored != 0 ? '1' : '0');
+        out.byte(' ');
+        out.bytes(path, length);
+        out.bytes(scan.path + old_length, scan.length - old_length);
+        out.byte('\n');
+    }
+    return scan.state == kScanEnded;
+}
+
+// Writes `folders.part`: the header with the same next number, then three readings of
+// `folders.txt`: the lines before the subtree's new place, the subtree with its new paths, and
+// the lines from that place on, each without the subtree's old lines. False when the host
+// could not take it or the file could not be read.
+ODRIG_NOINLINE bool write_moved(Core &core, const MovePlan &plan, const char *path, uint32_t length, uint32_t old_length) {
+    const odrig_host &host = core.host;
+    if (host.write_open(host.ctx, kFoldersPart) != 1) {
+        return false;
+    }
+    FolderWriter out;
+    out.core = &core;
+    out.used = 0;
+    out.failed = false;
+    out.bytes(kFoldersHeader, sizeof kFoldersHeader - 1);
+    out.number(plan.next);
+    out.byte('\n');
+    const uint32_t before = plan.before == kNoLine ? plan.count : plan.before;
+    const bool sound = copy_lines(core, out, plan, 0, before, path, length, old_length, false) &&
+                       copy_lines(core, out, plan, plan.first, plan.last + 1, path, length, old_length, true) &&
+                       copy_lines(core, out, plan, before, kNoLine, path, length, old_length, false);
+    out.flush();
+    return host.write_close(host.ctx) == 1 && !out.failed && sound;
+}
+
+uint32_t move_reply(Reply &reply, uint32_t id, bool moved) {
+    reply.text("{\"ok\":true,\"id\":");
+    reply.number(id);
+    reply.text(moved ? ",\"moved\":true}\n" : ",\"moved\":false}\n");
+    return reply.length;
+}
+
+}  // namespace
+
+ODRIG_NOINLINE uint32_t internal_folder_move(Core &core, uint32_t id, const char *path, Reply &reply) {
+    if (!storage_changes(core) || core.host.read_at == nullptr || core.chunk == nullptr) {
+        return refuse(reply, "unsupported");
+    }
+    if (core.upload.state != kUploadNone || catalog_rebuilding(core)) {
+        return refuse(reply, "busy");
+    }
+    if (core.folders_error) {
+        return refuse(reply, "storage-error");
+    }
+    for (uint32_t item = 0; item < core.item_count; ++item) {
+        if (core.items[item].id == id) {
+            return refuse(reply, "in-use");
+        }
+    }
+    uint32_t value = 0;
+    if (drive_find(core, id, &value) != 0) {
+        return refuse(reply, "in-use");
+    }
+    FolderLine folder;
+    char old[kFolderPathMost + 1];
+    if (!folder_by_id(core, id, folder, old)) {
+        return refuse(reply, "unknown-id");
+    }
+    const uint32_t length = text_length(path);
+    const uint32_t depth = folder_path_depth(path, length);
+    const uint32_t old_length = text_length(old);
+    // A move into the folder itself or below it.
+    if (depth == 0 || (length > old_length && memcmp(path, old, old_length) == 0 && path[old_length] == '/')) {
+        return refuse(reply, "bad-argument");
+    }
+    MovePlan plan;
+    if (!plan_move(core, folder, old_length, path, length, depth, plan)) {
+        return refuse(reply, "storage-error");
+    }
+    if (plan.over) {
+        return refuse(reply, "bad-argument");
+    }
+    if (length == old_length && memcmp(path, old, length) == 0) {
+        return move_reply(reply, id, false);
+    }
+    if (plan.taken) {
+        return refuse(reply, "in-use");
+    }
+    if (!plan.parent) {
+        return refuse(reply, "unknown-id");
+    }
+    // Whether the current playlist is the folder or a folder below it, by its line's index.
+    const bool current = (core.current & kInternalLevel) != 0 && core.current_folder.first >= plan.first + 1 && core.current_folder.first <= plan.last + 1;
+    if (!write_moved(core, plan, path, length, old_length) || !commit_part(core)) {
+        core.host.remove(core.host.ctx, kFoldersPart);
+        return refuse(reply, "storage-error");
+    }
+    folders_derive(core);
+    player_internal_inclusion_changed(core);
+    FolderLine line;
+    if (current && core.playlist_path != nullptr && folder_by_number(core, core.current & 0xFFu, line, old)) {
+        core.playlist_path[0] = ':';
+        memcpy(core.playlist_path + 1, old, text_length(old) + 1);
+        core.save_due = 1;
+    }
+    return move_reply(reply, id, true);
 }
 
 bool internal_choose(Core &core, uint32_t id) {

@@ -86,6 +86,11 @@ void internal_folders_prune(Core &core, uint32_t number);
 // folder goes; a folder of the storage that cannot be removed stays, listed nowhere.
 uint32_t internal_folder_remove(Core &core, uint32_t id, Reply &reply);
 
+// `move internal <folder id> <path>`: gives an internal folder the new path, another parent,
+// another name or both, and its sub-folders with it, by one rewrite of `folders.txt`. Every
+// number, id, Ignore, stored name and file is kept; the current playlist follows.
+uint32_t internal_folder_move(Core &core, uint32_t id, const char *path, Reply &reply);
+
 // Makes the internal folder with this id the current playlist. False when there is none.
 bool internal_choose(Core &core, uint32_t id);
 

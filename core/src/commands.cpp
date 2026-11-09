@@ -1099,6 +1099,18 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         return catalog_folder_make(core, path, reply);
     }
     if (words.is(0, "move")) {
+        if (words.count == 4 && words.is(1, "internal")) {
+            // `move internal <folder id> <path>`: the folder's new path from the root.
+            char path[kDrivePathRoom];
+            uint32_t id = 0;
+            if (!number_word(words, 2, 1, 0xFFFFFFFFu, &id) || !folder_path(words.text[3], words.size[3], path)) {
+                return refuse(reply, "bad-argument");
+            }
+            if (core.invalid) {
+                return refuse(reply, "show-invalid");
+            }
+            return internal_folder_move(core, id, path, reply);
+        }
         // `move external <id> <folder>`: `/` for the drive's root, else a folder's path.
         char path[kDrivePathRoom];
         uint32_t id = 0;

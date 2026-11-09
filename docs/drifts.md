@@ -15291,6 +15291,21 @@ either, the app says that whether the folder was removed is not known yet and re
 list again; it never sends the line again by itself.
 
 **Resolution.** `app/www/screens/explorer.js`, `docs/android-app.md`.
+## Seed 86: how the core knows the current playlist is in the moved subtree
+
+**Question.** The current playlist's path follows the move when it is the moved folder or a
+folder below it. The core keeps the current internal playlist by its number; how does it
+know, without keeping the subtree's numbers, that the current one is in it?
+
+**Answer.** By its line's index, which the record of the current folder holds as its first
+rank before the move: the subtree is the lines from the folder's index to the last of its
+subtree, found by the plan's reading. After the rename `folders_derive` finds the current
+folder again by its number, which stays, and its new path is read by that number into
+`playlist_path`; `save_due` writes `playlist.txt` at the next refresh, as the seed says. A
+cut before that leaves the old path there, which the next start does not find and so plays
+the root, as for a playlist that is gone.
+
+**Resolution.** `core/src/folders.cpp`, `tests/core/test_folder_move.py`.
 
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 

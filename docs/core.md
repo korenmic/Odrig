@@ -910,7 +910,15 @@ core no memory: every figure of [Memory](#memory) is as it is without them.
   drops its line alone through `folders.part`, renamed onto the file, and then removes
   `<n>`; the header keeps its next number, and a numbered folder the host cannot remove
   then stays, without a line, as after a cut of `folder make internal`. Nothing above it
-  is pruned. Numbers are given in turn from the
+  is pruned. `move internal` rewrites the file
+  once: one reading plans it, finding the folder's line and its subtree, which stand
+  together, checking each new path for 93 bytes and three levels and each file listed in
+  the subtree for 100, and finding where the subtree goes among the new parent's
+  sub-folders; three more readings, each from the file's start, write the lines before that
+  place, the subtree with its new start, and the rest, into `folders.part`, renamed onto the
+  file. Numbers, ids, Ignore and stored names stay, so no file and no folder of the storage
+  is touched, and the current playlist's path follows in `playlist.txt` at the next
+  refresh. Numbers are given in turn from the
   header's, back to 1 after 255, passing over one a line or a stored name of the file
   table has. A folder's id is the lowest that no item and no folder has.
 - **Limits.** 32 folders, three levels, a folder's path of 93 bytes, a file's path of 100
