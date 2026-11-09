@@ -744,7 +744,9 @@ sent. Each sends `move internal`, whose reply says `Renamed the folder Internal 
 /b.` or `Moved the folder Internal /a/ to Internal /b/a/.`; a level shown inside the folder
 follows it. A refusal is said in words, a firmware that answers `unknown-command` cannot move
 folders inside its storage, and after a reply that did not come the app reads the folders and
-says where the folder is, never sending the line again.
+says where the folder is, never sending the line again. In Clocks only a folder stays inside
+Clocks: `Move to…` offers its Clocks folders alone, and a rename or a move whose new path
+would leave Clocks is said in Clocks only's words, and nothing is sent.
 
 A file of the card that stays on the card under its name is moved by the board with
 `move external <id> <path>` ([commands.md](commands.md#moving-a-file-of-the-card)), in one

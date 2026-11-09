@@ -15338,6 +15338,23 @@ cannot take the folder disabled with its reason, in the chooser itself.
 
 **Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`.
 
+## Fused: seed 86's folder moves inside Clocks in Clocks only
+
+**Question.** On the branch of every unmerged seed, Clocks only keeps the files the app
+moves inside Clocks (seed 66's boundary, over both storages by seed 61). Seed 86's
+`move internal`, sent by `Rename…`, by `Move to…` of one folder and for selected folders
+moved inside the board's storage, went past that check: the board's `clocks` folder could be
+renamed out of Clocks. What does the app do?
+
+**Answer.** The folder's new full path must be a place Clocks only lets files into
+(`client.canMoveInto`), as a destination of a file's move must: a rename or a one-folder move
+that would leave Clocks says so in Clocks only's words and sends nothing, and a selected
+folder that would leave it is failed with the same words. `Move to…` of one folder offers the
+Clocks folders alone, as the chooser already did.
+
+**Resolution.** `app/www/screens/explorer.js`, `docs/android-app.md`,
+`tests/app/test_only_both.py`, `tests/app/page/scenarios/only-folder-moves.js`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

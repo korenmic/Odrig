@@ -181,6 +181,11 @@ async function internalPathOf(id) {
 async function moveInside(folder, to, renaming) {
   const from = folder.playlist;
   const named = renaming ? moves.label("internal", from) : moves.label("internal", `${from}/`);
+  if (!client.canMoveInto("internal", to)) {
+    // Clocks only keeps the folder inside Clocks: nothing is sent.
+    message(`The folder ${named} was not ${renaming ? "renamed" : "moved"}. ${messages.onlyDestination(client.state.status?.hasClockStorage === true)}`);
+    return;
+  }
   try {
     const moved = await client.operation("folder", () => commands.moveInternal(folder.id, to));
     client.followFolder("internal", from, to);
@@ -676,7 +681,12 @@ async function runMove() {
       await waitVisible();
       if (planned.byCommand) {
         // A folder moved inside the board's own storage by one line, which no job keeps; a
-        // reply that did not arrive is not answered by sending it again.
+        // reply that did not arrive is not answered by sending it again. Clocks only keeps it
+        // inside Clocks.
+        if (!client.canMoveInto("internal", planned.path)) {
+          failed.push(`${planned.folder.playlist}/: ${refusalText(new Refusal("in-use", "move"))}`);
+          continue;
+        }
         try {
           const took = await client.operation("move", () => commands.moveInternal(planned.folder.id, planned.path));
           client.followFolder("internal", planned.folder.playlist, planned.path);

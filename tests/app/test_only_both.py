@@ -562,3 +562,24 @@ class OnAStandIn(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FolderMovesInOnly(unittest.TestCase):
+    """`Rename…` and `Move to…` of a folder of the board's own storage while Clocks only is on:
+    the folder stays inside Clocks, and a rename or a move that would take it out is said in
+    Clocks only's words and sends nothing."""
+
+    def test_a_rename_of_the_boards_clocks_folder_is_refused_and_sends_nothing(self):
+        board = Board(self, "only")
+        seen = support.run("only-folder-moves", address=board.address, settings={"id": 20, "rename": "faces"}).seen
+        self.assertIn("Rename\u2026", seen["menu"])
+        self.assertEqual(seen["message"], f"The folder Internal /clocks was not renamed. {ONLY_BOTH}")
+        self.assertEqual(board.lines("move internal"), [])
+        self.assertIn("1 20 0 clocks\n", (board.folder / "folders.txt").read_text(encoding="ascii"))
+
+    def test_move_to_of_a_folder_inside_clocks_offers_the_clocks_folders_alone(self):
+        board = Board(self, "only")
+        self.assertTrue(json.loads(board.emulator.command("folder make internal clocks/old"))["made"])
+        seen = support.run("only-folder-moves", address=board.address, settings={"enter": 20, "id": 21}).seen
+        self.assertEqual(seen["choices"], ["/clocks \u2014 It is there already. (disabled)", "/clocks/old"])
+        self.assertEqual(board.lines("move internal"), [])
