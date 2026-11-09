@@ -13426,3 +13426,25 @@ makes the root current, saved as such, which a test now holds.
 `app/www/client.js`, `app/www/commands.js` and `app/www/screens/show.js`,
 `tests/app/test_internal_folders.py`, `tests/app/page/scenarios/downloads.js`,
 `tests/core/test_internal_folders.py`.
+
+## Seed 74: the place of a moved folder, and the app's job if the board's folder move is too large
+
+**Question.** Requirement 5.1 had the entries that `move external` moves go last in the
+destination. The card's catalog orders a folder's sub-folders by the bytes of their names
+(`docs/catalog.md`), a recorded format decision that the converter and the Python library
+keep too, so a folder put last would break it. And a folder's move was designed as a
+stepped job on the board, one commit with every id kept; should that job prove too large
+to build safely, a job of the app would keep neither the folder's id nor one commit. Both
+needed the owner, and task 6 waited for them.
+
+**Answer.** The owner's answers of 2026-11-09. A moved file goes last among the
+destination's files; a moved folder takes its place among the destination's sub-folders by
+its name, and the catalog's format, the converter and the Python library stay as they are.
+The stepped folder job on the board is built first. If it proves too large to build
+safely, a job of the app is allowed instead: it makes the destination folder and moves the
+files one at a time, each keeping its id and its saved settings; the folder gets a new id,
+and a move cut short is finished at the next connection.
+
+**Resolution.** `docs/specs/74-p2-phone-storage-explorer-and-backups/requirements.md`
+(5.1), `docs/specs/74-p2-phone-storage-explorer-and-backups/design.md` (task 6 and the
+tests).

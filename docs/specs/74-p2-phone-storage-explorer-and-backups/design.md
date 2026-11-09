@@ -374,10 +374,18 @@ resent line changes nothing, and `{"ok":true,"id":<id>,"moving":true}` for a fol
   generation after it shows the new path, else discarded.
 - On the board the card's host renames files only, so a folder moves file by file with
   `make_folder`, and emptied card directories stay.
-- Task 6 waits for the owner on two points: requirement 5.1's "moved entries go last" for
-  folders, against the catalog's order of sub-folders by their names; and, if the stepped
-  folder job proves too large, a job of the app instead, which keeps neither the folders'
-  ids nor one commit. Files go last as asked.
+- **The order in the destination.** A moved file goes last among its files. A moved
+  folder takes its place among its sub-folders by the bytes of its name, the order that
+  `docs/catalog.md` records for the card's index, so the sub-folders stay in the order a
+  rebuild gives them; the catalog's format, the converter and the Python library are
+  unchanged. These are the owner's answers of 2026-11-09.
+- **The folder's move is built in two steps.** File moves come first, as 6a; the stepped
+  folder job on the board follows, as 6b. If 6b proves too large to build safely, the
+  owner allowed on 2026-11-09 a job of the app instead: it makes the destination folder
+  with `folder make external`, then moves the files one at a time with `move external`,
+  each keeping its id and its saved settings, and records each step in its journal as
+  the move job of task 3 does. The folder gets a new id, the move is not one commit, and a
+  move cut short is finished at the next connection.
 
 ### Flat shows, the old APK and going back
 
@@ -407,7 +415,8 @@ resent line changes nothing, and `{"ok":true,"id":<id>,"moving":true}` for a fol
   the walk and the rotation, pruning and its `rmdir`, the round of numbers, the repair of
   an id at the start, a damaged `folders.txt`, and a cut at every store call of making,
   installing, removing and pruning; for `move external` every refusal, every record action
-  cut and replayed, the journal finished and discarded, ids kept, files last.
+  cut and replayed, the journal finished and discarded, ids kept, files last, a folder
+  among the sub-folders by its name.
 - Emulator, firmware host, fwtool, Python library and converter, `odrigctl`: the name
   rule, the folders, the guard and the new forms. App: rows, `keyOf`, the read probe, a ZIP
   written and read back by a reader of the test, a partial backup, a source changed during
