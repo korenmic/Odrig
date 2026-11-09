@@ -873,7 +873,15 @@ core no memory: every figure of [Memory](#memory) is as it is without them.
   its line, and so does each folder above it left empty the same way, and then the core
   removes the numbered folders with `remove("<n>")`. A removal while a rebuild runs or an
   upload is received, or one that a power cut ends before the prune, leaves the emptied
-  folder with its line, as a folder never filled is. Numbers are given in turn from the
+  folder with its line, as a folder never filled is. `move internal` rewrites the file
+  once: one reading plans it, finding the folder's line and its subtree, which stand
+  together, checking each new path for 93 bytes and three levels and each file listed in
+  the subtree for 100, and finding where the subtree goes among the new parent's
+  sub-folders; three more readings, each from the file's start, write the lines before that
+  place, the subtree with its new start, and the rest, into `folders.part`, renamed onto the
+  file. Numbers, ids, Ignore and stored names stay, so no file and no folder of the storage
+  is touched, and the current playlist's path follows in `playlist.txt` at the next
+  refresh. Numbers are given in turn from the
   header's, back to 1 after 255, passing over one a line or a stored name of the file
   table has. A folder's id is the lowest that no item and no folder has.
 - **Limits.** 32 folders, three levels, a folder's path of 93 bytes, a file's path of 100

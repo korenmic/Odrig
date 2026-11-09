@@ -5,7 +5,7 @@ Each task is one commit on the branch `seed-86-move-a-folder-inside-the-board`, 
 Every test of a fault is seen failing before the change, and the failure seen goes into the
 commit message. Code carries no history.
 
-- [ ] 1. `move internal <folder id> <path>` in the core
+- [x] 1. `move internal <folder id> <path>` in the core
   - `core/src/commands.cpp`: the line. `core/src/folders.cpp` and `.h`:
     `internal_folder_move`, `plan_move`, `write_moved`, `copy_lines`.
   - `tests/core/test_folder_move.py`, new, seen failing first; the command lists of

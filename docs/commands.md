@@ -63,6 +63,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `folder make internal <path>` | Makes a folder of the board's own storage, listed while it is empty. |
 | `folder make external <path>` | Makes a folder of the card, listed while it is empty. |
 | `move external <id> <path>` | Moves a file of the card into another of its folders, with its id and its saved settings. |
+| `move internal <folder-id> <path>` | Moves or renames a folder of the board's own storage, its sub-folders with it, every id and setting kept. |
 | `debug mini on` | Requests temporary miniature output; status reports host acknowledgement. |
 | `debug mini off` | Requests restoration of normal output. |
 
@@ -580,6 +581,53 @@ One that a computer's tool put in a folder of a longer path is listed at the roo
 stored name, plays with the root's animations and is named so in `status`, as a file is
 whose folder `folders.txt` does not name.
 
+### Moving or renaming a folder of the board's own storage
+
+```
+move internal 6 night
+{"ok":true,"id":6,"moved":true}
+move internal 6 shows/night
+{"ok":true,"id":6,"moved":true}
+move internal 6 shows/night
+{"ok":true,"id":6,"moved":false}
+```
+
+`move internal <folder-id> <path>`, under the owner's approval of 2026-11-09, gives a folder
+of the board's own storage a new path: another parent, another name, or both, its
+sub-folders with it. `<path>` is the folder's new full path from the storage's root, written
+as `folder make internal` writes one; the new parent, the path without its last name, is the
+root or a folder of the board's own storage, and the folder takes the last name as its own.
+The id is read as `remove <id>` reads one.
+
+- The folder's line and the line of each folder below it get the new path in place of the
+  old one at their start, and go together to the folder's new place in the tree's order:
+  among the new parent's sub-folders by the bytes of their names, where a folder made there
+  would go. `folders.txt` is written once, through `folders.part`; nothing else of the
+  storage is written, renamed or removed.
+- Every number, id and Ignore, the header's next number, every item, stored name and file,
+  the saved order, brightness and repeat, the internal catalog and `show.json` stay as they
+  are, so the previews on the phone stay too.
+- The reply gives the id and `"moved":true`; a folder that has that path already answers
+  `"moved":false` and writes nothing, so a line sent again after a lost reply changes nothing.
+- The root's playlist and the rotation take the new order at their next pick, and the turn
+  in progress goes on. A moved folder is held under an ignored new ancestor and no longer
+  under an ignored old one, and the turn in progress is checked again. A current playlist
+  that is the folder or below it stays current with its window: its path in `status` follows
+  at once, and in `playlist.txt` at the next refresh.
+
+Refusals, in this order: `bad-argument` for another form or a path outside the rule;
+`show-invalid`; `unsupported` on a host whose storage cannot be changed; `busy` while an
+upload is open or a rebuild runs; `storage-error` while the board could not read its folders
+in this boot; `in-use` for the id of an item of the show, or of an animation or a folder of a
+drive, and `unknown-id` for an id nothing has; `bad-argument` for a move into the folder
+itself or below it, for a folder of its subtree that would get a path over 93 bytes or more
+than three levels, and for a file listed in a folder of its subtree whose path would pass 100
+bytes (a file listed at the root for a longer path does not count); `"moved":false` for its
+own path; `in-use` when another folder of the new parent has the last name, in bytes or but
+for the case of its letters (a rename of the folder's own name that changes only its case is
+taken); `unknown-id` when the new parent is not there; `storage-error` when `folders.part`
+cannot be written or renamed, the folders then as they were.
+
 ## Miniature display debug mode
 
 `status.mini` reports `supported`, acknowledged `on` (null after failed setup),
@@ -609,16 +657,16 @@ character boundary, so expanded status remains within the fixed reply limit.
 |---|---|
 | `line-too-long` | The line is longer than 2,048 characters. |
 | `unknown-command` | The first word is not a command. |
-| `bad-argument` | An argument is missing, extra, not a number, out of range, or not in its form: a file name outside the naming rule, base64 that is not as described or stands for more bytes than `chunk`, a CRC-32 that is not eight hexadecimal digits, or a word after `upload` that is not `begin`, `data`, `end` or `cancel`; `move external` of a file whose new path would pass 100 bytes. |
+| `bad-argument` | An argument is missing, extra, not a number, out of range, or not in its form: a file name outside the naming rule, base64 that is not as described or stands for more bytes than `chunk`, a CRC-32 that is not eight hexadecimal digits, or a word after `upload` that is not `begin`, `data`, `end` or `cancel`; `move external` of a file whose new path would pass 100 bytes; `move internal` of a folder into itself or below it, or one whose subtree would pass the limits of a folder's or a file's path. |
 | `show-invalid` | `play`, `list`, `read`, `remove`, `repeat`, `clocks` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
-| `unsupported` | `debug mini` needs a supporting host and an installed60x60 canvas; `folder make` on a host that makes no folders, `folder make internal` on one whose storage cannot be changed, and `play` of a folder of the board's own storage on a host that keeps no current playlist. Judged after syntax. |
+| `unsupported` | `debug mini` needs a supporting host and an installed60x60 canvas; `folder make` on a host that makes no folders, `folder make internal` and `move internal` on one whose storage cannot be changed, and `play` of a folder of the board's own storage on a host that keeps no current playlist. Judged after syntax. |
 | `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
-| `busy` | `repeat <id> <n> save`, `repeat <id> default`, `saved` and the four lines of `clocks` until the player has read every installed animation after a start, while an upload is open and while a rebuild runs; `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read; `folder make external` while an upload is open, a rebuild runs, a test shows or the card's catalog is read; `folder make internal` while an upload is open or a rebuild runs; `move external` while an upload is open, a rebuild runs, a test shows or the card's catalog is read. |
-| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of a folder of the board's own storage nor of an animation or a folder of a USB drive or the card; `repeat <id> <n> save` or `repeat <id> default` names one of nothing `list` lists; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation; `folder make` names a parent folder the card's index or the board's own storage has not; `upload begin` names a folder of the board's own storage that is not there; `move external` names an id that is no file of the card, or a folder the card has not. The id of a folder of the card is unknown while the card is out. |
+| `busy` | `repeat <id> <n> save`, `repeat <id> default`, `saved` and the four lines of `clocks` until the player has read every installed animation after a start, while an upload is open and while a rebuild runs; `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read; `folder make external` while an upload is open, a rebuild runs, a test shows or the card's catalog is read; `folder make internal` and `move internal` while an upload is open or a rebuild runs; `move external` while an upload is open, a rebuild runs, a test shows or the card's catalog is read. |
+| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of a folder of the board's own storage nor of an animation or a folder of a USB drive or the card; `repeat <id> <n> save` or `repeat <id> default` names one of nothing `list` lists; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation; `folder make` names a parent folder the card's index or the board's own storage has not; `upload begin` names a folder of the board's own storage that is not there; `move external` names an id that is no file of the card, or a folder the card has not; `move internal` names an id nothing has, or a new parent the board's own storage has not. The id of a folder of the card is unknown while the card is out. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
-| `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file, and `remove`, `remove many`, `read`, `saved`, `repeat`, `brightness`, `order move` or `upload begin` names that of a folder of the board's own storage; `folder make` names a path whose last name a file or a folder of its parent has, in any case; `move external` names the id of a folder of either storage, or a destination a file or a folder of whose has the file's name in any case. |
+| `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file, and `remove`, `remove many`, `read`, `saved`, `repeat`, `brightness`, `order move` or `upload begin` names that of a folder of the board's own storage; `folder make` names a path whose last name a file or a folder of its parent has, in any case; `move external` names the id of a folder of either storage, or a destination a file or a folder of whose has the file's name in any case; `move internal` names the id of an item of the show or of an animation or a folder of a drive, or a path another folder of the new parent has, in any case. |
 | `read-only` | `upload begin external`, `folder make external`, `move external`, `catalog rebuild`, or `order move` of a file of the drive, while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
 | `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. `repeat <id> <n>`: no turn of that animation is reported. |
@@ -626,7 +674,7 @@ character boundary, so expanded status remains within the fixed reply limit.
 | `no-space` | `repeat <id> <n> save`: no room is left for another saved repeat; `upload begin`: the file would not fit, or the show has no room for another item; `upload begin external`: the file would not fit on the drive; `folder make external`: the card's index has no free id; `folder make internal`: the board's own storage has 32 folders, no free number or id, or too little room. |
 | `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |
 | `bad-file` | `upload end`: the file is not a valid ODRG file for the canvas. |
-| `storage-error` | The storage could not be read or written. The show is as it was. An upload that met it is discarded. A file an earlier change could not remove is removed before a change; while that fails, the change is refused with this code, and the next start removes it. `folder make internal` and an upload into a folder while the board could not read its folders in this boot, when its folders' ids are not known either. |
+| `storage-error` | The storage could not be read or written. The show is as it was. An upload that met it is discarded. A file an earlier change could not remove is removed before a change; while that fails, the change is refused with this code, and the next start removes it. `folder make internal`, `move internal` and an upload into a folder while the board could not read its folders in this boot, when its folders' ids are not known either; `move internal` when `folders.part` cannot be written or renamed. |
 
 When more than one code applies, the reply has the first in the order of this table.
 
