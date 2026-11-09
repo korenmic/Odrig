@@ -23,7 +23,7 @@ message. Code carries no history.
   - Requirements: 1.1–1.3, 2.1–2.3, 3.1–3.4, 4.1–4.4, 5.1–5.4, 6.1, 7.1–7.3, 8.1–8.3,
     9.1–9.7, 10.1–10.2, 13.1.
 
-- [ ] 2. The emulator, the firmware's card host and the command tool
+- [x] 2. The emulator, the firmware's card host and the command tool
   - `emulator/host.py`: `FolderHost.remove` of a drive's folder. `firmware/usermod/
     odrig_drive.cpp`: `removeDriveFile` of a directory. `odrigctl/cli.py`: `folder remove
     ID`.
