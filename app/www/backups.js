@@ -162,6 +162,9 @@ async function readChecked(context, file, progress) {
     error.fault = before.fault ?? null;
     throw error;
   }
+  // The key the catalog gives the file now, which serves when the app has forgotten the keys
+  // by the end of the read, as it does when the target answers again after a silence.
+  const known = context.client.keyOf(before.row);
   const parts = [];
   let read = 0;
   for (;;) {
@@ -182,7 +185,7 @@ async function readChecked(context, file, progress) {
     at += part.length;
   }
   const crc = crc32(bytes);
-  const key = context.client.keyOf(before.row);
+  const key = context.client.keyOf(before.row) ?? known;
   if (key !== null && key !== `${crc}-${read}`) throw new Error("Its bytes are not the ones its storage's catalog names.");
   const rows = await rowsAround(context, file);
   const after = sameFile(rows, file);

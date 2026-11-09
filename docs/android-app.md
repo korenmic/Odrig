@@ -720,8 +720,11 @@ written, one file at a time: its row is looked for before and after it in the pa
 level's list from the position the row was last seen at, one request, and in the whole level
 when it is not there; the part after a file serves before the next when it holds that file's
 row. A file whose id no longer names the same path and size, whose size changes between two
-pieces, or whose bytes are not the ones its storage's catalog names, fails and has no entry.
-The pieces go in their turn among the app's other requests, a status still once a second.
+pieces, or whose bytes are not the ones its storage's catalog names, fails and has no entry:
+the key is the one the app knows once the file is read, or the one it knew before the read
+when it has forgotten the keys meanwhile, as it does when the target answers again after a
+silence. The pieces go in their turn among the app's other requests, a status still once a
+second.
 Every request of a run only reads, so one whose reply does not come is sent again, up to
 three times in all: a piece, the probe, a part of a list, `saved` or `catalog`. The third
 silence of one request ends a download, as the failure of its file, and in a backup fails

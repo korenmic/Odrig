@@ -13694,3 +13694,22 @@ are lost on the installation's own Wi-Fi is for the board to show.
 
 **Resolution.** `app/www/backups.js`, `docs/android-app.md`, `tests/app/test_downloads.py`,
 `tests/app/page/scenarios/downloads.js`.
+
+## Seed 74: a file whose read lost a reply is still checked against its catalog's key
+
+**Question.** The entry "Seed 74: a lost reply of a download's or a backup's read is sent
+again" lets a read go on after a lost reply. The client forgets every key when the target
+answers again after a silence, and asks for `catalog` again only after the download's own
+requests that wait; a file is checked against the key the app knows at the end of its read.
+After a lost reply near the end of the file no key was known then, and a file whose bytes
+are not the ones its catalog names was saved, in a backup as `saved`. Which key is a file
+checked against?
+
+**Answer.** The key the app knows once the file is read, or, when it knows none then, the
+one it knew before the first piece. The keys are forgotten after a silence because another
+storage may answer now; a file whose pieces came from two storages is then not the file of
+the key from before, and fails, which is what the check is for. The client still forgets the
+keys as before: only the job keeps the one of the file it reads.
+
+**Resolution.** `app/www/backups.js`, `docs/android-app.md`, `tests/app/test_downloads.py`,
+`tests/app/page/scenarios/downloads.js`.

@@ -192,10 +192,11 @@ class Downloads(unittest.TestCase):
 class StandIn(unittest.TestCase):
     """A target of the test's own: its files, its list and its reads, which may change."""
 
-    def target(self, files, counts=True, changed=None, delay=0.0, counted=None, refused=None):
+    def target(self, files, counts=True, changed=None, delay=0.0, counted=None, refused=None, keys=None):
         """`counts` false refuses every read with a count, and `counted` refuses those after
         so many, as another installation at the same address would; `refused` maps a line of
-        `read` to the code it is refused with."""
+        `read` to the code it is refused with; `keys` maps a file's name to the CRC-32 its
+        storage's catalog names it by, and gives the target that catalog."""
         data = dict(files)
         state = {"reads": 0, "counted": 0}
 
@@ -218,8 +219,18 @@ class StandIn(unittest.TestCase):
             piece = data[name][offset:offset + (int(words[3]) if len(words) == 4 else 600)]
             return 200, json.dumps({"ok": True, "bytes": len(data[name]), "data": base64.urlsafe_b64encode(piece).decode("ascii").rstrip("=")})
 
+        def cataloged(line):
+            words = line.decode("ascii").split(" ")
+            if words[1:2] != ["page"]:
+                return 200, json.dumps({"ok": True, "internal": {"state": "ok", "generation": 3, "entries": len(data), "uncataloged": 0},
+                                        "external": {"state": "absent"}, "rebuild": None})
+            text = "".join(f"{keys[name]} {len(content)} 60 60 1000 frames {name}\n" for name, content in data.items()) if words[2:4] == ["internal", "0"] else ""
+            return 200, json.dumps({"ok": True, "generation": 3, "text": text[int(words[4]):], "next": None})
+
         replies = {"status": STATUS, "list": listed, "read": read, "space": (200, '{"ok":true,"free":1000000,"total":2000000}'),
                    "saved": (200, '{"ok":true,"brightness":null,"repeat":null,"start":false}')}
+        if keys is not None:
+            replies["catalog"] = cataloged
         return entered(self, support.StandIn(replies, delay=delay))
 
     def read_lines(self, target):
@@ -309,6 +320,23 @@ class StandIn(unittest.TestCase):
         self.assertEqual((made.read("a.odrg"), made.read("b.odrg")), (first, second))
         manifest = json.loads(made.read(MANIFEST))
         self.assertEqual(([file["outcome"] for file in manifest["files"]], manifest["partial"]), (["saved", "saved"], False))
+
+    def test_a_file_whose_read_lost_a_reply_is_still_checked_against_its_catalogs_key(self):
+        data = bytes(range(256)) * 7
+        # The app forgets the keys when the target answers again after a silence, and asks for
+        # the catalog only once the read has ended.
+        target = self.target({"a.odrg": data}, keys={"a.odrg": "deadbeef"})
+        found = support.run("downloads", address=target.address, settings={"rows": 1, "one": 1, "keyed": True, "lose": [{"line": "^read 1 1440 720$"}]}).seen
+        self.assertEqual(found["message"], "Internal /a.odrg was not downloaded. Its bytes are not the ones its storage's catalog names.")
+        self.assertEqual(found["files"], [])
+
+    def test_a_file_whose_read_lost_a_reply_is_saved_when_its_bytes_are_the_ones_its_key_names(self):
+        data = bytes(range(256)) * 7
+        target = self.target({"a.odrg": data}, keys={"a.odrg": crc(data)})
+        found = support.run("downloads", address=target.address, settings={"rows": 1, "one": 1, "keyed": True, "lose": [{"line": "^read 1 1440 720$"}]}).seen
+        (saved,) = found["files"]
+        self.assertEqual(base64.b64decode(saved["data"]), data)
+        self.assertIn(f"Saved a.odrg: {len(data)} bytes of Internal /a.odrg", found["message"])
 
 
 def row(number, path, data, external=False):

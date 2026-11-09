@@ -76,6 +76,11 @@ export default async function (app) {
   // The sizes of the animations, which the board knows once it has read them after its start.
   await app.until(() => [...app.doc.querySelectorAll("#animations-list > .row")].every((row) => row.dataset.fault !== "" ||
     !row.querySelector(".meta").textContent.includes("size not read yet")), "the sizes of the animations", 15000);
+  if (settings.keyed) {
+    // The keys of the board's storage, once the app has read its catalog's pages.
+    const client = await app.frame.contentWindow.eval('import("/client.js")');
+    await app.until(() => client.state.keys.internal !== null, "the keys of the board's storage", 10000);
+  }
   for (const path of settings.enter ?? []) await enter(app, path);
   if (settings.rowsThere !== undefined) {
     await app.until(() => app.doc.querySelectorAll("#animations-list > .row").length === settings.rowsThere, "the level's rows", 10000);
