@@ -18,7 +18,7 @@ export default async function () {
   equal("captured_navigation", d.pathOf(form, "new.odrg"), "night/deep/new.odrg");
   d.synchronize(form, {free: 1000000, external: null});
   equal("absent_fallback", [form.storage, d.pathOf(form, "new.odrg")], ["internal", "new.odrg"]);
-  equal("flat_root_explanation", /no matching subfolders/.test(d.reason(form, {free: 1000000, external: null})), true);
+  equal("card_root_explanation", d.reason(form, {free: 1000000, external: null}), "External storage is disconnected or not detected. Using Internal /; the explored folder is on the card.");
   d.synchronize(form, space);
   equal("redetection_default", form.storage, "external");
   // No reply yet: the destination is not known, and the form moves nowhere.

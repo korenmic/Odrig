@@ -172,6 +172,18 @@ class InternalFolders(unittest.TestCase):
         self.assertFalse((folder / 'ready.odrg').exists())
         self.assertEqual([path.name for path in folder.rglob('ready.odrg')], [])
 
+    def test_an_upload_at_an_internal_folder_is_checked_against_the_files_of_that_folder(self):
+        folder, emulator = self.board()
+        face = (folder / '1' / 'face.odrg').read_bytes()
+        media = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        (media / 'face.odrg').write_bytes(clip(7))
+        found = support.run('ready-upload', address=f'127.0.0.1:{emulator.port}', media=media,
+                            settings={'rows': 1, 'path': 'shows', 'file': 'face.odrg'}).seen
+        self.assertEqual(found['destination'], 'Internal /shows/face.odrg')
+        self.assertEqual(found['message'], 'A file already exists at this destination. Choose another filename; nothing was replaced.')
+        self.assertEqual((folder / '1' / 'face.odrg').read_bytes(), face)
+        self.assertEqual([(row['id'], row['file']) for row in self.listed(emulator, 20) if 'file' in row], [(2, 'shows/face.odrg')])
+
     def test_a_file_moved_out_of_an_internal_folder_leaves_it_and_takes_its_settings(self):
         folder, emulator = self.board()
         data = (folder / '1' / 'face.odrg').read_bytes()
@@ -209,6 +221,13 @@ class InternalFolders(unittest.TestCase):
         self.assertFalse((self.card / 'night' / 'deep' / 'old.odrg').exists())
         self.assertEqual((folder / 'old.odrg').read_bytes(), data)
         self.assertTrue((folder / '2' / 'deep.odrg').exists())
+
+    def test_a_selected_folder_of_the_boards_storage_is_not_called_the_cards(self):
+        folder, emulator = self.board()
+        found = support.run('downloads', address=f'127.0.0.1:{emulator.port}', settings={'rows': 1, 'folders': ['shows']}).seen
+        self.assertTrue(found['deleteDisabled'])
+        self.assertEqual(found['deleteTitle'], "Delete selected removes internal animations; clear the folders and the card's files from the selection.")
+        self.assertIn('Saved the backup', found['message'])
 
 
 if __name__ == '__main__':

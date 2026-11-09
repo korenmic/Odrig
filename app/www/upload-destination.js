@@ -111,7 +111,7 @@ export function reason(form, space) {
   const boundary = blocked(form, space);
   if (boundary !== null) return boundary;
   if (!present(space) && !absent(space)) return "Storage not known yet: the installation has not answered.";
-  if (absent(space)) return `External storage is disconnected or not detected. Using Internal /${intoLevel(form) ? form.level.path + "/" : form.level.path ? "; internal storage has no matching subfolders" : ""}.`;
+  if (absent(space)) return `External storage is disconnected or not detected. Using Internal /${intoLevel(form) ? form.level.path + "/" : form.level.path ? "; the explored folder is on the card" : ""}.`;
   if (form.storage === "external" && space.external.read_only !== false) return "External storage is detected but read-only. It will not be redirected to Internal.";
   if (form.storage === "internal" && form.level.path && !intoLevel(form)) return "This upload goes to the root of Internal storage: the explored folder is on the card.";
   return "The destination stays here even if you browse elsewhere.";

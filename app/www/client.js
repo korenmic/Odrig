@@ -25,7 +25,7 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 // own storage and "external" for one of the card; nothing of another level is kept. `animations` is the
 // animation items of the level's newest complete list, in its order, each as
 // `{id, file, bytes}` with optional `ignored`, or null while there is none; `cycles` is the
-// ids of its cycles, and `folders` its folders of the card, each `{id, playlist, files}` with
+// ids of its cycles, and `folders` its folders of either storage, each `{id, playlist, files}` with
 // its path and the number of its own files, in the order they play. `rootNames` holds what
 // the root's newest list named, `{ids, files}`, the ids and the file names of the show's
 // items, of the root's folders and of the root's files, which an upload chooses its id and
