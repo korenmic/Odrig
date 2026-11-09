@@ -683,6 +683,23 @@ write it. A new animation's id is chosen free among the root's ids and those of 
 folder of the board's storage, which the app lists for that. An upload prepared at a level
 of the board's storage goes into that folder, `Internal /shows/x.odrg`.
 
+`Remove folder`, in the menu of a folder's row of the board's storage, or of a card the
+board may write, removes that folder while it is empty, with `folder remove`. It is marked
+as a danger, and enabled while the board answers and nothing changes the list, for a row
+that counts no animation; a row with animations has it disabled, under the note `Only an
+empty folder can be removed.`, and a folder of a card the board may not write has the note
+`External storage is read-only: this folder cannot be removed.` in its place, or, until the
+app knows whether the board may write the card, the action disabled and the note `Whether
+the card can be written is not known yet.` When pressed, the app first lists the folder's
+level: one that holds a sub-folder, or an animation uploaded since, is said to be not empty,
+and nothing is sent. Otherwise it asks `Remove the empty folder Internal /shows? This cannot
+be undone.`, with `Remove` and `Cancel`; `Cancel` and Escape send nothing. After `Remove`
+the list is read again and the app says `Removed the folder Internal /shows.`, or why it was
+not removed; a firmware that answers `unknown-command` cannot remove folders. When no reply
+came, the app reads the level again and says whether the folder is still there, in which
+case `Remove folder` may be pressed again: the app never sends the line again by itself.
+`Delete selected` stays disabled while a folder is selected.
+
 `Move to…` opens a chooser of the destination: `External storage` or `Internal storage`,
 each with every folder it has, the level shown chosen when it is one of them, the card
 disabled with its reason while it is absent, read-only or without a ready catalog. Before
@@ -1706,7 +1723,13 @@ installed; the phone with mobile data on.
     Wi-Fi off during it, then on. *Seen:* the end says the move was cut short; once the app
     reaches the board again it says it finished the interrupted move, and every file is in
     one place only, once.
-33. **Note** the phone's model, its Android version, the web view's version from the
+33. **Removing an empty folder.** With firmware that has `folder remove` and the card in,
+    make a folder with `New folder` at the root of each storage. Choose `Remove folder` in
+    the menu of each, and `Remove`. *Seen:* each row goes, the app says it removed the
+    folder, and after the board restarts neither is listed. Open the menu of a folder that
+    holds an animation. *Seen:* `Remove folder` is disabled, under `Only an empty folder can
+    be removed.`
+34. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1924,6 +1947,9 @@ physical acceptance are in [verification.md](specs/64-p2-board-time-and-daily-on
 
 - **Moves on a phone and on the board.** No program has moved a file or a folder on the
   board's card, nor cut a folder's move with the phone's Wi-Fi: step 32 above.
+
+- **Removing a folder on a phone and on the board.** No phone has removed a folder of the
+  board's storage or of the card, nor seen them stay gone after a restart: step 33 above.
 
 - **Seed 33 on a phone and on the board.** Nobody has seen the line of the reading, the
   name of the board and its last fault on a phone; that belongs to the seed's board

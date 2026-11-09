@@ -353,6 +353,12 @@ export async function folderMake(path, storage = "external") {
   return {id: reply.id, made: reply.made};
 }
 
+// Removes the empty folder of either storage with this id. A folder that holds a file or a
+// folder is refused `in-use`.
+export async function folderRemove(id) {
+  await carriedOut(`folder remove ${id}`);
+}
+
 // Moves the card's file with this id into the card's folder with this path, "" for the root,
 // with its id and its saved settings. Gives whether it moved: false for a file that was in
 // that folder already.

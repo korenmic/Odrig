@@ -15277,6 +15277,21 @@ and verifies images and is run as it is. The card's changes are described in
 **Resolution.** `firmware/usermod/odrig_drive.cpp`, `tests/firmware/test_usermod_drive.py`,
 `docs/microsd.md`.
 
+## Seed 85: `Remove folder` before the app knows the card, and after a lost reply it cannot check
+
+**Question.** The seed names two states of a folder of the card: a card the board may write,
+with `Remove folder`, and one it may not, with the note that it is read-only. Until `space`
+and `catalog` have answered, the app knows neither; and after a reply that did not arrive,
+the list it reads to see whether the folder went may fail too. What does the app say then?
+
+**Answer.** Until the app knows whether the board may write the card, the action is there,
+disabled, under `Whether the card can be written is not known yet.`: calling the card
+read-only before it is known would be wrong. After a lost reply whose level cannot be read
+either, the app says that whether the folder was removed is not known yet and reads the
+list again; it never sends the line again by itself.
+
+**Resolution.** `app/www/screens/explorer.js`, `docs/android-app.md`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where
