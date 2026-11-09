@@ -33,7 +33,7 @@ Before a commit: `python core/build.py shared`, and the suites the task names wi
   - Suites: `core`, `emulator`, `firmware-host`.
   - Requirements: 1.1–1.5, 2.1–2.5, 3.1–3.6, 4.1–4.5 with `SD card`, 8.1–8.2.
 
-- [ ] 2. Choose the preferred storage with `clocks storage sd|internal`
+- [x] 2. Choose the preferred storage with `clocks storage sd|internal`
   - `breaks_command` with the storage setting, its refusals in the message line's order, a
     no-op that writes nothing, both bags drawn again at their next draw; `clocks.txt`
     version 3 written only for `Internal storage`, versions 1, 2 and 3 read strictly;

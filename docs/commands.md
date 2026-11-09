@@ -63,6 +63,8 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `clocks only` | Plays only the resolved Clocks subtrees of the card and of the board's own storage, and saves the mode. |
 | `clocks message on` | Switches the message after each clock on, and saves it. |
 | `clocks message off` | Switches it off, and saves it. |
+| `clocks storage sd` | Plays the card's copy of a clock or a message that both storages hold, and saves the choice. |
+| `clocks storage internal` | Plays the board's own copy of it, and saves the choice. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation, `<file>` its name or the path of a folder of the board's own storage and its name; with the file's CRC-32 after `<bytes>`, answers `unchanged` when the last upload installed that file. |
 | `upload begin external <file> <bytes>` | Opens an upload of an animation to the drive, when the core may write it. |
 | `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
@@ -215,7 +217,7 @@ file's override or latest default without restarting its timing. Missing/null
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"dimming":{"value":128,"saved":null,"error":null},"mini":{"supported":false,"on":false,"pending":false,"requested":false,"error":null,"brightness":40},"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"timing":true,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"clock_mode":"off","clock_only":null,"left":86399}
+{"ok":true,"on":true,"brightness":128,"dimming":{"value":128,"saved":null,"error":null},"mini":{"supported":false,"on":false,"pending":false,"requested":false,"error":null,"brightness":40},"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"timing":true,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"clock_mode":"off","clock_storage":"sd","clock_only":null,"left":86399}
 ```
 
 | Member | Meaning |
@@ -243,8 +245,9 @@ file's override or latest default without restarting its timing. Missing/null
 | `playlist` | The path of the folder of the board's own storage or of the card's folder whose playlist is current while `playing` is its id, `night/deep`; `null` otherwise. |
 | `clocks`, `clock_message` | Compatibility booleans: `clocks` is true in either enabled mode, and `clock_message` enables the message after a clock. A reply without them comes from a player before them. |
 | `clock_mode` | `off`, `between`, or `only`. Older targets without this member support the existing boolean Off/Between interface. |
+| `clock_storage` | The storage whose copy plays when a clock or a message is on both storages, as `clocks storage` chose it: `sd`, the card's, or `internal`, the board's own; `sd` while the saved settings are unreadable. It is reported in every mode. A reply without it comes from a player before it, which plays only the card's clocks and messages. |
 | `clock_only` | `null` outside Only; otherwise `{"folder":ID_OR_NULL,"state":STATE}`, with state `playing`, `no-card`, `missing-folder`, or `no-clocks`. The folder is the card's folder `clocks` when the card has one, else the board's own, resolved from the active tree/catalog or `folders.txt`, never remembered by transient ID. Without a folder `clocks` of the board's own storage the state is `no-card` without a card, else `missing-folder` without the card's, else `no-clocks` while nothing plays, else `playing`; with one, `playing` while a turn plays, else `no-clocks`. In Only, `playing` names that folder and `playlist` is `clocks` while a turn plays; `file` gives a file of the board's own storage by its path, `clocks/message/v7-the-time.odrgx`, and `animation` its id. The path is the same on both storages. A folder's id tells its storage, 60,000 or less for the board's own and 60,001 or more for the card's, and so does an animation's id of 60,000 or less, the board's own; but an animation of the show may have any id from 1 to 65,535, so a client tells the storage of an animation by its row, `external`, in `list in` of the folders `clocks` and `clocks/message` of each storage. |
-| `clock_error` | Optional `unreadable` when saved policy cannot be established. The effective mode is fail-closed Only, output is dark and the saved mode is unconfirmed. Omitted when confirmed. The board retries at most once a second; an explicit clock-mode save can replace corrupt settings. A message-only change cannot guess the lost policy. |
+| `clock_error` | Optional `unreadable` when saved policy cannot be established. The effective mode is fail-closed Only, output is dark and the saved mode is unconfirmed. Omitted when confirmed. The board retries at most once a second; an explicit clock-mode save can replace corrupt settings. A message-only or storage-only change cannot guess the lost policy and is refused with `storage-error`. |
 | `left` | The whole seconds left in the window of the current playlist, 86,400 down to 0: the 24 hours of running time it plays for before the next playlist is current, a folder's of the board's own storage or of the card, or the root's, see [show.md](show.md#the-playlist). 0 from the window's end until the turn in progress ends. Reported whatever the card holds, a fresh 86,400 each time a playlist becomes current. A reply without `left` comes from a player before it. |
 
 `checked`, `to_check` and `unavailable` are 0, and `checking` is `null`, while the show
@@ -666,7 +669,7 @@ character boundary, so expanded status remains within the fixed reply limit.
 | `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
-| `busy` | `repeat <id> <n> save`, `repeat <id> default`, `saved` and the four lines of `clocks` until the player has read every installed animation after a start, while an upload is open and while a rebuild runs; `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `mapping set` while an upload is open; `upload begin`, `ignore`, `remove` and `remove many` while a test of the mapping shows; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read; `folder make external` while an upload is open, a rebuild runs, a test shows or the card's catalog is read; `folder make internal` while an upload is open or a rebuild runs. |
+| `busy` | `repeat <id> <n> save`, `repeat <id> default`, `saved` and the lines of `clocks` until the player has read every installed animation after a start, while an upload is open and while a rebuild runs; `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `mapping set` while an upload is open; `upload begin`, `ignore`, `remove` and `remove many` while a test of the mapping shows; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read; `folder make external` while an upload is open, a rebuild runs, a test shows or the card's catalog is read; `folder make internal` while an upload is open or a rebuild runs. |
 | `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of a folder of the board's own storage nor of an animation or a folder of a USB drive or the card; `repeat <id> <n> save` or `repeat <id> default` names one of nothing `list` lists; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation; `folder make` names a parent folder the card's index or the board's own storage has not; `upload begin` names a folder of the board's own storage that is not there. The id of a folder of the card is unknown while the card is out. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
 | `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file, and `remove`, `remove many`, `read`, `saved`, `repeat`, `brightness`, `order move` or `upload begin` names that of a folder of the board's own storage; `folder make` names a path whose last name a file or a folder of its parent has, in any case. |
@@ -1057,18 +1060,22 @@ clocks on
 {"ok":true}
 clocks message on
 {"ok":true}
+clocks storage internal
+{"ok":true}
 ```
 
 `clocks on` selects Between animations, `clocks off` selects Off, and `clocks only`
 selects Clocks only. The independent `clocks message on|off` setting controls a message
-after each clock in both enabled modes. Mode and message setting survive restart.
-Each line replies `{"ok":true}` once its setting is saved; a setting already in force
-writes nothing and replies the same. While both are off the player plays as
-[show.md](show.md) says without them. `status` reports them as `clocks` and
-`clock_message`.
+after each clock in both enabled modes, and `clocks storage sd|internal` chooses the
+storage whose copy of a clock or a message plays, below. Mode, message setting and storage
+survive restart. Each line replies `{"ok":true}` once its setting is saved; a setting
+already in force writes nothing and replies the same. While both are off the player plays
+as [show.md](show.md) says without them. `status` reports them as `clocks`,
+`clock_message`, `clock_mode` and `clock_storage`.
 
 The settings are kept in `clocks.txt` of the board's own storage, beside `order.txt` and
-`repeats.txt`, in three lines each ended by LF and nothing more:
+`repeats.txt`, in lines each ended by LF and nothing more. While the card's copies are
+preferred, three:
 
 ```
 odrig-clocks 2
@@ -1076,16 +1083,32 @@ mode between
 message off
 ```
 
+While the board's own copies are preferred, four, of version 3, at most 57 bytes:
+
+```
+odrig-clocks 3
+mode between
+message off
+storage internal
+```
+
 The second line is `mode off`, `mode between` or `mode only`; the third is `message on`
-or `message off`. Valid version-1 files (`odrig-clocks 1`, `clocks on|off`, then the
-message line) still load, mapping on to Between and off to Off. The next changed setting
-writes version 2; a no-op does not rewrite an old file. A missing file means Off/message
-off when the host authoritatively reports no such file. Unreadable or malformed saved
-settings fail closed: effective Only, dark output, `clock_error:"unreadable"` and
-`clocks unreadable` in the log. Independent bounded reads retry at most once a second.
-A valid read restores the saved mode; an explicit mode command atomically replaces
-the policy and clears the error, even if it chooses Only. A message-only change is
-refused with `storage-error` until the saved mode is established.
+or `message off`; the fourth of version 3 is `storage internal`, or `storage sd`, which is
+read but never written. Valid version-1 files (`odrig-clocks 1`, `clocks on|off`, then the
+message line) still load, mapping on to Between and off to Off. Versions 1 and 2 prefer the
+card's copies. The next changed setting writes version 2, or version 3 while the board's
+copies are preferred; a no-op does not rewrite an old file. So a saved choice of the card
+is the same version 2, byte for byte, that a player before the choice reads; version 3 is
+out of form to such a player, which then fails closed as below until a mode line is sent,
+and `clocks storage sd` before going back to it writes version 2 again. A missing file
+means Off/message off and the card's copies when the host authoritatively reports no such
+file. Unreadable or malformed saved settings, a version 3 without its fourth line among
+them, fail closed: effective Only, dark output, the card's copies, `clock_error:"unreadable"`
+and `clocks unreadable` in the log. Independent bounded reads retry at most once a second.
+A valid read restores the saved mode and storage; an explicit mode command atomically
+replaces the policy and clears the error, even if it chooses Only, and keeps the card's
+copies. A message-only or storage-only change is refused with `storage-error` until the
+saved mode is established.
 
 Saving closes and reads back all of `clocks.part` before one atomic rename. A failure
 preserves published bytes and active settings; an abandoned part is removed at startup.
@@ -1095,10 +1118,17 @@ The faces are the direct files of the folders `clocks` of the card and of the bo
 storage, and the messages those of their folders `clocks/message`: [show.md](show.md#clocks-between-the-animations).
 Both modes draw from one bag of the faces of both storages and one of their messages. A
 card's file and a file of the board's own storage of the same class, the same name but for
-the case of ASCII letters and the same known type are copies: one place of the bag, which
-the card's copy takes when it plays automatically, and the board's only when the card's
-cannot. Each copy keeps its own id for `play`, `read`, edits, brightness, repeats, Ignore,
-quarantine and removal.
+the case of ASCII letters and the same known type are copies: one place of the bag. With
+`clocks storage sd`, the default, the card's copy takes it when it plays automatically, and
+the board's only when the card's cannot; with `clocks storage internal`, the board's copy
+takes it when it plays, and the card's only when the board's cannot. Each copy is judged by
+its own storage's rules: listed and readable, not ignored by its own or an inherited Ignore,
+not quarantined or unavailable. Each copy keeps its own id for `play`, `read`, edits,
+brightness, repeats, Ignore, quarantine and removal: the choice never sends a command to
+the other storage's file, and changes nothing of ordinary playlists or of an explicit
+`play`. A new choice takes effect at the next draw of either bag, both bags drawn anew; the
+turn in progress plays to its end, a message its whole loop. No catalog and no file of
+either storage is rewritten for it.
 
 Only stops outside playback and runs the faces of both storages in a shuffled bag, with
 one complete direct message from its independent bag after each clock when enabled.
@@ -1121,12 +1151,15 @@ board's own storage, then the exclusive program continues; a subfolder without o
 Clocks. These actions do not overwrite the saved normal playlist. Leaving Only
 restores its valid path, else root, with its window held and no paused break restored.
 
-- `bad-argument`: the words are not one of the five forms.
+- `bad-argument`: the words are not one of the seven forms.
 - `show-invalid`: the show is invalid.
 - `busy`: while a rebuild of a catalog runs, until the player has read every installed
   animation after a start, and while an upload is open.
 - `storage-error`: the file could not be written or verified, or the board's storage cannot be
-  changed. Nothing changes.
+  changed; for `clocks message on|off` and `clocks storage sd|internal`, also while the saved
+  settings are unreadable, until a mode line establishes them. Nothing changes.
+
+They come in this order: `bad-argument`, `show-invalid`, `busy`, `storage-error`.
 
 ## Square output rotation
 

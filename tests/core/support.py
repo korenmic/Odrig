@@ -647,7 +647,7 @@ def demo_show():
 # in the current playlist's window, which runs with the time, the counts of the turn in
 # progress, and the names of the file and the folder that play, which the tests of what
 # plays look at.
-READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "clocks", "clock_message", "clock_mode", "clock_only", "left", "mini", "dimming", "timing")
+READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "clocks", "clock_message", "clock_mode", "clock_storage", "clock_only", "left", "mini", "dimming", "timing")
 
 
 def without_readiness(state):
@@ -1014,6 +1014,7 @@ class ReferencePlayer:
         self.last_sent = None   # the LED data of the latest refresh
         self.clocks = False     # the clocks between the animations are on
         self.clock_message = False  # the message after each clock is on
+        self.clock_storage = "sd"   # the storage whose copy of a clock or a message plays
         content = {name: data if isinstance(data, bytes) else data.encode("utf-8") for name, data in files.items()}
         self.files = content    # the files of the folder by name
         self.schedule = (1, 1080, 360, 0)
@@ -1063,27 +1064,36 @@ class ReferencePlayer:
             self.logged = []
 
     CLOCKS = "clocks.txt"
-    CLOCKS_FORMS = {b"odrig-clocks 1\nclocks %s\nmessage %s\n" % (clocks, message): (clocks == b"on", message == b"on")
+    CLOCKS_FORMS = {b"odrig-clocks 1\nclocks %s\nmessage %s\n" % (clocks, message): (clocks == b"on", message == b"on", "sd")
                     for clocks in (b"on", b"off") for message in (b"on", b"off")}
-    CLOCKS_FORMS.update({b"odrig-clocks 2\nmode %s\nmessage %s\n" % (clocks, message): (clocks == b"between", message == b"on")
+    CLOCKS_FORMS.update({b"odrig-clocks 2\nmode %s\nmessage %s\n" % (clocks, message): (clocks == b"between", message == b"on", "sd")
                          for clocks in (b"between", b"off") for message in (b"on", b"off")})
+    CLOCKS_FORMS.update({b"odrig-clocks 3\nmode %s\nmessage %s\nstorage %s\n" % (clocks, message, storage): (clocks == b"between", message == b"on", storage.decode("ascii"))
+                         for clocks in (b"between", b"off") for message in (b"on", b"off") for storage in (b"sd", b"internal")})
 
     def _read_clocks(self):
-        """Reads `clocks.txt` whole and strictly: a missing file is both settings off, a file
-        out of its supported forms both off, and the log says so."""
+        """Reads `clocks.txt` whole and strictly: a missing file is the settings off and the
+        card's copies preferred, a file out of its supported forms the same, and the log says
+        so."""
         data = self.files.get(self.CLOCKS)
         if data is None:
             return
         if data not in self.CLOCKS_FORMS:
             self.start_logs.append("clocks unreadable")
             return
-        self.clocks, self.clock_message = self.CLOCKS_FORMS[data]
+        self.clocks, self.clock_message, self.clock_storage = self.CLOCKS_FORMS[data]
 
     def _clocks(self, arguments):
-        """`clocks on|off` and `clocks message on|off`: the setting is saved in the file,
-        written whole, before it takes effect; one already in force writes nothing."""
+        """`clocks on|off`, `clocks message on|off` and `clocks storage sd|internal`: the
+        setting is saved in the file, written whole, before it takes effect; one already in
+        force writes nothing. The file is of version 2 while the card's copies are preferred,
+        else of version 3."""
         message = len(arguments) == 2 and arguments[0] == b"message"
-        if (len(arguments) != 1 and not message) or arguments[-1] not in (b"on", b"off"):
+        storage = len(arguments) == 2 and arguments[0] == b"storage"
+        if storage:
+            if arguments[1] not in (b"sd", b"internal"):
+                return "bad-argument"
+        elif (len(arguments) != 1 and not message) or arguments[-1] not in (b"on", b"off"):
             return "bad-argument"
         if self.error is not None:
             return "show-invalid"
@@ -1092,10 +1102,15 @@ class ReferencePlayer:
         if not self.changeable:
             return "storage-error"
         on = arguments[-1] == b"on"
-        settings = (self.clocks, on) if message else (on, self.clock_message)
-        if settings != (self.clocks, self.clock_message):
-            self.files[self.CLOCKS] = next(text for text, form in self.CLOCKS_FORMS.items() if form == settings and text.startswith(b"odrig-clocks 2\n"))
-            self.clocks, self.clock_message = settings
+        current = (self.clocks, self.clock_message, self.clock_storage)
+        if storage:
+            settings = (self.clocks, self.clock_message, arguments[1].decode("ascii"))
+        else:
+            settings = (self.clocks, on, self.clock_storage) if message else (on, self.clock_message, self.clock_storage)
+        if settings != current:
+            version = b"odrig-clocks 3\n" if settings[2] == "internal" else b"odrig-clocks 2\n"
+            self.files[self.CLOCKS] = next(text for text, form in self.CLOCKS_FORMS.items() if form == settings and text.startswith(version))
+            self.clocks, self.clock_message, self.clock_storage = settings
         return None
 
     REPEATS = "repeats.txt"
@@ -2011,6 +2026,7 @@ class ReferencePlayer:
         state["playlist"] = None
         state["clocks"], state["clock_message"] = self.clocks, self.clock_message
         state["clock_mode"] = "between" if self.clocks else "off"
+        state["clock_storage"] = self.clock_storage
         state["clock_only"] = None
         state["left"] = max(0, self.WINDOW - (now - self.window_started)) // 1000
         return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"

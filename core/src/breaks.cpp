@@ -16,6 +16,7 @@ namespace odrig {
 namespace {
 
 const char kClocksHeader[] = "odrig-clocks 2\n";
+const char kStorageHeader[] = "odrig-clocks 3\n";
 const char kLegacyHeader[] = "odrig-clocks 1\n";
 // The most bytes the file is read into: more than its longest form has.
 const uint32_t kClocksRead = 64;
@@ -52,8 +53,9 @@ int read_file(Core &core, const char *name, uint8_t *text, uint32_t &length) {
     return -1;
 }
 
-// Closes and verifies the complete part before atomically publishing both settings.
-bool write_file(Core &core, uint8_t clocks, bool message) {
+// Closes and verifies the complete part before atomically publishing the settings: version 2
+// while the card's copies are preferred, else version 3 with its line of the storage.
+bool write_file(Core &core, uint8_t clocks, bool message, bool internal) {
     const odrig_host &host = core.host;
     if (host.write == nullptr || host.write_close == nullptr || host.rename == nullptr || host.write_open(host.ctx, kClocksPart) != 1) {
         return false;
@@ -61,7 +63,7 @@ bool write_file(Core &core, uint8_t clocks, bool message) {
     uint8_t text[kClocksRead];
     uint32_t length = 0;
     const char *mode = clocks == kClocksOnly ? "mode only\n" : clocks == kClocksBetween ? "mode between\n" : "mode off\n";
-    const char *lines[3] = {kClocksHeader, mode, message ? "message on\n" : "message off\n"};
+    const char *lines[4] = {internal ? kStorageHeader : kClocksHeader, mode, message ? "message on\n" : "message off\n", internal ? "storage internal\n" : ""};
     for (const char *line : lines) {
         for (uint32_t at = 0; line[at] != '\0'; ++at) {
             text[length++] = static_cast<uint8_t>(line[at]);
@@ -85,7 +87,10 @@ static bool load_settings(Core &core) {
     uint32_t at = 0;
     uint8_t clocks = kClocksOff;
     bool message = false;
-    if (sound && takes(text, length, &at, kClocksHeader)) {
+    bool internal = false;
+    const bool second = sound && takes(text, length, &at, kClocksHeader);
+    const bool third = sound && !second && takes(text, length, &at, kStorageHeader);
+    if (second || third) {
         if (takes(text, length, &at, "mode only\n")) clocks = kClocksOnly;
         else if (takes(text, length, &at, "mode between\n")) clocks = kClocksBetween;
         else if (!takes(text, length, &at, "mode off\n")) sound = false;
@@ -100,17 +105,24 @@ static bool load_settings(Core &core) {
     } else if (!(sound && takes(text, length, &at, "message off\n"))) {
         sound = false;
     }
+    if (third && sound && takes(text, length, &at, "storage internal\n")) {
+        internal = true;
+    } else if (third && !(sound && takes(text, length, &at, "storage sd\n"))) {
+        sound = false;
+    }
     if (!sound || at != length) {
         return false;
     }
     core.clocks_on = clocks;
     core.clock_message_on = message ? 1 : 0;
+    core.clock_storage_internal = internal ? 1 : 0;
     return true;
 }
 
 void breaks_start(Core &core) {
     core.clocks_on = kClocksOff;
     core.clock_message_on = 0;
+    core.clock_storage_internal = 0;
     core.clocks_error = 0;
     core.clocks_retry = 0;
     core.clocks_first = core.clocks_last = core.clocks_files = 0;
@@ -144,7 +156,7 @@ void breaks_poll(Core &core, uint64_t now) {
     player_clock_mode_changed(core, previous);
 }
 
-uint32_t breaks_command(Core &core, bool message, uint8_t value, Reply &reply) {
+uint32_t breaks_command(Core &core, uint8_t setting, uint8_t value, Reply &reply) {
     if (core.invalid) {
         return refuse(reply, "show-invalid");
     }
@@ -154,13 +166,15 @@ uint32_t breaks_command(Core &core, bool message, uint8_t value, Reply &reply) {
     if (!storage_changes(core) || core.host.read_at == nullptr) {
         return refuse(reply, "storage-error");
     }
-    const uint8_t clocks = message ? core.clocks_on : value;
+    const bool message = setting == kClockSettingMessage;
+    const uint8_t clocks = setting == kClockSettingMode ? value : core.clocks_on;
     const bool after = message ? value != 0 : core.clock_message_on != 0;
-    if (message && core.clocks_error) return refuse(reply, "storage-error");
-    if (!core.clocks_error && clocks == core.clocks_on && after == (core.clock_message_on != 0)) {
+    const bool internal = setting == kClockSettingStorage ? value != 0 : core.clock_storage_internal != 0;
+    if (setting != kClockSettingMode && core.clocks_error) return refuse(reply, "storage-error");
+    if (!core.clocks_error && clocks == core.clocks_on && after == (core.clock_message_on != 0) && internal == (core.clock_storage_internal != 0)) {
         return succeed(reply);
     }
-    if (!write_file(core, clocks, after)) {
+    if (!write_file(core, clocks, after, internal)) {
         core.host.remove(core.host.ctx, kClocksPart);
         return refuse(reply, "storage-error");
     }
@@ -174,6 +188,11 @@ uint32_t breaks_command(Core &core, bool message, uint8_t value, Reply &reply) {
     }
     core.clocks_on = clocks;
     core.clock_message_on = after ? 1 : 0;
+    if (internal != (core.clock_storage_internal != 0)) {
+        core.clock_storage_internal = internal ? 1 : 0;
+        core.order_count = 0;
+        core.message_order_count = 0;
+    }
     const bool was_uncertain = core.clocks_error != 0;
     core.clocks_error = 0;
     if (was_uncertain || previous != clocks) player_clock_mode_changed(core, previous);
@@ -263,6 +282,21 @@ bool begins_with(const char *text, const char *head) {
     return true;
 }
 
+// The card's row at a position of its walk when it can have a copy on the board: a file of
+// the card's folder of a class, of a known type; nullptr otherwise.
+const DriveRow *copyable_row(const Core &core, uint8_t kind, uint32_t position) {
+    const DriveRow *row = drive_row(core, position);
+    const char *folder = kind == kClockMessage ? "clocks/message/" : "clocks/";
+    return row == nullptr || row->type < kTypeFrames || row->type > kTypeWidget || !begins_with(row->name, folder) ? nullptr : row;
+}
+
+// Whether a show's file of a class is a copy of the card's row: the same name in any case
+// after the folder's path, and the same type.
+bool copy_of(const FileInfo &info, uint8_t kind, const DriveRow &row) {
+    const uint32_t length = kind == kClockMessage ? 15 : 7;
+    return info.clock == kind && info.type == row.type && same_name(stored_base(info.name), row.name + length);
+}
+
 // Marks the show's files of a class that are copies of a file of the card's folder of that
 // class that plays automatically: the same name in any case after the folder's path, and
 // the same known type. Every other file of the class is unmarked. The card's `count` files
@@ -273,29 +307,39 @@ ODRIG_NOINLINE void mark_copies(Core &core, uint8_t kind, uint32_t first, uint32
             core.files[file].copy = 0;
         }
     }
-    const char *folder = kind == kClockMessage ? "clocks/message/" : "clocks/";
-    const uint32_t length = kind == kClockMessage ? 15 : 7;
     for (uint32_t at = 0; at < count; ++at) {
         if (!drive_automatic(core, first + at)) {
             continue;
         }
-        const DriveRow *row = drive_row(core, first + at);
-        if (row == nullptr || row->type < kTypeFrames || row->type > kTypeWidget || !begins_with(row->name, folder)) {
+        const DriveRow *row = copyable_row(core, kind, first + at);
+        if (row == nullptr) {
             continue;
         }
         for (uint32_t file = 0; file < core.file_count; ++file) {
-            FileInfo &info = core.files[file];
-            if (info.clock == kind && info.type == row->type && same_name(stored_base(info.name), row->name + length)) {
-                info.copy = 1;
+            if (copy_of(core.files[file], kind, *row)) {
+                core.files[file].copy = 1;
             }
         }
     }
 }
 
+// Whether the card's file at a position of its walk has a copy among the show's animations
+// of its class that plays.
+bool board_copy_plays(const Core &core, uint8_t kind, uint32_t position) {
+    const DriveRow *row = copyable_row(core, kind, position);
+    for (uint32_t item = 0; row != nullptr && item < core.item_count; ++item) {
+        if (!core.items[item].is_cycle && copy_of(core.files[core.items[item].first], kind, *row) && player_plays(core, item)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // The next clock or message in its bag: the card's files of its folder, then the show's
-// animations of its class. A card's file is taken when it plays automatically; one of the
-// show's when it plays and, while the card's copies are preferred, is no copy of a card's
-// file that plays, which the draw marks once, the first time it comes to one of them.
+// animations of its class. A card's file is taken when it plays automatically and, while
+// the board's copies are preferred, no copy of it on the board plays; one of the show's
+// when it plays and, while the card's copies are preferred, is no copy of a card's file
+// that plays, which the draw marks once, the first time it comes to one of them.
 uint32_t pick(Core &core, uint64_t at, bool message) {
     const uint8_t kind = message ? kClockMessage : kClockFace;
     const uint32_t first = message ? core.message_first : core.clocks_first;
@@ -314,7 +358,7 @@ uint32_t pick(Core &core, uint64_t at, bool message) {
         }
         const uint32_t place = clock_shuffle(key, size, next++);
         if (place < external) {
-            if (drive_automatic(core, first + place)) {
+            if (drive_automatic(core, first + place) && !(core.clock_storage_internal && board_copy_plays(core, kind, first + place))) {
                 return kDriveBase + first + place;
             }
             continue;
@@ -345,6 +389,8 @@ uint32_t breaks_message(Core &core, uint64_t at) { return core.clocks_error ? kN
 const char *breaks_mode(const Core &core) {
     return core.clocks_on == kClocksOnly ? "only" : core.clocks_on == kClocksBetween ? "between" : "off";
 }
+
+const char *breaks_storage(const Core &core) { return core.clock_storage_internal ? "internal" : "sd"; }
 
 const char *breaks_only_state(const Core &core) {
     if (core.clocks_internal_id != 0) return core.playing == kNothing ? "no-clocks" : "playing";

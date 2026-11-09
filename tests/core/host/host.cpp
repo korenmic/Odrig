@@ -78,7 +78,7 @@ int usage() {
         "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
         "       --read-back-fails OFFSET  --read-back-differs OFFSET\n"
         "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --drive-read-only  --no-folders  --trace-drive  --trace-read-at  --about TEXT\n"
-        "       --command-read-fails FILE OFFSET  --trace-check\n",
+        "       --command-read-fails FILE OFFSET  --read-at-fails-first FILE N  --trace-check\n",
         stderr);
     return kUsage;
 }
@@ -166,6 +166,8 @@ struct Options {
     long drive_read_fails_offset = 0;   // fails at this offset; `read_at` reads it whole
     std::string command_read_fails_file;    // the file whose reading with `read_at` inside a
     long command_read_fails_offset = 0;     // command fails at this offset
+    std::string read_at_fails_file;         // the file whose first calls of `read_at`,
+    long read_at_fails_first = 0;           // this many, fail
     bool drive_read_only = false;   // the drive cannot be written
     bool no_folders = false;        // the host has no `make_folder`
     bool trace_drive = false;       // print `drive list <count>` and `drive bind <place> <name>`
@@ -826,6 +828,10 @@ private:
         if (capacity == 0 || capacity > 512 || (offset != 0 && !goes_on && !host.in_command_ && !anywhere)) {
             stop("file misuse", kFileMisuse);
         }
+        if (name == host.options_.read_at_fails_file && host.read_at_failed_ < host.options_.read_at_fails_first) {
+            ++host.read_at_failed_;
+            return -1;
+        }
         // A read that goes on where the last of the same file ended, with no storage call and
         // no change of the drive since, reads the content the last one read; any other reads
         // the file anew.
@@ -1204,6 +1210,7 @@ public:
     long read_at_kept_calls_ = 0;       // the storage calls made when it was read
     uint32_t read_at_kept_drive_ = 0;   // and the drive then
     size_t reads_at_ = 0;
+    long read_at_failed_ = 0;       // the calls of `read_at` that `--read-at-fails-first` failed
     bool in_command_ = false;       // a command line is being carried out
 
     long alloc_calls_ = 0;
@@ -1981,6 +1988,10 @@ int main(int argc, char **argv) {
             } else if (arguments[at] == "--command-read-fails" && at + 2 < arguments.size() &&
                        whole_number(arguments[at + 2], &options.command_read_fails_offset)) {
                 options.command_read_fails_file = arguments[at + 1];
+                at += 3;
+            } else if (arguments[at] == "--read-at-fails-first" && at + 2 < arguments.size() &&
+                       whole_number(arguments[at + 2], &options.read_at_fails_first)) {
+                options.read_at_fails_file = arguments[at + 1];
                 at += 3;
             } else if (arguments[at] == "--drive" && at + 1 < arguments.size()) {
                 options.drive = arguments[at + 1];

@@ -14601,3 +14601,83 @@ firmware.
 
 **Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("Older
 clients, older firmware"), `app/www/client.js` (`inClockFolder`, `canEnter`) as it is.
+
+## Seed 61: `clocks storage` while the saved clock settings are unreadable
+
+**Question.** Requirement 5.2 refuses the line with `storage-error` while the saved clock
+settings are unreadable. The card's copies are then in force: is `clocks storage sd` a
+choice already in force, answered `{"ok":true}` without a write, or a refusal?
+
+**Answer.** A refusal, as `clocks message on|off` is: the checks come in the order of the
+message line, and the one of unreadable settings comes before the comparison with the
+settings in force. A storage-only line cannot know the mode the file lost, so it writes
+nothing; a mode line writes version 2, the card's copies, and establishes the settings, and
+`clocks storage internal` may follow it. While the settings are unreadable `status` reports
+`"clock_storage":"sd"`, which is what plays.
+
+**Resolution.** `core/src/breaks.cpp` (`breaks_command`), `docs/commands.md` (the clocks
+section), `tests/core/test_internal_clocks.py`
+(`test_each_refusal_comes_in_the_order_of_the_message_lines`).
+
+## Seed 61: a new preferred storage and the orders of the bags
+
+**Question.** The design draws both bags anew at their next draw after `clocks storage`
+changes the choice. Does the retry that reads a version 3 after an unreadable start, which
+also sets the choice, draw them anew?
+
+**Answer.** It need not: while the settings are unreadable no clock or message is drawn,
+and the orders were cleared at the start, so the first draw after the retry draws a new
+order anyway. Only `clocks storage` with a new value sets both orders' sizes to 0; a mode
+or a message line keeps the choice and the orders. A new order matters because two copies
+hold two places of one order: without it, a copy whose place the old choice took could
+come again within the same order under the new choice.
+
+**Resolution.** `core/src/breaks.cpp` (`breaks_command`, `breaks_poll`),
+`tests/core/test_internal_clocks.py`
+(`test_a_change_during_a_messages_turn_lets_it_play_its_whole_loop`).
+
+## Seed 61: the card's copy passed over while the board's copies are preferred
+
+**Question.** Requirement 8.2 lets a draw read the card's index rows of its folder at most
+once, and only while the card's copies are preferred. With `Internal storage` preferred,
+how does a draw tell that a card's file it came to has a copy on the board that plays?
+
+**Answer.** From the card's row it read to judge that file, which `drive_automatic` has
+just read and the drive's two-row cache still holds: its name after `clocks/` or
+`clocks/message/` and its type are compared with the show's animations of the class, in
+the item table in memory, and the file is passed over when one of them plays. No other row
+is read and no mark is written; the marks of the `copy` bits stay the draw's of the card's
+preference alone.
+
+**Resolution.** `core/src/breaks.cpp` (`copyable_row`, `copy_of`, `board_copy_plays`,
+`pick`), `docs/core.md` ("Clocks").
+
+## Seed 61: a test of the retry that reads `clocks.txt` again
+
+**Question.** The task tests a version 3 read by `breaks_poll` after an unreadable start in
+the core's suite. The test host's options fail a file's reads for good (`--read-fails`) or
+only inside a command (`--command-read-fails`); none lets a start fail and a later read of
+the same file succeed. How is it tested?
+
+**Answer.** The test host gains `--read-at-fails-first FILE N`: the first N calls of
+`read_at` for that file return -1, wherever they are made, and the calls after them read
+it. With N of 3 the start and two retries fail and a later retry reads the version 3. It
+is an option of the test host alone; the core is unchanged by it.
+
+**Resolution.** `tests/core/host/host.cpp`, `docs/core.md` (the options of a session),
+`tests/core/test_internal_clocks.py`
+(`test_a_version_3_found_by_the_retry_after_an_unreadable_start_gives_its_choice`).
+
+## Seed 61: the firmware tool and a `clocks.txt` of version 3
+
+**Question.** The task has a firmware test that the firmware tool keeps a `clocks.txt` of
+version 3 through a show install. Does the tool need a change for it?
+
+**Answer.** No. The tool keeps `clocks.txt` by its name and copies its bytes, whatever
+their version, as it keeps one of version 1 or 2; the new test passes on the tool as it
+is and guards that. `docs/firmware.md` names the three settings and says any version is
+kept.
+
+**Resolution.** `tests/firmware/test_storage.py`
+(`test_clocks_with_the_preferred_storage_are_preserved_and_read_back_byte_for_byte`),
+`docs/firmware.md`.
