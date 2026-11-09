@@ -306,12 +306,22 @@ blocks more. The session goes on only when `space` gives `free` of 163,840 bytes
 40 blocks, and stops before it writes anything otherwise.
 
 **The rehearsal.** A test of the emulator suite runs the commands below, over TCP, against
-the emulator with a card that has a face in `clocks/`, using the tracked files: each file is
-read back with `read <id> <offset> 720` and its SHA-256 compared with the table, the
-emulator's show folder holds the same bytes under `<n>/`, `catalog` gives the internal
-catalog `ok`, `list in` gives the seven rows with their paths, and in Only with the message
-on a turn of an internal message follows the card's face. It is the rehearsal of the
-commands, and is reported as such, never as a deployment.
+the emulator, using the tracked files. Its card has a catalog, as the installation's has, a
+face in `clocks/` and a message of its own in `clocks/message/`; its board has an animation
+in a folder two levels down, under an id that a walk of `list` and of the folders it shows
+alone would give to one of the seven. It runs twice: once with Between, the message off and
+`Internal storage` found at the start and a card without the seven, so the modes are checked
+with `sd`; once with the settings of a new board and the seven copied on the card, so they
+are checked with `internal` and no card copy of the seven plays. Each file is read back with
+`read <id> <offset> 720` and its SHA-256 compared with the table, the emulator's show
+folder holds the same bytes under `<n>/`, `catalog` gives the internal catalog `ok`, `list
+in` gives the seven rows with their paths, in Only with the message on a turn of an internal
+message follows the card's face, and in Between it follows a face that follows an ordinary
+turn. The settings found are given back but for the brightness, and the walk at the end
+lists every row of the board found at the start. Its show is installed with its own catalog,
+as the firmware tool installs one, and has turns of a second, so that a break comes within
+seconds. It is the rehearsal of the commands, and is reported as such, never as a
+deployment.
 
 **The board session**, run by the owner or with the owner's leave, with the installation's
 board on USB at the port `PORT` (or `--http ADDRESS` in place of `--port PORT` over Wi-Fi),
@@ -324,6 +334,7 @@ python -m odrigctl --port PORT brightness 40
 python -m odrigctl --port PORT space
 python -m odrigctl --port PORT catalog
 python -m odrigctl --port PORT list
+python -m odrigctl --port PORT list in FOLDER_ID
 python -m odrigctl --port PORT folder make internal clocks
 python -m odrigctl --port PORT folder make internal clocks/message
 python -m odrigctl --port PORT --folder clocks/message upload ID1 collection/card/clocks/message/v7-consciousness.odrgx
@@ -336,7 +347,7 @@ python -m odrigctl --port PORT --folder clocks/message upload ID7 collection/car
 python -m odrigctl --port PORT list in MESSAGE_ID
 python -m odrigctl --port PORT catalog
 python -m odrigctl --port PORT read ID1 0 720
-python -m odrigctl --port PORT clocks storage sd
+python -m odrigctl --port PORT clocks storage CHECK
 python -m odrigctl --port PORT clocks message on
 python -m odrigctl --port PORT clocks only
 python -m odrigctl --port PORT status
@@ -344,33 +355,52 @@ python -m odrigctl --port PORT clocks on
 python -m odrigctl --port PORT status
 python -m odrigctl --port PORT clocks MODE
 python -m odrigctl --port PORT clocks message MESSAGE
+python -m odrigctl --port PORT clocks storage STORAGE
+python -m odrigctl --port PORT list
+python -m odrigctl --port PORT list in FOLDER_ID
 python firmware/fw.py read-show build/seed61-readback --port PORT
 python -c "import hashlib,pathlib; [print(hashlib.sha256(p.read_bytes()).hexdigest(), p.stat().st_size, p) for p in sorted(pathlib.Path('build/seed61-readback').glob('*/v7-*.odrgx'))]"
 ```
 
 - `status` first: the reply has `clock_storage`, which only this seed's firmware gives, and
-  its `brightness`, `clock_mode` and `clock_message` are written down as the owner's. The
-  brightness line is sent only when it is above 40; the owner is told the value found.
+  its `brightness`, `clock_mode`, `clock_message` and `clock_storage` are written down as
+  the owner's. The brightness line is sent only when it is above 40, and the session never
+  raises it again; the owner is told the value found.
 - `space` must give `free` of 163,840 or more, else the session stops here.
-- `list`, and `list in` of every folder it shows, give the ids in use. `ID1` to `ID7` are
-  seven ids that no row has, 60,000 or less. A `clocks` row with `"external":false`
-  already there answers `folder make internal clocks` with `"made":false`, which is no
-  fault; the same holds for `clocks/message`. `MESSAGE_ID` is the id that `folder make
-  internal clocks/message` answers.
+- `catalog` must give the internal catalog `ok`. While it gives the card's as `loading`, it
+  is sent again: `list` shows the card's rows only once its catalog is read.
+- **The walk**: `list`, and `list in FOLDER_ID` of every folder row that a reply of `list`
+  or of `list in` shows, at every depth: three levels of folders on either storage. Its
+  rows' ids are the ids in use; its rows with `"external":false` are written down as the
+  board's content; its rows of the card's `clocks/message` are the card's messages.
+- The two `folder make internal` replies give the ids of the folders: a new folder takes
+  the lowest id that no item and no folder has, and a folder there already answers
+  `"made":false` with its own id, which is no fault. `MESSAGE_ID` is the id that `folder
+  make internal clocks/message` answers. `ID1` to `ID7` are chosen after both replies:
+  seven ids, 60,000 or less, that no row of the walk has and neither reply names. An upload
+  under the id of an animation of any folder replaces that animation, and its folder goes
+  when that leaves it empty; one under the id of a folder is refused `in-use`.
 - Each upload must end with success; an upload refused or not answered stops the session,
   and its file is not counted.
+- `CHECK`, the storage the modes are checked with, is `sd` when no row of the card's
+  `clocks/message` has one of the seven names, and `internal` when one has: the board's file
+  of that name is then a copy of the card's, which `SD card` passes over.
 - The `status` after `clocks only` and after `clocks on` is repeated until `file` is one of
   the seven, `clocks/message/v7-...`, with an `animation` of 60,000 or less, after a turn
-  whose `file` is a face; in Between a break comes after five turns or five minutes. The
+  whose `file` is a face, and in Between after a turn of an animation outside `clocks/`
+  before that face; in Between a break comes after five turns or five minutes. After 20
+  minutes without it the step is not done, and the record names the last `status`. The
   owner looks at the LEDs.
-- `MODE` and `MESSAGE` give back the owner's settings written down at the start (`on` for
-  Between, `off`, `only`; `on` or `off`).
+- `MODE`, `MESSAGE` and `STORAGE` give back the owner's settings written down at the start
+  (`on` for Between, `off`, `only`; `on` or `off`; `sd` or `internal`).
+- The walk made again after them lists every row of the board's content written down at
+  the start, with its id, path and size.
 - `read-show` restarts the board and copies its storage into `build/seed61-readback`; the
   one-liner prints each file's SHA-256 and size, compared with the table. Its
   `folders.txt` names the folder's number `<n>`.
 - The record names the internal paths, the ids, the folder's number, `catalog`'s internal
-  state and generation, the hashes read back, the files and ids seen in both modes, and
-  every step not done with its reason.
+  state and generation, the hashes read back, `CHECK` and the card's messages it was chosen
+  by, the files and ids seen in both modes, and every step not done with its reason.
 
 ## Older clients, older firmware
 

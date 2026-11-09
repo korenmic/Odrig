@@ -14788,3 +14788,34 @@ dropdown says what it saved in the panel's one line, as the mode and the message
 **Resolution.** `app/www/screens/clocks.js`, `app/www/messages.js` (`ofRefusal`),
 `app/www/main.js`, `app/www/screens/author.js`, `app/www/screens/explorer.js`,
 `docs/android-app.md` ("Clocks", "Messages").
+
+## Seed 61: the ids of the seven uploads, and how the board session checks the modes
+
+**Question.** The board session chose `ID1` to `ID7` among the ids that no row of `list`,
+and of `list in` of the folders that `list` shows, had, and then made the two folders. A
+new folder takes the lowest free id, so the first two such ids went to the folders; and a
+walk one level deep misses an animation in a folder two levels down, whose id an upload
+then takes: an upload under the id of an animation of any folder replaces that animation,
+and the folders it empties go. The session also sent `clocks storage sd` without writing
+down the preference it found or giving it back; and with `SD card` preferred, a board
+message whose name the card's `clocks/message` has is a copy that does not play, so the wait
+for it need never end. And the rehearsal was to show a board message after the card's face
+in Only alone, though the session sends `clocks on` too.
+
+**Answer.** The walk lists every folder that a reply of `list` or `list in` shows, at every
+depth, and the seven ids are chosen after both `folder make internal` replies, among the ids
+that no row has and neither reply names; a folder there already answers with its own id.
+The preference found is written down with the brightness, the mode and the message, and
+given back with the mode and the message; the brightness is not raised again, as the
+working rules ask, and the owner is told the value found. The modes are checked with `sd`
+when no row of the card's `clocks/message` has one of the seven names, and with `internal`
+when one has; each wait ends after 20 minutes with the step not done. In Between the board
+message must follow a face that follows an ordinary turn. The walk is made again at the end
+and must list the board's content found at the start. The rehearsal runs every command of
+the session that the emulator takes, in its order, `read-show` aside, whose place the show
+folder's files take, on a card with its catalog and a message of its own and a board with
+an animation two folders down, once for each storage the modes are checked with. It is a
+rehearsal, and is never reported as a deployment.
+
+**Resolution.** `tests/emulator/test_message_rehearsal.py`, the board session's notes and
+"The rehearsal" in `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md`.

@@ -78,7 +78,7 @@ Before a commit: `python core/build.py shared`, and the suites the task names wi
   - Suites: `app`, `emulator`.
   - Requirements: 6.1–6.6.
 
-- [ ] 4. Rehearse the deployment of the seven messages on the emulator
+- [x] 4. Rehearse the deployment of the seven messages on the emulator
   - A test of the emulator suite that runs the design's board-session commands over TCP
     with the command tool against the emulator, with a card that has a face in `clocks/`:
     `space`, `folder make internal clocks` and `clocks/message`, the seven uploads of the
