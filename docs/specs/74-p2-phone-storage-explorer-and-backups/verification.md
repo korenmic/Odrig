@@ -99,20 +99,25 @@ host and 3,528 on the board, `FileInfo` 48, `Upload` 72 and `DriveIndex` 716 on 
 
 ### Builds
 
-Built on Windows from the pushed head 9e2e329 with a clean tree; each build record names
-that commit and `trackedDirty` false.
+Built on Windows from a pushed head with a clean tree: the two images and the first APK from
+9e2e329, each build record naming that commit and `trackedDirty` false, and the APK of the
+read retry from 6d8f7fd, its record naming that commit and no change. Nothing under
+`core/`, `firmware/`, `emulator/`, `odrigctl/`, `odrig/` or `converter/` changed between the
+two heads, so the images of 9e2e329 are the firmware of 6d8f7fd too.
 
 | File on the Drive | Bytes | SHA-256 | Link |
 |---|---:|---|---|
 | `odrig-seed74b-9e2e329-n16r8-installation.bin`, the installation's board, `odrig_microsd` | 1,904,720 | `9e2b959c319e83ec3d425785a34fcda4156e0d0a4b73c2afabca75762aacc5a9` | [download](https://drive.google.com/uc?export=download&id=1QxsUVGR19XVLQg2-0FED8CL7ax5sctVT) |
 | `odrig-seed74b-9e2e329-n8r2-spare.bin`, the spare, `odrig_microsd_n8r2` | 1,902,176 | `50f7f0bc45e8936aa3deed94446159576912460878d2b22d384953d6468e5656` | [download](https://drive.google.com/uc?export=download&id=1c3vLuuVu4HHl0ewF4t8PL5wgVRdRyg5s) |
 | `odrig-seed74b-9e2e329.apk`, signed with the persistent key | 19,125,340 | `b3582f88fa2164c4d880819763a1a476ab79b63b607c245a085cece588e4ad49` | [download](https://drive.google.com/uc?export=download&id=1iNx260ANPwoVkIce9iVFKvi7-zit8FMS) |
+| `odrig-seed74b-6d8f7fd.apk`, signed with the persistent key; it supersedes `odrig-seed74b-9e2e329.apk`, which ends a `Download` at one lost reply: this one sends a download's or a backup's line again when its reply is lost, up to three sends of each line, and checks a file whose read lost a reply against its catalog's key | 19,125,340 | `ae8e8665984decbc23d1d301062c1a4ff92fe9468cec4bc0a1217a6cca2b8a53` | [download](https://drive.google.com/uc?export=download&id=1vpCc3D9PsbQjXjKn7S64z1RhJvgiF_28) |
 
-Both images passed `verify_build.py` for their module, the installation's first. The APK's
-signature, by the persistent key's certificate of SHA-256
+Both images passed `verify_build.py` for their module, the installation's first. The
+signature of each APK, by the persistent key's certificate of SHA-256
 `5a489ec294e53cdec085d71092cf4e7285ae08d4d43c19929d84130f3649f0f1`, and its alignment were
-verified with `apksigner` and `zipalign -c 4`. They are in the Drive folder
-`odrig archive/seed-74-part-b-9e2e329/`, each copy checked against its SHA-256.
+verified with `apksigner` and `zipalign -c 4`. The builds of 9e2e329 are in the
+Drive folder `odrig archive/seed-74-part-b-9e2e329/` and the APK of 6d8f7fd in
+`odrig archive/seed-74-part-b-6d8f7fd/`, each copy checked against its SHA-256.
 
 ### On an emulated phone
 
