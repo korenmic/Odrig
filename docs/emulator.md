@@ -865,7 +865,7 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload --external FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] --folder PATH upload ID FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] folder make internal|external PATH
-python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] move external ID PATH
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] move external|internal ID PATH
 ```
 
 Through the serial port, here the emulator's; for the board the name is its USB serial
@@ -970,6 +970,7 @@ python -m odrigctl --http 127.0.0.1:8600 clocks off
 python -m odrigctl --http 127.0.0.1:8600 clocks message off
 python -m odrigctl --http 127.0.0.1:8600 folder make external "night/old songs"
 python -m odrigctl --http 127.0.0.1:8600 move external 60001 "night/old songs"
+python -m odrigctl --http 127.0.0.1:8600 move internal 6 "old shows/night"
 ```
 
 The temporary miniature command is submitted through the same routes; status reports
@@ -1143,6 +1144,11 @@ whose drive cannot be written answers `read-only`, which is status 1. With the e
 the PC tool's `python3 -m odrig.catalog DIR import` writes one, and so does `catalog rebuild
 external`. What the emulator wrote there the PC tool reads, and a change the PC tool makes
 there the emulator takes up within ten seconds, when it reads the marker again.
+
+**`move external ID PATH`** sends `move external <ID> <PATH>`, `/` for the card's root, and
+**`move internal ID PATH`** sends `move internal <ID> <PATH>`, the new full path of a folder of
+the board's own storage, which has no `/` of its own; each name of a path is escaped as a
+URI's, and the ID is sent as it was typed. Another form is status 2, and nothing is sent.
 
 The mapping operation is `get`, `set REV PINS`, or `test on` / `test off`.
 The pin list is twenty comma-separated GPIO numbers, in snake order.

@@ -367,7 +367,7 @@ class Usage(unittest.TestCase):
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
                          {"play": ("ID",), "brightness": ("N",), "read": ("ID", "OFFSET", "[COUNT]"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "repeat": ("ID", "N", "[save]"), "saved": ("ID",),
-                          "clocks": ("OPERATION",), "debug": ("mini", "on|off"), "folder": ("make", "internal|external", "PATH"), "move": ("external", "ID", "PATH"), "upload": ("ID", "FILE")})
+                          "clocks": ("OPERATION",), "debug": ("mini", "on|off"), "folder": ("make", "internal|external", "PATH"), "move": ("external|internal", "ID", "PATH"), "upload": ("ID", "FILE")})
 
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),
@@ -382,7 +382,8 @@ class Usage(unittest.TestCase):
                            (["clocks"], "clocks takes on, off, only, message on, or message off"), (["clocks", "message", "yes"], "clocks takes on, off, only, message on, or message off"),
                            (["status", "--external"], "--external goes with upload"), (["--log", "--external"], "--external goes with upload"),
                            (["upload", "--external"], "upload --external takes one argument: FILE"),
-                           (["upload", "--external", "9", "a.odrg"], "upload --external takes one argument: FILE")):
+                           (["upload", "--external", "9", "a.odrg"], "upload --external takes one argument: FILE"),
+                           (["move", "internal", "6", "/"], "move takes external ID PATH, PATH / for the card's root, or internal ID PATH")):
             result = support.run_tool("--port", "a", *argv)
             self.assertEqual(result.status, 2)
             self.assertIn(said, result.err)
@@ -395,6 +396,7 @@ class Usage(unittest.TestCase):
             (["off"], b"off\n"),
             (["debug", "mini", "on"], b"debug mini on\n"),
             (["debug", "mini", "off"], b"debug mini off\n"),
+            (["move", "internal", "6", "my shows/night"], b"move internal 6 my%20shows/night\n"),
             (["play", "12"], b"play 12\n"),
             (["play", "all"], b"play all\n"),
             (["brightness", "300"], b"brightness 300\n"),

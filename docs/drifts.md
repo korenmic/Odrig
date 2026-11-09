@@ -13760,3 +13760,16 @@ cut before that leaves the old path there, which the next start does not find an
 the root, as for a playlist that is gone.
 
 **Resolution.** `core/src/folders.cpp`, `tests/core/test_folder_move.py`.
+
+## Seed 86: the command tool and `/` for `move internal`
+
+**Question.** `move external` takes `/` for the card's root, as its path names the
+destination folder. `move internal` takes the folder's new full path, which is never the
+root. What does the command tool do with `move internal ID /`?
+
+**Answer.** It refuses it with its usage, status 2, and sends nothing, as for any other
+form it does not take: the board would answer `bad-argument`. The emulator's sources are
+unchanged; its line reaches the core as every line does.
+
+**Resolution.** `odrigctl/cli.py`, `docs/emulator.md`, `tests/emulator/test_tool.py`,
+`tests/emulator/test_folder_move.py`.
