@@ -114,8 +114,73 @@ signature, by the persistent key's certificate of SHA-256
 verified with `apksigner` and `zipalign -c 4`. They are in the Drive folder
 `odrig archive/seed-74-part-b-9e2e329/`, each copy checked against its SHA-256.
 
-The APK was not installed on an emulated phone this time, so the native plugin `Save` has
-still not run on Android; its web code is the code the app suite ran in Chrome.
+### On an emulated phone
+
+On 2026-11-09 the APK, and after it the fused branch's, ran on an emulated phone, so the
+native plugin `Save` has run on Android; it has not run on a real phone. The phone was
+`OdrigSaveCheck`, a temporary copy of the AVD `Medium_Phone_API_36.1`: the system image
+android-36.1 `google_apis_playstore` x86_64, Android 16 (SDK 36), WebView 134.0.6998.135.
+The board was the emulator of the fused branch at 67cad42, with `hello.odrg` (1,210 bytes)
+and `dvd.odrg` (1,052) in its own storage and four files on its card, one of them in the
+folder `night`.
+
+| APK | SHA-256 | Installed |
+|---|---|---|
+| `odrig-seed74b-9e2e329.apk` | `b3582f88fa2164c4d880819763a1a476ab79b63b607c245a085cece588e4ad49` | new |
+| `odrig-fused-67cad42.apk` | `e34e055fadd5b747e3869565887aeda62e00084669b7246320a2e76ecb9a68be` | over the first, its data kept |
+
+These steps were done with each APK:
+
+1. The app started and connected to the emulator.
+2. `Download` of `dvd.odrg` from the board's storage and of
+   `tenor-rainbow-17659339_fit.odrg` (50,676 bytes, two `append` calls) from the card: the
+   system's picker opened in Downloads with the file's name filled in, and each file saved
+   there was pulled from the phone and has its source's SHA-256,
+   `98318c27606cc3fa0b07070a46213d8ecb85ceb6b0e32f0da5b0a3079e23ebb2` and
+   `1bf9cd80dc6d90c17d2b562331fe2e9cf3d1072b5a13e619f437457cff46b0ec`.
+3. `Download selected` of the card's three root files with the folder `night`, a zip of
+   102,955 bytes, and of the board's two files. In each of the four zips every member has
+   the bytes and the CRC-32 of its source, `night/rainbow-lines-02.odrg` among them;
+   `odrig-backup.json` is the last entry, its `partial` is false, and its sizes and CRC-32s
+   are the members'.
+4. Back in the picker of `phosphor-containment-fi_fit.odrg` gave "… was not saved: no place
+   was chosen.", and the picker of a backup closed the same way gave its own; the app's
+   process stayed the same, and Downloads showed no new file.
+5. In the log of each APK: no `AndroidRuntime` error and no FATAL line; `Save` got 6
+   `begin`, 52 `append` and 6 `finish` calls, none of them failed. The zip of the board's
+   files and `dvd.odrg`, rebuilt from the bytes of the logged `append` calls, are the same
+   bytes as the files pulled from the phone; the logged pieces of the others add up to their
+   sizes.
+   All 1,632 read replies of the board emulator hold its files' bytes at their offsets.
+
+Not shown by this check:
+
+- That the plugin's folder `cache/saving` is emptied after a save and after a cancel: no
+  listing of it was kept.
+- `abandon`: no step called it.
+- Every message of success on the screen: some screenshots are black, and neither the "4 of
+  4 files" of the card's zip nor any of the fused APK's messages was captured. The saved
+  files and their manifests show the outcomes.
+- `Save` registering in the first APK's logs, which kept no line of it; its calls were
+  answered. Those logs leave out 12:22:31 to 12:23:58; for that time only the unchanged
+  process shows that the app did not crash.
+
+Found, and open:
+
+- One lost reply ends a `Download`: the job asks again only for a request withdrawn while
+  the app was hidden (`again()` in `app/www/backups.js`). In `Download selected` a lost
+  reply marks its file failed and the zip is saved as partial; the backup ends only when the
+  reply is lost while the selected folders or the catalog's generation are read. On the
+  emulated phone about one reply in ten through the host's address 10.0.2.2 was lost (162 of
+  1,305 requests with the first APK, 6 of 93 with the second), and the `Download` of
+  `tenor-rainbow-17659339_fit.odrg` that way ended three times as "was not downloaded …
+  (no-answer)". The board emulator's log shows one such read received and answered; where
+  the reply was lost is not shown. Through `adb reverse` to `127.0.0.1:8650` none of 1,245
+  was lost, so the larger downloads and the four zips were made that way. Whether replies
+  are lost on the installation's Wi-Fi needs the board.
+
+The owner's check of `Download` on a phone, below, stays open: this check opened neither the
+file nor the zip in the phone's own apps.
 
 ### Not done: the board session
 
