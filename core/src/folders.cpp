@@ -618,6 +618,22 @@ bool path_fits(uint32_t folder_length, const char *stored) {
     return folder_length + 1 + text_length(stored_base(stored)) < kDrivePathRoom;
 }
 
+// The class that a folder of this path gives its own files: the faces of `clocks`, the
+// messages of `clocks/message`, the files of another folder below `clocks`, and those of any
+// other folder. The path is compared by its bytes.
+uint8_t clock_kind(const char *path, uint32_t length) {
+    if (length < 6 || memcmp(path, "clocks", 6) != 0) {
+        return kNotClock;
+    }
+    if (length == 6) {
+        return kClockFace;
+    }
+    if (path[6] != '/') {
+        return kNotClock;
+    }
+    return length == 14 && memcmp(path + 7, "message", 7) == 0 ? kClockMessage : kClockBelow;
+}
+
 // Whether a file of the show is in the folder with this number.
 bool holds_files(const Core &core, uint32_t number) {
     for (uint32_t file = 0; file < core.file_count; ++file) {
@@ -693,7 +709,9 @@ void folders_derive(Core &core) {
     for (uint32_t file = 0; file < core.file_count; ++file) {
         core.files[file].rank = 0;
         core.files[file].held = 0;
+        core.files[file].clock = kNotClock;
     }
+    core.clocks_internal_id = 0;
     const bool internal_current = (core.current & kInternalLevel) != 0;
     if (core.folders_error || core.host.read_at == nullptr || (core.internal_folders == 0 && !internal_current)) {
         if (internal_current) {
@@ -708,10 +726,15 @@ void folders_derive(Core &core) {
     uint32_t end = 0;
     const bool begun = begin_scan(scan, core);
     while (begun && next_line(scan, line)) {
+        const uint8_t kind = clock_kind(scan.path, scan.length);
+        if (kind == kClockFace) {
+            core.clocks_internal_id = static_cast<uint16_t>(line.id);
+        }
         for (uint32_t file = 0; file < core.file_count; ++file) {
             if (stored_folder(core.files[file].name) == line.number && path_fits(scan.length, core.files[file].name)) {
                 core.files[file].rank = static_cast<uint8_t>((line.index + 1) & 0x3Fu);
                 core.files[file].held = static_cast<uint8_t>(line.held != 0 ? 1 : 0);
+                core.files[file].clock = kind;
             }
         }
         if (!internal_current) {
@@ -743,9 +766,11 @@ void folders_derive(Core &core) {
 void folders_start(Core &core) {
     core.internal_folders = 0;
     core.folders_error = 0;
+    core.clocks_internal_id = 0;
     for (uint32_t file = 0; file < core.file_count; ++file) {
         core.files[file].rank = 0;
         core.files[file].held = 0;
+        core.files[file].clock = kNotClock;
     }
     if (!storage_changes(core) || core.host.read_at == nullptr || core.chunk == nullptr) {
         return;
@@ -1063,6 +1088,37 @@ bool internal_choose(Core &core, uint32_t id) {
     memcpy(core.playlist_path + 1, path, text_length(path) + 1);
     folders_derive(core);
     return (core.current & kInternalLevel) != 0;
+}
+
+ODRIG_NOINLINE bool internal_subtree(const Core &core, uint32_t id, uint32_t *low, uint32_t *high, uint8_t *kind) {
+    if (id == 0 || id > kFolderIdMost || !readable(core)) {
+        return false;
+    }
+    FolderScan scan;
+    FolderLine line;
+    uint32_t found = kNoLine;
+    uint32_t depth = 0;
+    *high = 0;
+    *kind = kNotClock;
+    const bool begun = begin_scan(scan, core);
+    while (begun && next_line(scan, line)) {
+        if (found == kNoLine && line.id == id) {
+            found = line.index;
+            depth = line.depth;
+            *kind = clock_kind(scan.path, scan.length);
+        } else if (found != kNoLine && line.depth <= depth) {
+            *high = line.index + 1;
+            break;
+        }
+    }
+    if (found == kNoLine || (*high == 0 && scan.state != kScanEnded)) {
+        return false;
+    }
+    *low = found + 1;
+    if (*high == 0) {
+        *high = scan.count + 1;
+    }
+    return true;
 }
 
 uint32_t internal_id_at(const Core &core, uint32_t rank) {

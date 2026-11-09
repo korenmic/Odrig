@@ -295,12 +295,14 @@ uint64_t current_turn_ms(const Core &core) {
 
 // The show's animation that plays with the smallest walk key above `above` unless `any`
 // is set, of an internal folder ranked from `low` to before `high`; kNothing when none.
+// While the clocks are on, the files of the internal Clocks subtree are passed over.
 uint32_t lowest_playing(const Core &core, uint32_t above, bool any, uint32_t low, uint32_t high) {
     uint32_t best = kNothing;
     uint32_t best_key = 0;
     for (uint32_t position = 0; position < core.item_count; ++position) {
         const uint32_t rank = rank_of(core, position);
-        if (rank < low || rank >= high || !plays(core, position)) {
+        if (rank < low || rank >= high || !plays(core, position) ||
+            (core.clocks_on != 0 && core.files[core.items[position].first].clock != kNotClock)) {
             continue;
         }
         const uint32_t key = walk_key(core, position);
@@ -544,13 +546,20 @@ void pause_for_break(Core &core) {
     break_begins(core, at, paused);
 }
 
+// The turns of Clocks only: a clock, its message when there is one, the next clock. An
+// item of the show whose length is not known yet decodes its first loop to the moment, and
+// its turn goes on while that loop does.
 ODRIG_NOINLINE Reason clock_only_turn(Core &core, uint64_t now, uint64_t *in_turn) {
     for (uint32_t step = 0; step < 128; ++step) {
         if (core.playing == kNothing || core.turn_item == kNothing) { *in_turn = 0; return kNone; }
-        const uint64_t length = length_of(core, core.turn_item);
-        if (length == 0) return kLoopMismatch;
-        const uint64_t duration = current_turn_ms(core);
         const uint64_t elapsed = now >= core.zero ? now - core.zero : 0;
+        if (length_of(core, core.turn_item) == 0) {
+            if (is_drive(core.turn_item)) return kLoopMismatch;
+            const Reason reason = first_loop_to(core, core.turn_item, core.turn_number, elapsed);
+            if (reason != kNone) return reason;
+            if (length_of(core, core.turn_item) == 0) { *in_turn = elapsed; return kNone; }
+        }
+        const uint64_t duration = current_turn_ms(core);
         if (elapsed < duration) { *in_turn = elapsed; return kNone; }
         core.zero += duration;
         const uint32_t message = core.break_phase == kBreakClock && (core.break_message || core.clock_message_on)
@@ -788,7 +797,7 @@ Shown advance(Core &core, uint64_t now) {
         const uint64_t body_bytes = opened ? core.decoder.body_read : 0;
         close_stream(core);
         quarantine_file(core, core.items[animation].first, reason, kWorkPlay, record, body_bytes);
-        return kShowsBefore;
+        return core.clocks_on == kClocksOnly && core.playing == kNothing ? kShowsNothing : kShowsBefore;
     }
     core.shown = animation;
     return kShowsPicture;
@@ -869,11 +878,49 @@ uint32_t player_first_animation(const Core &core) {
     return first != kNothing ? first : core.item_count;
 }
 
-uint32_t player_first_in_playlist(const Core &core) {
-    if (core.clocks_on == kClocksOnly) {
+namespace {
+
+// The first face of a storage that plays: the card's in its walk, the board's in the item
+// table; kNothing when there is none.
+uint32_t first_face(const Core &core, bool internal) {
+    if (!internal) {
         for (uint32_t i = 0; i < core.clocks_files; ++i)
             if (drive_automatic(core, core.clocks_first + i)) return kDriveBase + core.clocks_first + i;
         return kNothing;
+    }
+    for (uint32_t item = 0; item < core.item_count; ++item)
+        if (plays(core, item) && core.files[core.items[item].first].clock == kClockFace) return item;
+    return kNothing;
+}
+
+}  // namespace
+
+bool player_plays(const Core &core, uint32_t position) {
+    return plays(core, position);
+}
+
+uint32_t player_first_usable(const Core &core, uint32_t low, uint32_t high) {
+    uint32_t best = kNothing;
+    uint32_t best_key = 0;
+    for (uint32_t position = 0; position < core.item_count; ++position) {
+        const uint32_t rank = rank_of(core, position);
+        if (core.items[position].is_cycle || rank < low || rank >= high || !item_usable(core, position)) {
+            continue;
+        }
+        const uint32_t key = walk_key(core, position);
+        if (best == kNothing || key < best_key) {
+            best = position;
+            best_key = key;
+        }
+    }
+    return best;
+}
+
+uint32_t player_first_in_playlist(const Core &core) {
+    if (core.clocks_on == kClocksOnly) {
+        const bool internal = core.clock_storage_internal != 0;
+        const uint32_t first = first_face(core, internal);
+        return first != kNothing ? first : first_face(core, !internal);
     }
     const uint32_t first = first_in(core, current_range(core));
     return first != kNothing ? first : first_in(core, root_range(core));
@@ -910,9 +957,14 @@ void player_jump(Core &core, uint32_t item) {
         core.resume_item = kNothing;
         core.playing = kPlaylist;
         core.turn_item = core.shown = item;
-        const uint32_t position = item - kDriveBase;
-        core.break_phase = position >= core.message_first && position - core.message_first < core.message_files ? kBreakMessage :
-            position >= core.clocks_first && position - core.clocks_first < core.clocks_files ? kBreakClock : kBreakNone;
+        if (is_drive(item)) {
+            const uint32_t position = item - kDriveBase;
+            core.break_phase = position >= core.message_first && position - core.message_first < core.message_files ? kBreakMessage :
+                position >= core.clocks_first && position - core.clocks_first < core.clocks_files ? kBreakClock : kBreakNone;
+        } else {
+            const uint8_t kind = core.files[core.items[item].first].clock;
+            core.break_phase = kind == kClockMessage ? kBreakMessage : kind == kClockFace ? kBreakClock : kBreakNone;
+        }
         core.break_message = core.clock_message_on;
         core.turn_repeat = core.break_phase == kBreakMessage ? 1 : 0;
         core.turn_manual = 1;
@@ -1134,6 +1186,11 @@ void player_file_failed(Core &core, uint32_t file) {
     if (core.stream_open && !is_drive(core.stream_item) && core.items[core.stream_item].first == file) {
         close_stream(core);
     }
+    if (core.clocks_on == kClocksOnly) {
+        core.only_dirty = 1;
+        player_only_refresh(core);
+        return;
+    }
     if (core.playing == kPlaylist && !is_drive(core.turn_item) && !plays(core, core.turn_item)) {
         const uint32_t next = next_animation(core, core.turn_item);
         if (next == kNothing) {
@@ -1228,17 +1285,24 @@ void player_item_added(Core &core) {
 }
 
 void player_inclusion_changed(Core &core, uint32_t item) {
-    if (core.playing == kPlaylist && core.turn_item == item && core.items[item].ignored) {
+    if (core.clocks_on == kClocksOnly) { core.only_dirty = 1; player_only_refresh(core); return; }
+    if (core.playing == kPlaylist && core.break_phase != kBreakNone && core.turn_item == item && core.items[item].ignored) {
+        // A break's clock or message is ignored: the break ends, as a card's does.
+        player_break_leave(core);
+        if (core.turn_item == kNothing) player_halt(core);
+    } else if (core.playing == kPlaylist && core.turn_item == item && core.items[item].ignored) {
         const uint32_t next = next_animation(core, item);
         if (next == kNothing) player_halt(core);
         else player_play_all(core, next);
     } else if (core.playing == kNothing && !core.items[item].ignored) {
-        player_play_all(core, item);
+        // A file of the internal Clocks subtree taken in plays in the breaks, not as a turn.
+        if (core.clocks_on != kClocksOff && core.files[core.items[item].first].clock != kNotClock) player_item_added(core);
+        else player_play_all(core, item);
     }
 }
 
 void player_internal_inclusion_changed(Core &core) {
-    if (core.clocks_on == kClocksOnly) return;
+    if (core.clocks_on == kClocksOnly) { core.only_dirty = 1; player_only_refresh(core); return; }
     if (core.playing == kPlaylist) {
         if (core.break_back != kNothing && !core.break_manual && !plays(core, core.break_back)) core.break_paused = 0;
         if (core.break_phase != kBreakNone && !plays(core, core.turn_item)) player_break_leave(core);
@@ -1288,9 +1352,9 @@ void player_only_refresh(Core &core) {
     if (core.clocks_on != kClocksOnly) return;
     core.only_dirty = 0;
     const uint32_t item = core.playing == kPlaylist ? core.turn_item : kNothing;
-    if (item != kNothing && breaks_position_allowed(core, item) && drive_plays(core, item - kDriveBase) &&
-        (core.turn_manual || (drive_automatic(core, item - kDriveBase) &&
-         (core.break_phase == kBreakClock || breaks_has_face(core))))) return;
+    if (item != kNothing && breaks_position_allowed(core, item) &&
+        (is_drive(item) ? drive_plays(core, item - kDriveBase) : item_usable(core, item)) &&
+        (core.turn_manual || (plays(core, item) && (core.break_phase == kBreakClock || breaks_has_face(core))))) return;
     player_only_restart(core);
 }
 
@@ -1313,6 +1377,12 @@ void player_clock_mode_changed(Core &core, uint8_t previous) {
 }
 
 void player_item_leaves(Core &core, uint32_t item) {
+    if (core.clocks_on == kClocksOnly) {
+        // The item that leaves is ignored already: the turn it played is drawn again at
+        // once, and the program is looked at again at the next refresh, once it is gone.
+        if (core.playing == kPlaylist && core.turn_item == item) player_only_restart(core);
+        core.only_dirty = 1;
+    }
     if (core.playing == kPlaylist && core.turn_item == item) {
         const uint32_t next = next_animation(core, item);
         if (next == item || next == kNothing) {

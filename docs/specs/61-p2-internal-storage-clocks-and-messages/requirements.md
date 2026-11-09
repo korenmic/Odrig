@@ -81,7 +81,8 @@ are, and `play all` stays refused.
 3.4 `status` in Only: `clock_only.folder`, and `playing` while a turn plays, name the
 card's Clocks folder when the card has one, else the internal one; `playlist` is
 `clocks`. `file` gives an internal file's path, `clocks/message/<name>`, and `animation`
-its id, which is 60,000 or less, so a client tells the storage by the id.
+its id. A show's id may be anything from 1 to 65,535, so a client tells the storage of an
+animation by its row of `list` (`external`), not by its id alone.
 3.5 Leaving Only restores ordinary playback by the existing rules.
 3.6 What this seed leaves as it is: the LEDs' On and Off, by hand or by the daily schedule
 of seed 64, which hide the LEDs while the turns of both storages' clocks go on unseen; the
@@ -173,7 +174,8 @@ keeping the upload's place as for any folder. A target without `clock_storage` k
 today's card-only boundary and today's words.
 6.6 The bar of the animation playing now and the brightness screen's line of the
 animation name the storage of a file of a Clocks subtree, as `Internal
-/clocks/message/v7-the-time.odrgx` or `External /clocks/analog.odrgx`, told by its id.
+/clocks/message/v7-the-time.odrgx` or `External /clocks/analog.odrgx`, told by its row of
+`list` (`external`).
 
 ## 7. The command tool and the emulator
 

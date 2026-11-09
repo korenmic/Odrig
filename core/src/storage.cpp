@@ -426,7 +426,9 @@ bool storage_remove_item(Core &core, uint32_t position) {
     }
 
     // The show in storage is the new one from here on. What cannot be removed now is
-    // named by `pending.txt` and is removed at the next start.
+    // named by `pending.txt` and is removed at the next start. The item that goes cannot
+    // become the next automatic turn.
+    core.items[position].ignored = 1;
     player_item_leaves(core, position);
     content_take_out(core, position);
     if (with_file) {

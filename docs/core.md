@@ -658,6 +658,22 @@ of [reasons.md](reasons.md), "Widgets in ODRGX", and held in the window while it
   pixel buffer is not written again in the turn. A hand or a cap touches only the pixels
   near it; the time walks the slowest points of the turn so far, one for at least every 6
   seconds of it.
+- **The board's own clocks.** The files of the board's own folder `clocks` are faces, and
+  those of `clocks/message` messages, beside the card's: [show.md](show.md#clocks-between-the-animations).
+  Each file's entry keeps its class in two bits, `clock`, written with its `rank` and
+  `held` whenever the folders are read, [Internal folders](#internal-folders): a face, a
+  message, a file of another folder below `clocks`, or none. The id of the folder `clocks`
+  is 16 bits of the core object's padding, 0 while there is none, and the preferred storage
+  of copies one bit of a byte of its flags. A draw counts its bag at once: the card's files
+  of the folder of its class, then the show's animations of that class in the item table's
+  order, so a change of either count draws a new order. While the
+  card's copies are preferred, the first time a draw comes to a file of the board's own
+  storage that plays, it reads the card's files of that folder once and marks, in a bit of
+  each file's entry, `copy`, the board's files of the class that are copies of a card's file
+  that plays; it then passes over a marked file. The marks are written by the draw that
+  reads them and read nowhere else, so a mark of an earlier draw is never taken, and a bit
+  of each file holds a show of any size. Nothing of it is a block or a table: [Memory](#memory)
+  is as it is without it.
 
 ## A drive
 
@@ -835,10 +851,12 @@ core no memory: every figure of [Memory](#memory) is as it is without them.
   in 37 bytes, its length as a 32-bit number that stays at 4,294,967,295 ms for a longer
   file, while the catalogs keep the exact length, its `checked` and its type in two bits
   each, `held`, whether its folder or a folder above it is ignored, and `rank`, 1 and the
-  index of its folder's line, 0 at the root. The core object keeps the number of lines and
-  whether the file could not be read in this boot, one byte inside its own padding. The
-  start, and every change of a folder or of a file in one, marks each file again with one
-  reading of the file.
+  index of its folder's line, 0 at the root, and in its last three bits the class of its
+  folder in the Clocks subtree, `clock`, and the mark of a copy, `copy`, of
+  [Clocks](#clocks). The core object keeps the number of lines and whether the file could
+  not be read in this boot, one byte inside its own padding, and the id of the folder
+  `clocks` in two bytes more of it. The start, and every change of a folder or of a file in
+  one, marks each file again with one reading of the file.
 - **The start.** It opens `folders.txt` after `pending.txt` and reads it whole, each line
   checked against the line before it. A line out of form or of order, a line whose parent
   is not before it, or two lines with one number or one id make the file damaged: the core

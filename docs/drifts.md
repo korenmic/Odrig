@@ -14466,6 +14466,142 @@ A target without `clock_storage` keeps today's card-only rule and words.
 
 **Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (6.5), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The app").
 
+## Seed 61: the first draw of Clocks only, before the card is taken up
+
+**Question.** At a start in Clocks only the core draws its first clock in `player_start`,
+before the first refresh takes the card up and before a card's file is listed or its index
+read. With a copy on both storages and the card's preferred, the board's copy is then the
+only one the draw can see. Does the start wait for the card?
+
+**Answer.** No. The first draw takes what the core holds then: the board's copy may play
+that first turn, and it plays to its end, as the turn in progress does when a card is put
+in; the card's copy is taken from the next draw on. A show without the board's clocks is as
+before: dark until the card is taken up.
+
+**Resolution.** `core/src/breaks.cpp` (`pick`), `docs/show.md` ("Copies"),
+`tests/core/test_internal_clocks.py` (`Copies`, which looks from the second turn on).
+
+## Seed 61: a face of the board's own storage whose length is not known yet
+
+**Question.** A card's file is in the playlist only once its length is known, and the
+scheduler of Clocks only took a turn without a length for the fault `loop-mismatch`. A
+frames file of the board's own storage learns its length from the check after the start or
+from playing its first loop, so a sound face drawn at the start, before the check came to
+it, would be quarantined. What is done?
+
+**Answer.** In Clocks only a turn of a file of the board's own storage whose length is not
+known yet decodes its first loop to the moment, as the playlist does, and its turn is
+reckoned once that loop's end gives the length. A card's file still has its length before
+it plays, and a turn of one without it is still a fault.
+
+**Resolution.** `core/src/player.cpp` (`clock_only_turn`), `tests/core/test_internal_clocks.py`
+(`test_a_face_whose_length_is_not_known_yet_plays_and_a_fault_gives_way_to_the_next`).
+
+## Seed 61: an Ignore of the board's clock or message during a break
+
+**Question.** An Ignore of a card's clock or message whose break turn plays leaves the
+break, and the playlist goes on where the break was to give way to it. An Ignore of an
+animation of the show whose turn plays went on with the animation after it in the walk,
+which for the board's clock is after the folder `clocks`, not where the break began. Which
+holds for the board's clock?
+
+**Answer.** The card's: an Ignore of the board's clock or message whose break turn plays
+ends the break, and the playlist goes on with the animation the break was to give way to.
+
+**Resolution.** `core/src/player.cpp` (`player_inclusion_changed`),
+`tests/core/test_internal_clocks.py` (`test_ignoring_the_boards_clock_of_a_break_goes_back_to_the_playlist`).
+
+## Seed 61: a removal of the board's file that Clocks only plays
+
+**Question.** When the file whose turn plays is removed, the playlist goes on with the next
+animation of the walk; in Clocks only that restarts the clocks while the removed item is
+still in the item table, so the draw could take it again, or leaves Only dark when the
+walk has nothing. What is done?
+
+**Answer.** As a card's removal: the clocks restart at once. The item that goes is marked
+ignored before it leaves, as a removal of several already does, so the draw cannot take it,
+and the next clock plays from the reply of `remove` on, or Only is dark with `no-clocks`
+when none is left; a `status` in the same poll says so. The removal of another file marks
+Only to be looked at again at the next refresh, as an install does.
+
+**Resolution.** `core/src/storage.cpp` (`storage_remove`), `core/src/player.cpp`
+(`player_item_leaves`), `tests/core/test_internal_clocks.py`
+(`test_a_removal_plays_the_next_face_and_the_last_one_darkens`).
+
+## Seed 61: the fault of the last face of the board's own storage
+
+**Question.** A card's file that fails in Clocks only and leaves no face makes that refresh
+show nothing. A file of the show that fails keeps the picture before for that refresh. Which
+holds for the board's last face?
+
+**Answer.** The card's: in Clocks only, a fault of a file of the board's own storage after
+which nothing plays shows nothing at that refresh, and the LEDs are dark.
+
+**Resolution.** `core/src/player.cpp` (`advance`), `tests/core/test_internal_clocks.py`
+(`test_the_last_face_at_fault_stays_dark`).
+
+## Seed 61: the replies of a show without the board's clocks, byte for byte
+
+**Question.** Requirement 1.4 wants the replies of a show without an internal folder
+`clocks` byte for byte as they are without this seed. How is that held by a test?
+
+**Answer.** Two sessions with the card's clocks, a flat show and a show whose only folder
+is `art`, go through Between, Clocks only, `play` inside and outside, Ignore, `list`, the
+card pulled out and Off. The SHA-256 of all their replies was taken on the core before this
+seed and is kept in the test, the member `clock_storage` taken out, which the next task adds.
+
+**Resolution.** `tests/core/test_internal_clocks.py` (`AShowWithoutClocks`).
+
+## Seed 61: the board's clock taken back in while nothing plays
+
+**Question.** In Between animations, when nothing plays because every ordinary animation is
+ignored, an Ignore taken off an animation of the show plays it at once as a turn of the
+playlist. Is a face or a message of the board's own Clocks subtree taken back in so played?
+
+**Answer.** No. While the clocks are on, it is passed over as every playlist passes over the
+Clocks subtree: an Ignore taken off it starts the playlist's first animation, as one taken
+off a card's file does, and Between stays dark while there is none; the clock plays in the
+breaks. While the clocks are off it plays at once, as any animation does.
+
+**Resolution.** `core/src/player.cpp` (`player_inclusion_changed`),
+`tests/core/test_internal_clocks.py`
+(`test_the_boards_clock_taken_back_in_while_nothing_plays_is_passed_over`).
+
+## Seed 61: the storage of the animation playing in Clocks only is not told by its id
+
+**Question.** Requirement 3.4 and the entry above on the storage of the clock playing now
+say that `status` names a file of the board's own storage with an id of 60,000 or less, so
+that a client tells the storage by the id. The ids of the show's items go from 1 to 65,535:
+a face of the board's own storage may have the id 60,500. Is the rule sound?
+
+**Answer.** Only for folders: a folder of the board's own storage has an id of 60,000 or
+less, and a card's folder one of 60,001 or more, and an animation with an id of 60,000 or
+less is the board's own. The storage of an animation is told by its row of `list`,
+`external`, in the lists of the Clocks folders of both storages. Requirements 3.4 and 6.6
+and the design's bar of the animation playing now say so; the app's `Internal` and
+`External` of task 3 are built on the row, not on the id alone.
+
+**Resolution.** `docs/commands.md` (`clock_only`),
+`docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (3.4, 6.6),
+`docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The app").
+
+## Seed 61: an APK before this seed in Clocks only with the board's Clocks folder
+
+**Question.** The design says an APK before this seed, on a target whose card has no Clocks
+folder, lists the board's own `clocks` as the Clocks level and plays inside it. Its
+`inClockFolder` takes no row of the board's own storage, `"external":false`, as inside
+Clocks, and its `canEnter` opens only a card's folder. What does it do?
+
+**Answer.** It lists the board's own `clocks` as the level, from `clock_only.folder`, but
+Play is disabled on each of its files, with the words of the boundary, and its sub-folder
+`message` cannot be opened; `Restart clocks`, `play <clock_only.folder>`, is all it can
+do there, and its uploads in Only still need a writable card. The verification of the seed
+and the owner's phone check describe that, and the APK of this seed is delivered with the
+firmware.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("Older
+clients, older firmware"), `app/www/client.js` (`inClockFolder`, `canEnter`) as it is.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

@@ -6,6 +6,7 @@
 #include "ignored.h"
 #include "mapping_control.h"
 #include "player.h"
+#include "show.h"
 #include "storage.h"
 
 #include <string.h>
@@ -211,12 +212,99 @@ bool breaks_passes_over(const Core &core, uint32_t at) {
 }
 
 namespace {
+
+// Whether an item of the show is an animation whose file is of a class.
+bool of_kind(const Core &core, uint32_t item, uint8_t kind) {
+    return !core.items[item].is_cycle && core.files[core.items[item].first].clock == kind;
+}
+
+// The number of the show's animations of a class.
+uint32_t kind_count(const Core &core, uint8_t kind) {
+    uint32_t count = 0;
+    for (uint32_t item = 0; item < core.item_count; ++item) {
+        count += of_kind(core, item, kind) ? 1 : 0;
+    }
+    return count;
+}
+
+// The position of the show's n-th animation of a class, counted from 0 in the item table.
+uint32_t kind_item(const Core &core, uint8_t kind, uint32_t nth) {
+    for (uint32_t item = 0; item < core.item_count; ++item) {
+        if (of_kind(core, item, kind) && nth-- == 0) {
+            return item;
+        }
+    }
+    return kNothing;
+}
+
+// Whether two names are the same but for the case of ASCII letters.
+bool same_name(const char *one, const char *other) {
+    for (;; ++one, ++other) {
+        char a = *one;
+        char b = *other;
+        a = a >= 'A' && a <= 'Z' ? static_cast<char>(a - 'A' + 'a') : a;
+        b = b >= 'A' && b <= 'Z' ? static_cast<char>(b - 'A' + 'a') : b;
+        if (a != b) {
+            return false;
+        }
+        if (a == '\0') {
+            return true;
+        }
+    }
+}
+
+// Whether a text begins with another.
+bool begins_with(const char *text, const char *head) {
+    for (; *head != 0; ++text, ++head) {
+        if (*text != *head) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Marks the show's files of a class that are copies of a file of the card's folder of that
+// class that plays automatically: the same name in any case after the folder's path, and
+// the same known type. Every other file of the class is unmarked. The card's `count` files
+// from `first` on are each read once.
+ODRIG_NOINLINE void mark_copies(Core &core, uint8_t kind, uint32_t first, uint32_t count) {
+    for (uint32_t file = 0; file < core.file_count; ++file) {
+        if (core.files[file].clock == kind) {
+            core.files[file].copy = 0;
+        }
+    }
+    const char *folder = kind == kClockMessage ? "clocks/message/" : "clocks/";
+    const uint32_t length = kind == kClockMessage ? 15 : 7;
+    for (uint32_t at = 0; at < count; ++at) {
+        if (!drive_automatic(core, first + at)) {
+            continue;
+        }
+        const DriveRow *row = drive_row(core, first + at);
+        if (row == nullptr || row->type < kTypeFrames || row->type > kTypeWidget || !begins_with(row->name, folder)) {
+            continue;
+        }
+        for (uint32_t file = 0; file < core.file_count; ++file) {
+            FileInfo &info = core.files[file];
+            if (info.clock == kind && info.type == row->type && same_name(stored_base(info.name), row->name + length)) {
+                info.copy = 1;
+            }
+        }
+    }
+}
+
+// The next clock or message in its bag: the card's files of its folder, then the show's
+// animations of its class. A card's file is taken when it plays automatically; one of the
+// show's when it plays and, while the card's copies are preferred, is no copy of a card's
+// file that plays, which the draw marks once, the first time it comes to one of them.
 uint32_t pick(Core &core, uint64_t at, bool message) {
+    const uint8_t kind = message ? kClockMessage : kClockFace;
     const uint32_t first = message ? core.message_first : core.clocks_first;
-    const uint32_t count = message ? core.message_files : core.clocks_files;
+    const uint32_t external = message ? core.message_files : core.clocks_files;
+    const uint32_t count = external + kind_count(core, kind);
     uint32_t &key = message ? core.message_order_key : core.order_key;
     uint32_t &next = message ? core.message_order_next : core.order_next;
     uint32_t &size = message ? core.message_order_count : core.order_count;
+    bool marked = false;
     // At most two whole orders are tried: what is left of this one, and a new one.
     for (uint32_t tried = 0; count != 0 && tried < 2 * count; ++tried) {
         if (next >= size || size != count) {
@@ -224,14 +312,32 @@ uint32_t pick(Core &core, uint64_t at, bool message) {
             size = count;
             next = 0;
         }
-        const uint32_t position = first + clock_shuffle(key, size, next++);
-        if (drive_automatic(core, position)) {
-            return kDriveBase + position;
+        const uint32_t place = clock_shuffle(key, size, next++);
+        if (place < external) {
+            if (drive_automatic(core, first + place)) {
+                return kDriveBase + first + place;
+            }
+            continue;
         }
+        const uint32_t item = kind_item(core, kind, place - external);
+        if (item == kNothing || !player_plays(core, item)) {
+            continue;
+        }
+        if (!core.clock_storage_internal) {
+            if (!marked) {
+                mark_copies(core, kind, first, external);
+                marked = true;
+            }
+            if (core.files[core.items[item].first].copy) {
+                continue;
+            }
+        }
+        return item;
     }
     return kNothing;
 }
-}
+
+}  // namespace
 
 uint32_t breaks_pick(Core &core, uint64_t at) { return core.clocks_error ? kNothing : pick(core, at, false); }
 uint32_t breaks_message(Core &core, uint64_t at) { return core.clocks_error ? kNothing : pick(core, at, true); }
@@ -241,6 +347,7 @@ const char *breaks_mode(const Core &core) {
 }
 
 const char *breaks_only_state(const Core &core) {
+    if (core.clocks_internal_id != 0) return core.playing == kNothing ? "no-clocks" : "playing";
     if (core.drive_number == 0) return "no-card";
     if (core.clocks_id == 0) return "missing-folder";
     return core.playing == kNothing ? "no-clocks" : "playing";
@@ -249,7 +356,10 @@ const char *breaks_only_state(const Core &core) {
 bool breaks_position_allowed(const Core &core, uint32_t position) {
     if (core.clocks_error) return false;
     if (core.clocks_on != kClocksOnly) return true;
-    return core.clocks_id != 0 && is_drive(position) && position - kDriveBase >= core.clocks_first && position - kDriveBase < core.clocks_last;
+    if (!is_drive(position)) {
+        return position < core.item_count && !core.items[position].is_cycle && core.files[core.items[position].first].clock != kNotClock;
+    }
+    return core.clocks_id != 0 && position - kDriveBase >= core.clocks_first && position - kDriveBase < core.clocks_last;
 }
 
 bool breaks_folder_allowed(const Core &core, uint32_t ordinal) {
@@ -262,6 +372,9 @@ bool breaks_folder_allowed(const Core &core, uint32_t ordinal) {
 bool breaks_has_face(const Core &core) {
     for (uint32_t i = 0; i < core.clocks_files; ++i) {
         if (drive_automatic(core, core.clocks_first + i)) return true;
+    }
+    for (uint32_t item = 0; item < core.item_count; ++item) {
+        if (of_kind(core, item, kClockFace) && player_plays(core, item)) return true;
     }
     return false;
 }
