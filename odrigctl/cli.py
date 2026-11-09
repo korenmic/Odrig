@@ -11,6 +11,7 @@ import os
 import signal
 import sys
 import time
+import urllib.parse
 
 from . import client, content
 
@@ -24,15 +25,18 @@ COMMANDS = {
     "fault": (),
     "space": (),
     "list": (),
-    "read": ("ID", "OFFSET"),
+    "read": ("ID", "OFFSET", "[COUNT]"),
     "catalog": ("[OPERATION]",),
     "remove": ("ID",),
     "ignore": ("ID", "VALUE"),
     "mapping": ("OPERATION",),
     "order": ("OPERATION",),
     "repeat": ("ID", "N", "[save]"),
+    "saved": ("ID",),
     "clocks": ("OPERATION",),
     "debug": ("mini", "on|off"),
+    "folder": ("OPERATION",),
+    "move": ("external", "ID", "PATH"),
     "upload": ("ID", "FILE"),
 }
 # What an upload came to, beside its reply: a reply that does not report success leaves the
@@ -68,7 +72,7 @@ def parser():
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it. "
                     "With --log and no command it prints the lines of the target's log as they arrive, until it is stopped.",
-        epilog="Commands: play ID, play all, on, off, brightness N, brightness ID N save, brightness ID default, status, fault, space, list, list in ID [FROM], read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, mapping test snake N, order get [FROM], order get in ID [FROM], order move REV ID BEFORE, repeat ID N, repeat ID N save, repeat ID default, clocks on|off|only, clocks message on|off, upload ID FILE, upload --external FILE, debug mini on|off. ID and N are sent as they are typed; list and order get without FROM print a reply for each part.",
+        epilog="Commands: play ID, play all, on, off, brightness N, brightness ID N save, brightness ID default, status, fault, space, list, list in ID [FROM], read ID OFFSET [COUNT], catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, mapping test snake N, order get [FROM], order get in ID [FROM], order move REV ID BEFORE, repeat ID N, repeat ID N save, repeat ID default, saved ID, clocks on|off|only, clocks message on|off, upload ID FILE, upload --folder PATH ID FILE, upload --external FILE, debug mini on|off, folder make internal|external PATH, folder remove ID, move external ID PATH (PATH / for the card's root). ID and N are sent as they are typed; list and order get without FROM print a reply for each part.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
@@ -77,8 +81,9 @@ def parser():
     made.add_argument("--timeout", metavar="SECONDS", type=_seconds, default=TIMEOUT_SECONDS, help="how long to wait for a reply (default: 2)")
     made.add_argument("--log", action="store_true", help="print each line of the target's log as it arrives, until stopped, and send nothing; with --port or --tcp, and no command")
     made.add_argument("--external", action="store_true", help="with upload: send the FILE to the target's drive, which takes no ID")
+    made.add_argument("--folder", metavar="PATH", help="with upload: send the FILE into this folder of the target's own storage")
     made.add_argument("command", metavar="COMMAND", nargs="?", choices=list(COMMANDS), help=", ".join(COMMANDS))
-    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, or ID N save or ID default of brightness, the ID and the N of repeat with save after them or default in the place of N, the ID and the OFFSET of read, rebuild internal, rebuild external or cancel of catalog, on, off, only, message on or message off of clocks, the ID and the FILE of upload, the FILE of upload --external")
+    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, or ID N save or ID default of brightness, the ID and the N of repeat with save after them or default in the place of N, the ID, the OFFSET and the COUNT of read, rebuild internal, rebuild external or cancel of catalog, on, off, only, message on or message off of clocks, the ID and the FILE of upload, the FILE of upload --external")
     return made
 
 
@@ -89,6 +94,10 @@ def checked(made, arguments):
     command without `--log`."""
     if arguments.external and arguments.command != "upload":
         made.error("--external goes with upload")
+    if arguments.folder is not None and (arguments.command != "upload" or arguments.external):
+        made.error("--folder goes with upload, and not with --external")
+    if arguments.folder is not None and (not arguments.folder or any(character in arguments.folder for character in "\r\n")):
+        made.error("--folder takes the path of a folder, on one line")
     if arguments.log:
         if arguments.http is not None:
             made.error("--log goes with --port or --tcp")
@@ -137,6 +146,13 @@ def checked(made, arguments):
         if any("\n" in word or "\r" in word for word in words):
             made.error("a command is one line")
         return [arguments.command, *words]
+    if arguments.command == "read":
+        words = arguments.arguments
+        if len(words) not in (2, 3):
+            made.error("read takes ID OFFSET, or ID OFFSET COUNT")
+        if any("\n" in word or "\r" in word for word in words):
+            made.error("a command is one line")
+        return [arguments.command, *words]
     if arguments.command == "repeat":
         words = arguments.arguments
         if not (len(words) == 2 or (len(words) == 3 and words[2] == "save")):
@@ -148,6 +164,25 @@ def checked(made, arguments):
         if arguments.arguments not in (["mini", "on"], ["mini", "off"]):
             made.error("debug takes mini on or mini off")
         return [arguments.command, *arguments.arguments]
+    if arguments.command == "folder":
+        words = arguments.arguments
+        if len(words) == 2 and words[0] == "remove" and words[1]:
+            if any(character in words[1] for character in "\r\n"):
+                made.error("a command is one line")
+            return [arguments.command, *words]
+        if len(words) != 3 or words[:2] not in (["make", "internal"], ["make", "external"]) or not words[2]:
+            made.error("folder takes make internal PATH, make external PATH, or remove ID")
+        if any(character in words[2] for character in "\r\n"):
+            made.error("a command is one line")
+        return [arguments.command, *words[:2], "/".join(urllib.parse.quote(part, safe="") for part in words[2].split("/"))]
+    if arguments.command == "move":
+        words = arguments.arguments
+        if len(words) != 3 or words[0] != "external" or not words[2]:
+            made.error("move takes external ID PATH, PATH / for the card's root")
+        if any(character in word for word in words for character in "\r\n"):
+            made.error("a command is one line")
+        path = words[2] if words[2] == "/" else "/".join(urllib.parse.quote(part, safe="") for part in words[2].split("/"))
+        return [arguments.command, *words[:2], path]
     if arguments.command == "clocks":
         words = arguments.arguments
         if words not in (["on"], ["off"], ["only"], ["message", "on"], ["message", "off"]):
@@ -216,6 +251,15 @@ class Progress:
             self.width = 0
 
 
+def upload_name(folder, file):
+    """The name `upload begin` gives a file: its name, after the path of a folder of the
+    target's own storage when one is given, each part escaped for a URI."""
+    name = os.path.basename(file)
+    if folder is None:
+        return name
+    return "/".join(urllib.parse.quote(part, safe="") for part in [*folder.split("/"), name])
+
+
 def _print(reply):
     print(reply.decode("utf-8", "replace"))
 
@@ -261,7 +305,7 @@ def main(argv=None):
             if arguments.command == "upload":
                 progress = Progress(sys.stderr)
                 try:
-                    reply = content.upload(session, words[1], os.path.basename(words[2]), data, progress.sent, progress.checking)
+                    reply = content.upload(session, words[1], upload_name(arguments.folder, words[2]), data, progress.sent, progress.checking)
                 finally:
                     progress.close()
             else:

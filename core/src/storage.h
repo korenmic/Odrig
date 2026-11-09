@@ -19,6 +19,10 @@ const char kPending[] = "pending.txt";      // the `.odrg` names a change makes 
 // it gathers them in.
 const uint32_t kChunkSize = 1500;
 
+// Where each page's count and CRC-32 wait in the chunk buffer while a rebuild of a catalog
+// runs, six bytes a page. A command between two steps of a rebuild may use the bytes before.
+const uint32_t kKeptPages = 1400;
+
 // The most bytes of `pending.txt` the core reads at its start.
 const uint32_t kPendingSize = 1500;
 
@@ -41,6 +45,10 @@ void storage_settle_pending(Core &core);
 // names and no item names, and then `pending.txt`, which it reads with `read_at`. True when
 // nothing is left to clean up; a change is made only then.
 bool storage_cleanup(Core &core);
+
+// The stored name of the file of the open upload to the storage, into room for
+// kStoredNameRoom characters: its name, after its folder's number when it has one.
+void upload_stored_name(const Upload &upload, char *into);
 
 // Puts the upload whose check has passed in place: its file under its name, and its item
 // into the show in storage and then into the tables, as a new last item or in place of

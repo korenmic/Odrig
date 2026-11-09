@@ -17,6 +17,9 @@ MOST_STORAGE = 4294967295
 
 LONGEST_NAME = 32
 NAME_CHARACTERS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789-_.")
+# The bytes a numbered folder of the storage takes, as the board's file system gives it two
+# blocks.
+FOLDER_BYTES = 8192
 
 # The most places of a drive's list that a name is bound to, how often the folder of a
 # drive is looked for, and the beginning of the name the core gives a file of the drive.
@@ -229,9 +232,9 @@ class FolderHost:
                 return -1
             self._opened(name, path)
             return 1
-        if not name or "/" in name or "\\" in name or os.sep in name or (os.altsep and os.altsep in name):
+        path = self._path(name)
+        if path is None:
             return -1
-        path = os.path.join(self.folder, name)
         try:
             self._file = reading(path)
         except FileNotFoundError:
@@ -320,16 +323,28 @@ class FolderHost:
         if self.verbose:
             print(f"core: {text}", file=sys.stderr, flush=True)
 
+    @staticmethod
+    def _number(name):
+        """The number of a numbered folder of the storage, 1 to 255 without a leading zero,
+        or 0 for a name that is no such number."""
+        if not name or len(name) > 3 or not name.isascii() or not name.isdigit() or name[0] == "0" or int(name) > 255:
+            return 0
+        return int(name)
+
     def _path(self, name):
         """The place of a file in the folder, or `None` for a name that is not one the core
         may use: 1 to 32 characters of a-z, 0-9, `-`, `_` and `.`, and not made of dots
-        alone. Such a name has no path separator, so the place is in the folder. A name
-        `drive/<name>` is the file of that name of the drive, when it can be written."""
+        alone, alone or after the number of a folder of the storage and `/`, which is a
+        folder of the folder. A name `drive/<name>` is the file of that name of the drive,
+        when it can be written."""
         if self._of_the_drive(name):
             return self.drive.path(name, changing=True)
-        if not name or len(name) > LONGEST_NAME or not NAME_CHARACTERS.issuperset(name) or not name.strip("."):
+        folder, slash, base = name.rpartition("/")
+        if slash and not self._number(folder):
             return None
-        return os.path.join(self.folder, name)
+        if not base or len(base) > LONGEST_NAME or not NAME_CHARACTERS.issuperset(base) or not base.strip("."):
+            return None
+        return os.path.join(self.folder, folder, base) if folder else os.path.join(self.folder, base)
 
     def _give_up(self):
         """Closes the file being written, if any, without making it whole."""
@@ -410,12 +425,35 @@ class FolderHost:
             return -1
         return 1
 
+    def make_folder(self, name):
+        """Makes a folder of the drive, `drive/<path>`, whose parent is there, or the
+        numbered folder `<n>` of the storage: 1 when the folder is there afterwards, -1 on a
+        failure and when a file has that name."""
+        if self._number(name):
+            path = os.path.join(self.folder, name)
+        else:
+            path = self._path(name) if self._of_the_drive(name) else None
+        if path is None:
+            return -1
+        try:
+            os.mkdir(path)
+        except FileExistsError:
+            pass
+        except OSError:
+            return -1
+        return 1 if os.path.isdir(path) else -1
+
     def remove(self, name):
         """Removes a file: 1 when it removed one, 0 when there was none, -1 on a failure. A
-        file being written under the name is given up."""
+        file being written under the name is given up. The number of a folder of the storage,
+        or the path of a folder of the drive, removes that folder while it is empty."""
+        if self._number(name):
+            return self._remove_folder(os.path.join(self.folder, name))
         path = self._path(name)
         if path is None:
             return -1
+        if self._of_the_drive(name) and os.path.isdir(path):
+            return self._remove_folder(path)
         if self._written_name == name:
             self._give_up()
         self._drop_second(name)
@@ -427,16 +465,35 @@ class FolderHost:
             return -1
         return 1
 
+    @staticmethod
+    def _remove_folder(path):
+        """Removes an empty folder: 1, 0 when there was none, -1 while it holds anything."""
+        try:
+            os.rmdir(path)
+        except FileNotFoundError:
+            return 0
+        except OSError:
+            return -1
+        return 1
+
     def space(self):
         """`(free, total)` in bytes, as the board would report them for the files of the
-        folder: the total less the size of each file rounded up to a whole block, and not
-        below 0. `None` when the folder cannot be listed."""
+        folder: the total less the size of each file rounded up to a whole block and two
+        blocks for each numbered folder, and not below 0. `None` when the folder cannot be
+        listed."""
         used = 0
         try:
             with os.scandir(self.folder) as entries:
                 for entry in entries:
                     if entry.is_file():
                         used += -(-entry.stat().st_size // STORAGE_BLOCK) * STORAGE_BLOCK
+                    elif entry.is_dir() and self._number(entry.name):
+                        # A numbered folder of the storage and the files in it.
+                        used += FOLDER_BYTES
+                        with os.scandir(entry.path) as inside:
+                            for file in inside:
+                                if file.is_file():
+                                    used += -(-file.stat().st_size // STORAGE_BLOCK) * STORAGE_BLOCK
         except OSError:
             return None
         return max(0, self.storage - used), self.storage
