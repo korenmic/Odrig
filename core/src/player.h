@@ -48,8 +48,18 @@ void player_play_all(Core &core, uint32_t from);
 uint32_t player_first_animation(const Core &core);
 
 // The position of the first animation of the current playlist in the exhausting order, or
-// of the root's in its place: an item or a drive's animation, or kNothing.
+// of the root's in its place: an item or a drive's animation, or kNothing. In Clocks only,
+// the first face that plays, of the preferred storage and then of the other.
 uint32_t player_first_in_playlist(const Core &core);
+
+// Whether a position of the playlist holds an animation that plays automatically: an
+// animation item of the show that is neither ignored, nor in an ignored internal folder,
+// nor unavailable, or a file of the drive that is in the playlist.
+bool player_plays(const Core &core, uint32_t position);
+
+// The show's usable animation of an internal folder ranked from `low` to before `high`
+// with the smallest walk key, ignored or not; kNothing when there is none.
+uint32_t player_first_usable(const Core &core, uint32_t low, uint32_t high);
 
 // A playlist was chosen at a moment, by a command or by the rotation: its window begins
 // there, nothing resumes after a jump, and whether the root plays in its place is judged

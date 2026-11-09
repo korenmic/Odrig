@@ -253,7 +253,9 @@ The shared code of `app/www`, which the emulator's Controller and the APK both r
   storage by its folder alone. The preview of an upload keeps its place (target, storage,
   name) as for any folder of the board's own storage; nothing of it changes.
 - **The animation playing now.** `screens/show.js` and `screens/brightness.js` write a file
-  whose path begins with `clocks/` with its storage, told by the id of `animation`: `Now 12
+  whose path begins with `clocks/` with its storage, told by the row of the id of
+  `animation` in the lists of the Clocks folders of both storages (`external`), as a show's
+  id may be above 60,000: `Now 12
   Internal /clocks/message/v7-the-time.odrgx`, `Animation 60004: External
   /clocks/analog.odrgx`. Other files read as today.
 - **`messages.js`.** The Only refusals of `play` and `upload` speak of the clocks folders.
@@ -374,8 +376,10 @@ python -c "import hashlib,pathlib; [print(hashlib.sha256(p.read_bytes()).hexdige
 
 - An APK before this seed ignores `clock_storage`. Its Clocks level in Only is the folder
   that `clock_only.folder` names, so on a target whose card has no Clocks folder it lists
-  the board's own `clocks` as that level and plays inside it; it never shows the two
-  Clocks folders together, and its uploads in Only still need a writable card. The APK of
+  the board's own `clocks` as that level; but it takes no file or folder of the board's
+  own storage as inside Clocks, so Play is disabled on each of its files and its
+  sub-folders cannot be opened, and `Restart clocks` alone works there. It never shows the
+  two Clocks folders together, and its uploads in Only still need a writable card. The APK of
   this seed is delivered with the firmware (task 5), as seed 74's must be.
 - An APK of this seed with an older firmware sees no `clock_storage`: the dropdown is
   disabled and the boundary is the card's alone, which is what such a firmware plays.

@@ -7,7 +7,7 @@ seed 74's folders of the board's own storage and seeds 66 and 67's Clocks-only b
 Before a commit: `python core/build.py shared`, and the suites the task names with
 `python tests/run.py --suites ...`.
 
-- [ ] 1. Play the board's own clocks and messages in both modes, the SD card's copy first
+- [x] 1. Play the board's own clocks and messages in both modes, the SD card's copy first
   - `FileInfo.clock` and `FileInfo.copy` in the spare bits of byte 38 and
     `Core.clocks_internal_id` in the end padding, the class and the id set by
     `folders_derive` and cleared on its early returns and by `folders_start`;

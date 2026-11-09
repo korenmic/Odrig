@@ -66,16 +66,25 @@ const uint32_t kStoredNameRoom = 37;
 // check has read it whole in this boot, kCheckedFromCatalog when they came from the
 // storage's catalog. `rank` is 0 for a file at the root and for one whose folder
 // `folders.txt` does not name, else 1 and the index of its folder's line there; `held` says
-// that its folder or one above it is ignored.
+// that its folder or one above it is ignored. `clock` is the class its folder gives it in
+// the Clocks subtree of the internal storage: kClockFace in the folder `clocks`,
+// kClockMessage in `clocks/message`, kClockBelow in another folder below `clocks`, else
+// kNotClock. `copy` marks a file of a class that is a copy of a card's file of that class:
+// it is written by a draw of the clocks before that draw reads it, and read nowhere else.
 const uint8_t kCheckedRead = 1;
 const uint8_t kCheckedFromCatalog = 2;
+const uint8_t kNotClock = 0;
+const uint8_t kClockFace = 1;
+const uint8_t kClockMessage = 2;
+const uint8_t kClockBelow = 3;
 struct FileInfo {
     char name[kStoredNameRoom];
     uint8_t fault;
     uint8_t checked : 2;
     uint8_t type : 2;
     uint8_t held : 1;
-    uint8_t spare : 3;
+    uint8_t clock : 2;
+    uint8_t copy : 1;
     uint8_t rank : 6;
     uint8_t spare_rank : 2;
     uint32_t bytes;
@@ -757,6 +766,8 @@ struct Core {
     uint8_t rotation : 2;
     uint8_t rotation_error : 1;
     uint8_t clocks_error : 1;
+    // The storage whose copy of a clock or a message plays: 0 the card's, 1 the board's own.
+    uint8_t clock_storage_internal : 1;
 
     // Whether the saved repeats of a drive without a catalog are to be read before its files
     // are checked.
@@ -845,6 +856,9 @@ struct Core {
     // show every reading of it; and whether the file could not be read in this boot.
     uint8_t internal_folders : 6;
     uint8_t folders_error : 1;
+
+    // The id of the internal folder `clocks`, 0 while there is none.
+    uint16_t clocks_internal_id;
 
 };
 

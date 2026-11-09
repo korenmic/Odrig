@@ -197,9 +197,11 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text(",\"brightness\":");
     reply.number(mini_brightness(core));
     reply.text("}");
+    // In Clocks only, the folder `clocks` of the card when it has one, else the internal one.
+    const uint32_t clocks_folder = core.clocks_id != 0 ? core.clocks_id : core.clocks_internal_id;
     reply.text(",\"playing\":");
-    if (core.clocks_on == kClocksOnly && core.playing == kPlaylist && core.clocks_id != 0) {
-        reply.number(core.clocks_id);
+    if (core.clocks_on == kClocksOnly && core.playing == kPlaylist && clocks_folder != 0) {
+        reply.number(clocks_folder);
     } else if (core.playing == kPlaylist && playlist_is_folder(core)) {
         // The playlist of an internal folder, or of a folder of the drive while the drive
         // is in and holds it.
@@ -305,7 +307,7 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
         reply.text("null");
     }
     reply.text(",\"playlist\":");
-    if (core.clocks_on == kClocksOnly && core.playing == kPlaylist && core.clocks_id != 0) {
+    if (core.clocks_on == kClocksOnly && core.playing == kPlaylist && clocks_folder != 0) {
         reply.text("\"clocks\"");
     } else if (core.playing == kPlaylist && (core.current & kInternalLevel) != 0 && core.playlist_path != nullptr) {
         reply.text("\"");
@@ -326,7 +328,7 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text("\",\"clock_only\":");
     if (core.clocks_on == kClocksOnly) {
         reply.text("{\"folder\":");
-        if (core.clocks_id != 0) reply.number(core.clocks_id);
+        if (clocks_folder != 0) reply.number(clocks_folder);
         else reply.text("null");
         reply.text(",\"state\":\"");
         reply.text(breaks_only_state(core));
@@ -340,11 +342,30 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     return reply.length;
 }
 
+// `play <id>` in Clocks only: an animation or a folder inside the Clocks subtree of either
+// storage plays as a manual turn, and the folder `clocks` of either restarts the clocks.
 uint32_t play_only(Core &core, uint32_t id, bool all, Reply &reply) {
     if (core.clocks_error) return refuse(reply, "storage-error");
     if (all) return refuse(reply, "in-use");
-    if (core.clocks_id != 0 && id == core.clocks_id) {
+    if ((core.clocks_id != 0 && id == core.clocks_id) || (core.clocks_internal_id != 0 && id == core.clocks_internal_id)) {
         player_only_restart(core);
+        return succeed(reply);
+    }
+    for (uint32_t position = 0; position < core.item_count; ++position) {
+        if (core.items[position].id != id) continue;
+        if (!breaks_position_allowed(core, position)) return refuse(reply, "in-use");
+        if (!item_usable(core, position)) return refuse(reply, "unavailable");
+        player_jump(core, position);
+        return succeed(reply);
+    }
+    uint32_t low = 0;
+    uint32_t high = 0;
+    uint8_t clock = kNotClock;
+    if (internal_subtree(core, id, &low, &high, &clock)) {
+        if (clock == kNotClock) return refuse(reply, "in-use");
+        const uint32_t item = player_first_usable(core, low, high);
+        if (item == kNothing) player_only_restart(core);
+        else player_jump(core, item);
         return succeed(reply);
     }
     uint32_t value = 0;

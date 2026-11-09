@@ -65,8 +65,9 @@ void logical_path(const Core &core, const char *stored, char *into);
 // unreadable`.
 void folders_start(Core &core);
 
-// Marks each file of the show with the rank of its folder and whether that folder or one
-// above it is ignored, and finds the current internal playlist's ranks again.
+// Marks each file of the show with the rank of its folder, whether that folder or one above
+// it is ignored and its class in the Clocks subtree, finds the id of the folder `clocks`, and
+// finds the current internal playlist's ranks again.
 void folders_derive(Core &core);
 
 // `folder make internal <path>`: makes the folder, its line and its folder of the storage.
@@ -85,6 +86,11 @@ bool internal_choose(Core &core, uint32_t id);
 
 // The id of the internal folder at a rank, 0 when there is none.
 uint32_t internal_id_at(const Core &core, uint32_t rank);
+
+// The internal folder with this id: the ranks of its subtree, from `low` to before `high`,
+// and the class it gives its own files, kNotClock for a folder outside the Clocks subtree.
+// False when there is none or `folders.txt` cannot be read.
+bool internal_subtree(const Core &core, uint32_t id, uint32_t *low, uint32_t *high, uint8_t *kind);
 
 // Writes the rows of `list` of the internal folders whose parent is the folder `parent`,
 // 0 for the root, from the `skip`-th on, as long as they fit with `tail` bytes after them:

@@ -60,7 +60,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `saved <id>` | Reports the saved brightness and the saved repeat of an animation, and whether it is the show's start. |
 | `clocks on` | Switches the clocks between the animations on, and saves it. |
 | `clocks off` | Switches them off, and saves it. |
-| `clocks only` | Plays only the resolved Clocks subtree, and saves the mode. |
+| `clocks only` | Plays only the resolved Clocks subtrees of the card and of the board's own storage, and saves the mode. |
 | `clocks message on` | Switches the message after each clock on, and saves it. |
 | `clocks message off` | Switches it off, and saves it. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation, `<file>` its name or the path of a folder of the board's own storage and its name; with the file's CRC-32 after `<bytes>`, answers `unchanged` when the last upload installed that file. |
@@ -243,7 +243,7 @@ file's override or latest default without restarting its timing. Missing/null
 | `playlist` | The path of the folder of the board's own storage or of the card's folder whose playlist is current while `playing` is its id, `night/deep`; `null` otherwise. |
 | `clocks`, `clock_message` | Compatibility booleans: `clocks` is true in either enabled mode, and `clock_message` enables the message after a clock. A reply without them comes from a player before them. |
 | `clock_mode` | `off`, `between`, or `only`. Older targets without this member support the existing boolean Off/Between interface. |
-| `clock_only` | `null` outside Only; otherwise `{"folder":ID_OR_NULL,"state":STATE}`, with state `playing`, `no-card`, `missing-folder`, or `no-clocks`. The folder is resolved from the active tree/catalog, never remembered by transient ID. In Only, `playing` names that folder and `playlist` is `clocks` while a turn plays. |
+| `clock_only` | `null` outside Only; otherwise `{"folder":ID_OR_NULL,"state":STATE}`, with state `playing`, `no-card`, `missing-folder`, or `no-clocks`. The folder is the card's folder `clocks` when the card has one, else the board's own, resolved from the active tree/catalog or `folders.txt`, never remembered by transient ID. Without a folder `clocks` of the board's own storage the state is `no-card` without a card, else `missing-folder` without the card's, else `no-clocks` while nothing plays, else `playing`; with one, `playing` while a turn plays, else `no-clocks`. In Only, `playing` names that folder and `playlist` is `clocks` while a turn plays; `file` gives a file of the board's own storage by its path, `clocks/message/v7-the-time.odrgx`, and `animation` its id. The path is the same on both storages. A folder's id tells its storage, 60,000 or less for the board's own and 60,001 or more for the card's, and so does an animation's id of 60,000 or less, the board's own; but an animation of the show may have any id from 1 to 65,535, so a client tells the storage of an animation by its row, `external`, in `list in` of the folders `clocks` and `clocks/message` of each storage. |
 | `clock_error` | Optional `unreadable` when saved policy cannot be established. The effective mode is fail-closed Only, output is dark and the saved mode is unconfirmed. Omitted when confirmed. The board retries at most once a second; an explicit clock-mode save can replace corrupt settings. A message-only change cannot guess the lost policy. |
 | `left` | The whole seconds left in the window of the current playlist, 86,400 down to 0: the 24 hours of running time it plays for before the next playlist is current, a folder's of the board's own storage or of the card, or the root's, see [show.md](show.md#the-playlist). 0 from the window's end until the turn in progress ends. Reported whatever the card holds, a fresh 86,400 each time a playlist becomes current. A reply without `left` comes from a player before it. |
 
@@ -1091,20 +1091,34 @@ Saving closes and reads back all of `clocks.part` before one atomic rename. A fa
 preserves published bytes and active settings; an abandoned part is removed at startup.
 No animation, catalog or show file is rewritten for a mode change.
 
-Only stops outside playback and runs direct files of `clocks` in a shuffled bag, with
+The faces are the direct files of the folders `clocks` of the card and of the board's own
+storage, and the messages those of their folders `clocks/message`: [show.md](show.md#clocks-between-the-animations).
+Both modes draw from one bag of the faces of both storages and one of their messages. A
+card's file and a file of the board's own storage of the same class, the same name but for
+the case of ASCII letters and the same known type are copies: one place of the bag, which
+the card's copy takes when it plays automatically, and the board's only when the card's
+cannot. Each copy keeps its own id for `play`, `read`, edits, brightness, repeats, Ignore,
+quarantine and removal.
+
+Only stops outside playback and runs the faces of both storages in a shuffled bag, with
 one complete direct message from its independent bag after each clock when enabled.
 It has no five-turn/five-minute break recursion. Messages finish a complete declared
 loop, including loops longer than 30 seconds. Own and ancestor Ignore choices apply
 to automatic candidates and are rechecked after changes. Without eligible faces, Only
-stays dark and reports why; it does not fall back to ordinary animations.
+stays dark and reports why; it does not fall back to ordinary animations or messages, and
+with a face of the board's own storage it plays without a card.
 
 Raw command browsing remains unrestricted; the operators' app confines visible browsing
-and upload destinations to Clocks in Only mode. Outside file/folder/cycle play and output-taking mapping
-diagnostics return `in-use` without changing playback. Raw `play all` is also refused;
-the app restarts Clocks with `play <resolved-clocks-folder-id>`.
+and upload destinations to Clocks in Only mode. The boundary holds the folder `clocks` and
+every folder below it of the card and of the board's own storage. Outside file/folder/cycle
+play and output-taking mapping diagnostics return `in-use` without changing playback, and
+an inside file of the board's own storage that is unavailable returns `unavailable`. Raw
+`play all` is also refused; the app restarts Clocks with `play <resolved-clocks-folder-id>`,
+and `play` of either storage's folder `clocks` does the same.
 An explicit inside file remains playable even when ignored or when automatic messages
-are off; an inside subfolder starts its first available file, then the exclusive program
-continues. These actions do not overwrite the saved normal playlist. Leaving Only
+are off; an inside subfolder starts its first available file, by the walk's order on the
+board's own storage, then the exclusive program continues; a subfolder without one restarts
+Clocks. These actions do not overwrite the saved normal playlist. Leaving Only
 restores its valid path, else root, with its window held and no paused break restored.
 
 - `bad-argument`: the words are not one of the five forms.

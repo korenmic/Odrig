@@ -39,9 +39,18 @@ void breaks_poll(Core &core, uint64_t now);
 uint32_t breaks_command(Core &core, bool message, uint8_t value, Reply &reply);
 
 const char *breaks_mode(const Core &core);
+
+// Why Clocks only plays or waits. Without an internal folder `clocks`: `no-card`, else
+// `missing-folder` without the card's folder `clocks`, else `no-clocks` while nothing plays,
+// else `playing`. With one: `playing` while something plays, else `no-clocks`.
 const char *breaks_only_state(const Core &core);
+
+// Whether a position of the playlist may play: outside Clocks only, any; in it, a file of the
+// card's Clocks subtree or an animation of the show whose file is in the internal one.
 bool breaks_position_allowed(const Core &core, uint32_t position);
 bool breaks_folder_allowed(const Core &core, uint32_t ordinal);
+
+// Whether a face of either storage plays automatically.
 bool breaks_has_face(const Core &core);
 
 // The drive's tree was built, found again or cleared, or the positions of its walk moved:
@@ -54,10 +63,12 @@ void breaks_tree(Core &core);
 bool breaks_passes_over(const Core &core, uint32_t at);
 
 // The clock of a break that begins at a moment: the next in the order that plays, as a
-// position of the playlist, a new order drawn when it is used up; kNothing when none plays.
+// position of the playlist, a new order drawn when it is used up or when the number of the
+// faces of both storages changes; kNothing when none plays. A face of the board's own
+// storage that is a copy of a card's face that plays gives its turn to the card's.
 uint32_t breaks_pick(Core &core, uint64_t at);
 
-// The next eligible message in its independent shuffled bag, or kNothing.
+// The next eligible message of both storages in its independent shuffled bag, or kNothing.
 uint32_t breaks_message(Core &core, uint64_t at);
 
 }  // namespace odrig

@@ -68,9 +68,10 @@ the entry links to it.
 - **turn**: The time an animation has in the playlist before the next one starts: unless
   the show says otherwise, the fewest whole loops that last 30 seconds. See
   [show.md](../docs/show.md#the-turn-of-an-animation).
-- **clock break**: While the clocks are on, a turn of a clock from the card's folder `clocks`,
-  after every 5 turns or when 5 minutes have passed, then the message of its sub-folder
-  `message` once while it is on. A turn the 5 minutes cut goes on after it from where it was. See
+- **clock break**: While the clocks are on, a turn of a clock from the folder `clocks` of the
+  card or of the board's own storage, after every 5 turns or when 5 minutes have passed, then
+  a message from the sub-folder `message` of either once while it is on. A turn the 5
+  minutes cut goes on after it from where it was. See
   [show.md](../docs/show.md#clocks-between-the-animations).
 - **installed file set**: The one folder of files that a show is installed as:
   `mapping.json`, `show.json` and the `.odrg` files the show names. Whatever plays a show

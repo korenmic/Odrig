@@ -404,15 +404,20 @@ never writes two.
 
 While the clocks are on, `clocks on` of [commands.md](commands.md#clocks-between-the-animations),
 the playlist has a break now and then: a turn of a clock, and, while the message is on and
-there is one, one loop of the message after it. The clocks are the animation files directly
-in the folder `clocks` of a card's folder `odrig`, at its first level, and each message is
-the next eligible direct file in an independent shuffled bag of `clocks/message`; the show's own animations
-are never clocks, nor is a file of another sub-folder of `clocks`. While both settings are
-off, the player plays as the rest of this page says.
+there is one, one loop of the message after it. The clocks, or faces, are the animation files
+directly in the folder `clocks` of a card's folder `odrig`, at its first level, and those of
+the board's own folder `clocks`, [Internal folders](core.md#internal-folders); each message
+is the next eligible direct file of the folders `clocks/message` of both, in an independent
+shuffled bag. An animation at the root of the board's storage, in a folder `folders.txt`
+does not name or in any other of its folders, and every animation of a boot that cannot
+read `folders.txt`, is never a clock, nor is a file of another sub-folder of `clocks` of
+either storage, such as `clocks/old`; a message is never a face, nor a face a message. While
+both settings are off, the player plays as the rest of this page says.
 
 - **The folders are the breaks'.** While the clocks are on, every playlist passes over the
-  folder `clocks` and every folder below it, as it passes over an ignored animation: the
-  root's walk, a folder's, the first animation of a playlist, and a folder whose files are
+  folder `clocks` and every folder below it, of the card and of the board's own storage, as
+  it passes over an ignored animation: the root's walk, a folder's, the rotation's
+  playlists, the first animation of a playlist, and a folder whose files are
   all in them, which has nothing to play, so that the root plays in its place. A `play
   <id>` of one of their files plays its turn as a jump; a `play <id>` of one of the folders
   makes it current, and the root plays in its place. While the clocks are off they are
@@ -436,10 +441,24 @@ off, the player plays as the rest of this page says.
   turns as turns: `animation`, `repeat`, `loop` and `saved` are the clock's or the
   message's, and `playing` stays the playlist's.
 - **The order of the clocks.** Each break takes the next clock of an order drawn at random
-  among all the orders of the clocks there are, each once; a clock that cannot play when
-  its place comes is passed over. When the order is used up a new one is drawn, and the
-  last clock of one may be the first of the next. A new order is drawn at the start, when a
-  card is taken up or dropped, and when its tree changes.
+  among all the orders of the clocks there are, the card's and the board's together, each
+  once; a clock that cannot play when its place comes is passed over. When the order is used
+  up a new one is drawn, and the last clock of one may be the first of the next. A new order
+  is drawn at the start, when a card is taken up or dropped, when its tree changes, and when
+  the number of the clocks of both storages changes. A card's clock followed by a message of
+  the board's storage, or the board's clock by a card's message, is a break as any other.
+  Without a clock of either storage no break comes, whatever messages there are.
+- **Copies.** A card's file and a file of the board's own storage of the same class, face
+  or message, whose names are the same but for the case of ASCII letters, so with the same
+  path `clocks/<name>` or `clocks/message/<name>`, and whose types the catalog or the check
+  gives as the same, frames, text or widget, are copies: they make one place of the order,
+  also when their bytes differ. The card's copy plays when it can; the board's plays in its
+  place only when the card's cannot: ignored by its own or an inherited Ignore, left out for
+  a fault, removed, or on a card that is out. A file whose type is not known yet is no copy.
+  Each copy keeps its own id, saved brightness, repeat and Ignore, and `play` of either plays
+  that one. A card taken up is taken at the next draw: the turn in progress plays to its end,
+  and so does the board's copy that the start of Clocks only drew before the card was taken
+  up.
 - **The order of messages.** Messages have their own shuffled bag in both enabled modes.
   Every eligible direct message is taken before that bag reshuffles; ignored files and
   descendants of ignored folders are passed over. A message turn is one complete loop,
@@ -459,16 +478,22 @@ off, the player plays as the rest of this page says.
 
 ### Clocks only
 
-`clocks only` uses the same two bags in a separate scheduler: a clock, optionally a
-complete message, then the next clock. It does not run normal breaks or folder-window
-rotation. The normal playlist path and its window stay saved, and leaving Only resumes
-that valid playlist, else root, without restoring a paused break. A global restart
-uses `play <resolved-clocks-folder-id>`; raw `play all` is refused. An explicit inside
-file or subfolder is a manual turn before the
-exclusive program continues. Outside play and output-taking diagnostics are refused.
+`clocks only` uses the same two bags, over the card and the board's own storage, in a
+separate scheduler: a clock, optionally a complete message, then the next clock. It does
+not run normal breaks or folder-window rotation. The normal playlist path and its window
+stay saved, and leaving Only resumes that valid playlist, else root, without restoring a
+paused break. A global restart uses `play <resolved-clocks-folder-id>`, the card's folder
+`clocks` when the card has one, else the board's, and `play` of either restarts the
+clocks; raw `play all` is refused. An explicit inside file or subfolder of either
+storage's Clocks subtree is a manual turn before the exclusive program continues. Outside
+play and output-taking diagnostics are refused. With a face of the board's own storage,
+Only plays without a card.
 
-Only remains selected when media is absent, Clocks is missing or no face is eligible.
-Output stays dark and responsive with the reason in `clock_only`; a relevant media or
-inclusion change retries selection. Raw command browsing is unrestricted; the operators'
-app keeps visible navigation and upload destinations inside Clocks in Only. Ignore remains an
-automatic exclusion rather than a manual-play ban inside the exclusive boundary.
+Only remains selected when no face of either storage is eligible. Output stays dark and
+responsive with the reason in `clock_only`: without a folder `clocks` of the board's own
+storage, `no-card` without a card, else `missing-folder` without the card's Clocks folder,
+else `no-clocks`; with one, `no-clocks`. No ordinary animation and no message stands in for
+a face. A relevant media, inclusion, removal or fault change retries selection. Raw command
+browsing is unrestricted; the operators' app keeps visible navigation and upload
+destinations inside Clocks in Only. Ignore remains an automatic exclusion rather than a
+manual-play ban inside the exclusive boundary.
