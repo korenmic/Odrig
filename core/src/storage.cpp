@@ -1,8 +1,11 @@
 #include "storage.h"
 
+#include <string.h>
+
 #include "catalog.h"
 #include "content.h"
 #include "crc32.h"
+#include "folders.h"
 #include "json_reader.h"
 #include "order.h"
 #include "playlist.h"
@@ -26,13 +29,20 @@ bool is_named(const Core &core, const char *name) {
     return false;
 }
 
-// Puts a name and a line feed into the chunk buffer, from `length` on. An absent name
-// adds nothing. Returns the new length.
+// Puts a name and a line feed into the chunk buffer, from `length` on, as far as
+// `pending.txt` may hold them. An absent name adds nothing. Returns the new length.
 uint32_t add_line(Core &core, uint32_t length, const char *name) {
     if (name == nullptr) {
         return length;
     }
-    for (uint32_t at = 0; name[at] != '\0'; ++at) {
+    uint32_t size = 0;
+    while (name[size] != '\0') {
+        ++size;
+    }
+    if (length + size + 1 > kPendingSize) {
+        return length;
+    }
+    for (uint32_t at = 0; at < size; ++at) {
         core.chunk[length++] = static_cast<uint8_t>(name[at]);
     }
     core.chunk[length++] = '\n';
@@ -88,16 +98,16 @@ uint32_t page_of_name(const char *name) {
     return 1u << catalog_page_of(name, length);
 }
 
-// The upload's file put in place under its name, as the commit of the internal catalog
-// does it with its entry when the storage has one, and by a rename otherwise. The entry of
-// `dropped`, when given, is taken out in the same commit.
-bool place_upload(Core &core, const char *dropped) {
+// The upload's file put in place under its stored name, as the commit of the internal
+// catalog does it with its entry when the storage has one, and by a rename otherwise. The
+// entry of `dropped`, when given, is taken out in the same commit.
+bool place_upload(Core &core, const char *stored, const char *dropped) {
     const Upload &upload = core.upload;
     if (core.catalogs[kInternal].state != kCatalogOk) {
-        return core.host.rename(core.host.ctx, kUploadPart, upload.name) == 1;
+        return core.host.rename(core.host.ctx, kUploadPart, stored) == 1;
     }
     CatalogChange change;
-    change.added = upload.name;
+    change.added = stored;
     change.added_bytes = upload.size;
     change.added_crc = crc_value(upload.crc);
     change.added_total_ms = upload.total_ms;
@@ -141,6 +151,9 @@ void storage_clear_parts(Core &core) {
     if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, kIgnoredPart, 0, &probe, 1) >= 0) {
         core.host.remove(core.host.ctx, kIgnoredPart);
     }
+    if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, kFoldersPart, 0, &probe, 1) >= 0) {
+        core.host.remove(core.host.ctx, kFoldersPart);
+    }
     if (!catalog_left(core, kInternal)) {
         // A change of the catalog that is not finished may move the upload's part yet.
         core.host.remove(core.host.ctx, kUploadPart);
@@ -177,13 +190,13 @@ void storage_settle_pending(Core &core) {
             continue;
         }
         const uint32_t size = at - begin;
-        char name[33];
-        if (size >= 1 && size <= 32) {
+        char name[kStoredNameRoom];
+        if (size >= 1 && size < kStoredNameRoom) {
             for (uint32_t index = 0; index < size; ++index) {
                 name[index] = static_cast<char>(core.chunk[begin + index]);
             }
             name[size] = '\0';
-            if (is_file_name(name) && !is_named(core, name) && host.remove(host.ctx, name) == -1) {
+            if (is_stored_name(name) && !is_named(core, name) && host.remove(host.ctx, name) == -1) {
                 all_gone = false;
             }
         }
@@ -223,13 +236,13 @@ bool storage_cleanup(Core &core) {
             continue;
         }
         const uint32_t size = at - begin;
-        char name[33];
-        if (size >= 1 && size <= 32) {
+        char name[kStoredNameRoom];
+        if (size >= 1 && size < kStoredNameRoom) {
             for (uint32_t index = 0; index < size; ++index) {
                 name[index] = static_cast<char>(core.chunk[begin + index]);
             }
             name[size] = '\0';
-            if (is_file_name(name) && !is_named(core, name) && host.remove(host.ctx, name) == -1) {
+            if (is_stored_name(name) && !is_named(core, name) && host.remove(host.ctx, name) == -1) {
                 all_gone = false;
             }
         }
@@ -241,24 +254,49 @@ bool storage_cleanup(Core &core) {
     return core.pending_cleanup == 0;
 }
 
+// The stored name of the open upload's file: its name, in its folder when it has one.
+void upload_stored_name(const Upload &upload, char *into) {
+    uint32_t length = 0;
+    if (upload.folder != 0) {
+        uint32_t number = upload.folder;
+        char figures[3];
+        uint32_t count = 0;
+        do {
+            figures[count++] = static_cast<char>('0' + number % 10);
+            number /= 10;
+        } while (number != 0);
+        while (count != 0) {
+            into[length++] = figures[--count];
+        }
+        into[length++] = '/';
+    }
+    for (const char *name = upload.name; *name != '\0'; ++name) {
+        into[length++] = *name;
+    }
+    into[length] = '\0';
+}
+
 bool storage_install_upload(Core &core) {
     if (!storage_cleanup(core)) return false;
     const odrig_host &host = core.host;
     const Upload &upload = core.upload;
+    char stored[kStoredNameRoom];
+    upload_stored_name(upload, stored);
     uint32_t position = 0;
     while (position < core.item_count && core.items[position].id != upload.id) {
         ++position;
     }
 
-    if (position < core.item_count && same_text(core.files[core.items[position].first].name, upload.name)) {
+    if (position < core.item_count && same_text(core.files[core.items[position].first].name, stored)) {
         // The item's file is replaced under its own name: the show file stays as it is,
         // and the one rename is where the show changes.
         player_releases_file(core, position);
-        if (!place_upload(core, nullptr)) {
+        if (!place_upload(core, stored, nullptr)) {
             return false;
         }
-        content_change_file(core, position, upload.name, upload.size, upload.total_ms, core.check_content.type);
+        content_change_file(core, position, stored, upload.size, upload.total_ms, core.check_content.type);
         entered(core, position);
+        folders_derive(core);
         player_file_replaced(core, position);
         return true;
     }
@@ -266,7 +304,7 @@ bool storage_install_upload(Core &core) {
     // A new item, or an item that gets a file of another name. The old file goes when no
     // other item names it.
     const bool is_new = position == core.item_count;
-    char old_file[33];
+    char old_file[kStoredNameRoom];
     old_file[0] = '\0';
     if (!is_new) {
         const ItemInfo &item = core.items[position];
@@ -285,37 +323,39 @@ bool storage_install_upload(Core &core) {
     }
     const bool with_old_file = old_file[0] != '\0';
 
-    if (!write_pending(core, upload.name, with_old_file ? old_file : nullptr) ||
-        !place_upload(core, with_old_file ? old_file : nullptr)) {
+    if (!write_pending(core, stored, with_old_file ? old_file : nullptr) ||
+        !place_upload(core, stored, with_old_file ? old_file : nullptr)) {
         host.remove(host.ctx, kPending);
         return false;
     }
     ShowChange change;
     if (is_new) {
         change.added_id = upload.id;
-        change.added_name = upload.name;
+        change.added_name = stored;
     } else {
         change.renamed = position;
-        change.name = upload.name;
+        change.name = stored;
     }
     if (!content_write_show(core, change) || host.rename(host.ctx, kShowPart, kShowFile) != 1) {
         host.remove(host.ctx, kShowPart);
-        host.remove(host.ctx, upload.name);
+        host.remove(host.ctx, stored);
         host.remove(host.ctx, kPending);
         return false;
     }
 
     // The show in storage is the new one from here on.
     if (is_new) {
-        content_add_item(core, upload.id, upload.name, upload.size, upload.total_ms, core.check_content.type);
+        content_add_item(core, upload.id, stored, upload.size, upload.total_ms, core.check_content.type);
         entered(core, core.item_count - 1);
+        folders_derive(core);
         // An old entry of the order may name the new item's id: it stands there at once,
         // as it would after a restart.
         order_reload(core);
         player_item_added(core);
     } else {
-        content_change_file(core, position, upload.name, upload.size, upload.total_ms, core.check_content.type);
+        content_change_file(core, position, stored, upload.size, upload.total_ms, core.check_content.type);
         entered(core, position);
+        folders_derive(core);
         // A saved repeat belongs to a file name: the item's new name has its own, or none.
         repeats_reload(core);
         brightness_start(core);
@@ -326,6 +366,10 @@ bool storage_install_upload(Core &core) {
     if (!with_old_file || host.remove(host.ctx, old_file) != -1) {
         core.pending_cleanup = host.remove(host.ctx, kPending) == -1 ? 1 : 0;
     }
+    if (with_old_file) {
+        // The old file's folder may be left empty.
+        internal_folders_prune(core, stored_folder(old_file));
+    }
     return true;
 }
 
@@ -335,7 +379,7 @@ bool storage_remove_item(Core &core, uint32_t position) {
     const ItemInfo &item = core.items[position];
 
     // The item's file goes with it when no other item names it.
-    char file[33];
+    char file[kStoredNameRoom];
     file[0] = '\0';
     if (!item.is_cycle) {
         bool shared = false;
@@ -385,6 +429,7 @@ bool storage_remove_item(Core &core, uint32_t position) {
     if (with_file) {
         core.pending_cleanup = 1;
         if (host.remove(host.ctx, file) != -1) core.pending_cleanup = host.remove(host.ctx, kPending) == -1 ? 1 : 0;
+        internal_folders_prune(core, stored_folder(file));
     }
     return true;
 }
@@ -412,6 +457,9 @@ bool storage_remove_many(Core &core, const uint16_t *ids, uint32_t count) {
     if (taken.drop_pages != 0 && !catalog_commit(core, kInternal, taken)) {
         return false;
     }
+    // The folders of the files that go, which may be left empty: a bit for each number.
+    uint8_t emptied[32];
+    memset(emptied, 0, sizeof emptied);
     uint32_t length = 0;
     for (uint32_t file = 0; file < core.file_count; ++file) {
         bool removed = false;
@@ -422,7 +470,11 @@ bool storage_remove_many(Core &core, const uint16_t *ids, uint32_t count) {
                 else retained = true;
             }
         }
-        if (removed && !retained) length = add_line(core, length, core.files[file].name);
+        if (removed && !retained) {
+            length = add_line(core, length, core.files[file].name);
+            const uint32_t number = stored_folder(core.files[file].name);
+            emptied[number / 8] = static_cast<uint8_t>(emptied[number / 8] | (1u << (number % 8)));
+        }
     }
     // Without a file that goes, as when each removed animation's file is another item's,
     // there is no `pending.txt`.
@@ -466,6 +518,9 @@ bool storage_remove_many(Core &core, const uint16_t *ids, uint32_t count) {
         begin = at + 1;
     }
     if (clean) core.pending_cleanup = host.remove(host.ctx, kPending) == -1 ? 1 : 0;
+    for (uint32_t number = 1; number <= 255; ++number) {
+        if ((emptied[number / 8] & (1u << (number % 8))) != 0) internal_folders_prune(core, number);
+    }
     return true;
 }
 

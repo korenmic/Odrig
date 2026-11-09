@@ -21,9 +21,16 @@ function whole(value, low, high) {
   return Number.isInteger(value) && value >= low && value <= high;
 }
 
-// The reply to a line, when the target carried it out. A refusal throws a Refusal.
+// The reply to a line, when the target carried it out. A refusal throws a Refusal, and a
+// Failure on the way names the line.
 async function carriedOut(line) {
-  const reply = await send(line);
+  let reply;
+  try {
+    reply = await send(line);
+  } catch (error) {
+    if (error instanceof Failure) error.line = line;
+    throw error;
+  }
   if (reply.ok === false) {
     if (typeof reply.error !== "string") {
       throw new Failure("bad-reply", address());
@@ -73,14 +80,14 @@ function progressOf(reply) {
 }
 
 // What `status` reports: whether the LEDs are on, the brightness, what plays, which is
-// "all" for the root playlist, the id of a folder of the card whose playlist is current,
+// "all" for the root playlist, the id of a folder of either storage whose playlist is current,
 // the id of a cycle or null, the id of the animation on the LEDs or null, the refreshes
 // in the last second, the reason of an invalid show or null, the width and the height of
 // the canvas, each null when the target gives none; in `progress`, how far it has read
 // its files after its start, in `host`, the text that names it, and in `left`, the whole
 // seconds left in the window of the current playlist, each null when the target gives
-// none; in `file`, the file of the animation on the LEDs, a card's by its path, and in
-// `playlist`, the path of the card's folder whose playlist is current, each null when the
+// none; in `file`, the file of the animation on the LEDs, one of a folder or of the card by its path, and in
+// `playlist`, the path of the folder whose playlist is current, each null when the
 // target names none, and undefined from a target that does not name them; and of the
 // playlist's turn in progress the loops it plays, `repeat`, the loop in progress, `loop`,
 // and its animation's saved repeat, `saved`, each null while the target reports none, with
@@ -178,14 +185,15 @@ export async function fault() {
 }
 
 // One part of the items of a level, in its order, from a position on: of the root, the
-// show's items and the root's folders and files of the card; of the card's folder with the
-// id `folder`, its sub-folders and its own files. Each animation as `{id, file, bytes}`
-// with the booleans `ignored` and `external` and the text `type` when the target gives
-// them and `fault`, the reason it is unavailable, when it has one, and `bytes` null while
-// the installation has not read it whole; each folder of the card as `{id, playlist}`
-// with its path, and `files`, the number of its own files, when the target gives it; each
-// cycle as `{id, cycle: true}`; and `next`, the position to ask for next, or
-// null when the part holds the last item.
+// show's items, the folders of the board's own storage and the root's folders and files of
+// the card; of a folder with the id `folder`, its sub-folders and its own files. Each
+// animation as `{id, file, bytes}` with the booleans `ignored` and `external` and the text
+// `type` when the target gives them, `stored`, the name the board's storage keeps a file of
+// one of its folders under, and `fault`, the reason it is unavailable, when it has one, and
+// `bytes` null while the installation has not read it whole; each folder as
+// `{id, playlist, external}` with its path, and `files`, the number of its own files, when
+// the target gives it; each cycle as `{id, cycle: true}`; and `next`, the position to ask
+// for next, or null when the part holds the last item.
 export async function list(from = 0, folder = null) {
   const reply = folder === null ? await carriedOut(`list ${from}`) : await carriedOut(`list in ${folder} ${from}`);
   const sound =
@@ -202,9 +210,10 @@ export async function list(from = 0, folder = null) {
         (item.external === undefined || typeof item.external === "boolean") &&
         (item.type === undefined || typeof item.type === "string") &&
         (item.fault === undefined || typeof item.fault === "string") &&
+        (item.stored === undefined || (typeof item.stored === "string" && typeof item.file === "string" && item.external === false)) &&
         ((typeof item.file === "string" && item.playlist === undefined && (item.bytes === null || whole(item.bytes, 0, MOST_BYTES))) ||
-          (typeof item.playlist === "string" && item.playlist.length > 0 && item.external === true && item.file === undefined && item.cycle === undefined &&
-            item.bytes === undefined && item.type === undefined && item.fault === undefined) ||
+          (typeof item.playlist === "string" && item.playlist.length > 0 && typeof item.external === "boolean" && item.file === undefined && item.cycle === undefined &&
+            item.bytes === undefined && item.type === undefined && item.fault === undefined && item.stored === undefined) ||
           (Array.isArray(item.cycle) && item.file === undefined && item.playlist === undefined && item.ignored === undefined && item.external === undefined &&
             item.inherited_ignored === undefined && item.type === undefined && item.fault === undefined)),
     );
@@ -215,10 +224,11 @@ export async function list(from = 0, folder = null) {
     items: reply.items.map((item) => (typeof item.file === "string" ? {id: item.id, file: item.file, bytes: item.bytes, ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
       ...(item.inherited_ignored === undefined ? {} : {inheritedIgnored: item.inherited_ignored}),
       ...(item.external === undefined ? {} : {external: item.external}), ...(item.type === undefined ? {} : {type: item.type}),
-      ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist, ...(item.files === undefined ? {} : {files: item.files}),
+      ...(item.stored === undefined ? {} : {stored: item.stored}),
+      ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist, external: item.external, ...(item.files === undefined ? {} : {files: item.files}),
       ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
       ...(item.inherited_ignored === undefined ? {} : {inheritedIgnored: item.inherited_ignored})} :
-      {id: item.id, cycle: true})),
+      {id: item.id, cycle: true, members: item.cycle.filter((member) => whole(member, 1, MOST_ID))})),
     next: reply.next,
   };
 }
@@ -247,13 +257,52 @@ export async function remove(id) {
   await carriedOut(`remove ${id}`);
 }
 
-// Opens the upload of a file of some bytes as the item with this id. Gives the most bytes
-// one `upload data` may carry.
+// Makes a folder of a storage, "external", the card, or "internal", the board's own, with
+// this path, its parent there already. Gives `{id, made}`, `made` false for a folder that
+// was there.
+export async function folderMake(path, storage = "external") {
+  const encoded = path.split("/").map(encodeURIComponent).join("/");
+  const reply = storage === "internal"
+    ? await carriedOut(`folder make internal ${encoded}`)
+    : await carriedOut(`folder make external ${encoded}`);
+  if (!whole(reply.id, 1, MOST_ID) || typeof reply.made !== "boolean") {
+    throw new Failure("bad-reply", address());
+  }
+  return {id: reply.id, made: reply.made};
+}
+
+// Moves the card's file with this id into the card's folder with this path, "" for the root,
+// with its id and its saved settings. Gives whether it moved: false for a file that was in
+// that folder already.
+export async function moveExternal(id, folder) {
+  const encoded = folder === "" ? "/" : folder.split("/").map(encodeURIComponent).join("/");
+  const reply = await carriedOut(`move external ${id} ${encoded}`);
+  if (reply.id !== id || typeof reply.moved !== "boolean") {
+    throw new Failure("bad-reply", address());
+  }
+  return reply.moved;
+}
+
+// What the board keeps for an animation: its saved brightness and saved repeat, null for
+// none, and whether it is the show's start item.
+export async function saved(id) {
+  const reply = await carriedOut(`saved ${id}`);
+  const value = (given, most) => given === null || whole(given, 0, most);
+  if (!value(reply.brightness, 255) || !value(reply.repeat, 65535) || typeof reply.start !== "boolean") {
+    throw new Failure("bad-reply", address());
+  }
+  return {brightness: reply.brightness, repeat: reply.repeat, start: reply.start};
+}
+
+// Opens the upload of a file of some bytes as the item with this id: a file name, or the
+// path of a folder of the board's own storage and a file name. Gives the most bytes one
+// `upload data` may carry.
 export async function uploadBegin(id, file, bytes, createCrc = null) {
-  const line = `upload begin ${id} ${file} ${bytes}${createCrc === null ? "" : " " + createCrc}`;
+  const encoded = file.split("/").map(encodeURIComponent).join("/");
+  const line = `upload begin ${id} ${encoded} ${bytes}${createCrc === null ? "" : " " + createCrc}`;
   const reply = createCrc === null
-    ? await carriedOut(`upload begin ${id} ${file} ${bytes}`)
-    : await carriedOut(`upload begin ${id} ${file} ${bytes} ${createCrc}`);
+    ? await carriedOut(`upload begin ${id} ${encoded} ${bytes}`)
+    : await carriedOut(`upload begin ${id} ${encoded} ${bytes} ${createCrc}`);
   if (createCrc !== null && reply.replacing !== false) {
     try { await uploadCancel(); } catch (_) { /* An unchanged upload opens no transaction. */ }
     throw new Refusal(reply.replacing === true || reply.unchanged === true ? "stale" : "unsupported", line);
@@ -291,11 +340,15 @@ export async function uploadExpect(crc) {
   await carriedOut(`upload expect ${crc}`);
 }
 
-// Up to 600 bytes of the file of an animation, from an offset, as given in base64, and
-// the size of the file.
-export async function read(id, offset) {
-  const reply = await carriedOut(`read ${id} ${offset}`);
-  if (!whole(reply.bytes, 0, MOST_BYTES) || typeof reply.data !== "string" || !/^[A-Za-z0-9_-]*$/.test(reply.data) || reply.data.length % 4 === 1) {
+// The most bytes one `read` with a count asks for.
+export const READ_COUNT = 720;
+
+// Up to 600 bytes of the file of an animation, from an offset, or up to `count` bytes, 1 to
+// 720, as given in base64, and the size of the file.
+export async function read(id, offset, count = null) {
+  const reply = count === null ? await carriedOut(`read ${id} ${offset}`) : await carriedOut(`read ${id} ${offset} ${count}`);
+  if (!whole(reply.bytes, 0, MOST_BYTES) || typeof reply.data !== "string" || !/^[A-Za-z0-9_-]*$/.test(reply.data) || reply.data.length % 4 === 1 ||
+      reply.data.length > Math.ceil(((count ?? READ_COUNT) * 4) / 3)) {
     throw new Failure("bad-reply", address());
   }
   const text = atob(reply.data.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (reply.data.length % 4)) % 4));

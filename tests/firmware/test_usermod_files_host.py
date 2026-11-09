@@ -112,6 +112,14 @@ struct Storage {
     return true;
   }
 
+  // Removes a folder that holds no file and no folder.
+  bool rmdir(const char *path) {
+    const std::string inside = std::string(path) + "/";
+    for (const auto &file : files) if (file.first.compare(0, inside.size(), inside) == 0) return false;
+    for (const auto &folder : folders) if (folder.compare(0, inside.size(), inside) == 0) return false;
+    return folders.erase(path) != 0;
+  }
+
   size_t totalBytes() const { return 5111808; }
   size_t usedBytes() const { return 8192; }
 };

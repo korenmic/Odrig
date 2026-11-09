@@ -241,6 +241,17 @@ The clocks play between the animations once `Clocks between animations` is check
 the Settings of the Controller view, or `clocks on` is sent; the core plays the breaks,
 and the emulator has no code of its own for them.
 
+### Folders of the show's folder
+
+The folders of the board's own storage, [core.md](core.md#internal-folders), are
+sub-folders of the show's folder named by their numbers, `1` to `255`, as on the board:
+`folder make internal shows` makes `1` and the line of `folders.txt` that names it, and a
+file of it is `1/stars.odrg`. The emulator makes and removes them when the core asks, a
+folder only while it is empty, and `space` counts two blocks of 4,096 bytes for each and
+the files in it. The current playlist is kept by a host with a drive: an emulator started
+without `--drive` or `--drive-folder` answers `play` of such a folder with `unsupported`
+and plays the root's playlist, its folders among it.
+
 ## The serial port
 
 The emulator creates a pseudo-terminal and a symbolic link to it, so the port has the same
@@ -840,17 +851,21 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] fault
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] space
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] list
-python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] read ID OFFSET
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] read ID OFFSET [COUNT]
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] catalog [OPERATION]
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] remove ID
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] ignore ID VALUE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] mapping OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] order OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] repeat ID N [save]
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] saved ID
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] clocks OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] debug mini on|off
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload --external FILE
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] --folder PATH upload ID FILE
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] folder make internal|external PATH
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] move external ID PATH
 ```
 
 Through the serial port, here the emulator's; for the board the name is its USB serial
@@ -879,8 +894,13 @@ python -m odrigctl --port build/emulator/serial order move 2805384113 9 1
 python -m odrigctl --port build/emulator/serial repeat 1 8
 python -m odrigctl --port build/emulator/serial repeat 1 8 save
 python -m odrigctl --port build/emulator/serial repeat 1 default
+python -m odrigctl --port build/emulator/serial saved 1
 python -m odrigctl --port build/emulator/serial clocks on
 python -m odrigctl --port build/emulator/serial clocks message on
+python -m odrigctl --port build/emulator/serial folder make external clocks
+python -m odrigctl --port build/emulator/serial folder make internal shows
+python -m odrigctl --port build/emulator/serial move external 60001 clocks
+python -m odrigctl --port build/emulator/serial --folder shows upload 10 build/hello-bench.odrg
 ```
 
 Over TCP, to the emulator's [line port](#the-line-port), which is how the emulator takes
@@ -896,6 +916,7 @@ python -m odrigctl --tcp 127.0.0.1:8601 fault
 python -m odrigctl --tcp 127.0.0.1:8601 space
 python -m odrigctl --tcp 127.0.0.1:8601 list
 python -m odrigctl --tcp 127.0.0.1:8601 read 1 0
+python -m odrigctl --tcp 127.0.0.1:8601 read 1 720 720
 python -m odrigctl --tcp 127.0.0.1:8601 catalog
 python -m odrigctl --tcp 127.0.0.1:8601 catalog cancel
 python -m odrigctl --tcp 127.0.0.1:8601 catalog page external 3 0
@@ -909,8 +930,12 @@ python -m odrigctl --tcp 127.0.0.1:8601 order move 2805384113 9 1
 python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 8
 python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 8 save
 python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 default
+python -m odrigctl --tcp 127.0.0.1:8601 saved 1
 python -m odrigctl --tcp 127.0.0.1:8601 clocks on
 python -m odrigctl --tcp 127.0.0.1:8601 clocks message off
+python -m odrigctl --tcp 127.0.0.1:8601 folder make external clocks/message
+python -m odrigctl --tcp 127.0.0.1:8601 folder make internal shows/night
+python -m odrigctl --tcp 127.0.0.1:8601 move external 60001 /
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -926,6 +951,7 @@ python -m odrigctl --http 127.0.0.1:8600 fault
 python -m odrigctl --http 127.0.0.1:8600 space
 python -m odrigctl --http 127.0.0.1:8600 list
 python -m odrigctl --http 127.0.0.1:8600 read 1 0
+python -m odrigctl --http 127.0.0.1:8600 read 1 720 720
 python -m odrigctl --http 127.0.0.1:8600 catalog
 python -m odrigctl --http 127.0.0.1:8600 catalog rebuild external
 python -m odrigctl --http 127.0.0.1:8600 catalog page external 3 512
@@ -939,8 +965,11 @@ python -m odrigctl --http 127.0.0.1:8600 order move 2805384113 9 1
 python -m odrigctl --http 127.0.0.1:8600 repeat 1 8
 python -m odrigctl --http 127.0.0.1:8600 repeat 1 8 save
 python -m odrigctl --http 127.0.0.1:8600 repeat 1 default
+python -m odrigctl --http 127.0.0.1:8600 saved 1
 python -m odrigctl --http 127.0.0.1:8600 clocks off
 python -m odrigctl --http 127.0.0.1:8600 clocks message off
+python -m odrigctl --http 127.0.0.1:8600 folder make external "night/old songs"
+python -m odrigctl --http 127.0.0.1:8600 move external 60001 "night/old songs"
 ```
 
 The temporary miniature command is submitted through the same routes; status reports
@@ -978,6 +1007,9 @@ The tool prints the reply line to standard output:
   card's folder with that id, and `order get` and `order get in ID` for the saved order of
   a level; with a position after them, `list in ID FROM` and `order get in ID FROM` send
   that one line.
+- `read ID OFFSET` sends `read <ID> <OFFSET>`, and `read ID OFFSET COUNT` sends
+  `read <ID> <OFFSET> <COUNT>`: one reply with up to 600 bytes of the file, or up to COUNT,
+  1 to 720, in base64. The tool prints that one reply; the next piece is a second command.
 - `--timeout SECONDS` is how long the tool waits for a reply; 2 seconds without it.
 - `--port NAME`: the tool opens the port without resetting the board. It sets 115200 baud,
   8 data bits and no parity, lowers RTS before it lowers DTR, waits 0.2 seconds, discards
@@ -1041,7 +1073,9 @@ here; the board's is in [firmware.md](firmware.md).
   <name> <bytes> <crc32>`, where the name is the last part of the path as it is and the
   CRC-32 is the file's, then the file in pieces of the size the reply names, each as one
   `upload data` line, and then `upload end` with the CRC-32 of the file. ID and the name
-  are not checked by the tool.
+  are not checked by the tool. With `--folder PATH` the name is the path of that folder of
+  the board's own storage, `/` and the last part, each part escaped as a URI's, so that
+  the file goes into the folder.
 - A reply `{"ok":true,"unchanged":true}` to `upload begin` ends the upload: the item holds
   this file already, and nothing more is sent. A reply `bad-argument` to it is followed by
   `upload begin <ID> <name> <bytes>` once, for a target older than the CRC-32 there.

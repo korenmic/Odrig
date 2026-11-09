@@ -25,13 +25,15 @@ uint32_t content_remove(Core &core, uint32_t id, Reply &reply);
 uint32_t content_remove_many(Core &core, const uint16_t *ids, uint32_t count, Reply &reply);
 uint32_t content_ignore(Core &core, uint32_t id, bool ignored, Reply &reply);
 
-// The most bytes `read` gives in one reply.
+// The most bytes `read` gives in one reply without a count, and the most a count may ask
+// for. The reply of 720 bytes in base64 with a size of ten digits is 1,001 bytes long.
 const uint32_t kReadMost = 600;
+const uint32_t kReadCountMost = 720;
 
-// `read`, on a valid show whose files the check after the start has read: up to kReadMost
+// `read`, on a valid show whose files the check after the start has read: up to `count`
 // bytes of the file of an animation of the show or of the drive, from an offset, with the
-// size of the file.
-uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply);
+// size of the file. The bytes pass through the chunk buffer.
+uint32_t content_read(Core &core, uint32_t id, uint32_t offset, uint32_t count, Reply &reply);
 struct ShowChange;
 bool content_removed(const Core &core, uint32_t position, const ShowChange &change);
 

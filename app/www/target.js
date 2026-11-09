@@ -1,5 +1,6 @@
 // The target: its address, and how one command line travels to it. This is the only
-// file that knows whether a line is sent by the app's sender or by the browser.
+// file that knows whether a line is sent by the app's sender or by the browser, and the
+// only one that knows the app's native shell.
 
 export const BOARD = "4.3.2.1";
 
@@ -8,12 +9,14 @@ const LABEL = "[a-z0-9](?:[a-z0-9-]*[a-z0-9])?";
 const ADDRESS = new RegExp(`^(${LABEL}(?:\\.${LABEL})*)(?::([0-9]{1,5}))?$`);
 
 // What went wrong on the way to the target or back. `kind` is `bad-address`, `no-wifi`,
-// `no-answer` or `bad-reply`; `detail` is the address, or the text that is no address.
+// `no-answer` or `bad-reply`; `detail` is the address, or the text that is no address;
+// `line` is the command line it was met for, once the command that sent it names it.
 export class Failure extends Error {
   constructor(kind, detail) {
     super(`${kind}: ${detail}`);
     this.kind = kind;
     this.detail = detail;
+    this.line = null;
   }
 }
 
@@ -78,6 +81,12 @@ export function setAddress(text) {
 function sender() {
   const bridge = window.Capacitor;
   return bridge !== undefined && typeof bridge.isNativePlatform === "function" && bridge.isNativePlatform() ? bridge : null;
+}
+
+// The app's native shell, whose plugins a page calls by name and method, or null in a
+// browser.
+export function shell() {
+  return sender();
 }
 
 // A promise that is refused when the one given has not settled in time.
