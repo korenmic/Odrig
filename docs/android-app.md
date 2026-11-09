@@ -71,9 +71,13 @@ a top bar with the app's name and whether the installation answers.
   in` inside a folder; entering a folder or going Back reads that level anew, and nothing
   of the level left is kept, so that a card of any size takes one level's rows on the
   phone. The heading is marked while the level's playlist is current, and so is the
-  folder row that leads to the current playlist at every level above it, from the path
-  that `status` names as `playlist`; the line of what plays names the file from `status`
-  as well. The list comes back to the root when the target changes, when the card goes
+  folder row that leads to the current playlist at every level above it. The current
+  folder is the one whose id `status` names as `playing`, not its path, since a folder of
+  the board's own storage and one of the card may have one path: an id of 60,000 or less
+  is the board's, a higher one the card's, and a row above it leads to it when it is of
+  the same storage and holds the path that `status` names as `playlist`. The line of what
+  plays names the file from `status` as well. The list comes back to the root when the
+  target changes, when the card goes
   out and when the folder shown is confirmed gone from the card. A refused folder lookup
   first rechecks its path through fresh parent listings. An existing path keeps its
   location, including when its id changed; an unavailable verification keeps the last

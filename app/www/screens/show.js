@@ -128,16 +128,33 @@ function playing(status, state) {
   return `Cycle ${status.playing}`;
 }
 
-// The playlist that is current: "" for the root, a folder's path, or null while a cycle
-// or nothing plays.
-function markedPath(status) {
+// The highest id of a folder of the board's own storage; the card's folders have higher ids.
+const MOST_INTERNAL_ID = 60000;
+
+// The playlist that is current: the root's, with the id null; a folder's, by the id that
+// `status` names as `playing`, with its path and whether it is the card's; or null while a
+// cycle or nothing plays. A folder of the board's own storage and one of the card may have
+// one path, never one id.
+function currentPlaylist(status) {
   if (status === null || status.playing === null) {
     return null;
   }
   if (status.playing === "all") {
-    return "";
+    return {id: null, path: "", external: null};
   }
-  return typeof status.playlist === "string" ? status.playlist : null;
+  if (typeof status.playlist !== "string") {
+    return null;
+  }
+  return {id: status.playing, path: status.playlist, external: status.playing > MOST_INTERNAL_ID};
+}
+
+// Whether a folder row leads to the current playlist: it is that folder, or a folder of the
+// same storage that holds it.
+function leadsTo(entry, current) {
+  if (current === null || current.id === null) {
+    return false;
+  }
+  return entry.id === current.id || (entry.external === current.external && current.path.startsWith(`${entry.path}/`));
 }
 
 // A folder's own name: the part of its path after its last `/`.
@@ -625,10 +642,10 @@ function rowsState(state, animations, here) {
   const version = client.targetVersion();
   // The level's head: its title, Back inside a folder, and the mark while its playlist is
   // current; each folder row's count, and its mark when it leads to the current playlist.
-  const marked = markedPath(state.status);
+  const playlist = currentPlaylist(state.status);
   byId("level-title").textContent = here.path === "" ? "Root" : here.path;
   byId("level-back").hidden = here.path === "";
-  byId("level-head").setAttribute("aria-current", String(marked === here.path));
+  byId("level-head").setAttribute("aria-current", String(playlist !== null && playlist.id === state.level.id));
   for (const made of byId("animations-list").querySelectorAll(":scope > .folder-row")) {
     const entry = here.folders.find((item) => String(item.id) === made.dataset.id);
     if (entry === undefined) {
@@ -648,7 +665,7 @@ function rowsState(state, animations, here) {
       check.checked = selection.has(entry.id);
       check.disabled = selection.locked();
     }
-    made.setAttribute("aria-current", String(marked !== null && (marked === entry.path || marked.startsWith(`${entry.path}/`))));
+    made.setAttribute("aria-current", String(leadsTo(entry, playlist)));
   }
   for (const made of byId("animations-list").querySelectorAll(":scope > .row")) {
     const animation = animations.find((item) => String(item.id) === made.dataset.id);

@@ -1,7 +1,8 @@
 """The folders of the board's own storage in the shared app: their rows at the root, a folder
 entered with the paths of its files, `New folder` at the root and inside one, the reply of
-`list` the app takes from a target that has them, and moves of files out of a folder of
-either storage while both have folders of one path."""
+`list` the app takes from a target that has them, moves of files out of a folder of
+either storage while both have folders of one path, and the marks of the playlist that
+plays then."""
 
 import json
 import pathlib
@@ -147,6 +148,34 @@ class InternalFolders(unittest.TestCase):
         self.assertFalse((self.card / 'night' / 'deep' / 'old.odrg').exists())
         self.assertEqual((folder / 'old.odrg').read_bytes(), data)
         self.assertTrue((folder / '2' / 'deep.odrg').exists())
+
+    def test_only_the_folder_that_plays_is_marked_while_both_storages_have_its_path(self):
+        text = 'odrig-folders 1 3\n1 20 0 night\n2 21 0 night/deep\n'
+        _, emulator = self.board(text, drive={'night/new.odrg': clip(8), 'night/deep/old.odrg': clip(9)})
+        card = lambda row: row.get('playlist') == 'night' and row.get('external') is True
+        card_night = next(row for row in self.answered(emulator, 'list', lambda reply: any(card(row) for row in reply.get('items', [])))['items'] if card(row))['id']
+        card_deep = next(row for row in self.listed(emulator, card_night) if row.get('playlist') == 'night/deep')['id']
+        levels = {'internal': (20, 21), 'card': (card_night, card_deep)}
+        steps = [{'enter': card_night, 'level': 'night', 'rows': 1}, {'enter': card_deep, 'level': 'night/deep', 'rows': 1},
+                 {'back': True, 'level': 'night', 'rows': 1}, {'back': True, 'level': 'Root', 'rows': 1},
+                 {'enter': 20, 'level': 'night', 'rows': 1}, {'enter': 21, 'level': 'night/deep', 'rows': 1}]
+
+        def marks(found):
+            return {'level': found['level']['marked'], 'folders': [row['id'] for row in found['folders'] if row['marked']]}
+
+        for plays in ('internal', 'card'):
+            night, deep = levels[plays]
+            with self.subTest(plays=plays):
+                self.answered(emulator, f'play {deep}')
+                self.answered(emulator, 'status', lambda reply: reply.get('playing') == deep and reply.get('playlist') == 'night/deep')
+                found = support.run('folders', address=f'127.0.0.1:{emulator.port}', settings={'rows': 1, 'folders': 2, 'steps': steps}).seen
+                root, card_night_level, card_deep_level, _, _, night_level, deep_level = [found['first'], *found['steps']]
+                self.assertEqual(sorted(row['id'] for row in root['folders']), [20, card_night])
+                self.assertEqual(marks(root), {'level': False, 'folders': [night]})
+                for storage, (at_night, at_deep) in {'internal': (night_level, deep_level), 'card': (card_night_level, card_deep_level)}.items():
+                    current = storage == plays
+                    self.assertEqual(marks(at_night), {'level': False, 'folders': [levels[storage][1]] if current else []}, storage)
+                    self.assertEqual(marks(at_deep), {'level': current, 'folders': []}, storage)
 
     def test_a_selected_folder_of_the_boards_storage_is_not_called_the_cards(self):
         folder, emulator = self.board()
