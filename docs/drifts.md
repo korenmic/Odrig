@@ -13448,3 +13448,226 @@ and a move cut short is finished at the next connection.
 **Resolution.** `docs/specs/74-p2-phone-storage-explorer-and-backups/requirements.md`
 (5.1), `docs/specs/74-p2-phone-storage-explorer-and-backups/design.md` (task 6 and the
 tests).
+
+## Seed 74: a folder of the card is moved by the app, not by a stepped job on the board
+
+**Question.** Task 6 was to try the stepped folder job on the board first, one commit with
+every id kept, and to take the job of the app the owner allowed on 2026-11-09 only if the
+board's job proved too large to build safely. Which is built?
+
+**Answer.** The job of the app. The board's job proved too large to build safely within
+the core's frames and the catalog's format: (1) the commit record of a folder would need a
+rename for each file of its subtree, and a line `move <old path> <new path>` takes up to
+206 bytes where a record's line may have 161 (`kCatalogLineRoom`, the arena's
+`OrderReader.line` too), so the record would need a new kind of action that is resolved
+against the new index while it is finished, a change of the record's format that the PC
+library would have to learn; (2) every file of the subtree takes a new path and so, by the
+hash of its name, another page, so the job writes every page from a pass over every old
+page, as a rebuild does, while the player and the commands go on; (3) the job would
+repeat the rebuild's eight phases with a second plan of the table and the map, kept in the
+rebuild's fields, each phase cut at every storage call in its tests; (4) the frames of the
+catalog's changes were at up to 480 bytes of the 512 before task 6 (g++ -O2 and the
+checked build), and a file's move alone, with up to four files of folders in one change,
+needed four of them split so that each stays at 480 at most. So
+`move external <id> <path>` moves one file in one commit, with its id, its saved settings
+and its place last among the destination's files; `move external` of a folder's id is
+`in-use`; and the app moves a folder of the card as the owner allowed: it makes the
+destination's folders from the top with `folder make external`, gives each the Ignore of
+the folder it stands for, and moves the files one at a time with `move external`, each
+keeping its id and its saved settings. The new folder has its own id, the move is not one
+commit, and a job cut short is finished at the next connection from the job the phone
+keeps. The source's folders go as their last files leave them, by the prune a removal
+makes. Once the folder goes, the board plays the root's playlist, as after a removal, and
+the Clocks-only boundary is judged again at each file's move, as at a removal; the app then
+plays the folder's new place when its playlist, or that of a folder below it, was current
+(see "the playlist of a moved folder follows it" below).
+
+**Resolution.** `core/src/catalog.cpp`, `core/src/moving.cpp`, `core/src/commands.cpp`,
+`app/www/moves.js`, `app/www/screens/explorer.js`, `docs/commands.md`,
+`docs/android-app.md`, `docs/catalog.md`, `tests/core/test_move_external.py`,
+`tests/app/test_moves.py`.
+
+## Seed 74: the order of the refusals of `move external`
+
+**Question.** Which refusal does `move external` give when more than one applies, and what
+does it give for an item's id, a folder's id and a file that is in the folder already?
+
+**Answer.** The order of the error table of `docs/commands.md`: `bad-argument` for the form,
+`show-invalid`, `busy`, `unknown-id` for an id that is no file of the card (an item of the
+show among them, since an item's id means the item) and for a destination the card has not,
+`in-use` for a folder's id of either storage, `bad-argument` for a new path over 100 bytes,
+`in-use` for a name of the destination that is the file's in any case, `read-only`, then
+`storage-error`. A file in that folder already answers `moved:false` before the
+destination's names are looked at, also on a card the board may not write, since nothing is
+written; a card without a catalog answers `read-only` once the id and the folder are known.
+
+**Resolution.** `core/src/catalog.cpp`, `core/src/catalog.h`, `docs/commands.md`,
+`tests/core/test_move_external.py`.
+
+## Seed 74: the journal of a move is on the card
+
+**Question.** The design put the saved settings of a moved file behind a journal
+`moving.txt` written before the commit and named no storage for it. Where does it go?
+
+**Answer.** On the card, `drive/moving.txt` through `drive/moving.part`. Its generation is
+the card catalog's, and a card may be pulled after the commit: on the card the journal
+travels with the move and is finished when that card is mounted again, while one on the
+board would be dropped by the mount of any other card, and would be a file of the board's
+folder that the firmware tool does not know. The mount finishes it when the catalog is of
+its generation and has a file of its new path, and removes it otherwise; a stray
+`moving.part` is removed at the mount as a stray `upload.part` is. The settings are given
+to the new path only while a line of the old one is there, so a journal finished again
+changes nothing, and the lines of the new path that a removed file left are dropped then.
+
+**Resolution.** `core/src/moving.cpp`, `core/src/catalog.cpp`, `docs/catalog.md`,
+`tests/core/test_move_external.py`.
+
+## Seed 74: the commit record's `move <name> upload.part`, read by the PC library too
+
+**Question.** A file's move renames it through `upload.part` in two actions, since `move
+<old> <new>` passes the 161 bytes of a record's line. A card's name may hold spaces, and the
+PC library read `move <from> <to>` with `<from>` up to the first space, so a card with a
+move's record left by a cut would be finished wrongly on a computer. The owner answered on
+2026-11-09 that the catalog's format and the Python library stay as they are, about the
+order of moved folders. Is the record's new line read on a computer?
+
+**Answer.** Yes. `parse_do` of `odrig/catalog.py` takes a line that ends in ` upload.part`
+as the move of the name before it onto the part, as the core does, so that the board and
+the PC tool finish such a record alike. No name of a catalog ends in `upload.part`, as each
+ends in `.odrg` or `.odrgx`, so the line is never the second action, also for a name that
+begins with `upload.part`, such as `upload.part.odrg` or `upload.part x.odrg`, which the
+card's naming rule allows. Nothing the PC tool writes changes, and the order of folders is
+as it was. A firmware or a PC tool older than the action reads such a record as not whole,
+leaves the change undone and removes the stray `upload.part`, which then holds the file:
+a card a cut left in the middle of a move is finished by a board that has `move external`,
+or by this PC tool, before an older one takes it, as `docs/catalog.md` says. The owner is
+told.
+
+**Resolution.** `odrig/catalog.py`, `core/src/catalog.cpp`, `docs/catalog.md`,
+`tests/core/test_move_external.py` (`Record`).
+
+## Seed 74: what a move leaves where
+
+**Question.** The design left open what stays behind a move: the card's emptied
+directories, empty folders of a moved subtree, a folder of the board's own storage moved
+inside it, a file given another name on the card, and the files a stopped folder's job did
+not reach.
+
+**Answer.** The board renames files on the card and never a folder, and no command removes
+a folder, so a directory emptied by moves stays on the card, out of the card's index. A
+folder of a moved subtree that never held a file is made at the destination and stays at
+the source, with the folders above it, and the end of the move says the source stays. A
+folder of the board's own storage is moved to the card only: a move inside the board's
+storage, with every id kept, is the approved seed of `move internal`, and the preview says
+so. A file of the card given another name in the preview is moved by the job of part A,
+since `move external` keeps a file's name, and takes a new id. `Stop` ends a folder's job
+after the file under way and forgets it: its other files stay where they are and are not
+moved at the next connection, as a stopped run of files is not.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`,
+`docs/microsd.md`, `docs/firmware.md`, `tests/app/test_moves.py`.
+
+## Seed 74: a folder's job cut short, refused or taken up again
+
+**Question.** The app's job of a folder moved its files one at a time and, whatever a file
+met, passed to the next one and forgot the job at its end. So a lost link failed every file
+left at once and forgot the job, which the owner's allowance of 2026-11-09 says is finished
+at the next connection; a folder the board refused to make left the job on the phone for
+good, and its taking up again failed and was asked again at once, without end. Which
+failures end a job, which keep it, and when is a kept job taken up?
+
+**Answer.** A failure of the way, no answer and no Wi-Fi, a request withdrawn as the app
+was hidden, and another target chosen cut the job short: the file under way and those
+after it stay in the job, the one under way first, and the end says that they move when the
+app reaches the installation again. A reply that is not a reply, and a refusal of the
+board or of the app's own checks, end the file alone, which is said, and the next file is
+moved. A refusal of `folder make` ends the folder's job, which is forgotten and said, the
+folders made before it staying empty until a folder can be removed (the approved seed of
+`folder remove`). A job is taken up again when the target answers after it did not, or
+when the app is shown again after it was hidden, never at once after it failed, and a
+job's requests are sent only while the target it began with is chosen, so none reaches a
+spare board that has the same card. Taking up a job says what it finished, what failed
+with why, what it gave up with why, and what waits again. `Stop` still forgets the job.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `app/www/messages.js`,
+`docs/android-app.md`, `tests/app/test_moves.py` (`Jobs`, and a kept job the board
+refuses), `tests/app/page/scenarios/move-jobs.js`.
+
+## Seed 74: a lost reply of `move external` is sent once more
+
+**Question.** `move external` answers `moved:false` for a file in that folder already, so
+that a line sent again changes nothing. Does the app send it again when its reply is lost?
+
+**Answer.** Once, when the reply did not come. Both answers then mean the file is in its
+new folder. A second silence fails the file, or cuts a folder's job short as above, and the
+list shows where the file is.
+
+**Resolution.** `app/www/moves.js`, `docs/android-app.md`, `tests/app/test_moves.py`.
+
+## Seed 74: a move inside the board's own storage keeps the file's id
+
+**Question.** The design (the app, and 8.15 of the design of part B) says a move inside the
+board's storage uploads under the same id, which keeps it, and that the job gives the
+settings again. The job gave such a file a new id, as a move between the storages does.
+The board keeps a file's saved brightness and repeat by its stored name, which an upload
+into another folder changes, and it leaves the old name's lines behind. In which order are
+the settings carried?
+
+**Answer.** The job uploads the file under its own id to its new path, which moves it there
+and keeps its id and its Ignore. Before the upload it takes the saved brightness and
+repeat from the file with `brightness <id> default` and `repeat <id> default`, keeping them
+in the job on the phone, and gives them to it again after the upload, so no line of the
+old stored name stays to be given to a later file of that name. A refused upload gives
+them back at once; a job cut short that the next connection finds not moved gives them
+back then. A folder of the board's own storage is still not moved inside it.
+
+**Resolution.** `app/www/moves.js`, `docs/android-app.md`,
+`tests/app/test_internal_folders.py`.
+
+## Seed 74: the playlist of a moved folder follows it
+
+**Question.** The design had the current playlist follow a folder moved inside the card.
+With the folder moved by the app, the source folder goes with its last file and the board
+plays the root's playlist. Does the playlist follow?
+
+**Answer.** Yes, by the app. When the move begins, the status says which playlist is
+current; when it is the moved folder's or one below it, of the same storage, the job keeps
+the new path. Once every file of the job has moved, the app asks for the status and plays
+the new folder's playlist with `play <id>` when the board plays the root's or still that
+folder's; when another playlist was chosen meanwhile, it is left. A refusal, such as the
+boundary of Clocks only, leaves the root's playing.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`,
+`tests/app/test_moves.py`.
+
+## Seed 74: two selected folders of one name
+
+**Question.** Two selected folders of one name, one of each storage, planned into one
+destination took the same path, and the second's files went into the first's. What does
+the preview do?
+
+**Answer.** It skips the later one, "Another selected folder takes this name", with a field
+for another name, as for a name the destination has; names compare in any case, as the
+card's do.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`,
+`tests/app/test_moves.py`.
+
+## Seed 74: the stack of `move external` on the board
+
+**Question.** The owner asked for designs that cost the core no memory. `move external`
+holds the old and the new name and two edits of folders' files while its commit runs, so
+its chain of frames is deeper than any command's before it, while the build's check sees
+each frame alone (512 bytes). How deep is it, and what is done about it?
+
+**Answer.** The checks of the move are made in a frame of their own, gone before the
+commit, and so is what follows it; the line of the record's end is a constant, not on the
+stack. With the board's compiler at `-Os` and `-fstack-usage`, the chain from
+`command_answer` to a rename of the commit is 416 + 432 (`catalog_move`) + 416
+(`move_committed`) + 208 (`commit_change`) + 208 (`finish`) + 272 (`read_record`) + 208
+(`take_action`) + 256 (`act`) = 2,416 bytes, where `folder make external`'s is 2,064; the
+old and new names and the four edits are what the move needs and stay. The figure is in
+`docs/core.md`; the margin of the task that runs the commands on the board, the web
+server's for a request, is the board's to see, at the delivery.
+
+**Resolution.** `core/src/catalog.cpp`, `docs/core.md`.

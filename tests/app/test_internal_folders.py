@@ -111,24 +111,40 @@ class InternalFolders(unittest.TestCase):
         self.assertEqual((folder / '1' / 'face.odrg').read_bytes(), face)
         self.assertEqual([(row['id'], row['file']) for row in self.listed(emulator, 20) if 'file' in row], [(2, 'shows/face.odrg')])
 
-    def test_a_file_moved_out_of_an_internal_folder_leaves_it_and_takes_its_settings(self):
+    def test_a_file_moved_out_of_an_internal_folder_leaves_it_with_its_id_and_its_settings(self):
         folder, emulator = self.board()
         data = (folder / '1' / 'face.odrg').read_bytes()
         self.answered(emulator, 'brightness 2 9 save')
-        found = support.run('move-out', address=f'127.0.0.1:{emulator.port}', settings={'rows': 1, 'enter': [[20, 'shows']], 'id': 2, 'storage': 'internal'}).seen
+        self.answered(emulator, 'repeat 2 3 save')
+        found = support.run('move-out', address=f'127.0.0.1:{emulator.port}', settings={'rows': 1, 'enter': [[20, 'shows']], 'id': 2, 'storage': 'internal', 'folder': ''}).seen
         self.assertIn('Internal /shows/face.odrg \u2192 Internal /face.odrg', found['preview'])
         self.assertIn('Moved 1 of 1', found['message'])
         moved = [row for row in self.listed(emulator) if row.get('file') == 'face.odrg']
-        self.assertEqual(len(moved), 1)
+        self.assertEqual([row['id'] for row in moved], [2])
         self.assertNotIn(2, [row['id'] for row in self.listed(emulator, 20)])
         self.assertFalse((folder / '1' / 'face.odrg').exists())
         self.assertEqual((folder / 'face.odrg').read_bytes(), data)
-        self.assertEqual(json.loads(emulator.command(f'saved {moved[0]["id"]}'))['brightness'], 9)
+        saved = json.loads(emulator.command('saved 2'))
+        self.assertEqual((saved['brightness'], saved['repeat']), (9, 3))
+        self.assertEqual((folder / 'brightness.txt').read_text(encoding='ascii'), 'odrig-brightness 1\n9 f face.odrg\n')
+        self.assertEqual((folder / 'repeats.txt').read_text(encoding='ascii'), 'odrig-repeats 1\n3 f face.odrg\n')
+
+    def test_a_file_moved_into_another_internal_folder_keeps_its_id_and_its_settings(self):
+        folder, emulator = self.board()
+        self.answered(emulator, 'brightness 1 7 save')
+        found = support.run('move-out', address=f'127.0.0.1:{emulator.port}', settings={'rows': 1, 'enter': [], 'id': 1, 'storage': 'internal', 'folder': 'shows/night'}).seen
+        self.assertIn('Internal /root.odrg \u2192 Internal /shows/night/root.odrg', found['preview'])
+        self.assertIn('Moved 1 of 1', found['message'])
+        rows = [(row['id'], row['file'], row['stored']) for row in self.listed(emulator, 21) if 'file' in row]
+        self.assertCountEqual(rows, [(3, 'shows/night/deep.odrg', '2/deep.odrg'), (1, 'shows/night/root.odrg', '2/root.odrg')])
+        self.assertFalse((folder / 'root.odrg').exists())
+        self.assertEqual(json.loads(emulator.command('saved 1'))['brightness'], 7)
+        self.assertEqual((folder / 'brightness.txt').read_text(encoding='ascii'), 'odrig-brightness 1\n7 f 2/root.odrg\n')
 
     def test_a_file_of_an_internal_folder_that_another_item_names_stays(self):
         folder, emulator = self.board(items=[{'id': 4, 'file': '1/face.odrg'}])
         found = support.run('move-out', address=f'127.0.0.1:{emulator.port}',
-                            settings={'rows': 1, 'enter': [[20, 'shows']], 'id': 2, 'storage': 'internal', 'skipped': True}).seen
+                            settings={'rows': 1, 'enter': [[20, 'shows']], 'id': 2, 'storage': 'internal', 'folder': '', 'skipped': True}).seen
         self.assertIn('Another item of the show names the same file; it stays.', found['preview'])
         self.assertEqual(found['go'], 'Move 0 files')
 

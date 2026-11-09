@@ -919,7 +919,7 @@ export function start(options) {
   previews.watch(redraw);
   filters.start({redraw});
   selection.start({message, redraw, visible: () => true});
-  explorer.start({message, redraw, chosen: selection.rows, done: selection.finished});
+  explorer.start({message, redraw, chosen: selection.rows, chosenFolders: selection.folders, done: selection.finished});
   extend({draw: explorer.draw});
   reorder.start({message, redraw, shownOrder, groupOf: folderOf, levelRows: shownOrder});
   extend({menu: reorder.menu, draw: reorder.draw, order: reorder.order});

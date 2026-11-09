@@ -133,7 +133,7 @@ class Downloads(unittest.TestCase):
         found = support.run("downloads", address=f"127.0.0.1:{emulator.port}",
                             settings={"rows": 3, "enter": ["night"], "rowsThere": 1, "files": [x["id"]], "folders": ["night/deep", "night/empty"]}).seen
         self.assertEqual(found["summary"], "3 selected: 0 in Internal storage, 1 in External storage. 2 folders of External storage, with everything in them.")
-        self.assertEqual((found["deleteDisabled"], found["moveDisabled"], found["downloadDisabled"]), (True, True, False))
+        self.assertEqual((found["deleteDisabled"], found["moveDisabled"], found["downloadDisabled"]), (True, False, False))
         self.assertIsNone(found["choice"])
         self.assertEqual(found["source"], "From External /night/: entries are named from there.")
         self.assertEqual(found["what"], f"1 file and 2 folders with everything in them, saved as one zip with the manifest {MANIFEST}.")

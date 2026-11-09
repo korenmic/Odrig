@@ -946,6 +946,11 @@ nav button[aria-current="true"] {
   opacity: 0.75;
 }
 
+/* A file of a moved folder, under the folder's line. */
+#move-preview li.inner {
+  margin-left: 18px;
+}
+
 #mapping-lock-dialog {
   width: calc(100% - 32px - var(--bar-left) - var(--bar-right));
   max-width: 560px;

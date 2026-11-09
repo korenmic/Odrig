@@ -930,3 +930,14 @@ and `ignore` of a folder's id holds its subtree. A file of a folder keeps the na
 the folders' paths are in `folders.txt`. The host interface's names, `remove` and
 `make_folder` take the number of such a folder, and `make_folder` may answer 0 for a storage
 that makes no folders. The core's memory is as it was.
+
+On 2026-11-09, under the same answer, `move external <id> <path>` moves a file of the card
+into another of its folders, `/` for its root: the board renames it through `upload.part` in
+one commit of the card's catalog, which keeps its id and puts it last among the folder's
+files, and gives its saved brightness, repeat and Ignore to its new path through a journal
+on the card, `moving.txt`, that a mount finishes after a cut. A folder of the card is moved
+by the app, as the owner allowed on 2026-11-09 should the board's own folder move prove too
+large to build safely: its folders made with `folder make external` and its files moved one
+at a time with `move external`, each keeping its id and its saved settings, the new folder
+with an id of its own. Folders move between the board's own storage and the card as jobs of
+the app over their files, their folders made first. The core's memory is as it was.

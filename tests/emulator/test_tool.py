@@ -228,7 +228,7 @@ class Session(unittest.TestCase):
         codes = [json.loads(reply).get("error") for reply in replies["http"]]
         self.assertEqual(codes[-10:-1], ["unknown-id", "bad-argument", "bad-argument", "line-too-long", None, None, "unknown-id", "unknown-id", "unknown-id"])
         # Uploads and miniature output have their own transport scenarios.
-        self.assertEqual({words[0] for words in SESSION}, set(cli.COMMANDS) - {"upload", "debug", "folder", "saved"})
+        self.assertEqual({words[0] for words in SESSION}, set(cli.COMMANDS) - {"upload", "debug", "folder", "move", "saved"})
 
 
 class Unreachable(unittest.TestCase):
@@ -357,17 +357,17 @@ class Usage(unittest.TestCase):
         table = text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
         self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "brightness <id> <n> save", "brightness <id> default", "status", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save",
-                                      "repeat <id> default", "saved <id>", "clocks on", "clocks off", "clocks only", "clocks message on", "clocks message off", "upload begin <id> <file> <bytes>", "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel", "folder make internal <path>", "folder make external <path>", "debug mini on", "debug mini off"])
+                                      "repeat <id> default", "saved <id>", "clocks on", "clocks off", "clocks only", "clocks message on", "clocks message off", "upload begin <id> <file> <bytes>", "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel", "folder make internal <path>", "folder make external <path>", "move external <id> <path>", "debug mini on", "debug mini off"])
         # `play all` is `play` with the word in the place of the id.
-        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog", "repeat ", "clocks ", "debug ", "folder ", "brightness <id> ", "read ")) and command not in ("play all", "remove many <ids>", "list in <folder-id>")]
-        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog", "repeat", "clocks", "debug", "folder", "read")],
+        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog", "repeat ", "clocks ", "debug ", "folder ", "move ", "brightness <id> ", "read ")) and command not in ("play all", "remove many <ids>", "list in <folder-id>")]
+        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog", "repeat", "clocks", "debug", "folder", "move", "read")],
                          [command.replace("<id>", "<x>").replace("<n>", "<x>").replace("<value>", "<x>").replace("<offset>", "<x>") for command in one_line])
         self.assertIn("| `read <id> <offset>`, `read <id> <offset> <count>` |", table)
         self.assertEqual(list(cli.COMMANDS)[-1], "upload")
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
                          {"play": ("ID",), "brightness": ("N",), "read": ("ID", "OFFSET", "[COUNT]"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "repeat": ("ID", "N", "[save]"), "saved": ("ID",),
-                          "clocks": ("OPERATION",), "debug": ("mini", "on|off"), "folder": ("make", "internal|external", "PATH"), "upload": ("ID", "FILE")})
+                          "clocks": ("OPERATION",), "debug": ("mini", "on|off"), "folder": ("make", "internal|external", "PATH"), "move": ("external", "ID", "PATH"), "upload": ("ID", "FILE")})
 
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),

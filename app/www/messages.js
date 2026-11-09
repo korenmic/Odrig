@@ -96,6 +96,35 @@ function kilobytes(bytes) {
   return String(Math.ceil(bytes / 1000));
 }
 
+// The id and the folder of a line `move external <id> <path>`, and the storage and the
+// folder of a line `folder make <storage> <path>`, each folder as `/` and its path; null for
+// another line.
+function moveOf(line) {
+  const found = /^move external ([0-9]+) (.+)$/.exec(line);
+  return found === null ? null : {id: found[1], folder: found[2] === "/" ? "/" : `/${decodeURIComponent(found[2])}`};
+}
+
+function makingOf(line) {
+  const found = /^folder make (internal|external) (.+)$/.exec(line);
+  return found === null ? null : {storage: found[1], folder: `/${decodeURIComponent(found[2])}`};
+}
+
+// The texts of the refusals of `move external` and of `folder make`, by their codes.
+const MOVES = {
+  "unknown-id": ({id, folder}) => `Animation ${id} or the folder ${folder} is not on the card any more. The list is read again.`,
+  "in-use": ({id, folder}) => `Animation ${id} cannot be moved into ${folder}: a file or a folder there has its name.`,
+  "read-only": ({id}) => `The card cannot be written now, so animation ${id} cannot be moved on it.`,
+  "bad-argument": ({id, folder}) => `Animation ${id} cannot be moved into ${folder}: its new path would pass 100 characters.`,
+};
+const MAKINGS = {
+  "unknown-id": ({folder}) => `The folder above ${folder} is not on the installation any more. The list is read again.`,
+  "in-use": ({folder}) => `The folder ${folder} cannot be made: a file or a folder there has its name.`,
+  "read-only": ({folder}) => `The card cannot be written now, so the folder ${folder} cannot be made.`,
+  "no-space": ({storage, folder}) => storage === "internal" ? `Internal storage has no room for the folder ${folder}: it keeps 32 folders at most, each with room for its files.` :
+    `The card has no free id for the folder ${folder}.`,
+  unsupported: () => "This installation cannot make folders in that storage.",
+};
+
 // The text for each error code a command of the app can get, from the line that was
 // refused, from the reason of an invalid show, when the target has said one, and from the
 // refusal itself.
@@ -219,6 +248,10 @@ export function ofRemoved(animation) {
 // The message of a command the target refused. A code without a text of its own gets
 // the general sentence.
 export function ofRefusal(refusal, reason = null) {
+  const moving = moveOf(refusal.line);
+  if (moving !== null && Object.prototype.hasOwnProperty.call(MOVES, refusal.code)) return `${MOVES[refusal.code](moving)} (${refusal.code})`;
+  const making = makingOf(refusal.line);
+  if (making !== null && Object.prototype.hasOwnProperty.call(MAKINGS, refusal.code)) return `${MAKINGS[refusal.code](making)} (${refusal.code})`;
   const text = Object.prototype.hasOwnProperty.call(REFUSALS, refusal.code) ? REFUSALS[refusal.code] : REFUSED;
   return `${text(refusal.line, reason, refusal)} (${refusal.code})`;
 }

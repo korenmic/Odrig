@@ -1,6 +1,6 @@
 // The explorer's actions on the list: a new folder at the level shown, of the board's own
-// storage or of the card, and the move of the selected files to a storage and a folder the
-// operator names in full, each destination shown before anything is sent.
+// storage or of the card, and the move of the selected files and folders to a storage and a
+// folder the operator names in full, each destination shown before anything is sent.
 
 import * as client from "../client.js";
 import * as commands from "../commands.js";
@@ -13,6 +13,7 @@ import {Failure} from "../target.js";
 let message = () => {};
 let redraw = () => {};
 let chosen = () => [];
+let chosenFolders = () => [];
 let done = () => {};
 // The folder dialog's level, the move dialog's files and plan, and the run under way.
 let folderAt = null;
@@ -131,8 +132,9 @@ async function makeFolder() {
   }
 }
 
-// Every folder of the card, its root first, by their paths, walked level by level.
-async function cardFolders() {
+// Every folder of a storage, "external" the card, its root first, by their paths, walked
+// level by level.
+async function foldersOf(storage) {
   const found = [""];
   const pending = [null];
   while (pending.length > 0 && found.length < 256) {
@@ -141,7 +143,7 @@ async function cardFolders() {
     do {
       const reply = await client.operation("move", () => commands.list(from, folder));
       for (const row of reply.items) {
-        if (typeof row.playlist === "string" && row.external === true && !found.includes(row.playlist)) {
+        if (typeof row.playlist === "string" && (row.external === true) === (storage === "external") && !found.includes(row.playlist)) {
           found.push(row.playlist);
           pending.push(row.id);
         }
@@ -167,16 +169,42 @@ async function blockedOf(files) {
 }
 
 async function destinationRows(storage, folder) {
-  if (storage === "internal") {
-    return (await client.uploadSnapshot({path: "", id: null})).root;
-  }
-  const level = folder ? await levelId(folder) : null;
-  return (await client.uploadSnapshot({path: folder, id: level})).items;
+  const level = folder ? await moves.folderId(client.operation, folder, storage) : null;
+  if (level === undefined) throw new Error("The folder is gone; choose another.");
+  return (await client.uploadSnapshot({path: folder, id: level, storage})).items;
 }
 
-// The id of the card's folder with this path, or null when there is none.
-async function levelId(path) {
-  return (await moves.folderId(client.operation, path, "external")) ?? null;
+function storageOfRow(row) {
+  return row.external === true ? "external" : "internal";
+}
+
+// A line of the preview: the source and its destination, and why it is skipped, with a
+// field for another name when the skip is about its name.
+function previewLine(from, to, skip, name, key, what, inner = false) {
+  const item = document.createElement("li");
+  if (inner) item.classList.add("inner");
+  const line = document.createElement("span");
+  line.textContent = `${from} \u2192 ${to}`;
+  item.append(line);
+  if (skip !== null) {
+    item.classList.add("skipped");
+    const why = document.createElement("span");
+    why.className = "small";
+    why.textContent = ` Skipped: ${skip}`;
+    item.append(why);
+    if (/name/.test(skip)) {
+      const rename = document.createElement("input");
+      rename.type = "text";
+      rename.value = name;
+      rename.setAttribute("aria-label", `Another name for ${what}`);
+      rename.addEventListener("change", () => {
+        moving.names.set(key, rename.value.trim());
+        replan();
+      });
+      item.append(rename);
+    }
+  }
+  return item;
 }
 
 function drawPlan() {
@@ -184,96 +212,119 @@ function drawPlan() {
   list.replaceChildren();
   if (moving === null || moving.plan === null) return;
   for (const entry of moving.plan) {
-    const item = document.createElement("li");
-    const line = document.createElement("span");
-    line.textContent = `${moves.label(entry.source.external === true ? "external" : "internal", entry.source.file)} \u2192 ${moves.label(entry.storage, entry.path)}`;
-    item.append(line);
-    if (entry.skip !== null) {
-      item.classList.add("skipped");
-      const why = document.createElement("span");
-      why.className = "small";
-      why.textContent = ` Skipped: ${entry.skip}`;
-      item.append(why);
-      if (/name/.test(entry.skip)) {
-        const rename = document.createElement("input");
-        rename.type = "text";
-        rename.value = entry.name;
-        rename.setAttribute("aria-label", `Another name for ${entry.source.file}`);
-        rename.addEventListener("change", () => {
-          moving.names.set(entry.source.id, rename.value.trim());
-          replan();
-        });
-        item.append(rename);
-      }
-    }
-    list.append(item);
+    list.append(previewLine(moves.label(storageOfRow(entry.source), entry.source.file), moves.label(entry.storage, entry.path), entry.skip, entry.name, entry.source.id, entry.source.file));
   }
-  const count = moving.plan.filter((entry) => entry.skip === null).length;
-  byId("move-go").textContent = `Move ${count} file${count === 1 ? "" : "s"}`;
-  byId("move-go").disabled = count === 0 || running !== null;
+  for (const planned of moving.folderPlans) {
+    const from = moves.label(storageOfRow(planned.folder), `${planned.folder.playlist}/`);
+    list.append(previewLine(`Folder ${from}`, moves.label(planned.storage, `${planned.path}/`), planned.skip, planned.name, `folder:${planned.folder.id}`, planned.folder.playlist));
+    for (const entry of planned.skip === null ? planned.entries : []) {
+      list.append(previewLine(moves.label(storageOfRow(entry.source), entry.source.file), moves.label(entry.storage, entry.path), entry.skip, entry.name, entry.source.id, entry.source.file, true));
+    }
+  }
+  const files = moving.plan.filter((entry) => entry.skip === null).length;
+  const folders = moving.folderPlans.filter((planned) => planned.skip === null);
+  const inside = folders.reduce((sum, planned) => sum + planned.entries.filter((entry) => entry.skip === null).length, 0);
+  const counted = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+  const words = [];
+  if (files > 0 || folders.length === 0) words.push(counted(files, "file"));
+  if (folders.length > 0) words.push(`${counted(folders.length, "folder")} with ${counted(inside, "file")}`);
+  byId("move-go").textContent = `Move ${words.join(" and ")}`;
+  byId("move-go").disabled = (files === 0 && folders.length === 0) || running !== null;
 }
 
 function replan() {
-  if (moving === null || moving.rows === null) return;
+  if (moving === null || moving.rows === null || moving.trees === null) return;
   moving.plan = moves.plan(moving.files, moving.destination, moving.rows, moving.names, moving.blocked);
+  const planned = [];
+  moving.folderPlans = moving.trees.map((tree) => {
+    const made = moves.folderPlan(tree, moving.destination, moving.rows, moving.names, moving.blocked, planned);
+    if (made.skip === null) planned.push(made.name);
+    return made;
+  });
   drawPlan();
 }
 
-async function chooseDestination() {
+// The folders of a storage the chooser offers, each by its full path, the level shown chosen
+// when it is one of them.
+function offerFolders(storage) {
+  const folder = byId("move-folder");
+  folder.replaceChildren();
+  for (const path of moving.folders[storage] ?? [""]) {
+    const option = document.createElement("option");
+    option.value = path;
+    option.textContent = `/${path}`;
+    folder.append(option);
+  }
+  const level = client.state.level;
+  const here = level.id !== null && (level.storage ?? "external") === storage ? level.path : "";
+  folder.value = [...folder.options].some((option) => option.value === here) ? here : "";
+}
+
+async function chooseDestination(event) {
   if (moving === null) return;
   const storage = byId("move-storage").value;
-  const folder = storage === "external" ? byId("move-folder").value : "";
-  byId("move-folder").disabled = storage !== "external";
+  if (event?.target?.id !== "move-folder") offerFolders(storage);
+  const folder = byId("move-folder").value;
   moving.destination = {storage, folder};
   moving.rows = null;
   moving.plan = null;
   byId("move-go").disabled = true;
   byId("move-preview").replaceChildren();
+  // Only the destination chosen last is read into the preview.
   const asked = moving;
+  const request = {};
+  moving.request = request;
   try {
     const rows = await destinationRows(storage, folder);
-    if (moving !== asked) return;
+    if (moving !== asked || moving.request !== request) return;
     moving.rows = rows;
     replan();
   } catch (error) {
-    if (moving === asked) byId("move-state").textContent = `The destination could not be read. ${refusalText(error)}`;
+    if (moving === asked && moving.request === request) byId("move-state").textContent = `The destination could not be read. ${refusalText(error)}`;
   }
 }
 
 async function openMove() {
   const files = chosen();
-  if (files.length === 0 || running !== null) return;
-  moving = {files, names: new Map(), blocked: new Map(), destination: null, rows: null, plan: null, version: client.targetVersion()};
+  const folders = chosenFolders();
+  if ((files.length === 0 && folders.length === 0) || running !== null) return;
+  moving = {files, chosenFolders: folders, trees: null, folderPlans: [], folders: {}, names: new Map(), blocked: new Map(), destination: null, rows: null, plan: null,
+    version: client.targetVersion()};
   const reason = cardReason(client.state);
   const storage = byId("move-storage");
   storage.querySelector('option[value="external"]').disabled = reason !== null;
   storage.value = reason === null ? "external" : "internal";
-  byId("move-storage-reason").textContent = reason === null ? "" : `${reason} Only Internal storage can take the files now.`;
-  byId("move-state").textContent = `${files.length} file${files.length === 1 ? "" : "s"} selected.`;
-  const folder = byId("move-folder");
-  folder.replaceChildren();
+  byId("move-storage-reason").textContent = reason === null ? "" : `${reason} Only Internal storage can take them now.`;
+  const words = [];
+  if (files.length > 0) words.push(`${files.length} file${files.length === 1 ? "" : "s"}`);
+  if (folders.length > 0) words.push(`${folders.length} folder${folders.length === 1 ? "" : "s"}, with everything in ${folders.length === 1 ? "it" : "them"}`);
+  byId("move-state").textContent = `${words.join(" and ")} selected.`;
+  byId("move-folder").replaceChildren();
   byId("move-dialog").hidden = false;
   const asked = moving;
   try {
-    const blocked = await blockedOf(files);
-    if (moving === asked) moving.blocked = blocked;
+    const trees = [];
+    for (const folder of folders) trees.push(await moves.subtree(client.operation, folder));
+    const blocked = await blockedOf([...files, ...trees.flatMap((tree) => tree.files)]);
+    if (moving === asked) {
+      moving.trees = trees;
+      moving.blocked = blocked;
+    }
   } catch (error) {
-    byId("move-state").textContent = `The show could not be read. ${refusalText(error)}`;
-  }
-  if (reason === null) {
-    try {
-      for (const path of await cardFolders()) {
-        const option = document.createElement("option");
-        option.value = path;
-        option.textContent = `/${path}`;
-        folder.append(option);
-      }
-      folder.value = client.state.level.path && [...folder.options].some((option) => option.value === client.state.level.path) ? client.state.level.path : "";
-    } catch (error) {
-      byId("move-state").textContent = `The card's folders could not be read. ${refusalText(error)}`;
+    if (moving === asked) {
+      moving.trees = [];
+      byId("move-state").textContent = `The show could not be read. ${refusalText(error)}`;
     }
   }
-  await chooseDestination();
+  for (const each of reason === null ? ["internal", "external"] : ["internal"]) {
+    try {
+      const found = await foldersOf(each);
+      if (moving === asked) moving.folders[each] = found;
+    } catch (error) {
+      if (moving === asked) byId("move-state").textContent = `The folders could not be read. ${refusalText(error)}`;
+    }
+  }
+  if (moving === asked) await chooseDestination();
 }
 
 function closeMove() {
@@ -303,25 +354,34 @@ async function runMove() {
   const version = moving.version;
   if (version !== client.targetVersion()) return;
   const entries = moving.plan.filter((entry) => entry.skip === null);
-  const skipped = moving.plan.filter((entry) => entry.skip !== null);
+  const folderPlans = moving.folderPlans.filter((planned) => planned.skip === null);
+  const skipped = [...moving.plan.filter((entry) => entry.skip !== null).map((entry) => entry.source.file),
+    ...moving.folderPlans.filter((planned) => planned.skip !== null).map((planned) => `${planned.folder.playlist}/`),
+    ...folderPlans.flatMap((planned) => planned.entries.filter((entry) => entry.skip !== null).map((entry) => entry.source.file))];
+  const total = entries.length + folderPlans.reduce((sum, planned) => sum + planned.entries.filter((entry) => entry.skip === null).length, 0);
   running = {stop: false};
   const progress = byId("move-progress");
   const moved = [];
   const failed = [];
+  const folderWords = [];
   let unstarted = 0;
   client.setContentBusy(true);
   drawPlan();
   byId("move-stop").hidden = false;
+  let cutWords = null;
   const context = {
     client,
     address: target.address(),
     report: (text) => { progress.textContent = text; },
     stopped: () => running.stop || version !== client.targetVersion(),
+    switched: () => version !== client.targetVersion(),
+    waitVisible,
+    playlist: () => client.state.status,
   };
   try {
     for (const [at, entry] of entries.entries()) {
       if (context.stopped()) {
-        unstarted = entries.length - at;
+        unstarted += entries.length - at;
         break;
       }
       await waitVisible();
@@ -333,15 +393,43 @@ async function runMove() {
         failed.push(`${entry.source.file}: ${refusalText(error)}`);
       }
     }
+    for (const [at, planned] of folderPlans.entries()) {
+      const from = moves.label(storageOfRow(planned.folder), `${planned.folder.playlist}/`);
+      if (context.stopped()) {
+        unstarted += folderPlans.slice(at).reduce((sum, rest) => sum + rest.entries.filter((entry) => entry.skip === null).length, 0);
+        break;
+      }
+      await waitVisible();
+      try {
+        const done = await moves.moveFolder(planned, context);
+        moved.push(...done.moved);
+        failed.push(...done.failed.map((each) => `${each.file}: ${refusalText(each.error)}`));
+        if (done.cut !== null) {
+          const rest = folderPlans.slice(at + 1).reduce((sum, other) => sum + other.entries.filter((entry) => entry.skip === null).length, 0);
+          cutWords = `The move of ${from} was cut short: ${refusalText(done.cut)} Its ${done.unstarted} file${done.unstarted === 1 ? "" : "s"} left ` +
+            `${done.unstarted === 1 ? "moves" : "move"} when the app reaches the installation again.${rest ? ` Not started: ${rest}.` : ""}`;
+          break;
+        }
+        unstarted += done.unstarted;
+        folderWords.push(`${from} is now ${moves.label(planned.storage, `${planned.path}/`)}.` +
+          (done.followed ? " Its playlist plays there." : "") +
+          (done.sourceGone ? "" : ` ${from} stays at its old place with what was not moved, or folders without files, which are not removed.`));
+      } catch (error) {
+        failed.push(`${planned.folder.playlist}/: ${refusalText(error)}`);
+      }
+    }
   } finally {
     running = null;
+    // A job cut short is taken up once the installation answers again.
+    if (moves.pending(context.address).length > 0) reconciledFor = null;
     byId("move-stop").hidden = true;
     client.setContentBusy(false);
     client.refreshContent();
   }
-  const words = [`Moved ${moved.length} of ${entries.length + skipped.length}.`];
-  if (skipped.length) words.push(`Skipped ${skipped.length}: ${skipped.map((entry) => entry.source.file).join(", ")}.`);
+  const words = [`Moved ${moved.length} of ${total + skipped.length}.`, ...folderWords];
+  if (skipped.length) words.push(`Skipped ${skipped.length}: ${skipped.join(", ")}.`);
   if (failed.length) words.push(`Failed ${failed.length}: ${failed.join("; ")}.`);
+  if (cutWords !== null) words.push(cutWords);
   if (unstarted) words.push(`Not started after Stop: ${unstarted}.`);
   progress.textContent = words.join(" ");
   message(words.join(" "));
@@ -351,25 +439,40 @@ async function runMove() {
 }
 
 // Finishes the moves a lost reply, a lost link or a restart of the app left for this
-// target, once its list answers.
+// target, once its list answers while the app is on the screen. Moves cut short again are
+// taken up when the target answers again after it did not, or when the app is shown again;
+// a move the target refuses is said and not asked again.
 async function reconcile(state) {
   const address = target.address();
-  if (reconciledFor === address || running !== null || state.link !== "answers" || state.animations === null || client.contentBusy()) return;
+  if (state.link !== "answers" || document.hidden) {
+    if (running === null) reconciledFor = null;
+    return;
+  }
+  if (reconciledFor === address || running !== null || state.animations === null || client.contentBusy()) return;
   reconciledFor = address;
   if (moves.pending(address).length === 0) return;
+  const version = client.targetVersion();
   running = {stop: false};
   client.setContentBusy(true);
+  let again = false;
   try {
-    const {finished, notMoved} = await moves.reconcile({client, address, report: () => {}, stopped: () => false});
+    const done = await moves.reconcile({client, address, report: (text) => message(`Finishing a move cut short earlier: ${text}`),
+      stopped: () => version !== client.targetVersion(), switched: () => version !== client.targetVersion(), waitVisible, playlist: () => client.state.status});
     const words = [];
-    if (finished.length) words.push(`Finished the interrupted move of ${finished.join(", ")}.`);
-    if (notMoved.length) words.push(`Not moved, left where they were: ${notMoved.join(", ")}.`);
+    if (done.finished.length) words.push(`Finished the interrupted move of ${done.finished.join(", ")}.`);
+    if (done.notMoved.length) words.push(`Not moved, left where they were: ${done.notMoved.join(", ")}.`);
+    if (done.failed.length) words.push(`Failed ${done.failed.length}: ${done.failed.map((each) => `${each.file}: ${refusalText(each.error)}`).join("; ")}.`);
+    for (const each of done.givenUp) words.push(`The interrupted move of ${each.path}/ was given up: ${refusalText(each.error)}`);
+    if (done.cut.length) {
+      again = true;
+      words.push(`The interrupted move of ${done.cut.join(", ")} goes on when the installation answers again.`);
+    }
     if (words.length) message(words.join(" "));
   } catch (error) {
-    reconciledFor = null;
-    message(`An interrupted move could not be finished yet. ${refusalText(error)}`);
+    message(`An interrupted move could not be finished. ${refusalText(error)}`);
   } finally {
     running = null;
+    if (again) reconciledFor = null;
     client.setContentBusy(false);
     client.refreshContent();
   }
@@ -395,6 +498,7 @@ export function start(options) {
   message = options.message;
   redraw = options.redraw;
   chosen = options.chosen;
+  chosenFolders = options.chosenFolders ?? (() => []);
   done = options.done ?? (() => {});
   byId("new-folder").addEventListener("click", () => openFolder(false));
   byId("new-playlist-folder").addEventListener("click", () => openFolder(true));
