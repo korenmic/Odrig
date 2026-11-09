@@ -15065,6 +15065,25 @@ server's for a request, is the board's to see, at the delivery.
 
 **Resolution.** `core/src/catalog.cpp`, `docs/core.md`.
 
+## Seeds 61 and 74: moves in Clocks only
+
+**Question.** Seed 74's `Move to…` offers every folder of both storages, and `move external`
+and `folder make` are no uploads, so the boundary of Clocks only, which seed 61 holds over
+the Clocks folders of both storages, did not reach them: a face could be moved out of
+Clocks. Where may a move go in Only, and what of a move under way or cut short when Only
+comes?
+
+**Answer.** Where an upload may go: a Clocks folder or one below it, of the card, and of the
+board's own storage on a target that reports `clock_storage`. The dialog offers only those,
+a storage without one disabled, with the words of the boundary of uploads. A file or a
+folder job that meets a confirmed Only is refused before anything is sent, `in-use` in those
+words, as an upload is; a move cut short whose destination is outside waits, kept on the
+phone, until Only is left, since finishing it would take its files out of Clocks.
+
+**Resolution.** `app/www/client.js` (`canMoveInto`), `app/www/moves.js`,
+`app/www/screens/explorer.js`, `app/www/messages.js`, `docs/android-app.md`,
+`docs/commands.md`, `tests/app/test_only_both.py`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

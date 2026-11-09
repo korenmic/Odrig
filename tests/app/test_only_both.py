@@ -251,6 +251,36 @@ class OnTheEmulator(unittest.TestCase):
         self.assertEqual(seen["message"], f"Moved 0 of 1. Failed 1: root.odrg: {ONLY_BOTH} (in-use).")
         self.assertTrue((board.folder / "root.odrg").exists())
 
+    def test_move_to_offers_the_clocks_folders_of_both_storages_alone_and_a_face_moved_stays_inside(self):
+        board = Board(self, "only")
+        acts = [{"until": {"backHidden": False}}, {"back": True, "until": {"level": "Clocks", "folders": 2}},
+                {"enter": 20, "until": {"level": "clocks", "files": ["clocks/face.odrg"]}},
+                {"move": {"as": "offered", "rows": [2]}},
+                {"move": {"as": "moved", "rows": [2], "storage": "external", "folder": "clocks"}}]
+        seen = run(board.address, acts, rows=1)
+        self.assertEqual(seen["offered"]["storages"], {"external": {"disabled": False, "folders": ["clocks"]},
+                                                       "internal": {"disabled": False, "folders": ["clocks", "clocks/message"]}})
+        self.assertEqual(seen["moved"]["message"], "Moved 1 of 1.")
+        card = board.folder.parent / "card" / "odrig"
+        self.assertEqual((card / "clocks" / "face.odrg").read_bytes(), clock_of(canvas=(60, 6)))
+        self.assertFalse((board.folder / "1" / "face.odrg").exists())
+        self.assertEqual([line for line in board.lines("upload begin ") if "clocks/" not in line], [])
+
+    def test_a_move_out_of_clocks_that_clocks_only_stopped_once_the_dialog_was_open_sends_nothing(self):
+        board = Board(self)
+
+        def only():
+            self.assertEqual(json.loads(board.emulator.command("clocks only")), {"ok": True})
+
+        acts = [{"enter": board.card_clocks, "until": {"level": "clocks", "files": ["clocks/cface.odrg"]}},
+                {"move": {"as": "moved", "rows": [board.card_face], "storage": "external", "folder": "", "step": True}}]
+        seen = run(board.address, acts, rows=2, steps=[only])
+        self.assertEqual(seen["moved"]["message"], f"Moved 0 of 1. Failed 1: clocks/cface.odrg: {ONLY_BOTH} (in-use).")
+        self.assertEqual(board.lines("move external"), [])
+        card = board.folder.parent / "card" / "odrig"
+        self.assertTrue((card / "clocks" / "cface.odrg").exists())
+        self.assertFalse((card / "cface.odrg").exists())
+
     def test_an_archive_opened_in_only_keeps_its_folder_and_says_why_without_only_once_only_is_left(self):
         board = Board(self, "only")
         media = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))

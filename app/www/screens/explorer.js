@@ -245,11 +245,11 @@ function replan() {
 }
 
 // The folders of a storage the chooser offers, each by its full path, the level shown chosen
-// when it is one of them.
+// when it is one of them: in Clocks only those the mode lets files into alone.
 function offerFolders(storage) {
   const folder = byId("move-folder");
   folder.replaceChildren();
-  for (const path of moving.folders[storage] ?? [""]) {
+  for (const path of (moving.folders[storage] ?? [""]).filter((each) => client.canMoveInto(storage, each))) {
     const option = document.createElement("option");
     option.value = path;
     option.textContent = `/${path}`;
@@ -270,6 +270,10 @@ async function chooseDestination(event) {
   moving.plan = null;
   byId("move-go").disabled = true;
   byId("move-preview").replaceChildren();
+  if (byId("move-folder").options.length === 0 || !client.canMoveInto(storage, folder)) {
+    byId("move-state").textContent = messages.onlyDestination(client.state.status?.hasClockStorage === true);
+    return;
+  }
   // Only the destination chosen last is read into the preview.
   const asked = moving;
   const request = {};
@@ -324,7 +328,19 @@ async function openMove() {
       if (moving === asked) byId("move-state").textContent = `The folders could not be read. ${refusalText(error)}`;
     }
   }
-  if (moving === asked) await chooseDestination();
+  if (moving !== asked) return;
+  if (client.clocksOnly()) {
+    // Clocks only keeps the files inside Clocks: a storage without a folder there is not offered.
+    const inside = (each) => (moving.folders[each] ?? []).some((path) => client.canMoveInto(each, path));
+    for (const each of ["internal", "external"]) {
+      const option = storage.querySelector(`option[value="${each}"]`);
+      option.disabled = option.disabled || !inside(each);
+    }
+    if (storage.querySelector(`option[value="${storage.value}"]`).disabled) storage.value = inside("external") ? "external" : "internal";
+    const why = byId("move-storage-reason");
+    why.textContent = `${why.textContent ? `${why.textContent} ` : ""}${messages.onlyDestination(client.state.status?.hasClockStorage === true)}`;
+  }
+  await chooseDestination();
 }
 
 function closeMove() {
@@ -377,6 +393,7 @@ async function runMove() {
     switched: () => version !== client.targetVersion(),
     waitVisible,
     playlist: () => client.state.status,
+    allowed: client.canMoveInto,
   };
   try {
     for (const [at, entry] of entries.entries()) {
@@ -449,15 +466,20 @@ async function reconcile(state) {
     return;
   }
   if (reconciledFor === address || running !== null || state.animations === null || client.contentBusy()) return;
+  const jobs = moves.pending(address);
+  // A move cut short that takes files where Clocks only keeps them out of waits until the mode
+  // is left.
+  if (jobs.some((job) => !client.canMoveInto(job.destination.storage, job.kind === "folder" ? moves.folderOf(job.destination.path) : job.destination.folder))) return;
   reconciledFor = address;
-  if (moves.pending(address).length === 0) return;
+  if (jobs.length === 0) return;
   const version = client.targetVersion();
   running = {stop: false};
   client.setContentBusy("move");
   let again = false;
   try {
     const done = await moves.reconcile({client, address, report: (text) => message(`Finishing a move cut short earlier: ${text}`),
-      stopped: () => version !== client.targetVersion(), switched: () => version !== client.targetVersion(), waitVisible, playlist: () => client.state.status});
+      stopped: () => version !== client.targetVersion(), switched: () => version !== client.targetVersion(), waitVisible, playlist: () => client.state.status,
+      allowed: client.canMoveInto});
     const words = [];
     if (done.finished.length) words.push(`Finished the interrupted move of ${done.finished.join(", ")}.`);
     if (done.notMoved.length) words.push(`Not moved, left where they were: ${done.notMoved.join(", ")}.`);

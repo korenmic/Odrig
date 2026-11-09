@@ -1406,6 +1406,13 @@ export function canUpload(destination) {
     state.catalog?.external?.state === "ok" && state.catalog.external.writable === true;
 }
 
+// Whether a move may put files into a folder of a storage, "external" the card's, "" for its
+// root: anywhere outside Clocks only; in it into a Clocks folder or one below it, of the card,
+// or of the board's own storage on a target that plays the clocks of both storages.
+export function canMoveInto(storage, folder) {
+  return !onlyActive || (storage === "external" || onlyBoth) && inClocks(folder);
+}
+
 // Asks for the next request again, as a job does when it has a line again.
 export function wake() {
   next();

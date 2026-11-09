@@ -689,7 +689,13 @@ disabled with its reason while it is absent, read-only or without a ready catalo
 anything is sent it lists each file's new full path, and the files it skips and why: a name
 the destination has already, in any case on the card, a name the storage does not take, a
 file a cycle lists or another item names, or one whose size is not known yet. A skipped
-name can be given another name in the preview. Nothing is replaced or merged.
+name can be given another name in the preview. Nothing is replaced or merged. In Clocks
+only it offers only the Clocks folders and the folders below them, of the card and, on a
+target that reports `clock_storage`, of the board's own storage, a storage without one
+disabled, and says the words of the boundary of uploads in Only below; a move that a
+confirmed Only meets, in its dialog or under way, sends nothing that would take a file out
+of Clocks, each file or folder failed in those words, and a move cut short that would
+waits until Only is left.
 
 A selected folder is listed as `Folder External /night/ → External /clocks/night/`, with
 each of its files and the path it takes under the new folder. A folder is skipped whole

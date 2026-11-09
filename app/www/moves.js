@@ -306,14 +306,22 @@ function upload(client, made, report) {
   });
 }
 
+// Refuses, as Clocks only does, a move into a folder of a storage that `context.allowed`
+// does not allow, "" for its root.
+function allowedInto(context, storage, folder) {
+  if (context.allowed !== undefined && !context.allowed(storage, folder)) throw new commands.Refusal("in-use", "move");
+}
+
 // Moves one planned file. `context` has the client, the address of the target,
-// `report(text)`, `stopped()`, and `switched()`, true once another target is chosen. Gives
-// the file's id afterwards. A file of the card that stays on the card under its name is
-// moved by the board, which keeps its id and its saved settings, and by a job when the
-// board's firmware cannot.
+// `report(text)`, `stopped()`, `switched()`, true once another target is chosen, and may have
+// `allowed(storage, folder)`, false for a destination the mode keeps files out of. Gives the
+// file's id afterwards. A file of the card that stays on the card under its name is moved by
+// the board, which keeps its id and its saved settings, and by a job when the board's
+// firmware cannot.
 export async function move(entry, context) {
   const {client, address} = context;
   const operation = requests(context);
+  allowedInto(context, entry.storage, entry.folder);
   if (storageOf(entry.source) === "external" && entry.storage === "external" && entry.name === baseOf(entry.source.file)) {
     context.report(`Moving ${label("external", entry.source.file)}`);
     const moveOnCard = () => operation("move", () => commands.moveExternal(entry.source.id, entry.folder));
@@ -450,9 +458,11 @@ function folderJob(planned, playlist) {
 
 // Makes a job's folders at its destination, from the top, each with the Ignore of the one it
 // stands for, keeping each one's id in the job; one that is there already is taken as made.
-// False when the job was stopped first.
+// False when the job was stopped first. A destination `context.allowed` does not allow is
+// refused before any folder is made.
 async function makeFolders(job, context) {
   const operation = requests(context);
+  allowedInto(context, job.destination.storage, folderOf(job.destination.path));
   for (const folder of job.folders) {
     if (context.stopped()) return false;
     context.report(`Making ${label(job.destination.storage, folder.path)}`);

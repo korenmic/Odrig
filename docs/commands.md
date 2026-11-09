@@ -1177,8 +1177,8 @@ stays dark and reports why; it does not fall back to ordinary animations or mess
 with a face of the board's own storage it plays without a card.
 
 Raw command browsing remains unrestricted; the operators' app confines visible browsing
-and upload destinations to Clocks in Only mode. The boundary holds the folder `clocks` and
-every folder below it of the card and of the board's own storage. Outside file/folder/cycle
+and upload and move destinations to Clocks in Only mode. The boundary holds the folder
+`clocks` and every folder below it of the card and of the board's own storage. Outside file/folder/cycle
 play and output-taking mapping diagnostics return `in-use` without changing playback, and
 an inside file of the board's own storage that is unavailable returns `unavailable`. Raw
 `play all` is also refused; the app restarts Clocks with `play <resolved-clocks-folder-id>`,

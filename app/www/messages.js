@@ -103,6 +103,12 @@ function kilobytes(bytes) {
 // clocks of both storages.
 export const ONLY_UPLOAD_BOTH = "Clocks only: choose a folder inside Clocks, a writable one on the card, or leave this mode in Settings.";
 
+// Why an upload or a move cannot go where it was asked to in Clocks only: `both` says that the
+// target plays the clocks of both storages.
+export function onlyDestination(both) {
+  return both ? ONLY_UPLOAD_BOTH : "Clocks only: choose a writable external folder inside Clocks, or leave this mode in Settings.";
+}
+
 // The id and the folder of a line `move external <id> <path>`, and the storage and the
 // folder of a line `folder make <storage> <path>`, each folder as `/` and its path; null for
 // another line.
@@ -149,7 +155,7 @@ const REFUSALS = {
     : `Animation ${line.split(" ")[1]} cannot be played until it is replaced: its file has a fault. The list says which.`,
   busy: () => "The installation is busy. Try again in a moment.",
   "in-use": (line, reason, refusal, both) =>
-    line === "upload" ? (both ? ONLY_UPLOAD_BOTH : "Clocks only: choose a writable external folder inside Clocks, or leave this mode in Settings.") :
+    line === "upload" || line === "move" ? onlyDestination(both) :
     line.startsWith("play ") ? `Clocks only allows playback inside the ${both ? "clocks folders" : "Clocks folder"}. Leave Clocks only in Settings to play elsewhere.` :
     line.startsWith("mapping test ") ? "Leave Clocks only in Settings before starting a display test." :
     line.startsWith("remove many ") ? "Some selected animations cannot be removed: a cycle plays them, or they are on external storage." :
