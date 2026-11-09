@@ -19,7 +19,7 @@ commit message. Code carries no history.
   - Suites: core, onboarding, emulator (its tool's command list).
   - Requirements: 1.1–1.4, 2.1–2.2, 3.1–3.3, 4.1–4.2, 5.1–5.4, 6.1–6.11, 9.1.
 
-- [ ] 2. The emulator's line and the command tool
+- [x] 2. The emulator's line and the command tool
   - `odrigctl/cli.py`: `move internal ID PATH`. `tests/emulator/test_folder_move.py`, new:
     the line over HTTP and TCP; `tests/emulator/test_tool.py`: the tool's sending and its
     usage errors, seen failing first.
