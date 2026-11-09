@@ -346,6 +346,18 @@ export async function folderMake(path, storage = "external") {
   return {id: reply.id, made: reply.made};
 }
 
+// Moves the card's file with this id into the card's folder with this path, "" for the root,
+// with its id and its saved settings. Gives whether it moved: false for a file that was in
+// that folder already.
+export async function moveExternal(id, folder) {
+  const encoded = folder === "" ? "/" : folder.split("/").map(encodeURIComponent).join("/");
+  const reply = await carriedOut(`move external ${id} ${encoded}`);
+  if (reply.id !== id || typeof reply.moved !== "boolean") {
+    throw new Failure("bad-reply", address());
+  }
+  return reply.moved;
+}
+
 // What the board keeps for an animation: its saved brightness and saved repeat, null for
 // none, and whether it is the show's start item.
 export async function saved(id) {

@@ -1,7 +1,8 @@
 """The folders of the board's own storage in the shared app: their rows at the root, a folder
 entered with the paths of its files, `New folder` at the root and inside one, the reply of
-`list` the app takes from a target that has them, and moves of files out of a folder of
-either storage while both have folders of one path."""
+`list` the app takes from a target that has them, moves of files out of a folder of
+either storage while both have folders of one path, and the marks of the playlist that
+plays then."""
 
 import json
 import pathlib
@@ -184,24 +185,40 @@ class InternalFolders(unittest.TestCase):
         self.assertEqual((folder / '1' / 'face.odrg').read_bytes(), face)
         self.assertEqual([(row['id'], row['file']) for row in self.listed(emulator, 20) if 'file' in row], [(2, 'shows/face.odrg')])
 
-    def test_a_file_moved_out_of_an_internal_folder_leaves_it_and_takes_its_settings(self):
+    def test_a_file_moved_out_of_an_internal_folder_leaves_it_with_its_id_and_its_settings(self):
         folder, emulator = self.board()
         data = (folder / '1' / 'face.odrg').read_bytes()
         self.answered(emulator, 'brightness 2 9 save')
-        found = support.run('move-out', address=f'127.0.0.1:{emulator.port}', settings={'rows': 1, 'enter': [[20, 'shows']], 'id': 2, 'storage': 'internal'}).seen
+        self.answered(emulator, 'repeat 2 3 save')
+        found = support.run('move-out', address=f'127.0.0.1:{emulator.port}', settings={'rows': 1, 'enter': [[20, 'shows']], 'id': 2, 'storage': 'internal', 'folder': ''}).seen
         self.assertIn('Internal /shows/face.odrg \u2192 Internal /face.odrg', found['preview'])
         self.assertIn('Moved 1 of 1', found['message'])
         moved = [row for row in self.listed(emulator) if row.get('file') == 'face.odrg']
-        self.assertEqual(len(moved), 1)
+        self.assertEqual([row['id'] for row in moved], [2])
         self.assertNotIn(2, [row['id'] for row in self.listed(emulator, 20)])
         self.assertFalse((folder / '1' / 'face.odrg').exists())
         self.assertEqual((folder / 'face.odrg').read_bytes(), data)
-        self.assertEqual(json.loads(emulator.command(f'saved {moved[0]["id"]}'))['brightness'], 9)
+        saved = json.loads(emulator.command('saved 2'))
+        self.assertEqual((saved['brightness'], saved['repeat']), (9, 3))
+        self.assertEqual((folder / 'brightness.txt').read_text(encoding='ascii'), 'odrig-brightness 1\n9 f face.odrg\n')
+        self.assertEqual((folder / 'repeats.txt').read_text(encoding='ascii'), 'odrig-repeats 1\n3 f face.odrg\n')
+
+    def test_a_file_moved_into_another_internal_folder_keeps_its_id_and_its_settings(self):
+        folder, emulator = self.board()
+        self.answered(emulator, 'brightness 1 7 save')
+        found = support.run('move-out', address=f'127.0.0.1:{emulator.port}', settings={'rows': 1, 'enter': [], 'id': 1, 'storage': 'internal', 'folder': 'shows/night'}).seen
+        self.assertIn('Internal /root.odrg \u2192 Internal /shows/night/root.odrg', found['preview'])
+        self.assertIn('Moved 1 of 1', found['message'])
+        rows = [(row['id'], row['file'], row['stored']) for row in self.listed(emulator, 21) if 'file' in row]
+        self.assertCountEqual(rows, [(3, 'shows/night/deep.odrg', '2/deep.odrg'), (1, 'shows/night/root.odrg', '2/root.odrg')])
+        self.assertFalse((folder / 'root.odrg').exists())
+        self.assertEqual(json.loads(emulator.command('saved 1'))['brightness'], 7)
+        self.assertEqual((folder / 'brightness.txt').read_text(encoding='ascii'), 'odrig-brightness 1\n7 f 2/root.odrg\n')
 
     def test_a_file_of_an_internal_folder_that_another_item_names_stays(self):
         folder, emulator = self.board(items=[{'id': 4, 'file': '1/face.odrg'}])
         found = support.run('move-out', address=f'127.0.0.1:{emulator.port}',
-                            settings={'rows': 1, 'enter': [[20, 'shows']], 'id': 2, 'storage': 'internal', 'skipped': True}).seen
+                            settings={'rows': 1, 'enter': [[20, 'shows']], 'id': 2, 'storage': 'internal', 'folder': '', 'skipped': True}).seen
         self.assertIn('Another item of the show names the same file; it stays.', found['preview'])
         self.assertEqual(found['go'], 'Move 0 files')
 
@@ -221,6 +238,34 @@ class InternalFolders(unittest.TestCase):
         self.assertFalse((self.card / 'night' / 'deep' / 'old.odrg').exists())
         self.assertEqual((folder / 'old.odrg').read_bytes(), data)
         self.assertTrue((folder / '2' / 'deep.odrg').exists())
+
+    def test_only_the_folder_that_plays_is_marked_while_both_storages_have_its_path(self):
+        text = 'odrig-folders 1 3\n1 20 0 night\n2 21 0 night/deep\n'
+        _, emulator = self.board(text, drive={'night/new.odrg': clip(8), 'night/deep/old.odrg': clip(9)})
+        card = lambda row: row.get('playlist') == 'night' and row.get('external') is True
+        card_night = next(row for row in self.answered(emulator, 'list', lambda reply: any(card(row) for row in reply.get('items', [])))['items'] if card(row))['id']
+        card_deep = next(row for row in self.listed(emulator, card_night) if row.get('playlist') == 'night/deep')['id']
+        levels = {'internal': (20, 21), 'card': (card_night, card_deep)}
+        steps = [{'enter': card_night, 'level': 'night', 'rows': 1}, {'enter': card_deep, 'level': 'night/deep', 'rows': 1},
+                 {'back': True, 'level': 'night', 'rows': 1}, {'back': True, 'level': 'Root', 'rows': 1},
+                 {'enter': 20, 'level': 'night', 'rows': 1}, {'enter': 21, 'level': 'night/deep', 'rows': 1}]
+
+        def marks(found):
+            return {'level': found['level']['marked'], 'folders': [row['id'] for row in found['folders'] if row['marked']]}
+
+        for plays in ('internal', 'card'):
+            night, deep = levels[plays]
+            with self.subTest(plays=plays):
+                self.answered(emulator, f'play {deep}')
+                self.answered(emulator, 'status', lambda reply: reply.get('playing') == deep and reply.get('playlist') == 'night/deep')
+                found = support.run('folders', address=f'127.0.0.1:{emulator.port}', settings={'rows': 1, 'folders': 2, 'steps': steps}).seen
+                root, card_night_level, card_deep_level, _, _, night_level, deep_level = [found['first'], *found['steps']]
+                self.assertEqual(sorted(row['id'] for row in root['folders']), [20, card_night])
+                self.assertEqual(marks(root), {'level': False, 'folders': [night]})
+                for storage, (at_night, at_deep) in {'internal': (night_level, deep_level), 'card': (card_night_level, card_deep_level)}.items():
+                    current = storage == plays
+                    self.assertEqual(marks(at_night), {'level': False, 'folders': [levels[storage][1]] if current else []}, storage)
+                    self.assertEqual(marks(at_deep), {'level': current, 'folders': []}, storage)
 
     def test_a_selected_folder_of_the_boards_storage_is_not_called_the_cards(self):
         folder, emulator = self.board()

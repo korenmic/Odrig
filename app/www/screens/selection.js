@@ -1,6 +1,6 @@
 // The selection of the files and the folders of both storages in the list, the
 // removal of one animation or of the selected internal ones, each asked about first, the
-// move of the selected files, and their download.
+// move of the selected files and folders, and their download.
 
 import * as capacity from "../capacity.js";
 import * as client from "../client.js";
@@ -192,12 +192,11 @@ export function draw(state) {
   const external = chosen.filter((item) => item.external === true).length;
   const chosenFolders = folders().length;
   const externalFolders = folders().filter((item) => item.external === true).length;
-  const readOnly = chosen.some((item) => item.external === true) && !capacity.cardWritable(state.space);
+  const readOnly = (chosen.some((item) => item.external === true) || externalFolders > 0) && !capacity.cardWritable(state.space);
   byId("delete-selected").disabled = locked() || selected.size === 0 || external > 0 || chosenFolders > 0;
   byId("delete-selected").title = external > 0 || chosenFolders > 0 ? "Delete selected removes internal animations; clear the folders and the card's files from the selection." : "";
-  byId("move-selected").disabled = locked() || chosen.length === 0 || chosenFolders > 0 || readOnly;
-  byId("move-selected").title = chosenFolders > 0 ? "Move to\u2026 moves files; clear the folders from the selection." :
-    readOnly ? "External storage is read-only: its files can be downloaded, not moved." : "";
+  byId("move-selected").disabled = locked() || (chosen.length === 0 && chosenFolders === 0) || readOnly;
+  byId("move-selected").title = readOnly ? "External storage is read-only: its files and folders can be downloaded, not moved." : "";
   byId("download-selected").disabled = locked() || selected.size === 0 || downloads.busy();
   const files = chosen.length;
   const folderWords = [[chosenFolders - externalFolders, false], [externalFolders, true]].filter(([count]) => count > 0)

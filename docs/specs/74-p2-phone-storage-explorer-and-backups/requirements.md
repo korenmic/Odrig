@@ -102,8 +102,15 @@ clocks.
 
 5.1 `move external <id> <path>` moves a file of the card, or a folder with its subtree,
 to another folder of the card by renaming, in one commit of the card's catalog, keeping
-its ids, its order inside a folder, and its saved settings; the moved entries go last in
-the destination. A folder is never moved into itself or below itself.
+its ids, its order inside a folder, and its saved settings. A moved file goes last among
+the destination's files. A moved folder takes its place among the destination's
+sub-folders by its name: the card's catalog orders sub-folders by the bytes of their
+names, a recorded format decision that is kept, with the converter and the Python library
+unchanged. A folder is never moved into itself or below itself. Should the folder's move
+on the board prove too large to build safely, a job of the app may move it instead: it
+makes the destination folder and moves the files one at a time, each keeping its id and
+its saved settings; the folder then gets a new id, and a move cut short is finished at
+the next connection.
 5.2 Moves of folders between the storages are jobs of the app over the subtree's files,
 the destination folders made first.
 

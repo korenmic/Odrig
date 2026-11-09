@@ -36,7 +36,7 @@ The tasks are done in the order 5, 7, 6, 8, because task 6 builds on task 7's fo
 - [x] 5. Read files back 720 bytes at a time, and download and back up from the app
   - Requirements: 6.1–6.2.
 
-- [ ] 6. Move files and folders inside the card by renaming, and folders between storages
+- [x] 6. Move files and folders inside the card by renaming, and folders between storages
   - Requirements: 5.1–5.2.
 
 - [x] 7. Give the board's own storage real folders

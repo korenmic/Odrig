@@ -955,7 +955,7 @@ as `upload.part`, the show file, first as `show.part`, and `pending.txt`; see
 | `write_open` | A file that was being written is closed and removed. The named file is opened for writing, which empties one that has the name; when the open fails, the folder is asked for once, made if it is missing, and the open tried once more. One file is written at a time. |
 | `write` | The bytes go to the open file in one write. |
 | `write_close` | The file is closed, and it is whole when storage then holds as many bytes as were given. |
-| `rename` | The file system's rename. A file that has the new name is replaced by it. |
+| `rename` | The file system's rename. A file that has the new name is replaced by it. A file of the card is the card host's, which renames files and never a folder, so that a file moves between the card's folders and a folder moves file by file ([microsd.md](microsd.md#plugging-in-and-pulling-out)). |
 | `remove` | The file is deleted; a name that has no file is told apart from a failure. The number of a folder, `<n>`, removes `/odrig/<n>` while it is empty. |
 | `make_folder` | The number of a folder, `<n>`, makes `/odrig/<n>`, an existing one a success; it is never asked to make `/odrig`, which only `write_open` makes. A folder of the card is the card host's, which makes it under its guard; a USB stick answers 0, it makes no folder. |
 | `space` | The total size, and the free bytes in whole blocks of 4,096. |

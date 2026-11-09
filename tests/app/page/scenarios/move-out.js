@@ -1,6 +1,6 @@
 // The operator enters folders by their rows, of the board's own storage or of the card,
-// selects one animation there and moves it to a storage and a folder, the destination shown
-// before it is sent; the card's folders the chooser offers are kept.
+// selects one animation there and moves it to a storage and a folder of it, the destination
+// shown before it is sent; the card's folders the chooser offers are kept.
 
 import {rowOf, shown, startSelection} from "../reading.js";
 
@@ -29,7 +29,8 @@ export default async function (app) {
   const storage = app.byId("move-storage");
   storage.value = settings.storage;
   storage.dispatchEvent(new view.Event("change", {bubbles: true}));
-  if (settings.storage === "external") {
+  if (settings.storage === "external" || settings.folder !== undefined) {
+    await app.until(() => [...folder.options].some((option) => option.value === settings.folder), "the destination's folders", 10000);
     folder.value = settings.folder;
     folder.dispatchEvent(new view.Event("change", {bubbles: true}));
   }

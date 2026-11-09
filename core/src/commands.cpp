@@ -1087,6 +1087,23 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         return catalog_folder_make(core, path, reply);
     }
+    if (words.is(0, "move")) {
+        // `move external <id> <folder>`: `/` for the drive's root, else a folder's path.
+        char path[kDrivePathRoom];
+        uint32_t id = 0;
+        const bool root = words.count == 4 && words.size[3] == 1 && words.text[3][0] == '/';
+        if (root) {
+            path[0] = '\0';
+        }
+        if (words.count != 4 || !words.is(1, "external") || !number_word(words, 2, 1, 0xFFFFFFFFu, &id) ||
+            (!root && !folder_path(words.text[3], words.size[3], path))) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return catalog_move(core, id, path, reply);
+    }
     if (words.is(0, "upload")) {
         // An upload already open goes on under a test; a new one waits for its end.
         if (words.count >= 2 && words.is(1, "begin") && (core.mapping_test || catalog_rebuilding(core))) return refuse(reply, "busy");

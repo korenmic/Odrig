@@ -71,9 +71,13 @@ a top bar with the app's name and whether the installation answers.
   in` inside a folder; entering a folder or going Back reads that level anew, and nothing
   of the level left is kept, so that a card of any size takes one level's rows on the
   phone. The heading is marked while the level's playlist is current, and so is the
-  folder row that leads to the current playlist at every level above it, from the path
-  that `status` names as `playlist`; the line of what plays names the file from `status`
-  as well. The list comes back to the root when the target changes, when the card goes
+  folder row that leads to the current playlist at every level above it. The current
+  folder is the one whose id `status` names as `playing`, not its path, since a folder of
+  the board's own storage and one of the card may have one path: an id of 60,000 or less
+  is the board's, a higher one the card's, and a row above it leads to it when it is of
+  the same storage and holds the path that `status` names as `playlist`. The line of what
+  plays names the file from `status` as well. The list comes back to the root when the
+  target changes, when the card goes
   out and when the folder shown is confirmed gone from the card. A refused folder lookup
   first rechecks its path through fresh parent listings. An existing path keeps its
   location, including when its id changed; an unavailable verification keeps the last
@@ -661,8 +665,8 @@ menu; a line under the bar says how many are selected in Internal storage and in
 storage, and how many folders of each. `Select all` takes the files the filters show of the
 board's storage and of a card the board may write: not the files of a read-only card, which
 are selected by hand, nor the folders. `Delete selected` removes internal animations only, and is disabled while an
-external one or a folder is selected; `Move to…` moves files, and is disabled while a folder
-or a file of a read-only card is selected.
+external one or a folder is selected; `Move to…` moves files and folders, and is disabled
+while a file or a folder of a read-only card is selected.
 
 At a level of the card that the board may write, `New folder` and `New playlist folder` ask
 for a name and make that folder there with `folder make external`: both make the same real
@@ -679,15 +683,46 @@ write it. A new animation's id is chosen free among the root's ids and those of 
 folder of the board's storage, which the app lists for that. An upload prepared at a level
 of the board's storage goes into that folder, `Internal /shows/x.odrg`.
 
-`Move to…` opens a chooser of the destination: `External storage` with every folder of the
-card, or `Internal storage`, the card disabled with its reason while it is absent, read-only
-or without a ready catalog. Before anything is sent it lists each file's new full path, and
-the files it skips and why: a name the destination has already, in any case on the card, a
-name the storage does not take, a file a cycle lists or another item names, or one whose size
-is not known yet. A skipped name can be given another name in the preview. Nothing is
-replaced or merged.
+`Move to…` opens a chooser of the destination: `External storage` or `Internal storage`,
+each with every folder it has, the level shown chosen when it is one of them, the card
+disabled with its reason while it is absent, read-only or without a ready catalog. Before
+anything is sent it lists each file's new full path, and the files it skips and why: a name
+the destination has already, in any case on the card, a name the storage does not take, a
+file a cycle lists or another item names, or one whose size is not known yet. A skipped
+name can be given another name in the preview. Nothing is replaced or merged.
 
-`Move` moves the files one at a time, each as a job the phone keeps until it is done: the
+A selected folder is listed as `Folder External /night/ → External /clocks/night/`, with
+each of its files and the path it takes under the new folder. A folder is skipped whole
+when the destination has a folder or a file of its name, in any case, which another name
+in the preview mends; when the destination is the folder itself or a folder below it; when
+it is there already; when a folder of it would be more than three levels deep or its path
+too long; when it is a folder of the board's own storage and the destination is the
+board's own storage too, which this app does not move; and when another selected folder
+takes the same name there, which another name mends too. A file of it can be skipped as a
+selected file is, and stays in its folder.
+
+A file of the card that stays on the card under its name is moved by the board with
+`move external <id> <path>` ([commands.md](commands.md#moving-a-file-of-the-card)), in one
+commit of the card's catalog: it keeps its id, its saved brightness, repeat and Ignore, and
+goes last among its new folder's files. A line whose reply does not come is sent once more:
+a file moved already answers that it did not move, and a second silence fails the file, the
+list then showing where it is. A firmware that answers `unknown-command` gets the job below
+instead. A folder is moved as one job the phone keeps until it is done: its
+folders made at the destination from the top with `folder make`, each given the Ignore of
+the folder it stands for, then its files moved one at a time, each as a selected file is,
+so that on the card a folder's files keep their ids while the new folder has an id of its
+own. The source folders go as their last files leave them; one that keeps a file that was
+not moved, or a folder that never held a file, stays, and the end says so. When the
+playlist that plays is the folder's or one below it, the board plays the root's once the
+folder is gone, so the app then plays the folder's new place, unless another playlist was
+chosen meanwhile. `Stop` ends a folder's job after the file under way, and its other files
+stay where they are. A folder the board refuses to make ends the job, said with its
+reason: the folders made before it stay, empty. A file the board refuses is said and the
+next one moved. A lost link, the app hidden or another target chosen cuts the job short
+instead: the file under way and those after it stay in the job for the next connection, and
+the end says so.
+
+`Move` moves any other file as a job the phone keeps until it is done: the
 file read back with `read` and checked against its size and its catalog key; its saved
 brightness, repeat and whether it is the show's start read with `saved` (the start is not
 moved); the bytes uploaded to the destination with the absence guard, the card's folders
@@ -696,13 +731,22 @@ and repeat, and the old one's brightness and repeat removed; and the old file re
 after a fresh listing of its own level shows its id with its path and size: a file of a
 folder of the board's storage is looked for in that folder, and a folder is found by its
 path among the folders of its own storage alone, since both storages may have a folder of
-one path. `Stop` ends the run after the file
+one path. A file that stays in the board's own storage is uploaded under its own id
+instead, which moves it there and keeps its id and its Ignore: its
+saved brightness and repeat, which the board keeps by the file's name in its folder, are
+taken from it before the upload and given to it after, and given back when the upload is
+refused or the move ends as not moved. `Stop` ends the run after the file
 under way; the end says what was moved, skipped, failed and left unstarted. The run waits
 while the app is hidden and ends with a change of target.
 
 A move cut by a lost reply, a lost link or a restart of the app is found again the next time
 the list of the same target answers: with the new file there it is finished; without it the
-old file was never touched and the move ends as not moved.
+old file was never touched and the move ends as not moved. A folder's job cut so is then
+taken up again: its folders are made, those made already being taken as made, and the
+files still where the job found them, by their ids, paths and sizes, are moved. The app
+says what it finishes, what failed and what it gave up; a job cut short again waits for
+the next time the target answers after it did not, or the app is shown again, and one
+for a target that is no longer chosen stops at once, its requests never sent to another.
 
 ### Downloads and backups
 
@@ -1630,7 +1674,17 @@ installed; the phone with mobile data on.
     the upload's message, and the panel of what plays too; after the app is closed and
     opened again they are still there; after one is deleted, a new file of another size at
     its name has no preview of the old.
-32. **Note** the phone's model, its Android version, the web view's version from the
+32. **Moves of files and folders.** With firmware that has `move external`, the card in,
+    and folders on both storages. Select a folder of the card, `Move to…` another folder of
+    the card and `Move`. *Seen:* the preview lists the folder and each file's new path; the
+    files are then in the new folder with their ids, the old folder is gone, a saved
+    brightness of one of them stays, and when the old folder's playlist played, the new
+    one's plays. Move that folder to Internal storage and back, and a file between two
+    folders of Internal storage. Start a folder's move once more and switch the phone's
+    Wi-Fi off during it, then on. *Seen:* the end says the move was cut short; once the app
+    reaches the board again it says it finished the interrupted move, and every file is in
+    one place only, once.
+33. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1840,6 +1894,9 @@ physical acceptance are in [verification.md](specs/64-p2-board-time-and-daily-on
   across a restart of the board, nor seen Clocks only show the Clocks level of both storages,
   play and take an upload inside the board's own `clocks/` and `clocks/message/`: step 23
   above.
+
+- **Moves on a phone and on the board.** No program has moved a file or a folder on the
+  board's card, nor cut a folder's move with the phone's Wi-Fi: step 32 above.
 
 - **Seed 33 on a phone and on the board.** Nobody has seen the line of the reading, the
   name of the board and its last fault on a phone; that belongs to the seed's board

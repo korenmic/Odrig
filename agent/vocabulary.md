@@ -86,6 +86,7 @@ the entry links to it.
   the board's civil clock and phone-zone rules, `schedule` for daily hours and manual mode, `guard` to bind timing to a board,
   `rotation` for saved square output orientation, `debug mini on|off` for temporary miniature output,
   `folder make` for the folders of the board's storage and of the card,
+  `move external` for a file moved to another folder of the card,
   `saved <id>` for what is saved for an animation, and `upload`, which
   sends a file as several lines. Each is answered by one
   line of JSON. See

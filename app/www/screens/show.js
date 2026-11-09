@@ -128,16 +128,50 @@ function playing(status, state) {
   return `Cycle ${status.playing}`;
 }
 
-// The playlist that is current: "" for the root, a folder's path, or null while a cycle
-// or nothing plays.
-function markedPath(status) {
+// The highest id of a folder of the board's own storage; the card's folders have higher ids.
+const MOST_INTERNAL_ID = 60000;
+
+// The playlist that is current: the root's, with the id null; a folder's, by the id that
+// `status` names as `playing`, with its path and whether it is the card's; or null while a
+// cycle or nothing plays. A folder of the board's own storage and one of the card may have
+// one path, never one id.
+function currentPlaylist(status) {
   if (status === null || status.playing === null) {
     return null;
   }
   if (status.playing === "all") {
-    return "";
+    return {id: null, path: "", external: null};
   }
-  return typeof status.playlist === "string" ? status.playlist : null;
+  if (typeof status.playlist !== "string") {
+    return null;
+  }
+  return {id: status.playing, path: status.playlist, external: status.playing > MOST_INTERNAL_ID};
+}
+
+// The current playlist as the folders are marked by it: in Clocks only the status names the
+// resolved Clocks folder as the playlist whichever storage's file plays, so the storage of the
+// file playing, "internal" or "external", is the playlist's when it is known, and its folder is
+// the one of that storage with the playlist's path.
+function markedPlaylist(status, from) {
+  const current = currentPlaylist(status);
+  return current === null || current.id === null || from === null ? current : {...current, external: from === "external", byPath: true};
+}
+
+// Whether a folder, `{id, path, external}`, is the current playlist's.
+function isCurrent(folder, current) {
+  if (current === null) {
+    return false;
+  }
+  return current.byPath === true ? folder.path === current.path && folder.external === current.external : folder.id === current.id;
+}
+
+// Whether a folder row leads to the current playlist: it is that folder, or a folder of the
+// same storage that holds it.
+function leadsTo(entry, current) {
+  if (current === null || current.id === null) {
+    return false;
+  }
+  return isCurrent(entry, current) || (entry.external === current.external && current.path.startsWith(`${entry.path}/`));
 }
 
 // A folder's own name: the part of its path after its last `/`.
@@ -633,15 +667,15 @@ function rowsState(state, animations, here) {
   const version = client.targetVersion();
   // The level's head: its title, Back inside a folder, and the mark while its playlist is
   // current; each folder row's count, and its mark when it leads to the current playlist.
-  const marked = markedPath(state.status);
-  // In Clocks only the status names the card's Clocks folder as the playlist whichever storage's
-  // file plays: of the two Clocks folders, the one of the storage of the file playing is marked
-  // when that storage is known.
+  // Of the two Clocks folders of the Clocks level, which have one path, the one of the storage of
+  // the file playing is marked in Clocks only when that storage is known, else the one whose id
+  // the status names.
   const from = client.clocksOnly() ? client.clockStorageOf(state.status) : null;
-  const levelStorage = state.level.storage === "internal" ? "internal" : "external";
+  const playlist = markedPlaylist(state.status, from);
   byId("level-title").textContent = here.clocks ? "Clocks" : here.path === "" ? "Root" : here.path;
   byId("level-back").hidden = !client.canGoBack();
-  byId("level-head").setAttribute("aria-current", String(marked === here.path && (from === null || from === levelStorage)));
+  byId("level-head").setAttribute("aria-current", String(!here.clocks &&
+    isCurrent({id: state.level.id, path: here.path, external: state.level.storage !== "internal"}, playlist)));
   for (const made of byId("animations-list").querySelectorAll(":scope > .folder-row")) {
     const entry = here.folders.find((item) => String(item.id) === made.dataset.id);
     if (entry === undefined) {
@@ -663,11 +697,7 @@ function rowsState(state, animations, here) {
       check.checked = selection.has(entry.id);
       check.disabled = selection.locked();
     }
-    // The two Clocks folders of the Clocks level have one path: the one that plays is marked by
-    // the storage of the file playing, or else by the id the status names.
-    made.setAttribute("aria-current", String(marked !== null && (here.clocks ?
-      (from !== null ? made.dataset.storage === from : state.status.playing === entry.id) :
-      marked === entry.path || marked.startsWith(`${entry.path}/`))));
+    made.setAttribute("aria-current", String(leadsTo(entry, playlist)));
   }
   for (const made of byId("animations-list").querySelectorAll(":scope > .row")) {
     const animation = animations.find((item) => String(item.id) === made.dataset.id);
@@ -926,7 +956,7 @@ export function start(options) {
   previews.watch(redraw);
   filters.start({redraw});
   selection.start({message, redraw, visible: () => true});
-  explorer.start({message, redraw, chosen: selection.rows, done: selection.finished});
+  explorer.start({message, redraw, chosen: selection.rows, chosenFolders: selection.folders, done: selection.finished});
   extend({draw: explorer.draw});
   reorder.start({message, redraw, shownOrder, groupOf: folderOf, levelRows: shownOrder});
   extend({menu: reorder.menu, draw: reorder.draw, order: reorder.order});

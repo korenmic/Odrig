@@ -908,6 +908,7 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload --external FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] --folder PATH upload ID FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] folder make internal|external PATH
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] move external ID PATH
 ```
 
 Through the serial port, here the emulator's; for the board the name is its USB serial
@@ -942,6 +943,7 @@ python -m odrigctl --port build/emulator/serial clocks message on
 python -m odrigctl --port build/emulator/serial clocks storage internal
 python -m odrigctl --port build/emulator/serial folder make external clocks
 python -m odrigctl --port build/emulator/serial folder make internal shows
+python -m odrigctl --port build/emulator/serial move external 60001 clocks
 python -m odrigctl --port build/emulator/serial --folder shows upload 10 build/hello-bench.odrg
 ```
 
@@ -978,6 +980,7 @@ python -m odrigctl --tcp 127.0.0.1:8601 clocks message off
 python -m odrigctl --tcp 127.0.0.1:8601 clocks storage sd
 python -m odrigctl --tcp 127.0.0.1:8601 folder make external clocks/message
 python -m odrigctl --tcp 127.0.0.1:8601 folder make internal shows/night
+python -m odrigctl --tcp 127.0.0.1:8601 move external 60001 /
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -1012,6 +1015,7 @@ python -m odrigctl --http 127.0.0.1:8600 clocks off
 python -m odrigctl --http 127.0.0.1:8600 clocks message off
 python -m odrigctl --http 127.0.0.1:8600 clocks storage internal
 python -m odrigctl --http 127.0.0.1:8600 folder make external "night/old songs"
+python -m odrigctl --http 127.0.0.1:8600 move external 60001 "night/old songs"
 ```
 
 The temporary miniature command is submitted through the same routes; status reports

@@ -781,6 +781,22 @@ its id, and asks the host for a name only when `list` writes it or a log line ne
   found by binary search, and the positions the core holds at or after it move on by one;
   a removal moves those after it back by one. The core's own commit gives the marker's
   CRC-32 to the look, which does not read the drive again for it.
+- `move external` moves a file of such a drive to another of its folders in one commit:
+  the file renamed through `drive/upload.part`, its folder made first with `make_folder`
+  when it is not the root, its row last among the new folder's files with its id, its old
+  folder left as a removal leaves it, and its entry on its new name's page with the fields
+  of its old line. The index change writes up to four files of folders: two of their edits
+  are held by the command's frame and two by the change, so that no frame passes 512
+  bytes, and the plan and the checks are made in frames of their own, gone before the
+  commit. The command's frame then holds the old name, the new one and the two edits; so
+  its deepest chain, from `command_answer` to a rename of the commit, is 2,416 bytes with
+  the board's compiler at `-Os` by `-fstack-usage`, where that of `folder make external` is
+  2,064. The player lets go of the file before the
+  commit, and the positions it holds follow the file, which plays on under its new path.
+  The saved settings of its old path go to its new one after the commit, through the
+  journal `drive/moving.txt` that the mount of the drive finishes after a cut, as
+  [catalog.md](catalog.md#a-drives-index-in-a-change) states. A folder is moved by the
+  app, file by file.
 - `catalog rebuild external` lists the drive's folder once and reads every listed file
   with the check's steps, without a limit, then writes the drive's catalog and index anew,
   a few lines at each step, through two files of its own that no reader reads,
