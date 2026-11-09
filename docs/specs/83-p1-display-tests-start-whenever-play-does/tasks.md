@@ -16,7 +16,7 @@ seen failing first.
     `docs/decisions.md`, `docs/drifts.md`; the documents' tests.
   - Requirements: 6.1, 7.1–7.3.
 
-- [ ] 3. Deliver
+- [x] 3. Deliver
   - Every suite that runs here; the pull request; the firmware images of both modules,
     built from the branch that joins every unmerged seed, and their place on the Drive in
     `verification.md`.
