@@ -14316,6 +14316,156 @@ makes the root current, saved as such, which a test now holds.
 `tests/app/test_internal_folders.py`, `tests/app/page/scenarios/downloads.js`,
 `tests/core/test_internal_folders.py`.
 
+## Seed 61: where the marks of copies of clocks and messages are kept
+
+**Question.** The design of seed 74 part B kept a spare bit of each file of the show for
+seed 61's mark of a copy: set when a file of the card with the same class, name and type is
+eligible. A mark kept from one draw to the next must be set again after every change of the
+card, the catalog, an Ignore, an install or a quarantine, and one change missed gives a
+duplicate turn. Where is it kept?
+
+**Answer.** In that spare bit, `FileInfo.copy`, written in the draw that reads it: at
+most once in a draw, and only when the draw lands on a file of the board's own storage
+while the SD card is preferred, the bits of the class are cleared and set again from the
+card's rows, and a flag on the draw's stack lets the draw read them only after that. No
+mark of an earlier draw is ever read. A bitset on the stack was weighed and left: the item
+table has room for 32 items more than `show.json` lists, 128 at least, so no bitset of a
+fixed size holds every show.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The bags").
+
+## Seed 61: what makes two clocks or messages copies
+
+**Question.** Seed 61 makes copies of files with "the same normalized full relative path,
+including extension, and the same validated file/animation type". The card's FAT does not
+keep the case of names, the board's names are lowercase, and a type may not be known yet.
+What is compared?
+
+**Answer.** The class, face or message, by the exact path of the folder, `clocks` or
+`clocks/message`; the file name with its extension, without the case of ASCII letters; and
+the type the catalog or the check gives, known on both sides. A type not known yet makes no
+copy. The files of the other folders below `clocks` are inside Clocks only's boundary but in
+no bag, so they have no copies.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (4.1), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The bags").
+
+## Seed 61: which version of `clocks.txt` keeps the preferred storage
+
+**Question.** The preferred storage is kept "atomically with the existing internal clock
+settings", in `clocks.txt`. A new version of the file is out of form to an older firmware,
+which fails closed into a dark Clocks only. Which version is written?
+
+**Answer.** Version 2, byte for byte as before, while the SD card is preferred, and version
+3, with a fourth line `storage internal`, only while internal storage is. Versions 1 and 2
+and a missing file mean the SD card. A firmware going back meets version 3 only after the
+owner chose internal storage, and `clocks storage sd` writes version 2 again.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (5.4), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The preferred storage",
+"Older clients, older firmware").
+
+## Seed 61: Clocks only in the app when both storages have a Clocks folder
+
+**Question.** By the owner's answer of 2026-11-09, Clocks only shows the board's own
+`clocks/` and `clocks/message/` as it shows the card's. The boundary of seed 66 begins at
+the one Clocks folder that `clock_only.folder` names, and Back stops there; with both
+storages there are two, and `status` names one. Which does the app open, and where does
+Back stop?
+
+**Answer.** `clock_only.folder` names the card's Clocks folder when the card has one, else
+the board's, and `Restart clocks` sends it as before. When one storage has a Clocks folder
+the app opens it, as before. When both have one, the app opens the Clocks level, the root
+showing only the two Clocks folders, each with its storage, and Back from either stops
+there. The app finds the other storage's folder in the root's list, which it reads in the
+background. A target without `clock_storage` keeps the card's boundary alone, since it does
+not play the board's clocks.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (6.5), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The app").
+
+## Seed 61: the state of Clocks only without a face
+
+**Question.** `clock_only.state` was `no-card` first whenever no card was in. With the
+board's own Clocks folder, Clocks only plays without a card. In what order are the states
+given?
+
+**Answer.** Without an internal Clocks folder, today's states in today's order, so such a
+show answers byte for byte as before: `no-card` without a card, else `missing-folder`
+without the card's Clocks folder, else `no-clocks` while nothing plays, else `playing`.
+With an internal Clocks folder, `playing` while something plays, else `no-clocks`. The
+app's words name the storages it looked in.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (3.2), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("Clocks only").
+
+## Seed 61: the storage of the clock playing now in the app
+
+**Question.** Seed 61 asks the app to make "the effective source/path understandable". A
+file `clocks/message/<name>` may be on either storage, and `status` gives the same path for
+both.
+
+**Answer.** The bar of the animation playing now and the brightness screen write a file of a
+Clocks folder with its storage, `Internal /clocks/...` or `External /clocks/...`, told by its
+id, 60,000 or less for the board's. Other files read as before.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (6.6), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The app").
+
+## Seed 61: the deployment of the seven messages without a board
+
+**Question.** Seed 61 asks that the seven approved messages be put into the board's own
+`clocks/message/` with the project's tools, read back and seen chosen in both modes. No board
+is connected to the computer the seed is built on. What is done?
+
+**Answer.** A test of the emulator suite rehearses the commands with the tracked files and is
+reported as a rehearsal only. The board session is prepared in the design with its exact
+commands, the room it needs, 163,840 bytes free, and what it records; it reads the files back
+with `fw.py read-show` and compares them by SHA-256 with the tracked files. It stays open for
+the owner, with the LED and phone checks.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The seven messages"), `docs/specs/61-p2-internal-storage-clocks-and-messages/tasks.md` (tasks 4 and 5).
+
+## Seed 61: room for `clock_storage` in a reply of `status`
+
+**Question.** A reply holds 1,024 bytes. The longest reply of `status` on the branch of
+pull request #63 is the one of `test_the_longest_reply_to_status_fits_1024_bytes` in
+`tests/core/test_internal_folders.py`, 991 bytes and the newline. Does
+`,"clock_storage":"internal"` fit, and where does it go?
+
+**Answer.** After `clock_mode`. It adds 27 bytes, 21 for `sd`: the longest reply, in Between
+with a file of a 100-byte path in a 93-byte internal playlist, becomes 1,019 bytes with its
+newline. In Only `playlist` is `clocks` or null, at most 966; `clock_error` comes only with
+a dark Only that names no file and with the SD card in force, at most 883. That test gains
+the member and a shape of Only with `clock_error`.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (5.3), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("Clocks only").
+
+## Seed 61: an Ignore or a fault of the board's own files in Clocks only
+
+**Question.** In Clocks only the card's Ignore and changes go through `only_dirty` and the
+refresh of Only, which ends an automatic turn that no longer plays and keeps a manual one.
+The board's own go another way: an Ignore of a file plays on through `player_play_all`,
+which restarts Clocks and cuts a manual turn, and an Ignore of a folder returns at once,
+which was right while no file of the board's own storage was inside the boundary. With the
+board's Clocks folders inside it, taking such a folder in again would leave Only dark.
+What is done?
+
+**Answer.** In Clocks only an Ignore of a file or a folder of the board's own storage, and a
+fault of one of its files, set `only_dirty` and refresh Only, as the card's do: an automatic
+turn that no longer plays ends at once, a manual turn goes on, and a dark Only starts a
+clock as soon as a face plays again.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (3.3), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("Clocks only").
+
+## Seed 61: the archive and the batch in Clocks only
+
+**Question.** The owner's answer of 2026-11-09 lets uploads in Clocks only go into the
+board's own Clocks folders. The Upload screen takes its rule from `upload-destination.js`,
+but the archive of seed 73 and the batch of seed 80 have storage selectors of their own,
+which disable External by the card alone and never Internal. Do they follow?
+
+**Answer.** Yes: every way of uploading offers in Clocks only the storage of the folder
+explored, and refuses the board's root, through the same rule of `upload-destination.js`.
+A target without `clock_storage` keeps today's card-only rule and words.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (6.5), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The app").
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

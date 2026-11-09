@@ -1000,3 +1000,19 @@ and `ignore` of a folder's id holds its subtree. A file of a folder keeps the na
 the folders' paths are in `folders.txt`. The host interface's names, `remove` and
 `make_folder` take the number of such a folder, and `make_folder` may answer 0 for a storage
 that makes no folders. The core's memory is as it was.
+
+- 2026-11-09: Seed 61, under the owner's answers of that day, asked one at a time. The owner
+  approved the command `clocks storage sd` and `clocks storage internal`, kept on the board
+  with the other clock settings in `clocks.txt`, and the status member
+  `"clock_storage":"sd"` or `"clock_storage":"internal"`, the SD card the default; the
+  dropdown `Preferred storage for matching clock/message files` of the app's clock settings
+  sends it. By the seed, the owner's request of 2026-10-31, the board's own folders `clocks`
+  and `clocks/message` give clocks and messages beside the card's `clocks` and
+  `clocks/message` of seed 54, in Between animations and in Clocks only. The command chooses
+  which of two copies plays as a clock or a message: a file of the card and a file of the
+  board's own storage with the same path under `clocks/` or `clocks/message/` and the same
+  type. The owner also changed the decision of 2026-11-01,
+  "Clocks-only app browsing and destinations": in Clocks only the app also shows the board's
+  own `clocks/` and `clocks/message/` folders and accepts uploads into them, like the card's,
+  so an upload in Clocks only no longer needs the card; the board's root still takes none
+  there. The core's memory is as it was.
