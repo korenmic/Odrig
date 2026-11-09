@@ -1,8 +1,10 @@
 """The clocks and messages of the board's own storage: the files of its folders `clocks` and
 `clocks/message` are faces and messages beside the card's, in Between animations and in
-Clocks only, and a copy in both storages plays from the card."""
+Clocks only, and a copy in both storages plays from the storage `clocks storage` prefers, the
+card by default."""
 
 import hashlib
+import itertools
 import json
 import unittest
 
@@ -11,7 +13,7 @@ from odrig import odrgx
 from . import support
 from .test_clock_modes import distinct, mode_file
 from .test_clocks import CARD, CLOCK_FILES, SHOW4, clock_of, states_of
-from .test_drive import a_drive, asked, logged, refusal, replies
+from .test_drive import DONE, a_drive, asked, logged, refusal, replies
 from .test_playback import T0
 from .test_playlist import loop_of, show_of
 
@@ -520,3 +522,208 @@ class Copies(unittest.TestCase):
         self.assertEqual([(state["animation"] > 60000, state["dimming"]["saved"]) for state in states_of(run)], [(True, 50)] * 2)
         run = session({**source, "ignored.txt": "odrig-ignored 1\nf clocks/c1.odrg\n"}, at_times(7000, 11000), card=card)
         self.assertEqual([(state["animation"], state["dimming"]["saved"]) for state in states_of(run)], [(11, 30)] * 2)
+
+
+def storage_file(mode, message, storage):
+    """`clocks.txt` of version 3, with the preferred storage of copies."""
+    return f"odrig-clocks 3\nmode {mode}\nmessage {'on' if message else 'off'}\nstorage {storage}\n"
+
+
+def kept_session(source, script, card=None, options=(), check_first=True):
+    """A session as `session` gives it, and the files the board's storage holds after it."""
+    script = [f"poll {T0}", *script]
+    if card is None:
+        return support.start_and_keep(source, script, list(options), check_first=check_first)
+    with a_drive(card) as top:
+        return support.start_and_keep(source, script, ["--drive", top, *options], check_first=check_first)
+
+
+def settings_of(run):
+    """The mode, the message and the preferred storage each `status` of a session reports, with
+    `clock_error` when it is there."""
+    return [(state["clock_mode"], state["clock_message"], state["clock_storage"], state.get("clock_error")) for state in states_of(run)]
+
+
+# A show whose board has a copy of the card's face `clocks/c1.odrg` and of its message, and
+# a face of its own, `clocks/f2.odrg`.
+COPY_ITEMS = [ROOT, {"id": 11, "file": "1/c1.odrg"}, F2, {"id": 13, "file": "2/m.odrg"}]
+COPY_FILES = {"1/c1.odrg": CARD["clocks/c1.odrg"], "2/m.odrg": CARD[CARD_MESSAGE]}
+
+
+def copies(mode="only", message=True, storage="internal", items=COPY_ITEMS, folders=ONLY_CLOCKS, **files):
+    source = board(items, folders=folders, **{**COPY_FILES, **files})
+    source["clocks.txt"] = storage_file(mode, message, storage) if storage == "internal" else mode_file(mode, message)
+    return source
+
+
+class ThePreferredStorage(unittest.TestCase):
+    def test_each_refusal_comes_in_the_order_of_the_message_lines(self):
+        run = support.start(support.with_show_fault(SHOW4), asked(100, "clocks storage x", "clocks storage internal", "clocks storage sd"), ["--no-storage"])
+        self.assertEqual(answers(run), [refusal("bad-argument")] + [refusal("show-invalid")] * 2)
+        run = support.start({**SHOW4, "clocks.txt": "bad"}, [support.line(T0, "clocks storage internal"), support.line(T0, "clocks storage sd")], check_first=False)
+        self.assertEqual(replies(run), [refusal("busy")] * 2)
+        script = asked(100, "upload begin 9 new.odrg 100", "clocks storage internal", "upload cancel", "catalog rebuild internal", "clocks storage internal")
+        script += [f"poll {T0 + time}" for time in range(120, 5000, 20)]
+        script += asked(5000, "catalog", "clocks storage internal", "clocks storage sd", "clocks on", "clocks storage internal", "status")
+        run, kept = kept_session({**SHOW4, "clocks.txt": "bad"}, script)
+        answered = answers(run)
+        self.assertEqual(answered[0]["ok"], True)
+        self.assertEqual(answered[5]["internal"]["state"], "ok")
+        self.assertEqual(answered[1:5] + answered[6:], [refusal("busy"), DONE, DONE, refusal("busy")] + [refusal("storage-error")] * 2 + [DONE] * 2)
+        self.assertEqual(settings_of(run), [("between", False, "internal", None)])
+        self.assertEqual(kept["clocks.txt"], storage_file("between", False, "internal").encode())
+        run = support.start({**SHOW4, "clocks.txt": storage_file("between", True, "internal")},
+                            asked(100, "clocks storage sd", "clocks storage internal", "status"), ["--no-storage"])
+        self.assertEqual(answers(run), [refusal("storage-error")] * 2)
+        self.assertEqual(settings_of(run), [("off", False, "sd", None)])
+
+    def test_a_choice_in_force_writes_nothing(self):
+        from .test_clocks import clocks_file
+        cases = ((SHOW4, "sd"), ({**SHOW4, "clocks.txt": clocks_file("on", "on")}, "sd"), ({**SHOW4, "clocks.txt": mode_file("only", True)}, "sd"),
+                 ({**SHOW4, "clocks.txt": storage_file("between", True, "internal")}, "internal"),
+                 ({**SHOW4, "clocks.txt": storage_file("off", False, "sd")}, "sd"))
+        for source, storage in cases:
+            with self.subTest(file=source.get("clocks.txt"), storage=storage):
+                run, kept = kept_session(source, asked(100, f"clocks storage {storage}", "status"), options=["--trace-store"])
+                self.assertEqual(answers(run), [DONE])
+                self.assertEqual(states_of(run)[0]["clock_storage"], storage)
+                self.assertFalse(any(line.startswith("store ") for line in run.lines))
+                data = source.get("clocks.txt")
+                self.assertEqual(kept.get("clocks.txt"), data.encode() if isinstance(data, str) else data)
+
+    def test_internal_storage_writes_version_3_and_the_sd_card_version_2_byte_for_byte(self):
+        source = {**SHOW4, "clocks.txt": mode_file("between", True)}
+        run, kept = kept_session(source, asked(100, "status", "clocks storage internal", "status"))
+        self.assertEqual(answers(run), [DONE])
+        self.assertEqual(settings_of(run), [("between", True, "sd", None), ("between", True, "internal", None)])
+        self.assertEqual(kept["clocks.txt"], storage_file("between", True, "internal").encode())
+        run, kept = kept_session({**SHOW4, "clocks.txt": kept["clocks.txt"]}, asked(100, "status", "clocks only", "clocks message off", "status"))
+        self.assertEqual(answers(run), [DONE] * 2)
+        self.assertEqual(settings_of(run), [("between", True, "internal", None), ("only", False, "internal", None)])
+        self.assertEqual(kept["clocks.txt"], storage_file("only", False, "internal").encode())
+        self.assertEqual(len(storage_file("between", False, "internal")), 57)
+        run, kept = kept_session({**SHOW4, "clocks.txt": kept["clocks.txt"]}, asked(100, "status", "clocks off", "clocks storage sd", "status"))
+        self.assertEqual(settings_of(run), [("only", False, "internal", None), ("off", False, "sd", None)])
+        self.assertEqual(kept["clocks.txt"], mode_file("off", False).encode())
+        restarted = support.start({**SHOW4, "clocks.txt": kept["clocks.txt"]}, asked(0, "status"))
+        self.assertEqual(settings_of(restarted), [("off", False, "sd", None)])
+
+    def test_versions_1_2_and_3_are_read_strictly(self):
+        from .test_clocks import clocks_file
+        sound = ((clocks_file("on", "on"), ("between", True, "sd")), (mode_file("only", False), ("only", False, "sd")),
+                 (storage_file("between", True, "sd"), ("between", True, "sd")), (storage_file("only", True, "internal"), ("only", True, "internal")),
+                 (storage_file("off", False, "internal"), ("off", False, "internal")))
+        for data, expected in sound:
+            with self.subTest(data=data):
+                run = support.start({**SHOW4, "clocks.txt": data}, asked(0, "status"))
+                self.assertEqual(settings_of(run), [(*expected, None)])
+                self.assertNotIn("clocks unreadable", logged(run))
+        whole = storage_file("between", True, "internal")
+        bad = ("odrig-clocks 3\nmode between\nmessage on\n", whole + "x", whole + "\n", whole[:-1], whole.replace("internal", "SD"), whole.replace("internal", "card"),
+               whole.replace("\n", "\r\n"), whole.replace("storage internal", "storage  internal"), mode_file("between", True) + "storage internal\n",
+               clocks_file("on", "on").decode() + "storage sd\n", "odrig-clocks 3\nmode between\nstorage internal\nmessage on\n",
+               "odrig-clocks 3\nstorage internal\nmode between\nmessage on\n", whole.replace("odrig-clocks 3", "odrig-clocks 4"),
+               "odrig-clocks 3\nclocks on\nmessage on\nstorage internal\n", whole + "storage internal\n")
+        for data in bad:
+            with self.subTest(data=data):
+                run = support.start({**SHOW4, "clocks.txt": data}, asked(0, "status"))
+                self.assertEqual(settings_of(run), [("only", False, "sd", "unreadable")])
+                self.assertEqual(logged(run).count("clocks unreadable"), 1)
+                self.assertEqual(list(states_of(run)[0])[-6:], ["clock_message", "clock_mode", "clock_storage", "clock_only", "clock_error", "left"])
+
+    def test_a_failed_write_keeps_the_file_and_the_choice(self):
+        for before, command, storage in ((mode_file("between", True), "clocks storage internal", "sd"),
+                                         (storage_file("between", True, "internal"), "clocks storage sd", "internal")):
+            files = {**SHOW4, "clocks.txt": before}
+            script = [f"poll {T0}"] + asked(1000, command, "status")
+            observed = support.start(files, script, ["--trace-store"])
+            first = len(observed.stored) + 1
+            calls = sum(line.startswith("store ") for line in observed.lines)
+            self.assertEqual(calls, 4)
+            for at in range(first, first + calls):
+                with self.subTest(command=command, at=at):
+                    run, kept = support.start_and_keep(files, script, ["--store-fails-at", str(at)])
+                    self.assertEqual(answers(run), [refusal("storage-error")])
+                    self.assertEqual(settings_of(run), [("between", True, storage, None)])
+                    self.assertEqual(kept["clocks.txt"], before.encode())
+                    self.assertNotIn("clocks.part", kept)
+            with self.subTest(command=command, read_back=True):
+                run, kept = support.start_and_keep(files, script, ["--command-read-fails", "clocks.part", "0"])
+                self.assertEqual(answers(run), [refusal("storage-error")])
+                self.assertEqual(settings_of(run), [("between", True, storage, None)])
+                self.assertEqual(kept["clocks.txt"], before.encode())
+
+    def test_a_version_3_found_by_the_retry_after_an_unreadable_start_gives_its_choice(self):
+        source = {**SHOW4, "clocks.txt": storage_file("between", True, "internal")}
+        script = asked(0, "status", "clocks storage internal") + at_times(*range(500, 6000, 500))
+        run = support.start(source, [f"poll {T0}", *script], ["--read-at-fails-first", "clocks.txt", "3"])
+        self.assertEqual(logged(run).count("clocks unreadable"), 1)
+        settings = settings_of(run)
+        self.assertEqual(settings[0], ("only", False, "sd", "unreadable"))
+        self.assertEqual(answers(run), [refusal("storage-error")])
+        self.assertEqual(settings[-1], ("between", True, "internal", None))
+        self.assertEqual(settings[-1], settings[-2])
+
+    def test_a_change_during_a_messages_turn_lets_it_play_its_whole_loop(self):
+        source = copies(storage="sd")
+        probe = session(source, at_times(*range(100, 30100, 100)), card=CARD)
+        times = range(100, 30100, 100)
+        message = next(time for time, state in zip(times, states_of(probe)) if state["file"] == CARD_MESSAGE)
+        playing = states_of(probe)[times.index(message)]
+        self.assertGreater(playing["animation"], 60000)
+        whole = list(itertools.takewhile(lambda state: state["animation"] == playing["animation"], states_of(probe)[times.index(message):]))
+        self.assertGreaterEqual(len(whole), 5)
+        script = at_times(*range(100, message, 100)) + asked(message, "clocks storage internal", "status") + at_times(*range(message + 100, 120000, 100))
+        run = session(source, script, card=CARD)
+        states = states_of(run)
+        at = len(range(100, message, 100))
+        self.assertEqual(answers(run), [DONE])
+        turn = list(itertools.takewhile(lambda state: state["animation"] == playing["animation"], states[at:]))
+        self.assertEqual(len(turn), len(whole))
+        self.assertTrue(all(state["file"] == CARD_MESSAGE and state["clock_storage"] == "internal" for state in turn))
+        after = distinct([(state["file"], "board" if state["animation"] <= 60000 else "card") for state in states[at + len(turn):] if state["file"] is not None])
+        self.assertIn((CARD_MESSAGE, "board"), after)
+        self.assertNotIn((CARD_MESSAGE, "card"), after)
+        self.assertNotIn(("clocks/c1.odrg", "card"), after)
+        self.assertIn(("clocks/c1.odrg", "board"), after)
+
+    def test_with_internal_storage_preferred_the_boards_copy_plays(self):
+        for mode, same in (("only", True), ("only", False), ("between", True)):
+            with self.subTest(mode=mode, same=same):
+                files = {} if same else {"1/c1.odrg": loop_of(3, 31), "2/m.odrg": loop_of(1, 32)}
+                times = range(7500, 200100, 500) if mode == "only" else range(100, 400100, 250)
+                sequence = played(session(copies(mode, **files), at_times(*times), card=CARD))
+                self.assertIn(("clocks/c1.odrg", "board"), sequence)
+                self.assertIn((CARD_MESSAGE, "board"), sequence)
+                self.assertNotIn(("clocks/c1.odrg", "card"), sequence)
+                self.assertNotIn((CARD_MESSAGE, "card"), sequence)
+                self.assertIn(("clocks/c2.odrg", "card"), sequence)
+                self.assertIn(("clocks/f2.odrg", "board"), sequence)
+
+    def test_a_boards_copy_that_cannot_play_gives_its_turn_to_the_cards(self):
+        cases = (("ignored", copies(message=False), asked(100, "ignore 11 1")),
+                 ("held", copies(message=False, folders=ONLY_CLOCKS.replace("1 20 0 clocks", "1 20 1 clocks")), []),
+                 ("quarantined", copies(message=False, **{"1/c1.odrg": b"bad"}), []),
+                 ("removed", copies(message=False), asked(100, "remove 11")))
+        for name, source, script in cases:
+            with self.subTest(case=name):
+                sequence = played(session(source, script + at_times(*range(1000, 100000, 500)), card=CARD_FACES))
+                self.assertIn(("clocks/c1.odrg", "card"), sequence)
+                self.assertNotIn(("clocks/c1.odrg", "board"), sequence)
+
+    def test_the_boards_copy_plays_on_through_a_card_pulled_out_and_put_in(self):
+        source = copies(message=False, items=[ROOT, {"id": 11, "file": "1/c1.odrg"}])
+        card = {"clocks/c1.odrg": CARD["clocks/c1.odrg"]}
+        script = at_times(*range(6500, 20100, 500)) + ["drive pull"] + at_times(*range(20300, 40300, 500))
+        script += ["drive plug"] + at_times(*range(40500, 80500, 500))
+        run = session(source, script, card=card)
+        self.assertEqual(played(run), [("clocks/c1.odrg", "board")])
+
+    def test_the_copy_that_plays_takes_its_own_saved_brightness(self):
+        source = copies(message=False, items=[ROOT, {"id": 11, "file": "1/c1.odrg"}])
+        source["brightness.txt"] = "odrig-brightness 1\n30 f 1/c1.odrg\n50 x clocks/c1.odrg\n"
+        card = {"clocks/c1.odrg": CARD["clocks/c1.odrg"]}
+        run = session(source, at_times(7000, 11000), card=card)
+        self.assertEqual([(state["animation"], state["dimming"]["saved"]) for state in states_of(run)], [(11, 30)] * 2)
+        run = session(source, asked(100, "ignore 11 1") + at_times(7000, 11000), card=card)
+        self.assertEqual([(state["animation"] > 60000, state["dimming"]["saved"]) for state in states_of(run)], [(True, 50)] * 2)

@@ -360,6 +360,11 @@ class Usage(unittest.TestCase):
             ["--port", "a", "clocks", "yes"],
             ["--port", "a", "clocks", "on", "now"],
             ["--port", "a", "clocks", "message", "on\n"],
+            ["--port", "a", "clocks", "storage"],
+            ["--port", "a", "clocks", "storage", "card"],
+            ["--port", "a", "clocks", "storage", "SD"],
+            ["--port", "a", "clocks", "storage", "sd", "now"],
+            ["--port", "a", "clocks", "storage", "internal\n"],
             ["--port", "a", "debug"],
             ["--port", "a", "debug", "mini"],
             ["--port", "a", "debug", "mini", "yes"],
@@ -376,7 +381,7 @@ class Usage(unittest.TestCase):
         table = text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
         self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "brightness <id> <n> save", "brightness <id> default", "status", "schedule", "schedule set <revision> <on-HH:MM> <off-HH:MM> <on-or-off>", "schedule resume <revision>", "time", "time zone <base64>", "time set <utc-seconds> <zone-crc32>", "guard <board-id> <timing-command>", "rotation", "rotation set <revision> <degrees>", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save",
-                                      "repeat <id> default", "saved <id>", "clocks on", "clocks off", "clocks only", "clocks message on", "clocks message off", "upload begin <id> <file> <bytes>", "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel", "folder make internal <path>", "folder make external <path>", "debug mini on", "debug mini off"])
+                                      "repeat <id> default", "saved <id>", "clocks on", "clocks off", "clocks only", "clocks message on", "clocks message off", "clocks storage sd", "clocks storage internal", "upload begin <id> <file> <bytes>", "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel", "folder make internal <path>", "folder make external <path>", "debug mini on", "debug mini off"])
         # `play all` is `play` with the word in the place of the id.
         one_line = [command for command in documented if not command.startswith(("rotation", "time", "schedule", "guard", "upload ", "mapping ", "order ", "catalog", "repeat ", "clocks ", "debug ", "folder ", "brightness <id> ", "read ")) and command not in ("play all", "remove many <ids>", "list in <folder-id>")]
         self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("rotation", "time", "schedule", "guard", "upload", "mapping", "order", "catalog", "repeat", "clocks", "debug", "folder", "read")],
@@ -398,7 +403,9 @@ class Usage(unittest.TestCase):
                            (["repeat", "1", "8", "save", "x"], "repeat takes ID N, ID N save, or ID default"), (["repeat", "1", "8\n"], "a command is one line"),
                            (["read", "1"], "read takes ID OFFSET, or ID OFFSET COUNT"), (["read", "1", "0", "720", "1"], "read takes ID OFFSET, or ID OFFSET COUNT"),
                            (["read", "1", "0", "720\n"], "a command is one line"),
-                           (["clocks"], "clocks takes on, off, only, message on, or message off"), (["clocks", "message", "yes"], "clocks takes on, off, only, message on, or message off"),
+                           (["clocks"], "clocks takes on, off, only, message on, message off, storage sd, or storage internal"),
+                           (["clocks", "message", "yes"], "clocks takes on, off, only, message on, message off, storage sd, or storage internal"),
+                           (["clocks", "storage", "card"], "clocks takes on, off, only, message on, message off, storage sd, or storage internal"),
                            (["status", "--external"], "--external goes with upload"), (["--log", "--external"], "--external goes with upload"),
                            (["upload", "--external"], "upload --external takes one argument: FILE"),
                            (["upload", "--external", "9", "a.odrg"], "upload --external takes one argument: FILE")):
@@ -443,6 +450,8 @@ class Usage(unittest.TestCase):
             (["clocks", "only"], b"clocks only\n"),
             (["clocks", "message", "on"], b"clocks message on\n"),
             (["clocks", "message", "off"], b"clocks message off\n"),
+            (["clocks", "storage", "sd"], b"clocks storage sd\n"),
+            (["clocks", "storage", "internal"], b"clocks storage internal\n"),
             (["read", "1", "0"], b"read 1 0\n"),
             (["read", "60001", "720", "720"], b"read 60001 720 720\n"),
         ):
@@ -461,6 +470,11 @@ class Usage(unittest.TestCase):
         said = " ".join(cli.parser().format_help().split())
         self.assertIn("read ID OFFSET [COUNT],", said)
         self.assertIn("the ID, the OFFSET and the COUNT of read", said)
+
+    def test_help_names_each_clocks_form(self):
+        said = " ".join(cli.parser().format_help().split())
+        self.assertIn("clocks on|off|only, clocks message on|off, clocks storage sd|internal,", said)
+        self.assertIn("on, off, only, message on, message off, storage sd or storage internal of clocks", said)
 
     def test_no_option_tells_the_emulator_from_the_board(self):
         options = {option for action in cli.parser()._actions for option in action.option_strings}

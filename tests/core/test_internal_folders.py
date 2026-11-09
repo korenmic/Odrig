@@ -271,12 +271,16 @@ class Listing(unittest.TestCase):
                    "playing": 65535, "animation": 65535, "fps": 9999, "error": None, "width": 255, "height": 255, "timing": True, "readiness": "checking",
                    "checked": 65535, "to_check": 65535, "unavailable": 65535, "checking": "c" * 32, "host": "h" * 160, "seed": big, "repeat": big,
                    "loop": big, "saved": 65535, "file": "f" * 100, "playlist": "p" * 93, "clocks": False, "clock_message": False,
-                   "clock_mode": "between", "clock_only": None, "left": 86400}
+                   "clock_mode": "between", "clock_storage": "internal", "clock_only": None, "left": 86400}
         self.assertEqual(list(status), list(longest))
-        # In Only mode the playlist is `clocks`, and `clock_only` is given.
-        only = {**longest, "playlist": "clocks", "clock_only": {"folder": 65535, "state": "missing-folder"}}
-        for shape in (longest, only):
-            self.assertLessEqual(len(json.dumps(shape, separators=(",", ":"))) + 1, 1024)
+        # In Only mode the playlist is `clocks`, and `clock_only` is given; `clock_error`
+        # comes only in Only, with the card's copies preferred.
+        only = {**longest, "playlist": "clocks", "clock_mode": "only", "clock_only": {"folder": 65535, "state": "missing-folder"}}
+        unreadable = {name: value for name, value in only.items() if name != "left"}
+        unreadable.update(clock_storage="sd", clock_error="unreadable", left=86400)
+        for shape in (longest, only, unreadable):
+            self.assertLessEqual(len(json.dumps(shape, separators=(",", ":"))) + 1, 1019)
+        self.assertEqual(len(json.dumps(longest, separators=(",", ":"))) + 1, 1019)
 
     def test_a_folders_id_is_in_use_for_the_commands_of_an_animation(self):
         commands = ("read 5 0", "read 5 0 10", "remove 5", "saved 5", "repeat 5 2 save", "brightness 5 9 save", "upload begin 5 x.odrg 10", "remove many 5")

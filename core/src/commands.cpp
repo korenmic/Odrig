@@ -325,6 +325,8 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text(core.clock_message_on != 0 ? ",\"clock_message\":true" : ",\"clock_message\":false");
     reply.text(",\"clock_mode\":\"");
     reply.text(breaks_mode(core));
+    reply.text("\",\"clock_storage\":\"");
+    reply.text(breaks_storage(core));
     reply.text("\",\"clock_only\":");
     if (core.clocks_on == kClocksOnly) {
         reply.text("{\"folder\":");
@@ -831,13 +833,21 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         return schedule_manual(core, switch_on, reply);
     }
     if (words.is(0, "clocks")) {
-        // `clocks on`, `clocks off`, `clocks message on` and `clocks message off`.
+        // `clocks on`, `clocks off`, `clocks only`, `clocks message on`, `clocks message off`,
+        // `clocks storage sd` and `clocks storage internal`.
+        if (words.count == 3 && words.is(1, "storage")) {
+            if (!words.is(2, "sd") && !words.is(2, "internal")) {
+                return refuse(reply, "bad-argument");
+            }
+            return breaks_command(core, kClockSettingStorage, words.is(2, "internal") ? 1 : 0, reply);
+        }
         const bool message = words.count == 3 && words.is(1, "message");
         const uint32_t last = message ? 2 : 1;
         if ((words.count != 2 && !message) || !(words.is(last, "on") || words.is(last, "off") || (!message && words.is(last, "only")))) {
             return refuse(reply, "bad-argument");
         }
-        return breaks_command(core, message, words.is(last, "only") ? kClocksOnly : words.is(last, "on") ? kClocksBetween : kClocksOff, reply);
+        return breaks_command(core, message ? kClockSettingMessage : kClockSettingMode,
+                              words.is(last, "only") ? kClocksOnly : words.is(last, "on") ? kClocksBetween : kClocksOff, reply);
     }
     if (words.is(0, "brightness")) {
         uint32_t value = 0;

@@ -784,8 +784,8 @@ struct Core {
 
     uint8_t file_present;
 
-    // The two settings of `clocks.txt`: the clocks between the animations, and the message
-    // after each clock.
+    // The mode and the message of `clocks.txt`: the clocks between the animations, and the
+    // message after each clock. Its preferred storage is `clock_storage_internal`.
     uint8_t clocks_on;
 
     uint8_t clock_message_on;

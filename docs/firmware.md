@@ -616,8 +616,9 @@ whether it is sound is not known yet.
    `show: kept 4 files; nothing added, replaced or removed`. The saved playlist order,
    `order.txt` of [show.md](show.md#the-saved-playlist-order), the saved playlist,
    `playlist.txt` of [core.md](core.md#the-saved-playlist), the saved repeats,
-   `repeats.txt` of [show.md](show.md#the-saved-repeats), and the clocks' two settings,
-   `clocks.txt` of `clocks on|off` and `clocks message on|off`, and saved animation
+   `repeats.txt` of [show.md](show.md#the-saved-repeats), and the clocks' three settings,
+   `clocks.txt` of `clocks on|off|only`, `clocks message on|off` and `clocks storage
+   sd|internal`, of any version, and saved animation
    brightness in `brightness.txt`, external inclusion in `ignored.txt` and the board's own
    folders in `folders.txt`, described in [commands.md](commands.md), may be files of the
    folder; a folder without them keeps the
@@ -1598,8 +1599,9 @@ until the old file is gone; [core.md](core.md), "The files the core writes", has
 step. A power cut at any step leaves the old show or the new one, whole; the change is
 committed by one rename. Moving an animation in the saved order writes `order.part` and
 renames it onto `order.txt` the same way, saving or restoring a repeat writes
-`repeats.part` and renames it onto `repeats.txt`, switching the clocks or their message on
-or off writes `clocks.part` and renames it onto `clocks.txt`, and the choice of a playlist
+`repeats.part` and renames it onto `repeats.txt`, a change of the clocks' mode, of their
+message or of their preferred storage writes `clocks.part` and renames it onto
+`clocks.txt`, and the choice of a playlist
 writes `playlist.part` and renames it onto `playlist.txt`. Saved animation brightness
 writes `brightness.part`, closes it durably and verifies it before renaming it onto
 `brightness.txt`; external inclusion writes and verifies `ignored.part` before renaming

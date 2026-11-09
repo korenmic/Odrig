@@ -452,13 +452,17 @@ both settings are off, the player plays as the rest of this page says.
   or message, whose names are the same but for the case of ASCII letters, so with the same
   path `clocks/<name>` or `clocks/message/<name>`, and whose types the catalog or the check
   gives as the same, frames, text or widget, are copies: they make one place of the order,
-  also when their bytes differ. The card's copy plays when it can; the board's plays in its
-  place only when the card's cannot: ignored by its own or an inherited Ignore, left out for
-  a fault, removed, or on a card that is out. A file whose type is not known yet is no copy.
+  also when their bytes differ. Which one plays is the preferred storage's, `clocks storage
+  sd|internal` of [commands.md](commands.md#clocks-between-the-animations), the card by
+  default. The preferred storage's copy plays when it can; the other plays in its place only
+  when the preferred one cannot: ignored by its own or an inherited Ignore, left out for a
+  fault, removed, or on a card that is out. A file whose type is not known yet is no copy.
   Each copy keeps its own id, saved brightness, repeat and Ignore, and `play` of either plays
-  that one. A card taken up is taken at the next draw: the turn in progress plays to its end,
-  and so does the board's copy that the start of Clocks only drew before the card was taken
-  up.
+  that one. A card taken up, and a new preferred storage, are taken at the next draw, the
+  orders of both bags drawn anew for a new preferred storage: the turn in progress plays to
+  its end, a message its whole loop, and so does the board's copy that the start of Clocks
+  only drew before the card was taken up. The preference decides which copy plays, never
+  whether a storage is used, and touches nothing but the faces and the messages.
 - **The order of messages.** Messages have their own shuffled bag in both enabled modes.
   Every eligible direct message is taken before that bag reshuffles; ignored files and
   descendants of ignored folders are passed over. A message turn is one complete loop,

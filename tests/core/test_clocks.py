@@ -179,7 +179,7 @@ class UploadsOfClocks(Uploads):
                 self.assertEqual(given[-1], bad_file(reason))
 
 
-SETTINGS = ["clocks on", "clocks off", "clocks message on", "clocks message off"]
+SETTINGS = ["clocks on", "clocks off", "clocks message on", "clocks message off", "clocks storage sd", "clocks storage internal"]
 
 
 def clocks_file(clocks, message):
@@ -203,15 +203,16 @@ def answers_of(run):
 
 class TheSettings(Playback):
     BAD = ["clocks", "clocks x", "clocks on x", "clocks  on", "clocks On", "clocks message", "clocks message x", "clocks message on x", "clocks messages on", "clocks off message",
-           "clocks on message"]
+           "clocks on message", "clocks storage", "clocks storage x", "clocks storage on", "clocks storage SD", "clocks storage sd x", "clocks storage  sd", "clocks storage internal sd",
+           "clocks storages sd", "clocks sd", "clocks internal", "clocks message storage sd", "clocks storage message on"]
 
-    def test_words_out_of_the_four_lines_are_refused_first_and_an_invalid_show_next(self):
+    def test_words_out_of_the_six_lines_are_refused_first_and_an_invalid_show_next(self):
         invalid = support.with_show_fault(three())
         for files in (three(), invalid):
             printed = self.assert_as_the_reference(files, [f"poll {T0}"] + asked(100, *self.BAD))
             self.assertEqual([json.loads(line[len("reply "):]) for line in printed if line.startswith("reply ")], [refusal("bad-argument")] * len(self.BAD))
         run = support.start(invalid, [f"poll {T0}"] + asked(100, *SETTINGS))
-        self.assertEqual(replies(run), [refusal("show-invalid")] * 4)
+        self.assertEqual(replies(run), [refusal("show-invalid")] * len(SETTINGS))
 
     def test_busy_until_the_check_after_the_start_ends_and_while_an_upload_is_open(self):
         script = [support.line(T0, "clocks on"), support.line(T0, "status")]
@@ -301,7 +302,7 @@ class TheSettings(Playback):
 
     def test_the_members_stand_before_left_which_stays_last(self):
         run = support.start(three(), asked(0, "status"))
-        self.assertEqual(list(replies(run)[0])[-5:], ["clocks", "clock_message", "clock_mode", "clock_only", "left"])
+        self.assertEqual(list(replies(run)[0])[-6:], ["clocks", "clock_message", "clock_mode", "clock_storage", "clock_only", "left"])
 
 
 # A card with two animations of 4 seconds at its root, three clocks of 6 seconds, two loops

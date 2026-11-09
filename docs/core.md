@@ -672,8 +672,15 @@ of [reasons.md](reasons.md), "Widgets in ODRGX", and held in the window while it
   each file's entry, `copy`, the board's files of the class that are copies of a card's file
   that plays; it then passes over a marked file. The marks are written by the draw that
   reads them and read nowhere else, so a mark of an earlier draw is never taken, and a bit
-  of each file holds a show of any size. Nothing of it is a block or a table: [Memory](#memory)
-  is as it is without it.
+  of each file holds a show of any size. While the board's own copies are preferred, a draw
+  makes no mark: a card's file it comes to is passed over when a show's animation of its
+  class that plays is a copy of it, found in the item table by the name and the type of the
+  card's row the draw read to judge the file. The preferred storage is kept in the fourth
+  line of a `clocks.txt` of version 3, read with the mode and the message at the start and
+  by the retry of unreadable settings; it is the card, 0, when the file is of version 1 or
+  2, missing or out of form. `clocks storage` writes it and sets both orders to be drawn
+  anew. Nothing of it is a
+  block or a table: [Memory](#memory) is as it is without it.
 
 ## A drive
 
@@ -1256,6 +1263,7 @@ leg; and `ready`.
 | `--drive DIR` | The host has a drive, plugged in at the start: its list is the animation files of the folder `DIR/odrig` and of its sub-folders to three levels, depth first by the rules of `drive_list`, each named by its path from `odrig`. The core then reads them as `drive/0`, `drive/1` and so on. With `--check-first` they are read before the startup lines too. |
 | `--drive-pulled` | With `--drive`: no drive is plugged in at the start. |
 | `--command-read-fails FILE OFFSET` | `read_at` returns -1 for that file at or after that offset when it is called inside a command, as `read` and `upload expect` call it; the checks read the file whole. |
+| `--read-at-fails-first FILE N` | The first N calls of `read_at` for that file return -1, wherever they are made; the calls after them read it. |
 | `--drive-read-fails NAME OFFSET` | With `--drive`: `read` fails at that offset of the drive's file of that name. `read_at` is not touched, so the check finds the file sound and the player meets the fault. |
 | `--drive-read-only` | With `--drive`: `drive_writable` says 0, and every storage call on a name of the drive fails. |
 | `--no-folders` | The host has no `make_folder`: it makes neither a folder of the drive nor a numbered folder of its own storage. |

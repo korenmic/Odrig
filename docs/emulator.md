@@ -240,7 +240,10 @@ python -m emulator build/clock-breaks/show --drive-folder collection/card
 
 The clocks play between the animations once `Clocks between animations` is checked in
 the Settings of the Controller view, or `clocks on` is sent; the core plays the breaks,
-and the emulator has no code of its own for them.
+and the emulator has no code of its own for them. `clocks storage sd` and `clocks storage
+internal` choose the storage whose copy of a clock or a message plays, over the serial
+port, TCP and HTTP alike, and the choice is kept in the show folder's `clocks.txt` across a
+restart, as the mode and the message are.
 
 ### Folders of the show's folder
 
@@ -936,6 +939,7 @@ python -m odrigctl --port build/emulator/serial repeat 1 default
 python -m odrigctl --port build/emulator/serial saved 1
 python -m odrigctl --port build/emulator/serial clocks on
 python -m odrigctl --port build/emulator/serial clocks message on
+python -m odrigctl --port build/emulator/serial clocks storage internal
 python -m odrigctl --port build/emulator/serial folder make external clocks
 python -m odrigctl --port build/emulator/serial folder make internal shows
 python -m odrigctl --port build/emulator/serial --folder shows upload 10 build/hello-bench.odrg
@@ -971,6 +975,7 @@ python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 default
 python -m odrigctl --tcp 127.0.0.1:8601 saved 1
 python -m odrigctl --tcp 127.0.0.1:8601 clocks on
 python -m odrigctl --tcp 127.0.0.1:8601 clocks message off
+python -m odrigctl --tcp 127.0.0.1:8601 clocks storage sd
 python -m odrigctl --tcp 127.0.0.1:8601 folder make external clocks/message
 python -m odrigctl --tcp 127.0.0.1:8601 folder make internal shows/night
 ```
@@ -1005,6 +1010,7 @@ python -m odrigctl --http 127.0.0.1:8600 repeat 1 default
 python -m odrigctl --http 127.0.0.1:8600 saved 1
 python -m odrigctl --http 127.0.0.1:8600 clocks off
 python -m odrigctl --http 127.0.0.1:8600 clocks message off
+python -m odrigctl --http 127.0.0.1:8600 clocks storage internal
 python -m odrigctl --http 127.0.0.1:8600 folder make external "night/old songs"
 ```
 
@@ -1639,9 +1645,12 @@ tool sends the words as they are typed. The emulator keeps the saved repeats in
 has no code of its own for them.
 
 `clocks on`, `clocks off`, and `clocks only` select Between animations, Off and Clocks
-only. `clocks message on|off` remains independent. The emulator and every command-tool
-transport use the shared core for mode boundaries and separate clock/message bags.
-The host keeps version-2 settings in `clocks.txt`; valid version-1 settings still load.
+only. `clocks message on|off` and `clocks storage sd|internal` remain independent of the
+mode. The emulator and every command-tool transport use the shared core for mode
+boundaries and separate clock/message bags. The host keeps version-2 settings in
+`clocks.txt` while the card's copies are preferred, and version-3 settings, whose fourth
+line is `storage internal`, while the board's own copies are; valid version-1 settings
+still load.
 Only rejects outside playback and output-taking diagnostics, retains the normal playlist
 for exit, and stays dark when no eligible faces exist. See
 [commands.md](commands.md#clocks-between-the-animations) for status and recovery.
