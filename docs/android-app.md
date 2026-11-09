@@ -792,12 +792,14 @@ the key is the one the app knows once the file is read, or the one it knew befor
 when it has forgotten the keys meanwhile, as it does when the target answers again after a
 silence. The pieces go in their turn among the app's other requests, a status still once a
 second.
-Every request of a run only reads, so one whose reply does not come is sent again, each of
-its lines up to three times in all: a piece, the probe, a part of a list, `saved` or
-`catalog`; the probe and the first piece go in one request and each has its own count. The
-third silence of one line ends a download, as the failure of its file, and in a backup fails
-the file being read, or ends the run while the selected folders or the catalog's generation
-are read. A refusal is the installation's answer and is not sent again as a line whose reply
+Every request of a run only reads, so over Wi-Fi one whose reply does not come is sent
+again, each of its lines up to three times in all: a piece, the probe, a part of a list,
+`saved` or `catalog`; the probe and the first piece go in one request and each has its own
+count. The third silence of one line ends a download, as the failure of its file, and in a
+backup fails the file being read, or ends the run while the selected folders or the
+catalog's generation are read. Over USB serial a line is sent once: a reply that did not
+come within the limit may still come over the cable, and the next line would take it for
+its own, so the first silence there is what the third is over Wi-Fi. A refusal is the installation's answer and is not sent again as a line whose reply
 did not come is, though `saved` is still asked again after `busy`, as above; an installation
 that refuses the count with `bad-argument` still has its files read 600 bytes at a time.
 `Stop` ends the run between two pieces, or as the piece under way ends, whatever its reply:
@@ -1870,7 +1872,9 @@ physical acceptance are in [verification.md](specs/64-p2-board-time-and-daily-on
   0 1`, then 720 bytes at a time, and 600 at a time from an installation without the count;
   a probe, a piece, a folder's list and the catalog's generation whose replies are lost,
   each sent again and the file or the zip saved whole, three lost replies in a row ending a
-  download in the words of no answer, and a refused read not sent again;
+  download in the words of no answer, and a refused read not sent again; over USB serial, a
+  file saved whole, and a piece whose reply comes late not sent again, the download ended in
+  the words of no answer over USB serial;
   the zip writer's data descriptors, folders, names and limits.
 - That the web code uses the documented protocol and names no address
   but `4.3.2.1`.

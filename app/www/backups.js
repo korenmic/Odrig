@@ -8,7 +8,7 @@
 
 import * as commands from "./commands.js";
 import {crc32} from "./crc32.js";
-import {Failure} from "./target.js";
+import {Failure, link} from "./target.js";
 import {ZipWriter, fits} from "./zip-writer.js";
 
 export const MANIFEST = "odrig-backup.json";
@@ -74,10 +74,12 @@ function sameTarget(context) {
 const SENDS = 3;
 
 // Waits for a request the client sends in its turn. One withdrawn while the app was hidden is
-// asked again once it is shown, for the same target; one whose reply did not come is sent
-// again, as every request of a run only reads, until the reply of one of its lines was lost
-// SENDS times: a request may send more than one line, the probe and a piece. A refusal is the
-// target's answer and is not asked again, nor anything after Stop or a change of target.
+// asked again once it is shown, for the same target; one whose reply did not come over Wi-Fi
+// is sent again, as every request of a run only reads, until the reply of one of its lines
+// was lost SENDS times: a request may send more than one line, the probe and a piece. A
+// refusal is the target's answer and is not asked again, nor anything after Stop or a change
+// of target. Over USB serial a reply that did not come in time may still come, and the next
+// line would take it for its own, so a line is not sent again there.
 async function again(context, request) {
   const lost = new Map();
   for (;;) {
@@ -89,7 +91,7 @@ async function again(context, request) {
         await context.visible();
         continue;
       }
-      if (!(error instanceof Failure && error.kind === "no-answer")) throw error;
+      if (!(error instanceof Failure && error.kind === "no-answer") || link() === "usb") throw error;
       const times = (lost.get(error.line) ?? 0) + 1;
       if (times >= SENDS) throw error;
       lost.set(error.line, times);

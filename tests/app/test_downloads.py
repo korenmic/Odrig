@@ -1,7 +1,7 @@
 """Downloads and backups of the shared app: one file saved as it is, one zip of a selection of
 one storage with its manifest, read back by Python's own reader, a partial backup, a file
-that changes while it is read, an installation that reads 600 bytes at a time, and replies
-lost on the way back to the app."""
+that changes while it is read, an installation that reads 600 bytes at a time, replies lost
+on the way back to the app, and a reply that comes late over USB serial."""
 
 import base64
 import io
@@ -473,6 +473,34 @@ class Levels(unittest.TestCase):
         found = support.run("downloads", address=first.address, settings={"rows": 3, "selectAll": True, "switchAt": 2, "other": other.address}).seen
         self.assertEqual(found["files"], [])
         self.assertEqual([line for _, line in other.lines if line.startswith((b"read", b"saved"))], [])
+
+
+class OverUsbSerial(unittest.TestCase):
+    """Downloads on the link USB serial, through a stand-in sender that is a board: it answers
+    the lines one at a time in the order they came, and may answer one after the client's
+    limit, when the reply of the next line is the first to come back."""
+
+    target = StandIn.target
+
+    def written(self, found):
+        return [line for line in found["lines"] if line.startswith("read ")]
+
+    def test_a_file_is_saved_whole_over_usb_serial(self):
+        data = bytes(range(256)) * 7
+        target = self.target({"a.odrg": data})
+        found = support.run("serial-downloads", address=target.address, settings={"rows": 1, "one": 1}).seen
+        self.assertIn(f"Saved a.odrg: {len(data)} bytes of Internal /a.odrg", found["message"])
+        (saved,) = found["saved"]
+        self.assertEqual((saved["name"], b"".join(base64.b64decode(piece) for piece in saved["data"])), ("a.odrg", data))
+        self.assertEqual(self.written(found), ["read 1 0 1", "read 1 0 720", "read 1 720 720", "read 1 1440 720"])
+
+    def test_a_read_whose_reply_comes_late_over_usb_serial_is_not_sent_again(self):
+        data = bytes(range(256)) * 7
+        target = self.target({"a.odrg": data})
+        found = support.run("serial-downloads", address=target.address, settings={"rows": 1, "one": 1, "late": {"read 1 720 720": 5600}}).seen
+        self.assertEqual(found["message"], "Internal /a.odrg was not downloaded. No answer over USB serial. Check the cable to the board's USB port and that the installation has power. (no-answer)")
+        self.assertEqual(found["saved"], [])
+        self.assertEqual(self.written(found), ["read 1 0 1", "read 1 0 720", "read 1 720 720"])
 
 
 if __name__ == "__main__":

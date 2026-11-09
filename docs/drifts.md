@@ -15197,6 +15197,28 @@ until it has read what it keeps. `docs/android-app.md` now says so; the code is 
 
 **Resolution.** `docs/android-app.md`.
 
+## Seed 74 with seed 82: over USB serial a line whose reply is lost is not sent again
+
+**Question.** The entry "Seed 74: a lost reply of a download's or a backup's read is sent
+again" sends a request again when its reply did not come, up to three sends of each line.
+It was made over Wi-Fi, where every line is a request of its own and a reply that comes too
+late has nowhere to go. Over the board's USB serial port, seed 82, the app drops what the
+port holds before it writes a line and takes the first whole reply that comes after it, and
+a status that is due goes before the job's next line. A reply of a piece that came after the
+client's limit was taken by the status, and the piece sent again took the status's reply,
+which ended the download as `bad-reply` with the words of a target that is no odrig
+installation. Is a line sent again over USB serial?
+
+**Answer.** No. Over USB serial a line whose reply did not come is not sent again: its
+first silence ends a download, or fails the file of a backup, as the third does over
+Wi-Fi, in the words of no answer over USB serial. A reply that comes late over the cable
+can only be told from the next line's by its fields, which the client does not compare, and
+matching replies to lines is a change of the link, not of the job. Over Wi-Fi nothing
+changes.
+
+**Resolution.** `app/www/backups.js`, `docs/android-app.md`, `tests/app/test_downloads.py`,
+`tests/app/page/scenarios/serial-downloads.js`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where
