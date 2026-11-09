@@ -1,0 +1,9 @@
+{
+  "number": 85,
+  "slug": "85-p2-remove-an-empty-folder",
+  "state": "remaining",
+  "title": "Remove an empty folder",
+  "priority": "P2",
+  "addedAt": "2026-11-09",
+  "summary": "folder remove <id>, approved by the owner on 2026-11-09, removes an empty folder of either storage: on the board's own storage its line of folders.txt and then its numbered folder; on the card its entry in the card's index in one commit of the catalog, and then its folder on the card, which the firmware's card host learns to remove with rmdir. A folder holding a file or a sub-folder is in-use; only the folder named goes, with no cascade; a current playlist removed gives the root; a folder of the storage that cannot be removed after the entry went stays, listed nowhere. The app gets Remove folder in a folder row's menu, with a check and a question, on a writable card only. No core memory; built after seed 74 part B (PR #64)."
+}

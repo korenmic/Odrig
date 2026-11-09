@@ -1,0 +1,9 @@
+{
+  "number": 86,
+  "slug": "86-p2-move-or-rename-a-folder-inside-the-boards-storage",
+  "state": "remaining",
+  "title": "Move or rename a folder inside the board's storage",
+  "priority": "P2",
+  "addedAt": "2026-11-09",
+  "summary": "move internal <folder id> <path>, approved by the owner on 2026-11-09, gives a folder of the board's own storage and its sub-folders a new full path, another parent or name or both, by one rewrite of folders.txt: the lines keep their numbers, ids and Ignore and go among their new siblings by name, and no file or numbered folder is touched, so every stored name, saved setting, catalog key and preview stays and the animation that plays goes on. Refused into itself or below, past 3 levels, 93 bytes for a folder or 100 for a file, onto a taken path or a missing parent; the folder's own path answers moved false; the current playlist's path follows. The app gets Rename and Move to in an internal folder row's menu, and task 6's folder moves inside the board's storage use the command. No core memory; built after seed 74 part B (PR #64) and its task 6."
+}

@@ -121,10 +121,9 @@ commands of Windows.
 
 ## What is coming
 
-These entries cover features not in the repository yet or not yet merged, and the
-cancelled fallback. A seed's merged implementation is completed. Unperformed
-physical checks remain recorded in its spec and verification documents without
-keeping the seed in progress.
+These entries cover features not in the repository yet or not yet merged, and the cancelled
+fallback. A seed's merged implementation is completed. Unperformed physical checks remain
+recorded in its spec and verification documents without keeping the seed in progress.
 
 - **A second firmware that does not use WLED**, seed 12: cancelled by the owner; do not resume its unfinished tasks.
 - **Current limits for the wall and each snake**, seed 45: implemented in open PR #15; not yet merged.
@@ -140,6 +139,7 @@ keeping the seed in progress.
 - **The upload check at full speed**, seed 81: planned; after the last byte the core checks the whole file at every refresh, in step or late, within a budget of 256 to 2,048 bytes of body a refresh, each step charged by its work and a larger record spread over the refreshes after it; the budget is set once a second by the refresh rate, so a board at 22 or more stays at 20 or more; verdicts unchanged. The app says `Checking the animation on the installation: m:ss` until `upload end` answers; odrigctl waits 10,800 s. No new command or reply.
 - **The app over the board's USB serial port**, seed 82: planned; a switch on the Target screen between Wi-Fi and USB serial, one `Connect over Wi-Fi` control in place of `Use` and `Board`, and every command line of the app sent over the board's USB serial port with the same replies, the port opened without a reset; APK only, no command, firmware, wiring or power change.
 - **Display tests whenever play, and a kept mapping lock**, seeds 83 and 84: planned; seed 83 (core only) stops answering the diagonal and snake tests `busy` while the board reads its animations after a start or while an upload is open, the open upload going on to its end, and `mapping set` no longer waits for that reading; seed 84 (app only) keeps `Lock mapping edits` on the phone, one value for every link, target and board, changed only by the operator's confirmed press, never by leaving Settings, another app, a lost reply, a reconnection or a restart.
+- **Remove an empty folder, and move a folder inside the board's storage**, seeds 85 and 86: planned, built after seed 74 part B (pull request #64), both commands approved by the owner on 2026-11-09; seed 85 adds `folder remove <id>`, which removes an empty folder of either storage, its entry first and then its folder of the storage, with `Remove folder` in the app; seed 86 adds `move internal <folder id> <path>`, which moves or renames a folder of the board's own storage and its sub-folders by one rewrite of its list of folders, every id, file, setting and catalog key kept, with Rename and Move to in the app. No core memory.
 
 The state of every seed is in the `state.json` of its folder.
 
