@@ -84,6 +84,7 @@ export default async function (app) {
   await app.until(() => /selected/.test(app.raw("selection-summary")), "the selection summary");
   seen.summary = app.text("selection-summary");
   seen.deleteDisabled = app.byId("delete-selected").disabled;
+  seen.deleteTitle = app.byId("delete-selected").title;
   seen.moveDisabled = app.byId("move-selected").disabled;
   seen.downloadDisabled = app.byId("download-selected").disabled;
   app.press("Download selected");

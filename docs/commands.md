@@ -79,8 +79,9 @@ At power-on brightness comes from `show.json` and the show plays what
 otherwise. Scheduling waits for valid civil time after every reset. Manual `on` and
 `off` persist until explicit `schedule resume`; they never expire at a boundary.
 Ordinary `brightness <n>` and a `play` of an animation or cycle are not kept across a
-restart. The current playlist and its spent window are kept as [show.md](show.md#the-playlist)
-describes. `remove` and `upload` change the installed show.
+restart. The current playlist, a folder of the board's own storage or of the card, or
+the root, and its spent window are kept as [show.md](show.md#the-playlist) describes.
+`remove` and `upload` change the installed show.
 
 Brightness scales every colour value v to `(v * selected + 127) / 255`, rounded down,
 where selected is the file's saved override or the runtime default. Overrides replace
@@ -244,7 +245,7 @@ file's override or latest default without restarting its timing. Missing/null
 | `clock_mode` | `off`, `between`, or `only`. Older targets without this member support the existing boolean Off/Between interface. |
 | `clock_only` | `null` outside Only; otherwise `{"folder":ID_OR_NULL,"state":STATE}`, with state `playing`, `no-card`, `missing-folder`, or `no-clocks`. The folder is resolved from the active tree/catalog, never remembered by transient ID. In Only, `playing` names that folder and `playlist` is `clocks` while a turn plays. |
 | `clock_error` | Optional `unreadable` when saved policy cannot be established. The effective mode is fail-closed Only, output is dark and the saved mode is unconfirmed. Omitted when confirmed. The board retries at most once a second; an explicit clock-mode save can replace corrupt settings. A message-only change cannot guess the lost policy. |
-| `left` | The whole seconds left in the window of the current playlist, 86,400 down to 0: the 24 hours of running time it plays for before the next playlist of the card's folders is current, see [show.md](show.md#the-playlist). 0 from the window's end until the turn in progress ends. Reported whatever the card holds, a fresh 86,400 each time a playlist becomes current. A reply without `left` comes from a player before it. |
+| `left` | The whole seconds left in the window of the current playlist, 86,400 down to 0: the 24 hours of running time it plays for before the next playlist is current, a folder's of the board's own storage or of the card, or the root's, see [show.md](show.md#the-playlist). 0 from the window's end until the turn in progress ends. Reported whatever the card holds, a fresh 86,400 each time a playlist becomes current. A reply without `left` comes from a player before it. |
 
 `checked`, `to_check` and `unavailable` are 0, and `checking` is `null`, while the show
 is invalid.
@@ -319,9 +320,11 @@ list in 60007
 
 A folder's id comes after the files', from the same pool, in the tree's order, depth
 first. `list in` is refused with `bad-argument` for another form, `show-invalid` while the
-show is invalid, and `unknown-id` for an id that is no folder of the card, the card out
-too. [show.md](show.md#animations-from-a-usb-drive) says what a folder of the card is to
-the player.
+show is invalid, and `unknown-id` for an id that is no folder of the card or of the board's
+own storage, a folder of the card while the card is out too; [folders of the board's own
+storage](#folders-of-the-boards-own-storage) says how theirs are listed.
+[show.md](show.md#animations-from-a-usb-drive) says what a folder of the card is to the
+player.
 A file left out for a fault is listed in its place as
 `{"id":60002,"file":"broken.odrg","bytes":null,"external":true,"type":"frames","fault":"truncated"}`, and `play` of it is
 refused with `unavailable`. Their ids are from 60001 up, the lowest that the show does not
@@ -365,7 +368,8 @@ form without a count.
 - An offset above the size of the file, and a count of 0 or above 720, are refused with
   `bad-argument`.
 - An id that is no animation of the show or of the drive, a cycle's too, is refused with
-  `unknown-id`; a folder of the card, which is a playlist, with `in-use`.
+  `unknown-id`; a folder of the board's own storage or of the card, which is a playlist,
+  with `in-use`.
 - A file the player has not read whole since the start is refused with `busy`: ask again
   a moment later. An animation that is unavailable, as its file had a fault, is refused
   with `unavailable`; while the show is invalid, `read` is refused with `show-invalid`; and
@@ -383,7 +387,8 @@ The item leaves the show, and the items after it move up.
 
 - An animation that a cycle lists is refused with `in-use`: remove the cycle first.
 - An animation of a USB drive is refused with `in-use`: the drive holds it.
-- A folder of the card is refused with `in-use`: it is a playlist, not a file.
+- A folder of the board's own storage or of the card is refused with `in-use`: it is a
+  playlist, not a file.
 - If the item is the `start` item, the show has no `start` afterwards.
 - If the item is the animation whose turn it is in the playlist, the playlist goes on
   with the animation after it, from its first frame. If it was the only animation of the
@@ -421,7 +426,7 @@ whichever route its commands arrive by.
 - `<bytes>` is the size of the file, 1 to 4,294,967,295.
 - The reply's `chunk` is the most bytes one `upload data` line may carry.
 - It is refused with `busy` when an upload is open; with `in-use` when the id belongs to a
-  cycle, to an animation of a USB drive or to a folder of the card, or another item already names `<file>`; and with `no-space` when the file would
+  cycle, to an animation of a USB drive or to a folder of the board's own storage or of the card, or another item already names `<file>`; and with `no-space` when the file would
   not fit into the free storage, or the show has no room for another item.
 
 **`upload begin <id> <file> <bytes> <crc32>`** is the same with the CRC-32 of the file, as
@@ -662,7 +667,7 @@ character boundary, so expanded status remains within the fixed reply limit.
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
 | `busy` | `repeat <id> <n> save`, `repeat <id> default`, `saved` and the four lines of `clocks` until the player has read every installed animation after a start, while an upload is open and while a rebuild runs; `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `mapping set` while an upload is open; `upload begin`, `ignore`, `remove` and `remove many` while a test of the mapping shows; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read; `folder make external` while an upload is open, a rebuild runs, a test shows or the card's catalog is read; `folder make internal` while an upload is open or a rebuild runs. |
-| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation or a folder of a USB drive or the card; `repeat <id> <n> save` or `repeat <id> default` names one of nothing `list` lists; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation; `folder make` names a parent folder the card's index or the board's own storage has not; `upload begin` names a folder of the board's own storage that is not there. A folder's id is unknown while the card is out. |
+| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of a folder of the board's own storage nor of an animation or a folder of a USB drive or the card; `repeat <id> <n> save` or `repeat <id> default` names one of nothing `list` lists; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation; `folder make` names a parent folder the card's index or the board's own storage has not; `upload begin` names a folder of the board's own storage that is not there. The id of a folder of the card is unknown while the card is out. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
 | `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file, and `remove`, `remove many`, `read`, `saved`, `repeat`, `brightness`, `order move` or `upload begin` names that of a folder of the board's own storage; `folder make` names a path whose last name a file or a folder of its parent has, in any case. |
 | `read-only` | `upload begin external`, `folder make external`, `catalog rebuild`, or `order move` of a file of the drive, while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
@@ -914,8 +919,9 @@ order get
 `ids` are the ids of the animations `list` lists, the ignored ones, the unavailable ones
 and the external storage's among them, of one level, in the saved order, beginning at the position `<from>`, counted
 from 0, which is 0 when it is left out; `<from>` is 0 to 4,294,967,295. `order get` gives the
-root level, the show's animations and the root's files of the card, and `order get in
-<folder-id>` the files of that folder of the card, refused as `list in` is. The reply holds as many
+root level, the show's animations at the root and the root's files of the card, and
+`order get in <folder-id>` the files of that folder of the board's own storage or of the
+card, refused as `list in` is. The reply holds as many
 as fit into it, and `next` is the position of the first one left out, or `null`, as for
 `list`. `revision` is a number that changes whenever the order or the listed animations
 change, and is the same after a restart for the same files. `order get` is refused as
@@ -949,9 +955,10 @@ its files: `read-only`.
 - `busy`: until the player has read every installed animation after a start, and while
   an upload is open.
 - `unknown-id`: `<id>` or `<before>` is the id of no listed animation, of no cycle and of
-  no folder of the card.
-- `in-use`: `<id>` or `<before>` is the id of a cycle or of a folder of the card, which
-  have no place in the order, or `<before>` is an animation of another level than `<id>`.
+  no folder of the board's own storage or of the card.
+- `in-use`: `<id>` or `<before>` is the id of a cycle or of a folder of the board's own
+  storage or of the card, which have no place in the order, or `<before>` is an animation
+  of another level than `<id>`.
 - `read-only`: `<id>` is a file of the card, and the core may not write its index.
 - `order-conflict`: `<revision>` is not the order's revision now. Nothing changes; read
   `order get` again.
@@ -973,8 +980,9 @@ saved 2
 none; `repeat`, its saved repeat of `repeat <id> <n> save`, or null for none; and `start`,
 true when it is the item the show's `start` names. A client reads it before it moves an
 animation, to give the new file the same settings. `in-use` for a cycle or a folder of the
-card, `unknown-id` for an id that `list` does not list, `busy` as for `repeat <id> default`,
-and `show-invalid` while the show is invalid. It writes nothing.
+board's own storage or of the card, `unknown-id` for an id that `list` does not list,
+`busy` as for `repeat <id> default`, and `show-invalid` while the show is invalid. It
+writes nothing.
 
 ## Repeating the turn in progress
 
@@ -1033,8 +1041,9 @@ saved, and restoring an animation that has none, write nothing and still act on 
 - `busy`: while a rebuild of a catalog runs, until the player has read every installed
   animation after a start, and while an upload is open.
 - `unknown-id`: `<id>` is the id of no animation `list` lists, of no cycle and of no folder
-  of the card.
-- `in-use`: `<id>` is the id of a cycle or of a folder of the card, which keep no repeat.
+  of the board's own storage or of the card.
+- `in-use`: `<id>` is the id of a cycle or of a folder of the board's own storage or of the
+  card, which keep no repeat.
 - `no-space`, for a save only: the drive's files would have more than 32 saved repeats, or
   the file holds 512 lines of other animations once the lines of files `show.json` no
   longer names are dropped, which a save does whenever it finds the file full.

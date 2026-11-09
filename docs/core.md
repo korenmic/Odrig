@@ -737,8 +737,10 @@ its id, and asks the host for a name only when `list` writes it or a log line ne
   window is kWindowMs, 86,400,000, of running time. Whether it has passed is judged by the
   turn's end time where a turn of the playlist ends, by the refresh's time at a refresh
   while a cycle or nothing plays, and when a mapping test ends; the rotation makes the
-  next folder of the table current, the root after the last and while the tree is not
-  known, and the new playlist plays from its first animation, or a cycle goes on. The
+  next folder current, those of the board's own storage, see
+  [Internal folders](#internal-folders), before those of the table, which it passes over
+  while the tree is not known, and the root after the last, and the new playlist plays
+  from its first animation, or a cycle goes on. The
   whole rounds that a long time without a refresh takes off at once end before the
   window's end, and a rotation sums the new playlist's round anew; with an indexed drive
   no round is taken off at once, since summing one would read every row: the turns are
@@ -1418,13 +1420,14 @@ place. The removal of the current folder's last file makes the root current the 
 
 The file is written as `playlist.part`, one `write` of at most 130 bytes from a buffer on
 the stack, `write_close` and `rename`, when the current playlist changes by a choice or by
-the rotation, and at most once in 900,000 ms while the tree has a folder, from the
-refresh, so that a restart loses at most 15 minutes of the window. A write while an upload
-receives its bytes, or while a rebuild holds a page open, waits for the next refresh that
-is free. Nothing is written while the tree has no folder and no file exists: a show
-without a card, or with a flat card, makes no storage call more than before. When the
-host fails the part is removed and nothing is refused. The start probes `playlist.part`
-with `read_at` and removes it when it is there, as it does `order.part`.
+the rotation, and at most once in 900,000 ms while the board's own storage or the card has
+a folder, from the refresh, so that a restart loses at most 15 minutes of the window. A
+write while an upload receives its bytes, or while a rebuild holds a page open, waits for
+the next refresh that is free. Nothing is written while neither has a folder and no file
+exists: a show without folders of its own, without a card or with a flat card, makes no
+storage call more than before. When the host fails the part is removed and nothing is
+refused. The start probes `playlist.part` with `read_at` and removes it when it is there,
+as it does `order.part`.
 
 ## Saved animation brightness
 

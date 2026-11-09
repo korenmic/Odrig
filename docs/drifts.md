@@ -14231,3 +14231,87 @@ a name without /.` The rule itself is unchanged.
 
 **Resolution.** `app/www/upload-destination.js` (`reason`), `app/www/screens/archive.js`,
 `tests/app/test_ready_upload.py`, `tests/app/test_archive.py`.
+
+## Seed 74: a saved playlist of a folder of the board's own storage while `folders.txt` cannot be read
+
+**Question.** A boot that cannot read `folders.txt` has no folders. The saved playlist
+names a folder of the board's own storage, `:` and its path. The core found no folder of
+that path and made the root current with a fresh window, saved as such: the operator's
+choice was lost for every later boot, while a card's saved playlist is kept as long as the
+card's tree is not known. Which holds for a folder of the board's own storage?
+
+**Answer.** The card's rule. While `folders.txt` cannot be read, the root plays in the
+folder's place and the path stays saved; the next boot that reads the file makes the folder
+current again. Only a file that was read and has no folder of that path makes the root
+current, saved as such.
+
+**Resolution.** `core/src/order.cpp` (`tree_find_current`), `docs/core.md`,
+`tests/core/test_internal_folders.py`.
+
+## Seed 74: the check of an upload into a folder of the board's own storage
+
+**Question.** An upload prepared at a folder of the board's own storage goes into it, but
+the check before it read the root: a folder gone since was not seen, and the board refused
+the file with `unknown-id`, which the app worded `Animation begin is not installed any
+more.` Its name was also checked against the root's files, not the folder's, so a name the
+folder has was sent and refused `in-use`. What does the check read?
+
+**Answer.** The folder the file goes into, as for a folder of the card: a folder gone or
+changed fails the upload with `The explored folder changed or disappeared. Select the
+destination again.`, and a name is checked against the folder's own files, `A file already
+exists at this destination.` A folder that goes between the check and `upload begin` is
+refused `unknown-id`, which the app words `The folder of this upload is not on the
+installation any more. Select the destination again.`
+
+**Resolution.** `app/www/upload-destination.js` (`snapshotLevel`),
+`app/www/screens/storage.js`, `app/www/messages.js`, `tests/app/test_internal_folders.py`,
+`tests/app/test_messages.py`.
+
+## Seed 74: the words of an upload to the root of the board's storage from a folder of the card
+
+**Question.** Requirement 2.2 of spec 63 has the board's own storage use "its existing flat
+root", and the destination line said `Internal storage has a flat root. This upload uses
+Internal / instead of the explored SD folder.` when Internal was chosen at a folder of the
+card, and `Using Internal /; internal storage has no matching subfolders.` when the card is
+not there. The board's own storage has folders now, and may have one of the same path. What
+do they say?
+
+**Answer.** What happens and why: `This upload goes to the root of Internal storage: the
+explored folder is on the card.`, and `External storage is disconnected or not detected.
+Using Internal /; the explored folder is on the card.` The rule itself is unchanged: an
+upload prepared at a folder of the card that goes to the board's own storage goes to its
+root, whatever folders it has.
+
+**Resolution.** `app/www/upload-destination.js` (`reason`), `tests/app/test_ready_upload.py`,
+`tests/app/page/scenarios/ready-checks.js`.
+
+## Seed 74: the texts that still gave the folders and the playlists to the card alone
+
+**Question.** The board's own storage has folders, each a playlist that the rotation goes
+through before the card's, that `play`, `list in`, `order get in` and `status` take, and
+that a selection takes for a download. Texts written before still gave all this to the
+card: `docs/show.md` had the playlists, the rotation and the saved playlist of the card's
+folders alone, `With no folder on the card the root is the only playlist`; `docs/core.md`
+had a show without a card write `playlist.txt` no more than before, though it writes it
+every 900,000 ms while the board's storage has a folder; `docs/commands.md` refused
+`list in`, `order get in`, `read`, `remove`, `upload begin`, `order move`, `saved` and
+`repeat` for a folder of the card alone, and its table made the id of a folder of the
+board's own storage `unknown-id` for `play`; comments of the app and
+`docs/android-app.md` said the same; and `Delete selected`, disabled while a folder of the
+board's own storage is selected, said `clear the card's files and folders from the
+selection.` What do they say?
+
+**Answer.** What the core and the app do, as the section of `docs/commands.md` on the
+folders of the board's own storage already says: the rotation goes from the root to the
+folders of the board's own storage in the tree's order, then to the card's, which it
+passes over while the card's tree is not known, then to the root; `playlist.txt` is
+written every 900,000 ms while either storage has a folder; each refusal names a folder of
+either storage; and `Delete selected` says `clear the folders and the card's files from
+the selection.` A start whose `folders.txt` is sound and has no folder of the saved path
+makes the root current, saved as such, which a test now holds.
+
+**Resolution.** `docs/show.md`, `docs/core.md`, `docs/commands.md`,
+`docs/android-app.md`, `app/www/screens/selection.js`, the comments of
+`app/www/client.js`, `app/www/commands.js` and `app/www/screens/show.js`,
+`tests/app/test_internal_folders.py`, `tests/app/page/scenarios/downloads.js`,
+`tests/core/test_internal_folders.py`.

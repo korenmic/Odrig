@@ -57,13 +57,14 @@ a top bar with the app's name and whether the installation answers.
   unavailable.` until a fresh reply arrives. A fresh absent reply alone says `absent`.
   Below them, when
   Settings says so, stands the pinned Tests group; then two filters and the one list of
-  animations, one level of the card's folders at a time, as a file explorer shows them.
+  animations, one level of the folders at a time, as a file explorer shows them.
   Above the list stands the level's heading, `Root` or the folder's whole path, as
   `night/deep`, with `Back` inside a folder and the button `Play this folder`, which
   makes the level's playlist current. At the root the list holds the board's own
   animations and the loose files of the card, in the saved order of the playlist, then
-  one row for each folder of the card, with the folder's name, how many animations it
-  holds itself and a chevron; a tap on a folder row enters it, and the list then holds
+  one row for each folder, those of the board's own storage before the card's, with the
+  folder's name, how many animations it holds itself and a chevron; a tap on a folder row
+  enters it, and the list then holds
   that folder's own files and the rows of its sub-folders. A folder with no file of its
   own keeps its row, `0 animations` and its way in. The app reads the level it shows and
   no other, in parts, with `list` and `order get` at the root and `list in` and `order get
@@ -654,7 +655,7 @@ colours do. A video is drawn at most 1,280 pixels wide or high before it is fitt
 ### Folders of the card, and moves
 
 In the selection mode a row of either storage can be selected, also one of a card the board
-may not write, and so can a folder of the card, by the checkbox on its row or `Select` in its
+may not write, and so can a folder of either storage, by the checkbox on its row or `Select` in its
 menu; a line under the bar says how many are selected in Internal storage and in External
 storage, and how many folders of each. `Select all` takes the files the filters show of the
 board's storage and of a card the board may write: not the files of a read-only card, which
@@ -1294,7 +1295,7 @@ it is dismissed with `OK` or another takes its place.
 | `storage-error` | The installation could not read or write its storage. | The installation could not use its storage. |
 | `zone-unset` | Time was set before usable time-zone rules were supplied. | Set the board's time from this phone first. |
 | `in-use` | An upload whose id or file name another item took meanwhile. | That name or id is in use on the installation. The list is asked for again; upload again. |
-| `in-use` | `Save` or `Restore default` of the bar for a cycle or a folder of the card. | That is a cycle or a folder, which keeps no repeat. |
+| `in-use` | `Save` or `Restore default` of the bar for a cycle or a folder. | That is a cycle or a folder, which keeps no repeat. |
 | `no-space` | An upload that does not fit, before it is sent or as the installation judges it. | The animation needs `<size>` KB, and the installation has `<free>` KB free. |
 | `no-space` | An upload to the card that does not fit on it. | The animation needs `<size>` KB, and the card has `<free>` KB free. |
 | `no-space` | `Save` of the bar when the installation keeps no more saved repeats. | The installation has no room for another saved repeat: it keeps them for at most 32 files of a card or drive and 512 files in all. |

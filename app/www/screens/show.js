@@ -1,5 +1,5 @@
 // Animations: what the installation does, power and brightness, the capacity of each
-// storage, and the one list of animations, one level of the card's folders at a time as
+// storage, and the one list of animations, one level of the folders at a time as
 // a file explorer shows them, each row with its preview, its storage badge and its menu.
 
 import * as client from "../client.js";
@@ -153,7 +153,7 @@ function levelOf(state, all) {
   return {path: state.level.path, rows: all, shown: all.filter(filters.matches), folders};
 }
 
-// Enters a folder of the card, as a tap on a folder row does, or goes up a level for null,
+// Enters a folder of either storage, as a tap on a folder row does, or goes up a level for null,
 // as Back does: the client reads the new level.
 function enter(entry) {
   closeMenu();
