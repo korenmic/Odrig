@@ -500,14 +500,19 @@ async function makeFolders(job, context) {
 
 // Once a job has moved every file of a folder whose playlist was current, the board plays
 // the root's in its place: the folder's new place is played instead, unless another
-// playlist was chosen meanwhile. Gives whether it was.
+// playlist was chosen meanwhile, or the new place is in a Clocks folder while the clocks
+// play between animations, whose files then play as clocks and never as a playlist: the
+// card's, and the board's own on a target that reports `clock_storage`. Gives whether it
+// was.
 async function follow(job, context) {
   const folder = job.folders.find((each) => each.path === job.follows.path);
   if (typeof folder?.id !== "number") return false;
   const operation = requests(context);
   try {
-    const playing = (await operation("move", () => commands.status())).playing;
-    if (playing !== "all" && playing !== job.follows.id) return false;
+    const status = await operation("move", () => commands.status());
+    if (status.playing !== "all" && status.playing !== job.follows.id) return false;
+    const inClocks = folder.path === "clocks" || folder.path.startsWith("clocks/");
+    if (status.clockMode === "between" && inClocks && (job.destination.storage === "external" || status.hasClockStorage)) return false;
     await operation("move", () => commands.play(folder.id));
     return true;
   } catch (_) {

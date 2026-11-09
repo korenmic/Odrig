@@ -15106,6 +15106,25 @@ carried from it, and takes them again when it finishes.
 `app/www/screens/explorer.js`, `docs/android-app.md`, `tests/app/test_moves.py`,
 `tests/app/test_only_both.py`.
 
+## Seeds 61 and 74: a moved folder's playlist and the Clocks folders
+
+**Question.** When the playlist that plays is a folder's that is moved, the app plays the
+folder's new place once it is gone. Between animations the files of a Clocks folder play as
+clocks and never as a playlist: the card's Clocks folder is passed over, and the files of
+the board's own Clocks folder are clocks while the clocks are on. A folder moved into either
+was played there all the same; the board played the root's in its place while its status
+named the moved folder as the playlist, and the app said that the playlist plays there.
+Does the playlist follow a folder into a Clocks folder?
+
+**Answer.** Not while the clocks play between animations: the new place is in the card's
+Clocks folder, or in the board's own on a target that reports `clock_storage`, and the
+root's plays on, as the board chose, with nothing said of the playlist. With the clocks off
+the Clocks folders are ordinary folders and the playlist follows, and in Clocks only it
+follows a folder moved inside Clocks, as before.
+
+**Resolution.** `app/www/moves.js` (`follow`), `docs/android-app.md`,
+`tests/app/test_moves.py`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

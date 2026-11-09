@@ -1,8 +1,9 @@
 """Moves inside the card and of folders in the shared app: a file of the card moved on the
 card by the board with `move external`, keeping its id and its saved settings; a folder of
 the card moved on the card file by file, its files keeping theirs; folders moved between the
-board's own storage and the card; a folder never moved into itself; and a folder's move cut
-short finished when the app is opened again."""
+board's own storage and the card; a folder never moved into itself; the playlist of a moved
+folder following it, but not into a Clocks folder between animations; and a folder's move
+cut short finished when the app is opened again."""
 
 import json
 import pathlib
@@ -24,6 +25,7 @@ def clip(seed):
 
 CARD = {'night/near.odrg': clip(1), 'night/deep/old.odrg': clip(2), 'clocks/face.odrg': clip(3)}
 FOLDERS = "odrig-folders 1 3\n1 20 0 shows\n2 21 0 shows/night\n"
+CLOCKS_FOLDERS = "odrig-folders 1 3\n1 20 0 clocks\n2 21 0 clocks/message\n"
 
 
 class Moves(unittest.TestCase):
@@ -193,6 +195,33 @@ class Moves(unittest.TestCase):
         moved = self.every(emulator)[(True, 'clocks/night')]['id']
         status = self.answered(emulator, 'status', lambda reply: reply.get('playlist') is not None)
         self.assertEqual((status['playing'], status['playlist']), (moved, 'clocks/night'))
+
+    def test_between_animations_the_playlist_of_a_folder_does_not_follow_it_into_clocks(self):
+        _, emulator = self.board()
+        self.answered(emulator, 'clocks on')
+        night = self.every(emulator)[(True, 'night')]['id']
+        self.answered(emulator, f'play {night}')
+        self.assertEqual(json.loads(emulator.command('status'))['playlist'], 'night')
+        found = support.run('move-selected', address=f'127.0.0.1:{emulator.port}', settings={
+            'rows': 1, 'folders': ['night'], 'storage': 'external', 'folder': 'clocks'}).seen
+        self.assertIn('Moved 2 of 2. External /night/ is now External /clocks/night/.', found['message'])
+        self.assertNotIn('Its playlist plays there.', found['message'])
+        status = json.loads(emulator.command('status'))
+        self.assertEqual((status['clock_mode'], status['playing'], status['playlist']), ('between', 'all', None))
+
+    def test_between_animations_the_playlist_of_a_folder_does_not_follow_it_into_the_boards_clocks(self):
+        _, emulator = self.board(folders=CLOCKS_FOLDERS)
+        self.answered(emulator, 'clocks on')
+        night = self.every(emulator)[(True, 'night')]['id']
+        self.answered(emulator, f'play {night}')
+        self.assertEqual(json.loads(emulator.command('status'))['playlist'], 'night')
+        found = support.run('move-selected', address=f'127.0.0.1:{emulator.port}', settings={
+            'rows': 1, 'folders': ['night'], 'storage': 'internal', 'folder': 'clocks'}).seen
+        self.assertIn('Moved 2 of 2. External /night/ is now Internal /clocks/night/.', found['message'])
+        self.assertNotIn('Its playlist plays there.', found['message'])
+        self.assertIn((False, 'clocks/night'), self.every(emulator))
+        status = json.loads(emulator.command('status'))
+        self.assertEqual((status['clock_mode'], status['playing'], status['playlist']), ('between', 'all', None))
 
     def test_a_kept_folders_job_that_the_board_refuses_is_given_up_once(self):
         _, emulator = self.board()

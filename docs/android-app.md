@@ -723,10 +723,11 @@ own. The source folders go as their last files leave them; one that keeps a file
 not moved, or a folder that never held a file, stays, and the end says so. When the
 playlist that plays is the folder's or one below it, the board plays the root's once the
 folder is gone, so the app then plays the folder's new place, unless another playlist was
-chosen meanwhile. `Stop` ends a folder's job after the file under way, and its other files
-stay where they are. A folder the board refuses to make ends the job, said with its
-reason: the folders made before it stay, empty. A file the board refuses is said and the
-next one moved. A lost link, the app hidden or another target chosen cuts the job short
+chosen meanwhile, or the new place is in a Clocks folder while the clocks play between
+animations, whose files then play as clocks and never as a playlist: the root's plays on.
+`Stop` ends a folder's job after the file under way, and its other files stay where they
+are. A folder the board refuses to make ends the job, said with its reason: the folders
+made before it stay, empty. A file the board refuses is said and the next one moved. A lost link, the app hidden or another target chosen cuts the job short
 instead: the file under way and those after it stay in the job for the next connection, and
 the end says so.
 
