@@ -82,15 +82,29 @@ function folderStorage(state) {
 }
 
 function showWhere() {
-  if (folderAt === null) return;
+  if (folderAt === null || folderAt.rename !== undefined) return;
   folderAt.storage = folderStorage(client.state);
   byId("folder-where").textContent = `In ${moves.label(folderAt.storage, folderAt.path ? `${folderAt.path}/` : "")}`;
+}
+
+// The new full path a rename gives, under the name field.
+function showNewPath() {
+  const line = byId("folder-path");
+  if (folderAt === null || folderAt.rename === undefined) {
+    line.hidden = true;
+    return;
+  }
+  const name = byId("folder-name").value.trim();
+  line.textContent = `New path: ${moves.label("internal", folderAt.path ? `${folderAt.path}/${name}` : name)}`;
+  line.hidden = false;
 }
 
 function openFolder(playlist) {
   const state = client.state;
   const level = state.level;
   folderAt = {path: level.path, playlist, version: client.targetVersion(), storage: "internal"};
+  byId("folder-make").textContent = "Make it";
+  byId("folder-path").hidden = true;
   byId("folder-dialog-title").textContent = playlist ? "New playlist folder" : "New folder";
   const atRoot = level.id === null;
   const chooser = byId("folder-storage");
@@ -108,11 +122,116 @@ function openFolder(playlist) {
 function closeFolder() {
   folderAt = null;
   byId("folder-dialog").hidden = true;
+  byId("folder-path").hidden = true;
+}
+
+// Opens the dialog of `New folder` to rename a folder of the board's own storage: its name in
+// the field, its parent above it and the new full path under it.
+function openRename(folder) {
+  const parent = moves.folderOf(folder.playlist);
+  folderAt = {path: parent, playlist: false, version: client.targetVersion(), storage: "internal", rename: folder};
+  byId("folder-dialog-title").textContent = "Rename folder";
+  byId("folder-storage").hidden = true;
+  byId("folder-storage-label").hidden = true;
+  byId("folder-where").textContent = `In ${moves.label("internal", parent ? `${parent}/` : "")}`;
+  byId("folder-name").value = moves.baseOf(folder.playlist);
+  byId("folder-problem").textContent = "";
+  byId("folder-make").textContent = "Rename";
+  showNewPath();
+  byId("folder-dialog").hidden = false;
+  byId("folder-name").focus();
+}
+
+// Why a folder of the board's storage cannot take a name at the level shown: another folder
+// there has it in any case.
+function siblingProblem(folder, name) {
+  const taken = client.state.folders.some((other) => other.external !== true && other.id !== folder.id && moves.baseOf(other.playlist).toLowerCase() === name.toLowerCase());
+  return taken ? "A folder there has that name." : null;
+}
+
+// The path of the folder of the board's own storage with this id, walked level by level, or
+// null when no folder has it.
+async function internalPathOf(id) {
+  const pending = [null];
+  let seen = 0;
+  while (pending.length > 0 && seen < 256) {
+    const level = pending.shift();
+    let from = 0;
+    do {
+      const reply = await client.operation("folder", () => commands.list(from, level));
+      for (const row of reply.items) {
+        if (typeof row.playlist !== "string" || row.external === true) continue;
+        if (row.id === id) return row.playlist;
+        pending.push(row.id);
+        seen += 1;
+      }
+      from = reply.next;
+    } while (from !== null);
+  }
+  return null;
+}
+
+// Gives a folder of the board's own storage a new full path with `move internal`, as a rename
+// or a move. A reply that did not arrive is never answered by sending the line again: the
+// folders are read, and the folder's place is said.
+async function moveInside(folder, to, renaming) {
+  const from = folder.playlist;
+  const named = renaming ? moves.label("internal", from) : moves.label("internal", `${from}/`);
+  try {
+    const moved = await client.operation("folder", () => commands.moveInternal(folder.id, to));
+    client.followFolder("internal", from, to);
+    message(!moved ? `The folder ${named} is there already.` : renaming ? `Renamed the folder ${named} to ${moves.label("internal", to)}.` :
+      `Moved the folder ${named} to ${moves.label("internal", `${to}/`)}.`);
+  } catch (error) {
+    if (error instanceof Refusal) {
+      const text = error.code === "unknown-command" ? "This installation's firmware cannot move folders inside its storage. Install the newer firmware." : refusalText(error);
+      message(`The folder ${named} was not ${renaming ? "renamed" : "moved"}. ${text}`);
+    } else {
+      let path = null;
+      try {
+        path = await internalPathOf(folder.id);
+      } catch (_) {
+        path = null;
+      }
+      if (path !== null) client.followFolder("internal", from, path);
+      message(path === null ? `No confirmed reply. Where the folder ${named} is now is not known yet; the list is read again.` :
+        `No confirmed reply. The folder is at ${moves.label("internal", path)} now.`);
+    }
+  } finally {
+    client.refreshContent();
+  }
+}
+
+async function renameFolder(asked) {
+  const folder = asked.rename;
+  const name = byId("folder-name").value.trim();
+  const problem = moves.folderNameProblem("internal", asked.path, name) ?? siblingProblem(folder, name);
+  if (problem !== null) {
+    byId("folder-problem").textContent = problem;
+    return;
+  }
+  closeFolder();
+  const to = asked.path ? `${asked.path}/${name}` : name;
+  if (asked.version !== client.targetVersion() || to === folder.playlist) return;
+  await moveInside(folder, to, true);
+}
+
+// The menu's actions for a folder's row of the board's own storage: `Rename` and `Move to`,
+// while the target answers and nothing changes the list. `held` says that the menu's other
+// actions are held now. A folder of the card gets neither.
+export function folderMenu(folder, held) {
+  if (folder.external === true) return [];
+  const free = !held && client.state.link === "answers" && running === null && !client.contentBusy();
+  return [{label: "Rename\u2026", act: () => openRename(folder), disabled: !free}, {label: "Move to\u2026", act: () => openMove(folder), disabled: !free}];
 }
 
 async function makeFolder() {
   const asked = folderAt;
   if (asked === null) return;
+  if (asked.rename !== undefined) {
+    await renameFolder(asked);
+    return;
+  }
   const name = byId("folder-name").value.trim();
   const problem = folderProblem(asked.path, name);
   if (problem !== null) {
@@ -244,20 +363,45 @@ function replan() {
   drawPlan();
 }
 
+// Why one folder of the board's storage cannot move to a destination there, or null: it is its
+// own parent; another folder there has its name in any case; a folder of its subtree would
+// pass three levels or 93 characters; or a file of it would pass 100.
+function destinationProblem(folder, destination) {
+  if (destination === moves.folderOf(folder.playlist)) return "It is there already.";
+  const name = moves.baseOf(folder.playlist);
+  const paths = moving.folders.internal ?? [];
+  if (paths.some((path) => path !== "" && path !== folder.playlist && moves.folderOf(path) === destination && moves.baseOf(path).toLowerCase() === name.toLowerCase())) {
+    return "A folder there has its name.";
+  }
+  const top = destination ? `${destination}/${name}` : name;
+  const inside = (path) => top + path.slice(folder.playlist.length);
+  const below = paths.filter((path) => path === folder.playlist || path.startsWith(`${folder.playlist}/`));
+  if (below.some((path) => inside(path).length > 93 || inside(path).split("/").length > 3)) return "It would pass 3 levels or 93 characters there.";
+  const tree = moving.trees?.[0];
+  if (tree && tree.files.some((file) => inside(file.file).length > 100)) return "An animation inside would pass 100 characters there.";
+  return null;
+}
+
 // The folders of a storage the chooser offers, each by its full path, the level shown chosen
-// when it is one of them.
+// when it is one of them. For one folder of the board's storage, the folder and those below it
+// are not offered, and a destination that cannot take it is disabled with its reason.
 function offerFolders(storage) {
   const folder = byId("move-folder");
   folder.replaceChildren();
+  const single = moving.internalOnly ? moving.chosenFolders[0] : null;
   for (const path of moving.folders[storage] ?? [""]) {
+    if (single !== null && (path === single.playlist || path.startsWith(`${single.playlist}/`))) continue;
     const option = document.createElement("option");
     option.value = path;
-    option.textContent = `/${path}`;
+    const why = single === null ? null : destinationProblem(single, path);
+    option.textContent = why === null ? `/${path}` : `/${path} \u2014 ${why}`;
+    option.disabled = why !== null;
     folder.append(option);
   }
   const level = client.state.level;
   const here = level.id !== null && (level.storage ?? "external") === storage ? level.path : "";
-  folder.value = [...folder.options].some((option) => option.value === here) ? here : "";
+  const offered = [...folder.options].filter((option) => !option.disabled);
+  folder.value = offered.some((option) => option.value === here) ? here : (offered[0]?.value ?? "");
 }
 
 async function chooseDestination(event) {
@@ -284,17 +428,21 @@ async function chooseDestination(event) {
   }
 }
 
-async function openMove() {
-  const files = chosen();
-  const folders = chosenFolders();
+// Opens the chooser of `Move to` for the selection, or with `single` for one folder of the
+// board's own storage, which moves inside that storage alone.
+async function openMove(single = null) {
+  const internalOnly = single !== null;
+  const files = internalOnly ? [] : chosen();
+  const folders = internalOnly ? [single] : chosenFolders();
   if ((files.length === 0 && folders.length === 0) || running !== null) return;
   moving = {files, chosenFolders: folders, trees: null, folderPlans: [], folders: {}, names: new Map(), blocked: new Map(), destination: null, rows: null, plan: null,
-    version: client.targetVersion()};
-  const reason = cardReason(client.state);
+    version: client.targetVersion(), internalOnly};
+  const reason = internalOnly ? null : cardReason(client.state);
   const storage = byId("move-storage");
-  storage.querySelector('option[value="external"]').disabled = reason !== null;
-  storage.value = reason === null ? "external" : "internal";
-  byId("move-storage-reason").textContent = reason === null ? "" : `${reason} Only Internal storage can take them now.`;
+  storage.querySelector('option[value="external"]').disabled = internalOnly || reason !== null;
+  storage.value = internalOnly || reason !== null ? "internal" : "external";
+  byId("move-storage-reason").textContent = internalOnly ? "A folder of Internal storage moves inside Internal storage here." :
+    reason === null ? "" : `${reason} Only Internal storage can take them now.`;
   const words = [];
   if (files.length > 0) words.push(`${files.length} file${files.length === 1 ? "" : "s"}`);
   if (folders.length > 0) words.push(`${folders.length} folder${folders.length === 1 ? "" : "s"}, with everything in ${folders.length === 1 ? "it" : "them"}`);
@@ -316,7 +464,7 @@ async function openMove() {
       byId("move-state").textContent = `The show could not be read. ${refusalText(error)}`;
     }
   }
-  for (const each of reason === null ? ["internal", "external"] : ["internal"]) {
+  for (const each of !internalOnly && reason === null ? ["internal", "external"] : ["internal"]) {
     try {
       const found = await foldersOf(each);
       if (moving === asked) moving.folders[each] = found;
@@ -353,6 +501,15 @@ async function runMove() {
   if (moving === null || moving.plan === null || running !== null) return;
   const version = moving.version;
   if (version !== client.targetVersion()) return;
+  if (moving.internalOnly) {
+    // One folder of the board's storage, by one line.
+    const planned = moving.folderPlans[0];
+    if (planned === undefined || planned.skip !== null) return;
+    moving = null;
+    byId("move-dialog").hidden = true;
+    await moveInside(planned.folder, planned.path, false);
+    return;
+  }
   const entries = moving.plan.filter((entry) => entry.skip === null);
   const folderPlans = moving.folderPlans.filter((planned) => planned.skip === null);
   const skipped = [...moving.plan.filter((entry) => entry.skip !== null).map((entry) => entry.source.file),
@@ -400,6 +557,20 @@ async function runMove() {
         break;
       }
       await waitVisible();
+      if (planned.byCommand) {
+        // A folder moved inside the board's own storage by one line, which no job keeps; a
+        // reply that did not arrive is not answered by sending it again.
+        try {
+          const took = await client.operation("move", () => commands.moveInternal(planned.folder.id, planned.path));
+          client.followFolder("internal", planned.folder.playlist, planned.path);
+          moved.push(...planned.entries.map((entry) => entry.path));
+          folderWords.push(took ? `${from} is now ${moves.label(planned.storage, `${planned.path}/`)}.` : `${from} is there already.`);
+        } catch (error) {
+          if (error instanceof Refusal) failed.push(`${planned.folder.playlist}/: ${refusalText(error)}`);
+          else folderWords.push(`No confirmed reply for ${from}; the list shows where it is.`);
+        }
+        continue;
+      }
       try {
         const done = await moves.moveFolder(planned, context);
         moved.push(...done.moved);
@@ -508,7 +679,8 @@ export function start(options) {
   byId("folder-name").addEventListener("keydown", (event) => {
     if (event.key === "Enter") makeFolder();
   });
-  byId("move-selected").addEventListener("click", openMove);
+  byId("move-selected").addEventListener("click", () => openMove());
+  byId("folder-name").addEventListener("input", showNewPath);
   byId("move-storage").addEventListener("change", chooseDestination);
   byId("move-folder").addEventListener("change", chooseDestination);
   byId("move-go").addEventListener("click", runMove);

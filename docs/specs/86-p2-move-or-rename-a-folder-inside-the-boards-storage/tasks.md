@@ -27,7 +27,7 @@ commit message. Code carries no history.
   - Suites: emulator, core, onboarding.
   - Requirements: 1.4, 8.1, 9.1.
 
-- [ ] 3. `Rename…` and `Move to…` of a folder of the board's storage in the app
+- [x] 3. `Rename…` and `Move to…` of a folder of the board's storage in the app
   - `app/www/commands.js` (`moveInternal`), `app/www/messages.js` (its refusals),
     `app/www/moves.js` (the command move of selected folders), `app/www/client.js`
     (`followFolder`), `app/www/screens/explorer.js` (the two actions, their dialogs, the

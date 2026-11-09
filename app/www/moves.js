@@ -108,13 +108,15 @@ export function folderPlan(tree, destination, rows, names = new Map(), blocked =
   const storage = storageOf(folder);
   const name = names.get(`folder:${folder.id}`) ?? baseOf(folder.playlist);
   const top = joined(destination.folder, name);
-  const moved = {folder, storage: destination.storage, name, path: top, folders: [], entries: [], skip: null};
+  // A folder of the board's own storage moved inside it is moved by one line, which keeps its
+  // files where they are.
+  const byCommand = storage === "internal" && destination.storage === "internal";
+  const moved = {folder, storage: destination.storage, name, path: top, folders: [], entries: [], skip: null, byCommand};
   const inside = (path) => path.slice(folder.playlist.length + 1);
   const into = (path) => (path === folder.playlist ? top : `${top}/${inside(path)}`);
   const taken = rows.filter((row) => storageOf(row) === destination.storage && (typeof row.file === "string" || typeof row.playlist === "string"))
     .map((row) => baseOf(row.file ?? row.playlist));
-  if (storage === "internal" && destination.storage === "internal") moved.skip = "A folder of Internal storage is not moved inside Internal storage; move it to External storage, or move its files.";
-  else if (storage === destination.storage && (destination.folder === folder.playlist || destination.folder.startsWith(`${folder.playlist}/`))) moved.skip = "A folder is not moved into itself or into a folder below it.";
+  if (storage === destination.storage && (destination.folder === folder.playlist || destination.folder.startsWith(`${folder.playlist}/`))) moved.skip = "A folder is not moved into itself or into a folder below it.";
   else if (storage === destination.storage && top === folder.playlist) moved.skip = "It is there already.";
   else if (folderNameProblem(destination.storage, destination.folder, name) !== null) moved.skip = folderNameProblem(destination.storage, destination.folder, name);
   else if (taken.some((other) => sameName("external", other, name))) moved.skip = "The destination has a folder or a file of this name. Give it another name to move it.";
@@ -133,6 +135,13 @@ export function folderPlan(tree, destination, rows, names = new Map(), blocked =
   const planned = new Map();
   for (const source of tree.files) {
     const destinationFolder = into(folderOf(source.file));
+    if (byCommand) {
+      // Its files keep their names; one whose path would pass the limit keeps the folder in place.
+      const entry = {source, storage: destination.storage, folder: destinationFolder, name: baseOf(source.file), path: joined(destinationFolder, baseOf(source.file)), skip: null};
+      if (entry.path.length > LONGEST_PATH) moved.skip = "A folder or an animation inside would pass the limits of 3 levels or 100 bytes.";
+      moved.entries.push(entry);
+      continue;
+    }
     const fileName = names.get(source.id) ?? baseOf(source.file);
     const entry = {source, storage: destination.storage, folder: destinationFolder, name: fileName, path: joined(destinationFolder, fileName), skip: null};
     const others = planned.get(destinationFolder) ?? [];

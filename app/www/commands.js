@@ -283,6 +283,18 @@ export async function moveExternal(id, folder) {
   return reply.moved;
 }
 
+// Gives the folder of the board's own storage with this id the new full path, its
+// sub-folders with it, each name encoded as `folderMake` encodes it. Gives whether it moved:
+// false for a folder that has that path already.
+export async function moveInternal(id, path) {
+  const encoded = path.split("/").map(encodeURIComponent).join("/");
+  const reply = await carriedOut(`move internal ${id} ${encoded}`);
+  if (reply.id !== id || typeof reply.moved !== "boolean") {
+    throw new Failure("bad-reply", address());
+  }
+  return reply.moved;
+}
+
 // What the board keeps for an animation: its saved brightness and saved repeat, null for
 // none, and whether it is the show's start item.
 export async function saved(id) {
