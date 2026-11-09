@@ -15257,6 +15257,26 @@ those of `folder make external`.
 
 **Resolution.** `core/src/folders.cpp`, `core/src/catalog.cpp`, `docs/commands.md`.
 
+## Seed 85: the card's `rmdir`, how it is checked and where it is written down
+
+**Question.** The seed gives a folder of the card that is not empty -1 without
+`capacityWriteFailed()`, and names the firmware host suite for its test and
+`docs/firmware.md` for its words. FAT may answer a folder that is not empty with a refusal
+other than `ENOTEMPTY`, and the card host's code is built for the board only; where is it
+tested, and where described?
+
+**Answer.** Any failure to remove a folder gives -1 without `capacityWriteFailed()`: the
+core asks `remove` of a folder only after the index let it go, and a folder that stays is
+what the seed allows, whatever FAT calls the refusal. A missing folder is not a folder to
+`stat`, so it falls to `unlink` and gives 0 as before. The card host's code is checked as
+the rest of it is, in its source by the firmware suite (`tests/firmware/
+test_usermod_drive.py`), since no host build of it exists; the firmware host suite builds
+and verifies images and is run as it is. The card's changes are described in
+`docs/microsd.md`, so the removal is written there, not in `docs/firmware.md`.
+
+**Resolution.** `firmware/usermod/odrig_drive.cpp`, `tests/firmware/test_usermod_drive.py`,
+`docs/microsd.md`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

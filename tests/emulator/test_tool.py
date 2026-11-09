@@ -391,7 +391,7 @@ class Usage(unittest.TestCase):
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
                          {"play": ("ID",), "brightness": ("N",), "schedule": ("[OPERATION]",), "time": ("[OPERATION]",), "guard": ("TARGET-ID", "TIMING-COMMAND"), "rotation": ("[OPERATION]",), "read": ("ID", "OFFSET", "[COUNT]"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "repeat": ("ID", "N", "[save]"), "saved": ("ID",),
-                          "clocks": ("OPERATION",), "debug": ("mini", "on|off"), "folder": ("make", "internal|external", "PATH"), "move": ("external", "ID", "PATH"), "upload": ("ID", "FILE")})
+                          "clocks": ("OPERATION",), "debug": ("mini", "on|off"), "folder": ("OPERATION",), "move": ("external", "ID", "PATH"), "upload": ("ID", "FILE")})
 
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),
@@ -408,7 +408,9 @@ class Usage(unittest.TestCase):
                            (["clocks", "storage", "card"], "clocks takes on, off, only, message on, message off, storage sd, or storage internal"),
                            (["status", "--external"], "--external goes with upload"), (["--log", "--external"], "--external goes with upload"),
                            (["upload", "--external"], "upload --external takes one argument: FILE"),
-                           (["upload", "--external", "9", "a.odrg"], "upload --external takes one argument: FILE")):
+                           (["upload", "--external", "9", "a.odrg"], "upload --external takes one argument: FILE"),
+                           (["folder", "remove"], "folder takes make internal PATH, make external PATH, or remove ID"),
+                           (["folder", "make", "internal"], "folder takes make internal PATH, make external PATH, or remove ID")):
             result = support.run_tool("--port", "a", *argv)
             self.assertEqual(result.status, 2)
             self.assertIn(said, result.err)
@@ -421,6 +423,7 @@ class Usage(unittest.TestCase):
             (["off"], b"off\n"),
             (["debug", "mini", "on"], b"debug mini on\n"),
             (["debug", "mini", "off"], b"debug mini off\n"),
+            (["folder", "remove", "60009"], b"folder remove 60009\n"),
             (["play", "12"], b"play 12\n"),
             (["play", "all"], b"play all\n"),
             (["brightness", "300"], b"brightness 300\n"),

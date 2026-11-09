@@ -39,7 +39,7 @@ COMMANDS = {
     "saved": ("ID",),
     "clocks": ("OPERATION",),
     "debug": ("mini", "on|off"),
-    "folder": ("make", "internal|external", "PATH"),
+    "folder": ("OPERATION",),
     "move": ("external", "ID", "PATH"),
     "upload": ("ID", "FILE"),
 }
@@ -76,7 +76,7 @@ def parser():
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it. "
                     "With --log and no command it prints the lines of the target's log as they arrive, until it is stopped.",
-        epilog="Commands: play ID, play all, on, off, brightness N, brightness ID N save, brightness ID default, status, rotation, rotation set REV DEGREES, fault, space, list, list in ID [FROM], read ID OFFSET [COUNT], catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, mapping test snake N, order get [FROM], order get in ID [FROM], order move REV ID BEFORE, repeat ID N, repeat ID N save, repeat ID default, saved ID, clocks on|off|only, clocks message on|off, clocks storage sd|internal, upload ID FILE, upload --folder PATH ID FILE, upload --external FILE, debug mini on|off, folder make internal|external PATH, move external ID PATH (PATH / for the card's root). ID and N are sent as they are typed; list and order get without FROM print a reply for each part.",
+        epilog="Commands: play ID, play all, on, off, brightness N, brightness ID N save, brightness ID default, status, rotation, rotation set REV DEGREES, fault, space, list, list in ID [FROM], read ID OFFSET [COUNT], catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, mapping test snake N, order get [FROM], order get in ID [FROM], order move REV ID BEFORE, repeat ID N, repeat ID N save, repeat ID default, saved ID, clocks on|off|only, clocks message on|off, clocks storage sd|internal, upload ID FILE, upload --folder PATH ID FILE, upload --external FILE, debug mini on|off, folder make internal|external PATH, folder remove ID, move external ID PATH (PATH / for the card's root). ID and N are sent as they are typed; list and order get without FROM print a reply for each part.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
@@ -198,8 +198,12 @@ def checked(made, arguments):
         return [arguments.command, *arguments.arguments]
     if arguments.command == "folder":
         words = arguments.arguments
+        if len(words) == 2 and words[0] == "remove" and words[1]:
+            if any(character in words[1] for character in "\r\n"):
+                made.error("a command is one line")
+            return [arguments.command, *words]
         if len(words) != 3 or words[:2] not in (["make", "internal"], ["make", "external"]) or not words[2]:
-            made.error("folder takes make internal PATH or make external PATH")
+            made.error("folder takes make internal PATH, make external PATH, or remove ID")
         if any(character in words[2] for character in "\r\n"):
             made.error("a command is one line")
         return [arguments.command, *words[:2], "/".join(urllib.parse.quote(part, safe="") for part in words[2].split("/"))]

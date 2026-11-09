@@ -252,7 +252,8 @@ sub-folders of the show's folder named by their numbers, `1` to `255`, as on the
 `folder make internal shows` makes `1` and the line of `folders.txt` that names it, and a
 file of it is `1/stars.odrg`. The emulator makes and removes them when the core asks, a
 folder only while it is empty, and `space` counts two blocks of 4,096 bytes for each and
-the files in it. The current playlist is kept by a host with a drive: an emulator started
+the files in it. It removes a folder of the drive's folder `odrig` the same way, only while
+it is empty, when `folder remove` of a folder of the card asks for it. The current playlist is kept by a host with a drive: an emulator started
 without `--drive` or `--drive-folder` answers `play` of such a folder with `unsupported`
 and plays the root's playlist, its folders among it.
 
@@ -907,7 +908,7 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload --external FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] --folder PATH upload ID FILE
-python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] folder make internal|external PATH
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] folder OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] move external ID PATH
 ```
 
@@ -1016,6 +1017,7 @@ python -m odrigctl --http 127.0.0.1:8600 clocks message off
 python -m odrigctl --http 127.0.0.1:8600 clocks storage internal
 python -m odrigctl --http 127.0.0.1:8600 folder make external "night/old songs"
 python -m odrigctl --http 127.0.0.1:8600 move external 60001 "night/old songs"
+python -m odrigctl --http 127.0.0.1:8600 folder remove 60009
 ```
 
 The temporary miniature command is submitted through the same routes; status reports
@@ -1192,6 +1194,12 @@ whose drive cannot be written answers `read-only`, which is status 1. With the e
 the PC tool's `python3 -m odrig.catalog DIR import` writes one, and so does `catalog rebuild
 external`. What the emulator wrote there the PC tool reads, and a change the PC tool makes
 there the emulator takes up within ten seconds, when it reads the marker again.
+
+The folder operation is `make internal PATH`, `make external PATH`, or `remove ID`. `make`
+sends `folder make internal <PATH>` or `folder make external <PATH>`, each name of the path
+escaped as a URI's; `remove ID` sends `folder remove <ID>`, the ID as it was typed, and the
+board removes that folder while it is empty. Another operation is status 2, and nothing is
+sent.
 
 The mapping operation is `get`, `set REV PINS`, or `test on` / `test off`.
 The pin list is twenty comma-separated GPIO numbers, in snake order.

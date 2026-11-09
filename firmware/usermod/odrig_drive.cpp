@@ -730,6 +730,12 @@ int removeDriveFile(const char *name) {
   invalidateCapacity();
   if (written != nullptr && strcasecmp(writtenPath, path) == 0) giveUpWritten(false);
   changing(path);
+  struct stat found;
+  if (stat(path, &found) == 0 && S_ISDIR(found.st_mode)) {
+    // A folder goes only while it is empty; one that holds a file is the card's, and no
+    // failed write.
+    return rmdir(path) == 0 ? 1 : -1;
+  }
   if (unlink(path) == 0) return 1;
   if (errno == ENOENT) return 0;
   capacityWriteFailed();

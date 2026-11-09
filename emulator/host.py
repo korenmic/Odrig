@@ -451,24 +451,31 @@ class FolderHost:
 
     def remove(self, name):
         """Removes a file: 1 when it removed one, 0 when there was none, -1 on a failure. A
-        file being written under the name is given up. The number of a folder of the storage
-        removes that folder while it is empty."""
+        file being written under the name is given up. The number of a folder of the storage,
+        or the path of a folder of the drive, removes that folder while it is empty."""
         if self._number(name):
-            try:
-                os.rmdir(os.path.join(self.folder, name))
-            except FileNotFoundError:
-                return 0
-            except OSError:
-                return -1
-            return 1
+            return self._remove_folder(os.path.join(self.folder, name))
         path = self._path(name)
         if path is None:
             return -1
+        if self._of_the_drive(name) and os.path.isdir(path):
+            return self._remove_folder(path)
         if self._written_name == name:
             self._give_up()
         self._drop_second(name)
         try:
             os.remove(path)
+        except FileNotFoundError:
+            return 0
+        except OSError:
+            return -1
+        return 1
+
+    @staticmethod
+    def _remove_folder(path):
+        """Removes an empty folder: 1, 0 when there was none, -1 while it holds anything."""
+        try:
+            os.rmdir(path)
         except FileNotFoundError:
             return 0
         except OSError:
