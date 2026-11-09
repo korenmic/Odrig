@@ -380,7 +380,7 @@ async function upload(message) {
           if (error instanceof Refusal && error.code === "no-space") {
             message(messages.ofNoSpace(bytes.length, client.state.space === null ? null : client.state.space.free));
           } else if (error instanceof Refusal) {
-            message(messages.ofRefusal(error, client.state.status === null ? null : client.state.status.error));
+            message(messages.ofRefusal(error, client.state.status === null ? null : client.state.status.error, client.state.status?.hasClockStorage === true));
           } else if (error instanceof Failure) {
             message(messages.ofFailure(error));
           }

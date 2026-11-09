@@ -58,7 +58,7 @@ Before a commit: `python core/build.py shared`, and the suites the task names wi
     `ODRIG_TOOLS`.
   - Requirements: 4.2–4.3 with `Internal storage`, 5.1–5.6, 7.1–7.2.
 
-- [ ] 3. Give the app the preferred storage and Clocks only over both storages
+- [x] 3. Give the app the preferred storage and Clocks only over both storages
   - `commands.js` (`clock_storage`, `clockStorage`), `index.html` and `screens/clocks.js`
     (the dropdown, its states and words, older firmware), the panel's words, `client.js`
     (the boundary of both storages, the Clocks level, Back, play, `canUpload`),

@@ -34,15 +34,27 @@ function storage() {
   return archive.form.storage;
 }
 
-// The name a row goes under by default: the last part of its path in the board's storage,
-// its path on the card.
-function defaultName(row) {
-  return storage() === "external" ? row.entry.path : lastPart(row.entry.path);
+// Whether the archive goes into the folder it was opened at, as one opened in Clocks only does,
+// also after the mode is left: then each file takes the last part of its path there, of either
+// storage.
+function intoFolder() {
+  return archive.form.level.id !== null;
 }
 
-// The names the destination's list has.
+// The name a row goes under by default: the last part of its path in the board's storage or
+// in the folder explored, its path on the card.
+function defaultName(row) {
+  return storage() === "external" && !intoFolder() ? row.entry.path : lastPart(row.entry.path);
+}
+
+// The names the destination's list has: in the folder explored, the last parts of its files
+// of the archive's storage, while that folder is shown.
 function existing() {
   const state = client.state;
+  if (intoFolder()) {
+    const here = state.animations !== null && state.level.id === archive.form.level.id && (state.level.storage === "internal") === (storage() === "internal");
+    return new Set(here ? state.animations.filter((item) => (item.external === true) === (storage() === "external")).map((item) => lastPart(item.file)) : []);
+  }
   if (state.animations === null) return new Set(state.rootNames?.files ?? []);
   if (storage() === "internal") {
     return state.level.path === "" ? new Set(state.animations.filter((item) => item.external !== true).map((item) => item.file)) : new Set(state.rootNames?.files ?? []);
@@ -57,6 +69,7 @@ function why(row) {
   if (part.length > 32 || !/^[a-z0-9_-][a-z0-9._-]*\.(odrg|odrgx)$/.test(part)) {
     return "Use a filename of at most 32 lowercase letters, digits, dots, - or _, ending in .odrg or .odrgx.";
   }
+  if (intoFolder() && name.includes("/")) return "An archive opened in a folder goes into that folder: use a name without /.";
   if (storage() === "internal" && name.includes("/")) return "An archive's files go to the root of the board's storage: use a name without /.";
   if (new TextEncoder().encode(name).length > LONGEST_PATH) return "The path on the card is longer than 100 bytes; use a shorter name.";
   if (name.split("/").length - 1 > DEEPEST) return "The card takes at most three folders in a path.";
@@ -105,8 +118,10 @@ async function open(file, message) {
     }
     rows.push(row);
   }
-  archive = {name: file.name, bytes, rows, form: destinations.capture(client.state, client.targetVersion()), lastStorage: undefined};
-  archive.form.level = {path: "", id: null};
+  archive = {name: file.name, bytes, rows, form: destinations.capture(client.state, client.targetVersion(), client.clocksOnly()), lastStorage: undefined};
+  // An archive goes to the root of the board's storage, or to its paths on the card; in Clocks
+  // only into the folder explored, which must be inside a Clocks subtree.
+  if (!archive.form.only) archive.form.level = {path: "", id: null};
   for (const row of rows) {
     row.name = defaultName(row);
     row.ticked = tickable(row);
@@ -198,6 +213,8 @@ function drawRows(locked, there) {
 
 // Why `Upload ticked` is disabled now, or null.
 function lockedReason(state, reason, there) {
+  const boundary = destinations.blocked(archive.form, state.space, client.clocksOnly());
+  if (boundary !== null) return boundary;
   const chosen = ticked();
   if (chosen.length === 0) return "Tick the animations to upload.";
   if (chosen.some((row) => why(row) !== null)) return "Mend the names marked in the list.";
@@ -214,7 +231,8 @@ export function draw(state, reason = null) {
   byId("archive-list").hidden = archive === null;
   if (archive === null) return;
   const running = batch.running() && archive.sent === true;
-  if (!running && !archive.ranSince) destinations.synchronize(archive.form, state.space);
+  const only = client.clocksOnly();
+  if (!running && !archive.ranSince) destinations.synchronize(archive.form, state.space, only);
   if (archive.lastStorage !== undefined && archive.lastStorage !== storage()) {
     for (const row of archive.rows) if (!row.edited) row.name = defaultName(row);
   }
@@ -223,7 +241,10 @@ export function draw(state, reason = null) {
   byId("archive-name").textContent = `${archive.name}: ${archive.rows.filter(tickable).length} animations of ${archive.rows.length} entries.`;
   const selector = byId("archive-storage");
   selector.value = storage();
-  selector.options[0].disabled = !(destinations.present(state.space) && state.space.external.read_only === false);
+  // In Clocks only the selector offers the storage of the folder explored alone.
+  const offered = only ? destinations.storageInOnly(archive.form) : null;
+  selector.options[0].disabled = !(destinations.present(state.space) && state.space.external.read_only === false) || offered !== null && offered !== "external";
+  selector.options[1].disabled = offered !== null && offered !== "internal";
   selector.disabled = running;
   const chosen = ticked();
   const sum = chosen.reduce((total, row) => total + row.entry.size, 0);
@@ -252,13 +273,13 @@ function sendTicked() {
   if (archive === null || batch.running()) return;
   const there = existing();
   const bytes = archive.bytes;
-  const external = storage() === "external";
+  const external = storage() === "external" && !intoFolder();
   const items = ticked().map((row) => ({
     row,
     name: lastPart(row.name),
     path: external ? row.name : null,
     storage: storage(),
-    folder: external ? row.name.slice(0, Math.max(0, row.name.lastIndexOf("/"))) : "",
+    folder: external ? row.name.slice(0, Math.max(0, row.name.lastIndexOf("/"))) : destinations.folderOf(archive.form),
     size: row.entry.size,
     replace: row.replace && there.has(row.name),
     read: () => facts(extract(bytes, row.entry), row.entry.path),
@@ -277,7 +298,7 @@ export function start({message}) {
   byId("archive-none").addEventListener("click", () => tickAll(false));
   byId("archive-storage").addEventListener("change", () => {
     if (archive === null || batch.running()) return;
-    destinations.select(archive.form, byId("archive-storage").value, client.state.space);
+    destinations.select(archive.form, byId("archive-storage").value, client.state.space, client.clocksOnly());
     draw(client.state);
   });
   byId("archive-upload").addEventListener("click", sendTicked);

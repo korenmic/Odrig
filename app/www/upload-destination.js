@@ -5,10 +5,14 @@ import {Failure} from "./target.js";
 import {fits} from "./upload.js";
 
 export const ONLY_REASON = "Clocks only: choose a writable external folder inside Clocks, or leave this mode in Settings.";
+// The same on a target that plays the clocks of both storages, whose Clocks folders both
+// take uploads in Clocks only.
+export const ONLY_BOTH_REASON = messages.ONLY_UPLOAD_BOTH;
 
 // The words of an upload that did not end with success: of a refusal or a failure of the way
 // that ended a file of `size` bytes.
 export function refusalWords(error, external, size, state, only = false) {
+  const both = state.status?.hasClockStorage === true;
   if (error instanceof Refusal && error.code === "no-space" && external) {
     const card = state.space === null ? null : state.space.external;
     return messages.ofNoSpace(size, card == null || card.free === null ? null : card.free, "the card");
@@ -20,8 +24,8 @@ export function refusalWords(error, external, size, state, only = false) {
   if (error instanceof Refusal && external && ["bad-argument", "unknown-command", "no-upload", "stale"].includes(error.code)) {
     return "The destination changed, already exists, or the firmware lacks safe folder uploads. Check the folder and filename, or update the firmware. Nothing was acknowledged as installed.";
   }
-  if (error instanceof Refusal && error.code === "read-only" && only) return ONLY_REASON;
-  if (error instanceof Refusal) return messages.ofRefusal(error, state.status === null ? null : state.status.error);
+  if (error instanceof Refusal && error.code === "read-only" && only) return both ? ONLY_BOTH_REASON : ONLY_REASON;
+  if (error instanceof Refusal) return messages.ofRefusal(error, state.status === null ? null : state.status.error, both);
   if (error instanceof Failure) return `${messages.ofFailure(error)} The upload was not acknowledged as installed; check the destination before retrying.`;
   return error.message;
 }
@@ -49,20 +53,31 @@ function intoLevel(form) {
   return form.level.path !== "" && form.storage === levelStorage(form);
 }
 
-// In Clocks only the form goes to the card; else to the board's own storage when it was
-// prepared at one of its folders or no card is present, and to the card otherwise.
+// The storage of a form in Clocks only: the board's own for one prepared at a folder of it, on
+// a target that plays the clocks of both storages; else the card.
+export function storageInOnly(form) {
+  return form.both === true && levelStorage(form) === "internal" ? "internal" : "external";
+}
+
+// In Clocks only the form goes to the storage of the folder it was prepared at, as
+// `storageInOnly` says; else to the board's own storage when it was prepared at one of its
+// folders or no card is present, and to the card otherwise. `both` keeps whether the target
+// plays the clocks of both storages.
 export function capture(state, target, only = state.status?.clockMode === "only") {
   const internalLevel = state.level.storage === "internal";
-  return {target, level: {...state.level}, only, storage: only ? "external" : internalLevel || !present(state.space) ? "internal" : "external", explicitInternal: internalLevel,
+  const form = {target, level: {...state.level}, only, both: state.status?.hasClockStorage === true, storage: "external", explicitInternal: internalLevel,
     generations: {internal: state.catalog?.internal?.generation ?? null, external: state.catalog?.external?.generation ?? null}};
+  form.storage = only ? storageInOnly(form) : internalLevel || !present(state.space) ? "internal" : "external";
+  return form;
 }
 
 // Moves the form to the storage a reply allows: Internal when it was chosen, or when the
 // reply names no card; External when the reply says a card is present. Without a reply
-// the form stays where it is. Gives whether the storage changed.
+// the form stays where it is. In Clocks only it stays at the storage of its folder. Gives
+// whether the storage changed.
 export function synchronize(form, space, only = form.only) {
   form.only = only;
-  const storage = only ? "external" : form.explicitInternal ? "internal" : present(space) ? "external" : absent(space) ? "internal" : form.storage;
+  const storage = only ? storageInOnly(form) : form.explicitInternal ? "internal" : present(space) ? "external" : absent(space) ? "internal" : form.storage;
   const changed = storage !== form.storage;
   form.storage = storage;
   return changed;
@@ -70,17 +85,24 @@ export function synchronize(form, space, only = form.only) {
 
 export function select(form, storage, space, only = form.only) {
   form.only = only;
-  if (only && storage !== "external") return;
+  if (only && storage !== storageInOnly(form)) return;
   if (storage === "external" && !present(space)) return;
   form.explicitInternal = storage === "internal";
   synchronize(form, space, only);
 }
 
+// Why a form may not upload in Clocks only, or null: its folder must be inside a Clocks
+// subtree, of the card only while it is present and writable; on a target that plays the
+// clocks of both storages the board's own is taken as the card's, else it is never.
 export function blocked(form, space, only = form.only) {
   if (!only) return null;
   const path = form.level.path;
-  return form.storage !== "external" || form.level.id === null || levelStorage(form) !== "external" ||
-    !(path === "clocks" || path.startsWith("clocks/")) || !present(space) ||
+  const inside = form.level.id !== null && (path === "clocks" || path.startsWith("clocks/"));
+  if (form.both === true) {
+    return !inside || form.storage !== levelStorage(form) ||
+      form.storage === "external" && (!present(space) || space.external.read_only !== false) ? ONLY_BOTH_REASON : null;
+  }
+  return form.storage !== "external" || !inside || levelStorage(form) !== "external" || !present(space) ||
     space.external.read_only !== false ? ONLY_REASON : null;
 }
 

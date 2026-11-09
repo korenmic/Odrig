@@ -259,6 +259,9 @@
 <label class="clock-mode-label" for="clocks"><span class="title">Clocks</span><span class="small" id="clocks-description">Between animations inserts a clock after every 5 animations or 5 minutes. Clocks only restricts playback to the external clocks folder.</span></label>
 <select id="clocks" aria-describedby="clocks-description clocks-support"><option value="off">Off</option><option value="between">Between animations</option><option value="only">Clocks only</option></select>
 <p class="small" id="clocks-support" hidden></p>
+<label class="clock-mode-label" for="clock-storage"><span class="title">Preferred storage for matching clock/message files</span><span class="small" id="clock-storage-description">Applies when the same relative path and file type exist in both storages.</span></label>
+<select id="clock-storage" aria-describedby="clock-storage-description clock-storage-support"><option value="sd">SD card</option><option value="internal">Internal storage</option></select>
+<p class="small" id="clock-storage-support" hidden></p>
 <label class="check" for="clock-message"><input id="clock-message" type="checkbox"><span><span class="title">The message after each clock</span><span class="small">One complete animation from clocks/message plays after each clock in either enabled mode.</span></span></label>
 <p id="clocks-state" role="status" hidden></p>
 <p id="clocks-said" role="status" aria-live="polite" hidden></p>

@@ -81,14 +81,15 @@ class TheAppsPage(unittest.TestCase):
                                  "upload begin <id> <file> <bytes>", "upload expect <crc32>", "mapping get", "mapping set <revision> <pins>",
                                  "mapping test on",
                                  "mapping test off", "mapping test snake <n>", "order get", "order get <next>", "order move <revision> <id> <before>", "repeat <id> <n>",
-                                 "repeat <id> <n> save", "repeat <id> default", "clocks off", "clocks on", "clocks only", "clocks message on", "clocks message off", "fault", "catalog",
+                                 "repeat <id> <n> save", "repeat <id> default", "clocks off", "clocks on", "clocks only", "clocks message on", "clocks message off", "clocks storage sd", "clocks storage internal", "fault", "catalog",
                                  "catalog page <storage> <page> <offset>", "catalog rebuild internal", "catalog rebuild external", "catalog cancel", "time", "guard <board-id> time", "guard <board-id> time zone <base64>", "guard <board-id> time set <utc-seconds> <zone-crc32>", "guard <board-id> schedule",
                                  "guard <board-id> schedule set <revision> <on-HH:MM> <off-HH:MM> <on-or-off>", "guard <board-id> schedule resume <revision>", "rotation", "rotation set <revision> <degrees>"])
         self.assertIn("The table maps its actions to command lines", self.said)
 
     def test_every_message_of_the_app_is_on_the_page(self):
         refusals = [["line-too-long", "on", None], ["show-invalid", "play all", "`<reason>`"], ["unknown-id", "play `<id>`", None], ["unknown-id", "play all", None], ["weird", "on", None],
-                    ["busy", "remove `<id>`", None], ["in-use", "remove `<id>`", None], ["in-use", "play `<id>`", None], ["in-use", "mapping test on", None], ["in-use", "ignore 1 1", None], ["storage-error", "space", None],
+                    ["busy", "remove `<id>`", None], ["in-use", "remove `<id>`", None], ["in-use", "play `<id>`", None], ["in-use", "play `<id>`", None, True], ["in-use", "upload", None], ["in-use", "upload", None, True],
+                    ["in-use", "mapping test on", None], ["in-use", "ignore 1 1", None], ["storage-error", "space", None],
                     ["in-use", "upload begin 1 a.odrg 1", None], ["no-upload", "upload data 0 AA", None], ["bad-offset", "upload data 0 AA", None],
                     ["read-only", "remove `<id>`", None], ["read-only", "upload begin external a.odrg 1", None], ["read-only", "catalog rebuild external", None],
                     ["in-use", "repeat 9 5 save", None], ["no-space", "repeat 1 5 save", None], ["stale", "repeat 1 5", None], ["zone-unset", "time set 1800000000 01234567", None]]
@@ -103,7 +104,7 @@ class TheAppsPage(unittest.TestCase):
         self.assertIn("The installed show is invalid: <reason>.", said)
         self.assertIn("| No answer over USB serial. Check the cable to the board's USB port and that the installation has power. |", said)
         rows = [row.split("`")[1] for row in messages.splitlines() if row.startswith("| `")]
-        self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "no-answer", "no-usb", "usb-refused", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "unavailable", "busy", "in-use", "in-use", "in-use", "in-use",
+        self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "no-answer", "no-usb", "usb-refused", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "unavailable", "busy", "in-use", "in-use", "in-use", "in-use", "in-use", "in-use", "in-use",
                                 "read-only", "read-only", "read-only", "storage-error", "zone-unset", "in-use", "in-use", "no-space", "no-space", "no-space", "no-upload", "bad-checksum",
                                 "bad-file", "mapping-conflict", "order-conflict", "stale", "stale", "unsupported-character", "does-not-fit", "no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"])
         self.assertIn("`Removed animation <id> <file>.`", said)
@@ -146,6 +147,14 @@ class TheAppsPage(unittest.TestCase):
                          "**The phone's bars.**", "wholly above Android's buttons or the line of gesture navigation", "the tabs go away and the address stays in view",
                          "**The numbers of animations.**", "the external line says `absent (read-only).` with no number"):
             self.assertIn(expected, flat(check))
+
+    def test_the_check_of_the_clocks_and_what_is_open_name_both_storages_clocks(self):
+        check = flat(section(self.text, "The check on a phone"))
+        clocks = check.split("23. **The clocks.**")[1].split("24. **")[0]
+        for expected in ("`Preferred storage for matching clock/message files`", "after a restart of the board", "`Internal /clocks` and `External /clocks`",
+                         "Back stops at `Clocks`", "the board's own `clocks/message`"):
+            self.assertIn(expected, clocks)
+        self.assertIn("**Seed 61 on a phone.**", flat(section(self.text, "What is open")))
 
     def test_it_says_what_is_verified_and_what_is_open(self):
         verified = flat(section(self.text, "What is verified"))

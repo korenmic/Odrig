@@ -92,8 +92,10 @@ function draw(state) {
     }
     const selector = byId("upload-storage");
     selector.value = form.storage;
-    selector.options[0].disabled = !destinations.present(state.space);
-    selector.options[1].disabled = client.clocksOnly();
+    // In Clocks only the selector offers the storage of the folder explored alone.
+    const only = client.clocksOnly() ? destinations.storageInOnly(form) : null;
+    selector.options[0].disabled = !destinations.present(state.space) || only !== null && only !== "external";
+    selector.options[1].disabled = only !== null && only !== "internal";
     selector.disabled = frozen;
     byId("upload-destination").textContent = destinations.label(form, byId("upload-name").value);
     const boundary = destinations.blocked(form, state.space, client.clocksOnly());
@@ -284,7 +286,7 @@ async function upload(message) {
   client.upload(sending);
   batch.otherUpload();
   } catch (error) {
-    if (error instanceof Refusal) message(messages.ofRefusal(error, client.state.status?.error ?? null));
+    if (error instanceof Refusal) message(messages.ofRefusal(error, client.state.status?.error ?? null, client.state.status?.hasClockStorage === true));
     else if (error instanceof Failure) message(messages.ofFailure(error));
     else message(error.message);
   } finally {

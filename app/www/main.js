@@ -169,7 +169,8 @@ byId("batch-line").addEventListener("click", () => {
   go("upload");
   batch.seen();
 });
-client.onRefusal((refusal) => message(messages.ofRefusal(refusal, client.state.status === null ? null : client.state.status.error)));
+client.onRefusal((refusal) => message(messages.ofRefusal(refusal, client.state.status === null ? null : client.state.status.error,
+  client.state.status?.hasClockStorage === true)));
 client.watch((state) => {
   const pill = byId("top-link");
   pill.textContent = LINKS[state.link];

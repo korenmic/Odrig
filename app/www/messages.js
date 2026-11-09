@@ -99,9 +99,13 @@ function kilobytes(bytes) {
   return String(Math.ceil(bytes / 1000));
 }
 
+// Why an upload cannot go where it was prepared in Clocks only, on a target that plays the
+// clocks of both storages.
+export const ONLY_UPLOAD_BOTH = "Clocks only: choose a folder inside Clocks, a writable one on the card, or leave this mode in Settings.";
+
 // The text for each error code a command of the app can get, from the line that was
-// refused, from the reason of an invalid show, when the target has said one, and from the
-// refusal itself.
+// refused, from the reason of an invalid show, when the target has said one, from the
+// refusal itself, and from whether the target plays the clocks of both storages.
 const REFUSALS = {
   "unsupported": () => "This target cannot use miniature display mode with its current output setup.",
   "line-too-long": NOT_UNDERSTOOD,
@@ -115,9 +119,9 @@ const REFUSALS = {
   unavailable: (line) => line.startsWith("read ") ? `Animation ${line.split(" ")[1]} cannot be read until it is replaced: its file has a fault. The list says which.`
     : `Animation ${line.split(" ")[1]} cannot be played until it is replaced: its file has a fault. The list says which.`,
   busy: () => "The installation is busy. Try again in a moment.",
-  "in-use": (line) =>
-    line === "upload" ? "Clocks only: choose a writable external folder inside Clocks, or leave this mode in Settings." :
-    line.startsWith("play ") ? "Clocks only allows playback inside the Clocks folder. Leave Clocks only in Settings to play elsewhere." :
+  "in-use": (line, reason, refusal, both) =>
+    line === "upload" ? (both ? ONLY_UPLOAD_BOTH : "Clocks only: choose a writable external folder inside Clocks, or leave this mode in Settings.") :
+    line.startsWith("play ") ? `Clocks only allows playback inside the ${both ? "clocks folders" : "Clocks folder"}. Leave Clocks only in Settings to play elsewhere.` :
     line.startsWith("mapping test ") ? "Leave Clocks only in Settings before starting a display test." :
     line.startsWith("remove many ") ? "Some selected animations cannot be removed: a cycle plays them, or they are on external storage." :
     line.startsWith("ignore ") ? "This target does not support playlist inclusion for that item." :
@@ -145,6 +149,18 @@ const REFUSALS = {
   "bad-offset": NOT_WHOLE,
   "no-upload": () => "The installation dropped the upload, after the app was away for a minute or more. Upload again.",
 };
+
+// A path with its storage before it: `Internal /clocks/message` for the board's own,
+// `External /clocks` for the card.
+export function storagePath(storage, path) {
+  return `${storage === "internal" ? "Internal" : "External"} /${path}`;
+}
+
+// The file a status names, with the storage it plays from before it when that is known, as
+// for a file of a Clocks subtree: `Internal /clocks/message/v7-the-time.odrgx`.
+export function playingFile(status, storage) {
+  return storage === null ? status.file : storagePath(storage, status.file);
+}
 
 // What the app says of an animation that does not fit into the free storage, of the
 // installation or, as `where` says, of the card. The free bytes are null when the app
@@ -223,8 +239,9 @@ export function ofRemoved(animation) {
 }
 
 // The message of a command the target refused. A code without a text of its own gets
-// the general sentence.
-export function ofRefusal(refusal, reason = null) {
+// the general sentence. `both` says that the target plays the clocks of both storages, whose
+// boundary of Clocks only holds the Clocks folders of each.
+export function ofRefusal(refusal, reason = null, both = false) {
   const text = Object.prototype.hasOwnProperty.call(REFUSALS, refusal.code) ? REFUSALS[refusal.code] : REFUSED;
-  return `${text(refusal.line, reason, refusal)} (${refusal.code})`;
+  return `${text(refusal.line, reason, refusal, both)} (${refusal.code})`;
 }

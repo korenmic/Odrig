@@ -248,11 +248,11 @@ async function turn(item, guarded) {
           notSent(item);
           return null;
         }
-        fail(item, messages.ofRefusal(error, client.state.status?.error ?? null));
+        fail(item, messages.ofRefusal(error, client.state.status?.error ?? null, client.state.status?.hasClockStorage === true));
         return null;
       }
       if (error instanceof Refusal) {
-        fail(item, messages.ofRefusal(error, client.state.status?.error ?? null));
+        fail(item, messages.ofRefusal(error, client.state.status?.error ?? null, client.state.status?.hasClockStorage === true));
         return null;
       }
       if (client.targetVersion() !== form.target) continue;
@@ -281,7 +281,9 @@ async function turn(item, guarded) {
       fail(item, messages.ofNoSpace(item.size, checked.noSpace, external ? "the card" : undefined));
       return null;
     }
-    const there = item.replace === true && !external ? fresh.root.find((row) => row.file === checked.path && row.external !== true && typeof row.id === "number") : undefined;
+    // A file replaced in a folder of the board's own storage is found in that folder's rows.
+    const rows = destinations.folderOf({...form, level: folder}) !== "" ? fresh.items : fresh.root;
+    const there = item.replace === true && !external ? rows.find((row) => row.file === checked.path && row.external !== true && typeof row.id === "number") : undefined;
     const id = external ? null : there !== undefined ? there.id : freeId(new Set(fresh.ids ?? fresh.root.map((row) => row.id)));
     if (!external && id === null) {
       fail(item, "Internal storage has no free animation id.");
