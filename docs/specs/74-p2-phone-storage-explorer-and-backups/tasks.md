@@ -42,5 +42,5 @@ The tasks are done in the order 5, 7, 6, 8, because task 6 builds on task 7's fo
 - [x] 7. Give the board's own storage real folders
   - Requirements: 4.1–4.2.
 
-- [ ] 8. Deliver part B
+- [x] 8. Deliver part B
   - Requirements: 7.1.
