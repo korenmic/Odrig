@@ -41,7 +41,7 @@ commit message. Code carries no history.
   - Suites: app, emulator, onboarding.
   - Requirements: 7.1–7.8, 9.1.
 
-- [ ] 4. Deliver seed 86
+- [x] 4. Deliver seed 86
   - Push the branch and open its pull request against `master`, saying it is built on pull
     request #64. From the pushed head with a clean tree: the installation's image
     (`odrig_microsd`) and the spare's (`odrig_microsd_n8r2`), each through
