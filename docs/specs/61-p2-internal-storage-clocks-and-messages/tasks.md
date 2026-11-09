@@ -90,7 +90,7 @@ Before a commit: `python core/build.py shared`, and the suites the task names wi
   - Suites: `emulator`.
   - Requirements: 9.1–9.2.
 
-- [ ] 5. Deliver seed 61
+- [x] 5. Deliver seed 61
   - From the pushed head with a clean tree: the image of the installation's board
     (`odrig_microsd`, N16R8) and the spare's (`odrig_microsd_n8r2`), each through
     `verify_build.py` for its module, and the APK signed with the persistent key, checked
