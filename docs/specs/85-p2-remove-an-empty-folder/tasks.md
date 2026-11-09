@@ -35,7 +35,7 @@ message. Code carries no history.
   - Suites: emulator, firmware (alone, with `ODRIG_TOOLS`), firmware host, core, onboarding.
   - Requirements: 1.2, 10.3–10.4, 12.1, 13.1.
 
-- [ ] 3. `Remove folder` in the app
+- [x] 3. `Remove folder` in the app
   - `app/www/commands.js` (`folderRemove`), `app/www/messages.js` (its refusals),
     `app/www/screens/explorer.js` (the action, its check, its dialog, the lost reply),
     `app/www/screens/show.js` (the folder hook of `extend`), `app/www/index.html` (the

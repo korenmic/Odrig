@@ -36,6 +36,7 @@ class TheTable(unittest.TestCase):
         refusals += [["unknown-id", "move external 60003 /", None]]
         refusals += [[code, "folder make internal shows/night", None] for code in ("unknown-id", "in-use", "no-space", "unsupported")]
         refusals += [[code, "folder make external old%20songs", None] for code in ("read-only", "no-space")]
+        refusals += [[code, "folder remove 22", None] for code in ("in-use", "read-only", "unknown-id", "unsupported", "busy")]
         failures = [["bad-address", "x y"], ["no-wifi", "4.3.2.1"], ["no-answer", "4.3.2.1"], ["bad-reply", "192.168.1.23:8600"]]
         cls.found = support.run("texts", settings={"refusals": refusals, "failures": failures}).seen
 
@@ -81,6 +82,12 @@ class TheTable(unittest.TestCase):
         self.assertEqual(self.text("unsupported", make, None), "This installation cannot make folders in that storage. (unsupported)")
         self.assertEqual(self.text("read-only", "folder make external old%20songs", None), "The card cannot be written now, so the folder /old songs cannot be made. (read-only)")
         self.assertEqual(self.text("no-space", "folder make external old%20songs", None), "The card has no free id for the folder /old songs. (no-space)")
+        remove = "folder remove 22"
+        self.assertEqual(self.text("in-use", remove, None), "Only an empty folder can be removed: it holds a file or a folder. (in-use)")
+        self.assertEqual(self.text("read-only", remove, None), "The card cannot be written now, so the folder cannot be removed. (read-only)")
+        self.assertEqual(self.text("unknown-id", remove, None), "The folder is not on the installation any more. The list is read again. (unknown-id)")
+        self.assertEqual(self.text("unsupported", remove, None), "This installation cannot remove folders in that storage. (unsupported)")
+        self.assertEqual(self.text("busy", remove, None), "The installation is busy. Try again in a moment. (busy)")
         self.assertEqual(self.text("mapping-conflict"), "Mapping changed on the target. Reload before saving. (mapping-conflict)")
         self.assertEqual(self.text("unsupported"), "This target cannot use miniature display mode with its current output setup. (unsupported)")
         self.assertEqual(self.text("storage-error", "space", None), "The installation could not use its storage. (storage-error)")

@@ -20,6 +20,8 @@ let folderAt = null;
 let moving = null;
 let running = null;
 let reconciledFor = null;
+// The folder whose removal is asked about, with its words and the target's version.
+let removing = null;
 
 function byId(id) {
   return document.getElementById(id);
@@ -127,6 +129,97 @@ async function makeFolder() {
     message(made.made ? `Made the folder ${moves.label(asked.storage, path)}. It plays as a playlist once files are in it.` : `The folder ${moves.label(asked.storage, path)} was there already.`);
   } catch (error) {
     message(`The folder was not made. ${refusalText(error)}`);
+  } finally {
+    client.refreshContent();
+  }
+}
+
+// The menu's actions for a folder's row: `Remove folder` for a folder of the board's own
+// storage, and for one of a card the board may write, while the target answers and nothing
+// changes the list, for a folder without animations; a note for a card the board may not
+// write. `held` says that the menu's other actions are held now.
+export function folderMenu(folder, held) {
+  const state = client.state;
+  if (folder.external === true && !cardSettled(state)) {
+    return [{label: "Remove folder", act: () => {}, disabled: true, danger: true}, {note: "Whether the card can be written is not known yet."}];
+  }
+  if (folder.external === true && !cardWritable(state)) return [{note: "External storage is read-only: this folder cannot be removed."}];
+  const empty = folder.files === undefined || folder.files === 0;
+  const free = !held && state.link === "answers" && running === null && removing === null && !client.contentBusy();
+  const items = [{label: "Remove folder", act: () => askRemoval(folder), disabled: !free || !empty, danger: true}];
+  if (!empty) items.push({note: "Only an empty folder can be removed."});
+  return items;
+}
+
+function storageOfFolder(folder) {
+  return folder.external === true ? "external" : "internal";
+}
+
+// Asks whether to remove a folder, once its level has been read and found empty.
+async function askRemoval(folder) {
+  const version = client.targetVersion();
+  const label = moves.label(storageOfFolder(folder), folder.playlist);
+  let level;
+  try {
+    level = await client.operation("folder", () => commands.list(0, folder.id));
+  } catch (error) {
+    if (version === client.targetVersion()) message(`The folder ${label} was not removed. ${refusalText(error)}`);
+    return;
+  }
+  if (version !== client.targetVersion()) return;
+  if (level.items.length > 0) {
+    message(`The folder ${label} is not empty: only an empty folder can be removed.`);
+    client.refreshContent();
+    return;
+  }
+  removing = {folder, label, version};
+  byId("folder-remove-text").textContent = `Remove the empty folder ${label}? This cannot be undone.`;
+  byId("folder-remove-dialog").hidden = false;
+  byId("folder-remove-cancel").focus();
+}
+
+function closeRemoval() {
+  removing = null;
+  byId("folder-remove-dialog").hidden = true;
+}
+
+// Whether the level shown still lists a folder by its id and its path.
+async function stillListed(folder) {
+  let from = 0;
+  do {
+    const reply = await client.operation("folder", () => commands.list(from, client.state.level.id));
+    if (reply.items.some((row) => row.id === folder.id && row.playlist === folder.playlist)) return true;
+    from = reply.next;
+  } while (from !== null);
+  return false;
+}
+
+// Removes the folder asked about. A reply that did not arrive is never answered by sending
+// the line again: the level is read, and the folder's row says whether it went.
+async function removeFolder() {
+  const asked = removing;
+  closeRemoval();
+  if (asked === null || asked.version !== client.targetVersion()) return;
+  try {
+    await client.operation("folder", () => commands.folderRemove(asked.folder.id));
+    message(`Removed the folder ${asked.label}.`);
+  } catch (error) {
+    if (asked.version !== client.targetVersion()) return;
+    if (error instanceof Refusal) {
+      const text = error.code === "unknown-command" ? "This installation's firmware cannot remove folders. Install the newer firmware." : refusalText(error);
+      message(`The folder ${asked.label} was not removed. ${text}`);
+    } else {
+      let there = null;
+      try {
+        there = await stillListed(asked.folder);
+      } catch (_) {
+        there = null;
+      }
+      if (asked.version !== client.targetVersion()) return;
+      message(there === null ? `No confirmed reply. Whether the folder ${asked.label} was removed is not known yet; the list is read again.` :
+        there ? `No confirmed reply. The folder ${asked.label} is still there; press Remove folder again to remove it.` :
+        `No confirmed reply. The folder ${asked.label} was removed.`);
+    }
   } finally {
     client.refreshContent();
   }
@@ -491,6 +584,7 @@ export function draw(state) {
   }
   const storage = level.id === null ? (cardWritable(state) ? "external" : "internal") : level.storage === "internal" ? "internal" : "external";
   byId("new-folder").title = `Makes a folder in ${moves.label(storage, level.path)}`;
+  if (removing !== null && removing.version !== client.targetVersion()) closeRemoval();
   reconcile(state);
 }
 
@@ -515,5 +609,10 @@ export function start(options) {
   byId("move-cancel").addEventListener("click", closeMove);
   byId("move-stop").addEventListener("click", () => {
     if (running !== null) running.stop = true;
+  });
+  byId("folder-remove-go").addEventListener("click", removeFolder);
+  byId("folder-remove-cancel").addEventListener("click", closeRemoval);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && removing !== null) closeRemoval();
   });
 }

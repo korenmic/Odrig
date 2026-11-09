@@ -109,6 +109,11 @@ function makingOf(line) {
   return found === null ? null : {storage: found[1], folder: `/${decodeURIComponent(found[2])}`};
 }
 
+// Whether a line is `folder remove <id>`.
+function removingOf(line) {
+  return /^folder remove [0-9]+$/.test(line);
+}
+
 // The texts of the refusals of `move external` and of `folder make`, by their codes.
 const MOVES = {
   "unknown-id": ({id, folder}) => `Animation ${id} or the folder ${folder} is not on the card any more. The list is read again.`,
@@ -123,6 +128,13 @@ const MAKINGS = {
   "no-space": ({storage, folder}) => storage === "internal" ? `Internal storage has no room for the folder ${folder}: it keeps 32 folders at most, each with room for its files.` :
     `The card has no free id for the folder ${folder}.`,
   unsupported: () => "This installation cannot make folders in that storage.",
+};
+// The texts of the refusals of `folder remove`, by their codes.
+const REMOVINGS = {
+  "in-use": () => "Only an empty folder can be removed: it holds a file or a folder.",
+  "read-only": () => "The card cannot be written now, so the folder cannot be removed.",
+  "unknown-id": () => "The folder is not on the installation any more. The list is read again.",
+  unsupported: () => "This installation cannot remove folders in that storage.",
 };
 
 // The text for each error code a command of the app can get, from the line that was
@@ -252,6 +264,7 @@ export function ofRefusal(refusal, reason = null) {
   if (moving !== null && Object.prototype.hasOwnProperty.call(MOVES, refusal.code)) return `${MOVES[refusal.code](moving)} (${refusal.code})`;
   const making = makingOf(refusal.line);
   if (making !== null && Object.prototype.hasOwnProperty.call(MAKINGS, refusal.code)) return `${MAKINGS[refusal.code](making)} (${refusal.code})`;
+  if (removingOf(refusal.line) && Object.prototype.hasOwnProperty.call(REMOVINGS, refusal.code)) return `${REMOVINGS[refusal.code]()} (${refusal.code})`;
   const text = Object.prototype.hasOwnProperty.call(REFUSALS, refusal.code) ? REFUSALS[refusal.code] : REFUSED;
   return `${text(refusal.line, reason, refusal)} (${refusal.code})`;
 }

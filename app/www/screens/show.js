@@ -41,7 +41,7 @@ let menuButton = null;
 let visible = false;
 let message = () => {};
 // What other parts of the screen add to a row's menu and to drawing.
-const extensions = {menu: [], draw: [], order: null};
+const extensions = {menu: [], folderMenu: [], draw: [], order: null};
 
 function byId(id) {
   return document.getElementById(id);
@@ -822,6 +822,7 @@ function fillMenu() {
       disabled: !answers() || selection.locked() || saving},
     ...(animation.inheritedIgnored ? [{note: "Excluded by a parent folder. Including this folder does not override that ancestor."}] : []),
     ...(selection.folderSelectable(animation) ? [{label: "Select", act: () => selection.enter(animation.id), disabled: !answers() || selection.locked()}] : []),
+    ...extensions.folderMenu.flatMap((extra) => extra(animation, !answers() || selection.locked() || saving)),
   ] : actions(animation);
   const key = JSON.stringify(items.map((item) => [item.label, item.note, item.disabled]));
   if (menu.dataset.key === key) {
@@ -892,8 +893,9 @@ export function closeMenu() {
 
 // Lets another part of the screen add actions to a row's menu, draw with the screen, or
 // give the order of the rows.
-export function extend({menu, draw: drawing, order}) {
+export function extend({menu, folderMenu, draw: drawing, order}) {
   if (menu) extensions.menu.push(menu);
+  if (folderMenu) extensions.folderMenu.push(folderMenu);
   if (drawing) extensions.draw.push(drawing);
   if (order) extensions.order = order;
 }
@@ -920,7 +922,7 @@ export function start(options) {
   filters.start({redraw});
   selection.start({message, redraw, visible: () => true});
   explorer.start({message, redraw, chosen: selection.rows, chosenFolders: selection.folders, done: selection.finished});
-  extend({draw: explorer.draw});
+  extend({draw: explorer.draw, folderMenu: explorer.folderMenu});
   reorder.start({message, redraw, shownOrder, groupOf: folderOf, levelRows: shownOrder});
   extend({menu: reorder.menu, draw: reorder.draw, order: reorder.order});
   downloads.start({message, redraw, chosen: () => ({files: selection.rows(), folders: selection.folders()})});
