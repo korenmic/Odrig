@@ -985,6 +985,17 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         return repeats_saved_reply(core, id, reply);
     }
     if (words.is(0, "folder")) {
+        if (words.count == 3 && words.is(1, "remove")) {
+            // `folder remove <id>`: an empty folder of either storage.
+            uint32_t id = 0;
+            if (!number_word(words, 2, 1, 0xFFFFFFFFu, &id)) {
+                return refuse(reply, "bad-argument");
+            }
+            if (core.invalid) {
+                return refuse(reply, "show-invalid");
+            }
+            return content_folder_remove(core, id, reply);
+        }
         char path[kDrivePathRoom];
         if (words.count != 4 || !words.is(1, "make") || (!words.is(2, "external") && !words.is(2, "internal")) ||
             !folder_path(words.text[3], words.size[3], path)) {

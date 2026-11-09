@@ -496,6 +496,27 @@ uint32_t content_remove(Core &core, uint32_t id, Reply &reply) {
     return succeed(reply);
 }
 
+uint32_t content_folder_remove(Core &core, uint32_t id, Reply &reply) {
+    for (uint32_t position = 0; position < core.item_count; ++position) {
+        if (core.items[position].id == id) {
+            return refuse(reply, "in-use");
+        }
+    }
+    uint32_t value = 0;
+    const uint8_t kind = drive_find(core, id, &value);
+    if (kind == 'f') {
+        return refuse(reply, "in-use");
+    }
+    if (kind == 'd') {
+        return catalog_folder_remove(core, value, reply);
+    }
+    if (id > kFolderIdMost) {
+        // While the card's catalog is read, the core cannot tell what a card's id names.
+        return refuse(reply, catalog_drive_loading(core) ? "busy" : "unknown-id");
+    }
+    return internal_folder_remove(core, id, reply);
+}
+
 bool content_removed(const Core &core, uint32_t position, const ShowChange &change) {
     if (position == change.without) return true;
     for (uint32_t at = 0; at < change.removed_count; ++at) {

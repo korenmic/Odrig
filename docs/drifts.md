@@ -13744,3 +13744,42 @@ lost reply does; only `saved` is asked again, after `busy`, because the board an
 until it has read what it keeps. `docs/android-app.md` now says so; the code is as it was.
 
 **Resolution.** `docs/android-app.md`.
+
+## Seed 85: no stepped card folder move enters the refusals of `folder remove`
+
+**Question.** The seed refuses `folder remove` `busy` while the board moves a card folder in
+steps, "if seed 74's task 6 builds that stepped move". Does it?
+
+**Answer.** No. Seed 74's task 6 moved a folder of the card with a job of the app, the
+fallback the owner allowed on 2026-11-09, and the board holds no move of a folder between
+two lines. So no such condition is judged, on either storage.
+
+**Resolution.** `core/src/catalog.cpp`, `core/src/folders.cpp`, `docs/commands.md`.
+
+## Seed 85: an id above 60,000 while the card's catalog is read
+
+**Question.** The card's refusals give `busy` while its catalog is read. While it is read
+the core has not published the card's index, so it cannot tell whether an id of the card
+names a folder, an animation or nothing. What does `folder remove` of such an id answer?
+
+**Answer.** `busy`: an id above 60,000, the highest id of the board's own storage, can only
+be the card's, and the card's answer waits for its catalog. The id of a folder of the card
+is `unknown-id` while the card is out, as for every command. On the test host and in the
+emulator a card's catalog is read within the refresh that notices the card, so no line
+arrives while it is read and no test reaches this `busy`, nor that of `folder make
+external`; the test of the card that is out stands for it.
+
+**Resolution.** `core/src/content.cpp`, `docs/commands.md`,
+`tests/core/test_folder_remove.py`.
+
+## Seed 85: a test that shows makes `folder remove` of the card `busy`, not of the board
+
+**Question.** The card's refusals name a test of the mapping that shows; those of the board's
+own storage do not. Is a folder of the board's own storage removed while a test shows?
+
+**Answer.** Yes, as the seed lists the conditions: the board's storage is refused `busy`
+only while an upload is open or a rebuild runs, the two that hold the chunk buffer through
+which `folders.txt` is written, as for `folder make internal`. The card's conditions are
+those of `folder make external`.
+
+**Resolution.** `core/src/folders.cpp`, `core/src/catalog.cpp`, `docs/commands.md`.

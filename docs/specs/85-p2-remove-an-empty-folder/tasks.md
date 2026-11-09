@@ -5,7 +5,7 @@ with seed 74 part B (pull request #64) merged, with only its own checkbox ticked
 of a fault is seen failing before the change, and the failure seen goes into the commit
 message. Code carries no history.
 
-- [ ] 1. `folder remove <id>` in the core, on both storages
+- [x] 1. `folder remove <id>` in the core, on both storages
   - `core/src/commands.cpp`: the line. `core/src/content.cpp` and `.h`:
     `content_folder_remove`. `core/src/folders.cpp` and `.h`: `internal_folder_remove`.
     `core/src/catalog.cpp` and `.h`: `catalog_folder_remove`, `folder_entry_removed`,

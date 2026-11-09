@@ -1050,6 +1050,48 @@ void internal_folders_prune(Core &core, uint32_t number) {
     }
 }
 
+ODRIG_NOINLINE uint32_t internal_folder_remove(Core &core, uint32_t id, Reply &reply) {
+    if (!storage_changes(core) || core.host.read_at == nullptr || core.chunk == nullptr) {
+        return refuse(reply, "unsupported");
+    }
+    if (core.upload.state != kUploadNone || catalog_rebuilding(core)) {
+        return refuse(reply, "busy");
+    }
+    if (core.folders_error) {
+        return refuse(reply, "storage-error");
+    }
+    FolderLine line;
+    if (!folder_by_id(core, id, line, nullptr)) {
+        return refuse(reply, "unknown-id");
+    }
+    Tree tree;
+    if (!read_tree(core, tree)) {
+        return refuse(reply, "storage-error");
+    }
+    // Empty: no file of the show is stored in its folder, and no line is below it.
+    if (holds_files(core, line.number) || (line.index + 1 < tree.count && tree.depths[line.index + 1] > line.depth)) {
+        return refuse(reply, "in-use");
+    }
+    FolderEdit edit;
+    edit_clear(edit, tree.next);
+    edit.drops = 1u << line.index;
+    if (!write_part(core, edit, false) || !commit_part(core)) {
+        core.host.remove(core.host.ctx, kFoldersPart);
+        return refuse(reply, "storage-error");
+    }
+    char name[4];
+    number_text(line.number, name);
+    core.host.remove(core.host.ctx, name);
+    core.internal_folders = static_cast<uint8_t>((tree.count - 1) & 0x3Fu);
+    const uint32_t before = core.current;
+    folders_derive(core);
+    if (core.current != before) {
+        player_playlist_chosen(core, core.latest);
+        playlist_changed(core);
+    }
+    return succeed(reply);
+}
+
 bool internal_choose(Core &core, uint32_t id) {
     FolderLine line;
     char path[kFolderPathMost + 1];

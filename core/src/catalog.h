@@ -141,6 +141,14 @@ bool catalog_remove_external(Core &core, uint32_t position);
 // index has not; `in-use` for a file or a folder of the parent whose name is the same in any
 // case; `no-space` without a free id; `storage-error` on a failed storage call.
 uint32_t catalog_folder_make(Core &core, const char *path, Reply &reply);
+
+// Carries out `folder remove` of the folder of the drive's index at an ordinal: when it has no
+// own file and no sub-folder, its line leaves the table and the map and its row its parent's
+// file in one commit, and then its folder on the drive is removed, as the host can. `busy`
+// while an upload is open, a rebuild runs, a test of the mapping shows or the catalog is read;
+// `read-only` when the core may not change the drive; `in-use` for a folder that is not empty;
+// `storage-error` on a failed storage call, the index then as it was.
+uint32_t catalog_folder_remove(Core &core, uint32_t ordinal, Reply &reply);
 // `move external <id> <folder>`: moves the drive's file with the id into the folder of the
 // index with this path, the root for an empty one, in one commit of the drive's catalog: the
 // file renamed through the upload's part, its line on the page of its new name with its

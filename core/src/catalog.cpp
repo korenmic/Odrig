@@ -2241,6 +2241,74 @@ uint32_t catalog_folder_make(Core &core, const char *path, Reply &reply) {
 
 namespace {
 
+// Commits the change of the index that takes out an empty folder: its line of the table, with
+// the ordinals and ends after it one less and its parent with one sub-folder less; its line of
+// the map; and its row of its parent's file. Kept apart from catalog_folder_remove, whose
+// frame holds the folder's path.
+ODRIG_NOINLINE bool folder_entry_removed(Core &core, const IndexFolder &folder) {
+    // The parent: the nearest folder before it in the table that is one level up.
+    IndexFolder parent;
+    uint32_t before = folder.ordinal;
+    do {
+        if (before == 0 || !drive_folder(core, --before, parent)) {
+            return false;
+        }
+    } while (parent.depth + 1 != folder.depth);
+    IndexChange index;
+    clear_change(index);
+    index.map_changes = true;
+    index.gone_ids[0] = folder.id;
+    index.gone_count = 1;
+    index.table.gone_from = folder.ordinal;
+    index.table.gone_count = 1;
+    index.table.folders_of = parent.ordinal;
+    index.map.gone_from = folder.ordinal;
+    index.map.gone_count = 1;
+    index.folder_count = 1;
+    index.folders[0] = edit_of(parent);
+    index.folders[0].child = folder.id;
+    index.folders[0].child_files = kNothing;
+    return commit_index(core, index);
+}
+
+// Removes the folder of the drive with this path, as the host can: a folder that stays is
+// listed nowhere.
+ODRIG_NOINLINE void remove_drive_folder(Core &core, const char *path) {
+    char name[kDriveOpenRoom] = "drive/";
+    copy_text(name + 6, path);
+    core.host.remove(core.host.ctx, name);
+}
+
+}  // namespace
+
+uint32_t catalog_folder_remove(Core &core, uint32_t ordinal, Reply &reply) {
+    if (core.upload.state != kUploadNone || catalog_drive_loading(core) || catalog_rebuilding(core) || core.mapping_test) {
+        return refuse(reply, "busy");
+    }
+    if (!catalog_drive_writable(core) || !core.indexed) {
+        return refuse(reply, "read-only");
+    }
+    IndexFolder folder;
+    if (ordinal == 0 || !drive_folder(core, ordinal, folder)) {
+        return refuse(reply, "storage-error");
+    }
+    if (folder.files != 0 || folder.folders != 0) {
+        return refuse(reply, "in-use");
+    }
+    char path[kDrivePathRoom];
+    if (drive_folder_path(core, ordinal, path, sizeof path) == 0 || !folder_entry_removed(core, folder)) {
+        return refuse(reply, "storage-error");
+    }
+    remove_drive_folder(core, path);
+    current_again(core);
+    repeats_reload(core);
+    brightness_start(core);
+    ignored_start(core);
+    return succeed(reply);
+}
+
+namespace {
+
 // The line of the map that holds an id, found by binary search, or kNothing when the map has
 // none or cannot be read.
 uint32_t map_line_of(const Core &core, uint32_t id) {
