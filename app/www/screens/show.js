@@ -145,12 +145,15 @@ function nameOf(path) {
   return path.includes(`/`) ? path.slice(path.lastIndexOf(`/`) + 1) : path;
 }
 
-// The level shown and what it holds, as the list of the level gives it: its path; its rows
-// in the shown order and those of them the filters show; and its sub-folders in the order
-// of the list, each with the count of the files directly in it.
+// The level shown and what it holds, as the list of the level gives it: its path, and whether
+// it is the Clocks level of Clocks only; its rows in the shown order and those of them the
+// filters show; and its sub-folders in the order of the list, each with the count of the files
+// directly in it, the two of the Clocks level each named by its storage.
 function levelOf(state, all) {
-  const folders = state.folders.map((item) => ({...item, path: item.playlist, name: nameOf(item.playlist), count: item.files ?? 0}));
-  return {path: state.level.path, rows: all, shown: all.filter(filters.matches), folders};
+  const clocks = state.level.clocks === true;
+  const folders = state.folders.map((item) => ({...item, path: item.playlist, count: item.files ?? 0, clocksLevel: clocks,
+    name: clocks ? messages.storagePath(item.external === false ? "internal" : "external", item.playlist) : nameOf(item.playlist)}));
+  return {path: state.level.path, clocks, rows: all, shown: all.filter(filters.matches), folders};
 }
 
 // Enters a folder of either storage, as a tap on a folder row does, or goes up a level for null,
@@ -193,20 +196,21 @@ function folderRow(entry) {
   made.dataset.path = entry.path;
   made.dataset.id = String(entry.id);
   made.dataset.managed = String(managed);
+  made.dataset.storage = entry.external === false ? "internal" : "external";
   if (managed) {
     const pick = document.createElement("label");
     pick.className = "pick";
     pick.addEventListener("click", (event) => event.stopPropagation());
     const check = document.createElement("input");
     check.type = "checkbox";
-    check.setAttribute("aria-label", `Select folder ${entry.path}`);
+    check.setAttribute("aria-label", `Select folder ${entry.clocksLevel ? entry.name : entry.path}`);
     check.addEventListener("change", () => selection.choose(entry.id, check.checked));
     pick.append(check);
     made.append(pick);
   }
   const open = managed ? document.createElement("button") : made;
   if (managed) { open.type = "button"; open.className = "folder-open"; }
-  open.setAttribute("aria-label", `Open folder ${entry.path}`);
+  open.setAttribute("aria-label", `Open folder ${entry.clocksLevel ? entry.name : entry.path}`);
   const text = document.createElement("span");
   text.className = "folder-text";
   const name = document.createElement("span");
@@ -224,19 +228,19 @@ function folderRow(entry) {
   chevron.setAttribute("aria-hidden", "true");
   chevron.textContent = "\u203a";
   open.append(text, chevron);
-  if (managed) made.append(open, moreButton(entry.id, `Actions for folder ${entry.path}`));
+  if (managed) made.append(open, moreButton(entry.id, `Actions for folder ${entry.clocksLevel ? entry.name : entry.path}`));
   made.addEventListener("click", () => enter(entry));
   return made;
 }
 
-// The animation on the LEDs: its id, and its file name as `status` names it or the list
-// has it.
+// The animation on the LEDs: its id, and its file name as `status` names it, with its storage
+// for a file of a Clocks subtree, or as the list has it.
 function now(status, animations) {
   if (status.animation === null) {
     return null;
   }
   if (typeof status.file === "string") {
-    return `Now ${status.animation} ${status.file}`;
+    return `Now ${status.animation} ${messages.playingFile(status, client.clockStorageOf(status))}`;
   }
   const found = animations === null ? undefined : animations.find((animation) => animation.id === status.animation);
   return found === undefined ? `Now ${status.animation}` : `Now ${found.id} ${found.file}`;
@@ -590,7 +594,7 @@ function rowKey(animation, kept) {
 
 function keyOfChild(child) {
   if (child.classList.contains("folder-row")) {
-    return `#${child.dataset.path}|${child.dataset.id}|${child.dataset.managed}`;
+    return `#${child.dataset.path}|${child.dataset.id}|${child.dataset.managed}|${child.querySelector(".name").textContent}`;
   }
   if (!child.classList.contains("row")) {
     return "?";
@@ -607,7 +611,7 @@ function drawRows(here) {
   // Unknown capacity keeps the last-rendered badge; action permissions still use current observations.
   const kept = new Map(client.state.space === null ? [...place.children].filter(child => child.classList.contains("row"))
     .map(child => [child.dataset.id, child]) : []);
-  const wanted = [...here.shown.map(animation => rowKey(animation, kept.get(String(animation.id)))), ...here.folders.map((entry) => `#${entry.path}|${entry.id}|${canIgnore(entry)}`)];
+  const wanted = [...here.shown.map(animation => rowKey(animation, kept.get(String(animation.id)))), ...here.folders.map((entry) => `#${entry.path}|${entry.id}|${canIgnore(entry)}|${entry.name}`)];
   const shown = [...place.children].map(keyOfChild);
   if (shown.length === wanted.length && shown.every((key, at) => key === wanted[at])) {
     return;
@@ -630,9 +634,14 @@ function rowsState(state, animations, here) {
   // The level's head: its title, Back inside a folder, and the mark while its playlist is
   // current; each folder row's count, and its mark when it leads to the current playlist.
   const marked = markedPath(state.status);
-  byId("level-title").textContent = here.path === "" ? "Root" : here.path;
+  // In Clocks only the status names the card's Clocks folder as the playlist whichever storage's
+  // file plays: of the two Clocks folders, the one of the storage of the file playing is marked
+  // when that storage is known.
+  const from = client.clocksOnly() ? client.clockStorageOf(state.status) : null;
+  const levelStorage = state.level.storage === "internal" ? "internal" : "external";
+  byId("level-title").textContent = here.clocks ? "Clocks" : here.path === "" ? "Root" : here.path;
   byId("level-back").hidden = !client.canGoBack();
-  byId("level-head").setAttribute("aria-current", String(marked === here.path));
+  byId("level-head").setAttribute("aria-current", String(marked === here.path && (from === null || from === levelStorage)));
   for (const made of byId("animations-list").querySelectorAll(":scope > .folder-row")) {
     const entry = here.folders.find((item) => String(item.id) === made.dataset.id);
     if (entry === undefined) {
@@ -654,7 +663,11 @@ function rowsState(state, animations, here) {
       check.checked = selection.has(entry.id);
       check.disabled = selection.locked();
     }
-    made.setAttribute("aria-current", String(marked !== null && (marked === entry.path || marked.startsWith(`${entry.path}/`))));
+    // The two Clocks folders of the Clocks level have one path: the one that plays is marked by
+    // the storage of the file playing, or else by the id the status names.
+    made.setAttribute("aria-current", String(marked !== null && (here.clocks ?
+      (from !== null ? made.dataset.storage === from : state.status.playing === entry.id) :
+      marked === entry.path || marked.startsWith(`${entry.path}/`))));
   }
   for (const made of byId("animations-list").querySelectorAll(":scope > .row")) {
     const animation = animations.find((item) => String(item.id) === made.dataset.id);
@@ -682,7 +695,8 @@ function rowsState(state, animations, here) {
     const play = made.querySelector(".play");
     const allowed = client.canPlay(animation);
     play.disabled = typeof animation.fault === "string" || !allowed;
-    play.title = allowed ? "" : "Leave Clocks only to play an animation outside the Clocks folder.";
+    play.title = allowed ? "" : state.status?.hasClockStorage === true ? "Leave Clocks only to play an animation outside the clocks folders." :
+      "Leave Clocks only to play an animation outside the Clocks folder.";
     if (!allowed) play.setAttribute("aria-describedby", "only-boundary");
     else play.removeAttribute("aria-describedby");
   }

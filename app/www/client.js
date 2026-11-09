@@ -33,6 +33,10 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 // known. `space` holds internal and external capacity from the newest reply, or
 // null while none came from this address or the newest said the capacity is unknown; a request
 // that fails leaves it.
+// In Clocks only, on a target that plays the clocks of both storages, `level` may be the
+// Clocks level, `{path: "", id: null, storage: null, clocks: true}`: the root's list with only
+// its two Clocks folders, one of each storage. `rootNames.clocks` holds the ids of the root's
+// Clocks folders, `{internal, external}`, each null when that storage has none.
 // `listBusy` says whether the newest `list` request was answered `busy`. `order` is the
 // saved playlist order that goes with the newest list, `{ids, revision}`, or null while
 // there is none; `orderKnown` is false when the target has no saved order, an older one.
@@ -68,6 +72,18 @@ const trail = [];
 let onlyActive = false;
 let onlyFolder = null;
 let onlyDesired = "clocks";
+// Whether the target of the confirmed Only plays the clocks of both storages, as its
+// `clock_storage` tells: the Clocks subtree of the board's own storage is inside the
+// boundary then, beside the card's.
+let onlyBoth = false;
+// The step of the trail, and the level, of the Clocks level.
+const CLOCKS_LEVEL = Object.freeze({path: "", id: null, storage: null, clocks: true});
+// The rows of files of a Clocks subtree that lists named, by id, `{file, external}`; the
+// files a status named whose rows are asked for in the background, `{id, file}`, or null;
+// and those asked for once already, as `<id> <file>`.
+const clockRows = new Map();
+let clockAsk = null;
+const clockAsked = new Set();
 // Whether the root's names are due while another level is shown, and the root's list that
 // is being asked for in parts for them: the ids and the files so far and the position to
 // ask for next.
@@ -175,16 +191,105 @@ function unavailableClocks() {
   toLevel();
 }
 
+// The storage of the Clocks folder a status names by its id: the board's own for an id of
+// 60,000 or less on a target that plays the clocks of both storages, else the card's.
+function storageOfClockId(id) {
+  return onlyBoth && id !== null && id <= 60000 ? "internal" : "external";
+}
+
+// The step of the trail of the Clocks folder of this id.
+function clockStep(id) {
+  return storageOfClockId(id) === "internal" ? {path: "clocks", id, storage: "internal"} : {path: "clocks", id};
+}
+
+// The Clocks folders of both storages, `{internal, external}`, when the root's newest list
+// names one of each on a target in Only that plays the clocks of both; else null.
+function bothClockFolders() {
+  const found = state.rootNames?.clocks;
+  return onlyActive && onlyBoth && found != null && found.internal !== null && found.external !== null ? found : null;
+}
+
+// Whether a step of the trail is one of the two Clocks folders of the Clocks level.
+function oneOfBoth(step) {
+  const both = bothClockFolders();
+  return both !== null && step?.path === "clocks" && step.id !== null && step.id === both[step.storage === "internal" ? "internal" : "external"];
+}
+
+// The trail that begins at a Clocks folder: under the Clocks level when it is one of two.
+function clocksTrail(step) {
+  return oneOfBoth(step) ? [CLOCKS_LEVEL, step] : [step];
+}
+
+// Where Only opens: the Clocks level while both storages have a Clocks folder, the one the
+// status names and the other storage's that the root's newest list names; else the folder the
+// status names. The Clocks level's own list then tells whether both are still there.
+function openClocks() {
+  const step = clockStep(onlyFolder);
+  const other = step.storage === "internal" ? "external" : "internal";
+  return onlyActive && onlyBoth && onlyFolder !== null && (state.rootNames?.clocks?.[other] ?? null) !== null ? [CLOCKS_LEVEL] : [step];
+}
+
+// Whether two steps of the trail are one folder: one id of one storage.
+function sameFolder(one, other) {
+  return one.id === other.id && (one.storage === "internal") === (other.storage === "internal");
+}
+
+// The Clocks folder that remains when the root's newest list does not name one of each
+// storage: the one the status names while the list names it too, else the one the list
+// names, else the one the status names.
+function remainingClocks() {
+  const found = state.rootNames?.clocks ?? {internal: null, external: null};
+  const named = clockStep(onlyFolder);
+  if (found[named.storage === "internal" ? "internal" : "external"] === named.id) return named;
+  if (found.internal !== null) return {path: "clocks", id: found.internal, storage: "internal"};
+  if (found.external !== null) return {path: "clocks", id: found.external};
+  return named;
+}
+
+// Fits the trail of Only to the root's newest list: under a trail that begins at one of the
+// two Clocks folders the Clocks level is put, the level shown staying; a trail of the Clocks
+// level goes back to the Clocks level when its folder is not one of the two the list names,
+// and when the list no longer names both, to the Clocks folder that remains, a level below
+// that folder staying.
+function fitClocks() {
+  if (!onlyActive || !onlyBoth || onlyFolder === null || trail.length === 0) return;
+  const bottom = trail[0];
+  if (bottom.clocks !== true) {
+    if (oneOfBoth(bottom)) trail.unshift(CLOCKS_LEVEL);
+    return;
+  }
+  const both = bothClockFolders();
+  if (both !== null && (trail.length === 1 || oneOfBoth(trail[1]))) return;
+  const top = trail[trail.length - 1];
+  if (both !== null) trail.splice(0, trail.length, CLOCKS_LEVEL);
+  else {
+    const remaining = remainingClocks();
+    if (trail.length > 1 && sameFolder(trail[1], remaining)) trail.shift();
+    else trail.splice(0, trail.length, remaining);
+  }
+  if (trail[trail.length - 1] !== top) toLevel();
+}
+
 // Takes the clock mode a status confirms. In Only, browsing stays inside the Clocks folder
 // the target names: entering Only opens it, a valid location inside it stays, and a status
-// that names no folder shows it unavailable. A status without mode metadata changes
-// nothing; a confirmed Off or Between releases the bound.
+// that names no folder shows it unavailable. On a target that plays the clocks of both
+// storages the board's own Clocks folder is inside too, and while both have one, Only opens
+// the Clocks level above the two. A status without mode metadata changes nothing; a
+// confirmed Off or Between releases the bound.
 function reconcileOnly(reply) {
   if (reply.hasClockMode && ["off", "between"].includes(reply.clockMode)) {
     onlyActive = false;
     onlyFolder = null;
     onlyDesired = "clocks";
+    onlyBoth = false;
     state.onlyUnavailable = false;
+    if (trail[0]?.clocks === true) {
+      trail.shift();
+      if (trail.length === 0) {
+        toLevel();
+        return;
+      }
+    }
     if (state.level.path !== "" && state.level.id === null) {
       trail.length = 0;
       toLevel();
@@ -194,25 +299,36 @@ function reconcileOnly(reply) {
   if (reply.clockMode !== "only") return;
   const entering = !onlyActive;
   const before = onlyFolder;
+  const bothBefore = onlyBoth;
   onlyActive = true;
   onlyFolder = reply.clockOnly.folder;
+  onlyBoth = reply.hasClockStorage === true;
   if (entering) onlyDesired = "clocks";
   if (onlyFolder === null) {
     unavailableClocks();
-  } else if (entering || !inClocks(state.level)) {
-    trail.splice(0, trail.length, {path: "clocks", id: onlyFolder});
+  } else if (entering || bothBefore !== onlyBoth || !inClocks(state.level)) {
+    trail.splice(0, trail.length, ...openClocks());
+    toLevel();
+  } else if (before !== onlyFolder && onlyBoth && (trail[0]?.clocks === true || bothClockFolders() !== null ||
+      storageOfClockId(onlyFolder) === "internal" || (trail[0]?.storage ?? "external") !== "external")) {
+    // Another folder of either storage: the Clocks level, or the folder named now.
+    trail.splice(0, trail.length, ...openClocks());
     toLevel();
   } else if (before !== onlyFolder && state.level.id === null) {
     // The unavailable location is resolved again under the folder the target names now.
     listing = null;
     listDue = true;
   } else if (before !== onlyFolder) {
-    trail[0] = {path: "clocks", id: onlyFolder};
+    trail[0] = clockStep(onlyFolder);
     if (state.level.path === "clocks") toLevel();
     else {
       listing = null;
       listDue = true;
     }
+  }
+  if (onlyBoth && onlyFolder !== null && state.level.clocks !== true && (entering || before !== onlyFolder || !bothBefore)) {
+    // The root's list tells whether the other storage has a Clocks folder too.
+    rootDue = true;
   }
 }
 
@@ -227,11 +343,23 @@ function takeStatus(reply) {
   }
   reconcileOnly(reply);
   const named = reply.animation;
-  const here = typeof reply.file === "string" && parentOf(reply.file) === state.level.path && (state.level.id === null || reply.file.includes("/"));
+  // A file of a Clocks subtree of the other storage than the level's, which shares its path, is
+  // not of the level shown.
+  const from = clockStorageOf(reply);
+  const here = typeof reply.file === "string" && parentOf(reply.file) === state.level.path && (state.level.id === null || reply.file.includes("/")) &&
+    (from === null || from === (state.level.storage === "internal" ? "internal" : "external"));
   if (named !== null && state.animations !== null && named !== askedFor && here && !state.animations.some((animation) => animation.id === named)) {
     // The target plays an animation of the level shown that its list does not have.
     askedFor = named;
     listDue = true;
+  }
+  if (clockAsk === null && from === null && reply.hasClockStorage === true && typeof reply.file === "string" &&
+      inClocks(reply.file) && typeof named === "number" && state.animations !== null && listing === null && !listDue &&
+      !clockAsked.has(`${named} ${reply.file}`)) {
+    // A file of a Clocks subtree whose row no list named: the storage it plays from is
+    // asked for once, in the lists of its folder of each storage.
+    clockAsked.add(`${named} ${reply.file}`);
+    clockAsk = {id: named, file: reply.file};
   }
   const playing = reply.playing;
   if (typeof playing === "number" && typeof reply.playlist === "string" && parentOf(reply.playlist) === state.level.path && state.animations !== null &&
@@ -272,6 +400,9 @@ function listAgainLater(after = LIST_EVERY_MS) {
     listTimer = null;
     if (showScreen || storageScreen) {
       listDue = true;
+      // Inside a Clocks folder of Only the root's list says whether both storages still
+      // have one, or have one now.
+      if (onlyActive && onlyBoth && state.level.clocks !== true) rootDue = true;
       next();
     }
   }, after);
@@ -319,18 +450,44 @@ function parentOf(path) {
   return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
 }
 
-// Whether a path of the card, or a level or a trail's step `{path, storage}`, is the Clocks
-// folder or inside it. The Clocks folder of Clocks only is the card's: no folder of the
-// board's own storage is inside it, whatever its path.
+// Whether a path, or a level or a trail's step `{path, storage}`, is a Clocks folder or inside
+// one; the Clocks level is. A folder of the board's own storage is inside only on a target
+// that plays the clocks of both storages: on another the Clocks folder of Clocks only is
+// the card's, whatever the path of a folder of the board's own storage.
 function inClocks(where) {
-  const path = where !== null && typeof where === "object" ? (where.storage === "internal" ? null : where.path) : where;
-  return path === "clocks" || typeof path === "string" && path.startsWith("clocks/");
+  if (where !== null && typeof where === "object") {
+    if (where.clocks === true) return true;
+    if (where.storage === "internal" && !onlyBoth) return false;
+    return inClocks(where.path);
+  }
+  return where === "clocks" || typeof where === "string" && where.startsWith("clocks/");
 }
 
-// What an upload chooses its id and its name against, from the items of the root's list.
+// What an upload chooses its id and its name against, from the items of the root's list,
+// and the ids of the root's Clocks folders of each storage.
 function namesOf(items) {
+  const clocksOf = (external) => items.find((item) => item.playlist === "clocks" && (item.external !== false) === external)?.id ?? null;
   return {ids: items.map((item) => item.id), files: items.filter((item) => typeof item.file === "string").map((item) => item.file),
-    internal: items.some((item) => typeof item.playlist === "string" && item.external === false)};
+    internal: items.some((item) => typeof item.playlist === "string" && item.external === false),
+    clocks: {internal: clocksOf(false), external: clocksOf(true)}};
+}
+
+// Notes the rows of files of a Clocks subtree that a list named.
+function noteClockRows(items) {
+  for (const item of items) {
+    if (typeof item.file === "string" && inClocks(item.file)) clockRows.set(item.id, {file: item.file, external: item.external === true});
+  }
+}
+
+// The storage of the file a status names when it is of a Clocks subtree, on a target that
+// plays the clocks of both storages: "internal" or "external", by the row of its id that a
+// list named, an id of 60,000 or less being the board's own; null when the row is not known,
+// on another target, or for a file of no Clocks subtree.
+export function clockStorageOf(status) {
+  if (status?.hasClockStorage !== true || typeof status.file !== "string" || !inClocks(status.file) || typeof status.animation !== "number") return null;
+  const row = (state.animations ?? []).find((item) => item.id === status.animation && item.file === status.file) ?? clockRows.get(status.animation);
+  if (row !== undefined && row.file === status.file) return row.external === true ? "external" : "internal";
+  return status.animation <= 60000 ? "internal" : null;
 }
 
 // The storage of a folder's row: "internal" for one of the board's own storage.
@@ -369,11 +526,16 @@ async function recoverLevel(asked, level, fromRoot = false) {
   let parent = null;
   const desired = bounded && level.id === null ? onlyDesired : level.path;
   let names = desired.split("/");
-  const knownRoot = bounded && !fromRoot && level.id !== null && desired !== "clocks" && onlyFolder !== null;
+  // The Clocks folder of the level's storage, when it is known: the one the status names, or
+  // the other storage's that the root's list named.
+  const storage = level.storage === "internal" ? "internal" : "external";
+  const clocksId = !bounded || onlyFolder === null ? null :
+    storageOfClockId(onlyFolder) === storage ? onlyFolder : state.rootNames?.clocks?.[storage] ?? null;
+  const knownRoot = bounded && !fromRoot && level.id !== null && desired !== "clocks" && clocksId !== null;
   if (knownRoot) {
     path = "clocks";
-    parent = onlyFolder;
-    found.push({path, id: parent});
+    parent = clocksId;
+    found.push(storage === "internal" ? {path, id: parent, storage} : {path, id: parent});
     names = names.slice(1);
   }
   try {
@@ -398,7 +560,15 @@ async function recoverLevel(asked, level, fromRoot = false) {
           heard();
           if (authoritative && found.length > 0) {
             onlyDesired = "clocks";
-            trail.splice(0, trail.length, found[0]);
+            trail.splice(0, trail.length, ...clocksTrail(found[0]));
+            toLevel();
+            return;
+          }
+          if (authoritative && storageOfClockId(onlyFolder) !== storage) {
+            // The level's Clocks folder is gone; the other storage's, which the status names,
+            // is where Only opens.
+            onlyDesired = "clocks";
+            trail.splice(0, trail.length, ...openClocks());
             toLevel();
             return;
           }
@@ -417,7 +587,7 @@ async function recoverLevel(asked, level, fromRoot = false) {
       parent = folder.id;
     }
     if (found.length === desired.split("/").length) {
-      trail.splice(0, trail.length, ...found);
+      trail.splice(0, trail.length, ...clocksTrail(found[0]), ...found.slice(1));
       if (parent !== level.id || desired !== level.path) {
         heard();
         toLevel();
@@ -448,14 +618,16 @@ async function askListPart() {
   const level = state.level;
   const part = listing === null ? {items: [], from: 0, began: performance.now()} : listing;
   listing = null;
-  if (onlyActive && level.id === null) return;
+  // The Clocks level is the root's list, of which it shows only the two Clocks folders.
+  const clocksLevel = level.clocks === true;
+  if (onlyActive && level.id === null && !clocksLevel) return;
   try {
     const reply = await commands.list(part.from, level.id);
     if (asked !== target || level !== state.level) {
       return;
     }
     heard();
-    if (onlyActive && reply.items.some(item => !inClockFolder(item) ||
+    if (onlyActive && !clocksLevel && reply.items.some(item => !inClockFolder(item) ||
         parentOf(item.playlist ?? item.file) !== level.path)) {
       state.listBusy = true;
       listAgainLater(LIST_WHEN_BUSY_MS);
@@ -475,20 +647,22 @@ async function askListPart() {
       else keeper.unlisted(keptUnder, "external", level.path, new Set(files.filter((item) => item.external === true).map((item) => item.file)), part.began);
       state.listVersion += 1;
       state.listBusy = false;
-      state.animations = items.filter((item) => typeof item.file === "string");
+      state.animations = clocksLevel ? [] : items.filter((item) => typeof item.file === "string");
       for (const item of state.animations) {
         if (item.external !== true && typeof item.stored === "string" && item.stored !== item.file) storedNames.set(item.file, item.stored);
       }
-      state.folders = items.filter((item) => typeof item.playlist === "string");
-      state.cycles = items.filter((item) => item.cycle === true).map((item) => item.id);
+      noteClockRows(state.animations);
+      state.folders = items.filter((item) => typeof item.playlist === "string" && (!clocksLevel || item.playlist === "clocks"));
+      state.cycles = clocksLevel ? [] : items.filter((item) => item.cycle === true).map((item) => item.id);
       if (level.id === null) {
         state.rootNames = namesOf(items);
       }
-      orderDue = state.orderKnown;
+      orderDue = state.orderKnown && !clocksLevel;
       ordering = null;
-      if (!state.orderKnown) state.order = null;
+      if (!state.orderKnown || clocksLevel) state.order = null;
       catalogDue = !state.catalogNone && !state.pagesRefused;
       listAgainLater();
+      if (clocksLevel) fitClocks();
     }
   } catch (error) {
     if (asked !== target || level !== state.level) {
@@ -957,6 +1131,9 @@ function due() {
     catalogDue = false;
     return askCatalog;
   }
+  if (clockAsk !== null) {
+    return askClockRows;
+  }
   if (reads.length > 0 && pageWait === null && keptTaken) {
     return askPage;
   }
@@ -1004,6 +1181,10 @@ export function begin() {
   onlyActive = false;
   onlyFolder = null;
   onlyDesired = "clocks";
+  onlyBoth = false;
+  clockRows.clear();
+  clockAsk = null;
+  clockAsked.clear();
   state.onlyUnavailable = false;
   state.level = {path: "", id: null, storage: null};
   state.rootNames = null;
@@ -1070,7 +1251,7 @@ export function canEnter(folder) {
   return !onlyActive || state.link === "answers" && state.statusFresh && inClocks(state.level) &&
     typeof folder?.playlist === "string" && inClocks(folder.playlist) &&
     parentOf(folder.playlist) === state.level.path &&
-    state.folders.some(known => known.id === folder.id && known.playlist === folder.playlist && storageOf(known) === "external");
+    state.folders.some(known => known.id === folder.id && known.playlist === folder.playlist && (onlyBoth || storageOf(known) === "external"));
 }
 
 export function canGoBack() {
@@ -1092,13 +1273,14 @@ export function back() {
 }
 
 function toLevel() {
-  if (onlyActive && !inClocks(trail[trail.length - 1])) {
-    trail.splice(0, trail.length, {path: "clocks", id: onlyFolder});
+  if (onlyActive && !inClocks(trail[trail.length - 1] ?? null)) {
+    trail.splice(0, trail.length, ...(onlyFolder === null ? [{path: "clocks", id: null}] : openClocks()));
   }
   const top = trail[trail.length - 1];
-  state.level = top === undefined ? {path: "", id: null, storage: null} : {path: top.path, id: top.id, storage: top.storage};
+  state.level = top === undefined ? {path: "", id: null, storage: null} : top.clocks === true ? {...CLOCKS_LEVEL} :
+    {path: top.path, id: top.id, storage: top.storage};
   if (onlyActive && inClocks(state.level) && state.level.id !== null) onlyDesired = state.level.path;
-  state.onlyUnavailable = onlyActive && inClocks(state.level) && state.level.id === null;
+  state.onlyUnavailable = onlyActive && inClocks(state.level) && state.level.id === null && state.level.clocks !== true;
   state.listBusy = false;
   // The unavailable Clocks location lists nothing while its folder is resolved again.
   state.animations = state.onlyUnavailable ? [] : null;
@@ -1132,6 +1314,7 @@ async function askRootPart() {
       rooting = {items, from: reply.next};
     } else {
       state.rootNames = namesOf(items);
+      fitClocks();
     }
   } catch (error) {
     if (asked !== target) {
@@ -1142,6 +1325,51 @@ async function askRootPart() {
     } else {
       failed(error);
     }
+  }
+  changed();
+}
+
+// Asks, in the background, for the rows of the folder of the Clocks file a status named: the
+// root's list, then the lists of its folder's path in the card and in the board's own storage,
+// until one names its id; each list's files of a Clocks subtree are noted with their storage.
+async function askClockRows() {
+  const asked = target;
+  const wanted = clockAsk;
+  clockAsk = null;
+  async function all(folder) {
+    const items = [];
+    let from = 0;
+    do {
+      const reply = await commands.list(from, folder);
+      if (asked !== target) return null;
+      items.push(...reply.items);
+      from = reply.next;
+    } while (from !== null);
+    return items;
+  }
+  try {
+    const root = await all(null);
+    if (root === null) return;
+    heard();
+    const names = parentOf(wanted.file).split("/");
+    for (const external of [true, false]) {
+      let rows = root;
+      let path = "";
+      for (const name of names) {
+        path += (path ? "/" : "") + name;
+        const folder = rows.find((row) => row.playlist === path && (row.external !== false) === external);
+        rows = folder === undefined ? [] : await all(folder.id);
+        if (rows === null) return;
+        noteClockRows(rows);
+      }
+      if (clockRows.get(wanted.id)?.file === wanted.file) break;
+    }
+  } catch (error) {
+    if (asked !== target) return;
+    // A read that got no answer, or was answered busy, is asked for again at a later status.
+    if (!(error instanceof commands.Refusal) || error.code === "busy") clockAsked.delete(`${wanted.id} ${wanted.file}`);
+    if (error instanceof commands.Refusal) heard();
+    else failed(error);
   }
   changed();
 }
@@ -1167,10 +1395,14 @@ export function upload(made) {
   next();
 }
 
+// Whether an upload may go to its destination, `{external, file}`: anywhere outside Clocks
+// only; in it into a Clocks subtree, of a writable card with a ready catalog, or of the board's
+// own storage on a target that plays the clocks of both storages.
 export function canUpload(destination) {
-  return !onlyActive || state.statusFresh && state.status?.clockMode === "only" &&
-    destination.external === true && typeof destination.file === "string" && destination.file.startsWith("clocks/") &&
-    state.space?.external?.present === true && state.space.external.read_only === false &&
+  if (!onlyActive) return true;
+  if (!state.statusFresh || state.status?.clockMode !== "only" || typeof destination.file !== "string" || !destination.file.startsWith("clocks/")) return false;
+  if (destination.external !== true) return onlyBoth && destination.external === false;
+  return state.space?.external?.present === true && state.space.external.read_only === false &&
     state.catalog?.external?.state === "ok" && state.catalog.external.writable === true;
 }
 
@@ -1187,11 +1419,12 @@ export function remove(animation, done) {
   });
 }
 
-// Whether an item of a list is the card's Clocks folder or inside it; a folder or a file of
+// Whether an item of a list is a Clocks folder or inside one: the card's, and the board's
+// own on a target that plays the clocks of both storages; on another a folder or a file of
 // the board's own storage never is.
 export function inClockFolder(item) {
-  const path = typeof item.playlist === "string" ? (item.external === false ? null : item.playlist) : item.external === true ? item.file : null;
-  return inClocks(path);
+  if (typeof item.playlist === "string") return (onlyBoth || item.external !== false) && inClocks(item.playlist);
+  return (onlyBoth || item.external === true) && inClocks(item.file);
 }
 
 export function canPlay(item) {
@@ -1280,6 +1513,10 @@ export function clockMode(mode) {
 
 export function clockMessage(on) {
   return requestOperation("clocks", () => commands.clockMessage(on));
+}
+
+export function clockStorage(storage) {
+  return requestOperation("clocks", () => commands.clockStorage(storage));
 }
 
 export function debugMini(on) {

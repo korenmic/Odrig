@@ -1,5 +1,6 @@
 // The operator makes a folder of the card at the root, selects an internal animation and
-// moves it into that folder, the destination shown before it is sent.
+// moves it into that folder, the destination shown before it is sent. `ends` is what the
+// message at the move's end says, `Moved 1 of 1` unless the settings name another.
 
 import {rowOf, shown, startSelection} from "../reading.js";
 
@@ -50,7 +51,7 @@ export default async function (app) {
   seen.preview = app.text("move-preview");
   seen.go = go.textContent.trim();
   go.click();
-  await app.until(() => app.says("Moved 1 of 1"), "the move's end", 30000);
+  await app.until(() => app.says(settings.ends ?? "Moved 1 of 1"), "the move's end", 30000);
   seen.message = app.text("message-text");
   return seen;
 }

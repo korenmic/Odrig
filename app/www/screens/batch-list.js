@@ -193,6 +193,8 @@ function drawRows(locked) {
 
 // Why the list's button is disabled now, or null.
 function lockedReason(state, reason) {
+  const boundary = destinations.blocked(list.form, state.space, client.clocksOnly());
+  if (boundary !== null) return boundary;
   if (list.rows.some((row) => why(row) !== null)) return MEND;
   const external = list.form.storage === "external";
   const space = state.space;
@@ -211,7 +213,8 @@ export function draw(state, reason = null) {
   if (!shown) return;
   const running = batch.running();
   const ran = running || list.ran;
-  if (!ran) destinations.synchronize(list.form, state.space);
+  const only = client.clocksOnly();
+  if (!ran) destinations.synchronize(list.form, state.space, only);
   if (!ran && list.lastStorage !== undefined && list.form.storage !== list.lastStorage) name(list.rows.filter((row) => !row.edited));
   list.lastStorage = list.form.storage;
   const count = sendable().length;
@@ -219,7 +222,10 @@ export function draw(state, reason = null) {
   byId("batch-capacity").textContent = list.form.storage === "external" ? capacity.external(state.space, undefined) ?? "" : `Internal storage: ${capacity.internal(state.space, undefined)}`;
   const selector = byId("batch-storage");
   selector.value = list.form.storage;
-  selector.options[0].disabled = !destinations.present(state.space);
+  // In Clocks only the selector offers the storage of the folder explored alone.
+  const offered = only ? destinations.storageInOnly(list.form) : null;
+  selector.options[0].disabled = !destinations.present(state.space) || offered !== null && offered !== "external";
+  selector.options[1].disabled = offered !== null && offered !== "internal";
   selector.disabled = ran;
   byId("batch-destination").textContent = destinations.label(list.form, "");
   byId("batch-destination-reason").textContent = destinations.reason(list.form, state.space);
@@ -240,7 +246,7 @@ export function draw(state, reason = null) {
 // Moves the list's destination to a storage the operator chose.
 export function choose(storage, state) {
   if (list === null || list.ran || batch.running()) return;
-  destinations.select(list.form, storage, state.space);
+  destinations.select(list.form, storage, state.space, client.clocksOnly());
   draw(state);
 }
 
@@ -286,8 +292,8 @@ export async function press(message) {
   list.pressing = true;
   draw(client.state);
   try {
-    const fresh = await client.uploadSnapshot(external ? form.level : {path: "", id: null});
-    if (destinations.synchronize(form, fresh.space)) {
+    const fresh = await client.uploadSnapshot(destinations.snapshotLevel(form));
+    if (destinations.synchronize(form, fresh.space, client.clocksOnly())) {
       draw(client.state);
       message(`The destination changed to ${byId("batch-destination").textContent}. Review it and press Upload again.`);
       return;

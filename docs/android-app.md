@@ -148,6 +148,7 @@ maps its actions to command lines, each sent as `POST /odrig` to the address tha
 | Presses `Save` on that bar | `repeat <id> <n> save` |
 | Presses `Restore default` on that bar | `repeat <id> default` |
 | Chooses `Off`, `Between animations` or `Clocks only`, or changes `The message after each clock` | `clocks off`, `clocks on`, `clocks only`, `clocks message on`, `clocks message off` |
+| Chooses SD card or Internal storage under Preferred storage | `clocks storage sd`, `clocks storage internal` |
 | Opens the target screen while the installation answers | `fault` |
 | Opens Settings, or waits two seconds while Settings is visible, and after it sent a rebuild or a cancel; nothing: when the target first answers, when it answers again after a silence, and after every complete list | `catalog` |
 | Nothing: after `catalog` showed a storage's catalog of another generation or number of entries than the one the app read, every page of it from offset 0 to its end, one request after the other | `catalog page <storage> <page> <offset>` |
@@ -1148,12 +1149,26 @@ photo leaves the phone.
 
 **Clocks.** The Settings panel has one `Clocks` dropdown: `Off`, `Between animations`,
 `Clocks only`. Between inserts a clock after five animations or five minutes and resumes
-the interrupted animation. Only plays the external `clocks` program exclusively. The
+the interrupted animation. Only plays the `clocks` programs exclusively: the card's, and on
+a target whose status reports `clock_storage` the board's own too, whose description says
+`Clocks only restricts playback to the clocks folders.`; on another the external `clocks`
+program alone, as its description says. The
 independent `The message after each clock` checkbox inserts one complete animation from
 `clocks/message` in either enabled mode. Messages and clock faces each use their own
 shuffled bag; every eligible direct child has a turn before that bag reshuffles.
 
-The controls follow fresh target status. While a change is pending, both controls are
+Under the mode's dropdown stands a second, `Preferred storage for matching clock/message
+files`, with the explanation `Applies when the same relative path and file type exist in
+both storages.` and two options, `SD card` and `Internal storage`, which send `clocks
+storage sd` and `clocks storage internal`. It is a control of its own, apart from the mode,
+and follows the target's `clock_storage` as the mode's follows `clock_mode`; once a status
+confirms a choice, the panel says `Saved: matching files play from the SD card.` or `Saved:
+matching files play from internal storage.`. It is disabled while the saved clock settings
+are unreadable. A target whose status has no `clock_storage`, an older firmware, shows it
+disabled at `SD card` with the words `This target plays the card's clocks and messages
+only. Update its firmware to use those of the board's own storage.`
+
+The controls follow fresh target status. While a change is pending, the three controls are
 disabled. A successful command acknowledgement is followed by status confirmation before
 the panel says `Saved:`. A refusal restores the reported setting and explains busy,
 invalid-show or storage failure. A lost reply is explicitly unconfirmed; a later fresh
@@ -1161,8 +1176,16 @@ status shows the actual setting without claiming the reply was acknowledged. A d
 reported choice is shown as such. Reconnect and other controllers update the controls;
 changing targets clears pending state and ignores replies belonging to the old target.
 
+On a target that reports `clock_storage` the waiting reasons of Only name both storages:
+`no-card` says `Clocks only is waiting: internal storage has no clocks folder and no external
+storage is present.`, `missing-folder` says `Clocks only is waiting: neither storage has a
+clocks folder.`, and `playing` says `Only the clocks folders play.` before the browsing
+boundary. On another target they name the external clocks folder.
+
 Selecting Only opens the resolved Clocks folder on Animations. Browsing stays inside
-that folder and its descendants; Back stops at Clocks. Direct navigation uses the same
+that folder and its descendants; Back stops at Clocks. On a target that reports
+`clock_storage` and has a Clocks folder in each storage, Only opens the Clocks level of the
+two instead, and Back stops there (below). Direct navigation uses the same
 guard as the visible controls. Later status reconciles the folder's current ID while
 preserving valid Clocks descendants. If automatic recovery cannot resolve that location,
 the app shows an unavailable Clocks view and retries its ancestry without publishing
@@ -1178,10 +1201,50 @@ manually playable when ignored or when automatic messages are off. Display tests
 leaving Only first. Missing storage, missing Clocks or no eligible face keeps Only
 selected, with an explanation and dark output; a missing resolved folder disables restart.
 
-In Only, upload preparation and final preflight require a writable external destination
-inside Clocks. Missing external storage cannot redirect the attempt to internal root,
-and Internal is unavailable in the storage selector. A prepared destination stays fixed;
-entering Only later cannot move an outside draft into Clocks silently. Shared upload
+On a target that reports `clock_storage` the boundary holds the Clocks subtrees of both
+storages. The board's own `clocks`, `clocks/message` and their sub-folders are shown,
+played and uploaded into as the card's are. The storage of the folder `clock_only.folder`
+names is told by its id, the card's above 60,000. When the root's list has a `clocks` folder
+of each storage, Only opens the Clocks level: a level titled `Clocks` that shows only the two,
+`Internal /clocks` and `External /clocks`, and takes no upload. Back from either Clocks
+folder goes there and no higher. When one storage has one, its Clocks folder is the level of
+Only, as before. Until the root's list is known, Only opens the folder the status names; when
+the root's list, which the app reads in the background while a Clocks folder is shown, names
+the other storage's Clocks folder too, the Clocks level is put under the folder shown, so
+that Back reaches it. A status that names another folder takes the trail back to the Clocks
+level while the root's list names the other storage's Clocks folder, else to the folder it
+names. A root's list that no longer has one of the two takes the Clocks level from under the
+trail: a level shown inside the Clocks folder that remains stays, and else the trail goes to
+that folder, without the unavailable Clocks view. The status names the card's Clocks folder
+as the playlist whichever storage's file plays, so of the two the one of the storage of the
+file playing is marked. A turn of a file of the other storage, which has the path of a file
+of the level shown, reads no list again. On a target without `clock_storage` no folder of
+the board's own storage is inside the boundary, whatever its path.
+
+The line of the animation playing now and the brightness screen's line of the animation name
+the storage of a file of a Clocks subtree on a target that reports `clock_storage`: `Now 12
+Internal /clocks/message/v7-the-time.odrgx`, `Animation 60004: External /clocks/analog.odrgx`.
+The storage is told by the file's row in a list, an id of 60,000 or less being the board's
+own. When no list the app read named the row, it reads, once for that file and in the
+background, the root's list and the lists of the file's folder of each storage, the card's
+first; a read that gets no answer, or is answered busy, is made again at a later status.
+Other files, and every file on another target, read as before.
+
+In Only, upload preparation and final preflight require a destination inside a Clocks
+folder: a writable one on the card, or on a target that reports `clock_storage` one of the
+board's own too. The Upload screen's, the batch's and the archive's storage selectors offer
+only the storage of the folder explored, and the archive goes into that folder under the
+last part of each path. At the Clocks level, at the board's root and in the unavailable
+Clocks view nothing is uploaded: the three forms say `Clocks only: choose a folder inside
+Clocks, a writable one on the card, or leave this mode in Settings.` on a target that reports
+`clock_storage`, and `Clocks only: choose a writable external folder inside Clocks, or leave
+this mode in Settings.` on another. Missing external storage cannot redirect the attempt to
+internal root, and in a folder of the card Internal is unavailable in the storage selector.
+A prepared destination stays fixed: entering Only later cannot move an outside draft into
+Clocks silently, and an archive opened in Only keeps its folder after Only is left, a name
+with `/` refused in the words `An archive opened in a folder goes into that folder: use a
+name without /.` An upload that a confirmed Only stops, of a text, a clock or a move too, is
+said in the words of the target's boundary above. Shared upload
 jobs recheck the boundary before each next step and cancel an opened staging upload
 when a confirmed mode change makes its destination invalid. The text/clock authoring
 form still previews, but its internal-root Upload/Save stays disabled until leaving Only.
@@ -1287,6 +1350,9 @@ it is dismissed with `OK` or another takes its place.
 | `busy` | A removal while the installation still reads what it has installed after a start, or while an upload is open; a rebuild while another runs or an upload is open; an upload to the card while its catalog is read. | The installation is busy. Try again in a moment. |
 | `in-use` | A removal of an animation that a cycle plays or that a USB stick holds. | Animation `<id>` cannot be removed: a cycle plays it, or it is on a USB stick. |
 | `in-use` | Play outside Clocks only, or raw `play all` in that mode. | Clocks only allows playback inside the Clocks folder. Leave Clocks only in Settings to play elsewhere. |
+| `in-use` | The same, on a target that reports `clock_storage`. | Clocks only allows playback inside the clocks folders. Leave Clocks only in Settings to play elsewhere. |
+| `in-use` | An upload outside the boundary of Clocks only. | Clocks only: choose a writable external folder inside Clocks, or leave this mode in Settings. |
+| `in-use` | The same, on a target that reports `clock_storage`. | Clocks only: choose a folder inside Clocks, a writable one on the card, or leave this mode in Settings. |
 | `in-use` | A display-taking mapping test while Only owns playback. | Leave Clocks only in Settings before starting a display test. |
 | `in-use` | Inclusion of an unsupported item or on older firmware. | This target does not support playlist inclusion for that item. |
 | `read-only` | A removal of an animation of the card while the installation cannot write it. | Animation `<id>` cannot be removed: the card cannot be written now. |
@@ -1506,8 +1572,15 @@ installed; the phone with mobile data on.
     still targets Clocks. Play an inside message with automatic messages off; try Ignore
     on a face, a message and their folders, including an inherited child choice, then
     Include. Check dark recovery when all faces are excluded, mode restoration, reconnect
-    and another controller's changes. Repeat upright and sideways. These physical and
-    phone observations remain open until actually performed.
+    and another controller's changes. Repeat upright and sideways. With a firmware whose
+    status reports `clock_storage`, choose `Internal storage` under `Preferred storage for
+    matching clock/message files`, see `Saved: matching files play from internal storage.`,
+    and see the choice again after a restart of the board; choose `SD card` again. With a
+    `clocks` folder on the card and in the board's own storage, choose Only: the Clocks level
+    shows `Internal /clocks` and `External /clocks`, Back stops at `Clocks`, a face and a
+    message of the board's own `clocks/message` play, and an upload goes into it with only
+    `Internal` offered. These physical and phone observations remain open until actually
+    performed.
 24. **Time and scheduled hours.** Keep board brightness at40 or less. In Settings,
     *Seen:* the confirmed time/zone matches the phone, automatic sync starts on, and
     disabling it survives reopening. Set a short daily interval excluding now, save,
@@ -1763,6 +1836,10 @@ physical acceptance are in [verification.md](specs/64-p2-board-time-and-daily-on
 
 - **Seed 54 on a phone and on the board.** No program has seen the panel `Clocks` on a
   phone, nor a clock between the animations on the LEDs: step 23 above.
+- **Seed 61 on a phone.** Nobody has chosen the preferred storage on a phone and seen it kept
+  across a restart of the board, nor seen Clocks only show the Clocks level of both storages,
+  play and take an upload inside the board's own `clocks/` and `clocks/message/`: step 23
+  above.
 
 - **Seed 33 on a phone and on the board.** Nobody has seen the line of the reading, the
   name of the board and its last fault on a phone; that belongs to the seed's board

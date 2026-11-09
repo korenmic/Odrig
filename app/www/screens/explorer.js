@@ -55,7 +55,7 @@ export function busy() {
 
 function refusalText(error) {
   if (error instanceof Refusal && error.code === "unknown-command") return "This installation's firmware cannot do this. Install the newer firmware.";
-  if (error instanceof Refusal) return messages.ofRefusal(error, client.state.status?.error ?? null);
+  if (error instanceof Refusal) return messages.ofRefusal(error, client.state.status?.error ?? null, client.state.status?.hasClockStorage === true);
   if (error instanceof Failure) return messages.ofFailure(error);
   return error.message;
 }

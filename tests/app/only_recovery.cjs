@@ -10,6 +10,9 @@ function body(name, required = true) {
 const context = vm.createContext({console});
 vm.runInContext(`
 let target = 0, connectionDue = false, onlyActive = false, onlyFolder = null, onlyDesired = 'clocks';
+let onlyBoth = false, rootDue = false, clockAsk = null;
+const clockAsked = new Set(), clockRows = new Map();
+const CLOCKS_LEVEL = Object.freeze({path:'', id:null, storage:null, clocks:true});
 let statusTimer = null, statusDue = false;
 const trail = [], paths = [];
 let listing = null, ordering = null, orderDue = false, listDue = false, askedFor = null;
@@ -33,7 +36,8 @@ function clearTimeout() {}
 function setTimeout() { return 1; }
 function listAgainLater() {}
 function parentOf(value) { return value.slice(0, value.lastIndexOf('/')); }
-${['inClocks', 'unavailableClocks', 'reconcileOnly', 'takeStatus'].map(name => body(name, false)).join('\n')}
+${['inClocks', 'unavailableClocks', 'reconcileOnly', 'takeStatus', 'storageOfClockId', 'clockStep', 'bothClockFolders',
+  'oneOfBoth', 'clocksTrail', 'openClocks', 'sameFolder', 'remainingClocks', 'fitClocks', 'clockStorageOf'].map(name => body(name, false)).join('\n')}
 ${['askStatus', 'recoverLevel', 'toLevel'].map(name => body(name)).join('\n')}
 `, context);
 (async () => {

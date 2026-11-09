@@ -42,6 +42,9 @@ function side(value) {
 // The readiness of a target after its start, as `status` reports it.
 const READINESS = ["checking", "ready", "degraded", "recovery"];
 
+// The storages a copy of a clock or a message may play from first.
+const CLOCK_STORAGES = ["sd", "internal"];
+
 // The most files a count of `status` names.
 const MOST_FILES = 1000000;
 
@@ -86,7 +89,9 @@ function progressOf(reply) {
 // and its animation's saved repeat, `saved`, each null while the target reports none, with
 // `hasRepeat` and `hasSaved` saying whether the target reports them; and whether a clock plays
 // between the animations, `clocks`, and the message after each clock, `clockMessage`, each
-// null from a target that does not report them.
+// null from a target that does not report them; and the storage whose copy of a clock or a
+// message plays first, `clockStorage`, "sd" or "internal", with `hasClockStorage` saying
+// whether the target reports it: one that does plays the clocks of both storages.
 export async function status() {
   const reply = await carriedOut("status");
   const dimming = reply.dimming;
@@ -127,6 +132,7 @@ export async function status() {
     countOrNull(reply.saved, MOST_SAVED) &&
     (reply.clocks === undefined || typeof reply.clocks === "boolean") &&
     (reply.clock_message === undefined || typeof reply.clock_message === "boolean") &&
+    (reply.clock_storage === undefined || CLOCK_STORAGES.includes(reply.clock_storage)) &&
     (reply.timing === undefined || typeof reply.timing === "boolean");
   if (!sound || !miniSound || !dimmingSound || !modeSound ||
       (reply.clock_error !== undefined && reply.clock_error !== null && reply.clock_error !== "unreadable")) {
@@ -158,6 +164,8 @@ export async function status() {
     clockMode,
     clockError: reply.clock_error ?? null,
     clockOnly: hasClockMode && only !== null ? {...only} : null,
+    hasClockStorage: reply.clock_storage !== undefined,
+    clockStorage: reply.clock_storage ?? null,
     mini: mini === undefined ? null : {...mini},
     ...(reply.timing === undefined ? {} : {timing: reply.timing}),
   };
@@ -509,6 +517,13 @@ export async function rotationSet(revision, degrees) {
 // Switches the message after each clock on or off.
 export async function clockMessage(on) {
   await carriedOut(`clocks message ${on ? "on" : "off"}`);
+}
+
+// Chooses the storage whose copy of a clock or a message plays when both storages hold one:
+// "sd" for the card, "internal" for the board's own storage.
+export async function clockStorage(storage) {
+  if (!CLOCK_STORAGES.includes(storage)) throw new RangeError("unknown clock storage");
+  await carriedOut(`clocks storage ${storage}`);
 }
 
 // Removes an animation's saved repeat: its turns play its own count again.

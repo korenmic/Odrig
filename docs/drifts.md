@@ -14682,6 +14682,113 @@ kept.
 (`test_clocks_with_the_preferred_storage_are_preserved_and_read_back_byte_for_byte`),
 `docs/firmware.md`.
 
+## Seed 61: the Clocks level in the app
+
+**Question.** The design gives Clocks only, while both storages have a Clocks folder, a
+Clocks level of the root that shows only the two Clocks folders, each with its storage. What
+is that level to the rest of the app: its title, the names of its rows, its list, its order
+and its uploads?
+
+**Answer.** It is the root's list, of which only the two rows whose path is `clocks` are
+shown, under the title `Clocks`; each row is named by its storage, `Internal /clocks` and
+`External /clocks`, as an upload's destination is, and its button and its menu say so too.
+The level has no files, so it reads no saved order, and it drops no upload place: its list is
+the root's whole list. In Only the status names the card's Clocks folder as the playlist
+whichever storage's file plays, and both rows have one path: the row of the storage of the
+file playing is marked, as `clockStorageOf` tells it, or while that is not known the row whose
+id the status names; the head of either Clocks folder is marked by the same storage. An upload
+of any kind is refused there, as at the board's root.
+
+**Resolution.** `app/www/client.js` (`CLOCKS_LEVEL`, `askListPart`), `app/www/screens/show.js`
+(`levelOf`, `folderRow`, `rowsState`), `docs/android-app.md` ("Clocks"),
+`tests/app/test_only_both.py`.
+
+## Seed 61: when the app reads the root's list in Clocks only
+
+**Question.** The design reads the root's list in the background to learn the other
+storage's Clocks folder, and takes the trail back when a root's list no longer has one of
+the two. When is it read, and what of a level below the remaining folder?
+
+**Answer.** On a target that reports `clock_storage`, when Only is entered, when the status
+names another folder, and at every refresh of the list while a Clocks folder, not the Clocks
+level, is shown: every ten seconds, as the list itself. The Clocks level's own list is the
+root's. A root's list that has only one of the two drops the Clocks level from the trail; a
+level shown below the folder that remains stays, else the trail goes to that folder. The
+folder that remains is the one the status names while the list names it too, else the one
+the list names: a list read one status before the status names the other folder does not take
+the trail to a folder that is gone. A status that names another folder opens the Clocks level
+while the newest root's list names the other storage's Clocks folder, also when that list
+does not name the folder the status names yet, as when a card with a Clocks folder is put in;
+the Clocks level's own list then tells whether both are there. A folder shown whose storage's
+Clocks folder is gone, while the status names the other storage's, goes where Only opens, not
+through the unavailable Clocks view, which stays for a status that names no folder. On a
+target without `clock_storage` the root's list is not read for it, so a show whose Clocks
+folder is the card's alone asks for nothing more than an older firmware's.
+
+**Resolution.** `app/www/client.js` (`reconcileOnly`, `fitClocks`, `listAgainLater`,
+`askRootPart`), `docs/android-app.md` ("Clocks").
+
+## Seed 61: the storage of a Clocks file that no list the app read named
+
+**Question.** The bar of the animation playing now names the storage of a Clocks file by its
+row of `list`. In Between the root is shown, and in Only a message often plays while its
+folder is not shown: no list the app holds has the row. What does the line say then?
+
+**Answer.** An id of 60,000 or less is the board's own, as `docs/commands.md` says, and needs
+no row. For another, the app reads once for that id and file, in the background after the
+list, the space and the catalog, the root's list and the lists of the file's folder in the
+card and then in the board's own storage, until one names the id; every file of a Clocks
+subtree a list names is kept with its storage until the target changes. A read that gets no
+answer, or is answered `busy`, is made again at a later status; another refusal is not. Until
+it knows, and when no list names it, the line names the file without a storage. The storage
+also keeps a turn of a file of the other storage's Clocks subtree, which has the path of a
+file of the level shown, from reading the level's list again as for a file it lacks.
+
+**Resolution.** `app/www/client.js` (`clockStorageOf`, `askClockRows`, `noteClockRows`,
+`takeStatus`), `app/www/messages.js` (`playingFile`), `app/www/screens/show.js`,
+`app/www/screens/brightness.js`, `tests/app/test_only_both.py`
+(`test_the_storage_of_a_clocks_file_playing_between_the_animations_is_asked_for_once`,
+`test_a_busy_answer_to_the_read_of_a_clocks_files_storage_is_asked_again`,
+`test_turns_of_the_boards_faces_read_the_cards_clocks_folder_no_more_often`).
+
+## Seed 61: the archive and the batch in Clocks only
+
+**Question.** In Only every way of uploading offers only the storage of the folder explored.
+An archive goes to the root of the board's storage, or to its paths on the card, which in
+Only were refused file by file; and the batch's button was enabled where every file would be
+refused. What do they do in Only?
+
+**Answer.** An archive opened in Only goes into the folder explored, of either storage, each
+file under the last part of its path; a name with `/` is refused in words that do not name
+the mode, as the archive keeps that folder after Only is left, as a prepared destination
+stays fixed. An archive opened outside Only goes to the root of the board's storage, or to
+its paths on the card. A file replaced in a folder of the board's own storage is found among
+that folder's rows. The archive's and the batch's buttons are disabled where the Upload
+screen's is, with the same words: at the Clocks level, at the board's root and in a folder
+outside.
+
+**Resolution.** `app/www/screens/archive.js`, `app/www/screens/batch-list.js`,
+`app/www/batch.js`, `app/www/upload-destination.js` (`storageInOnly`, `blocked`),
+`tests/app/test_only_both.py`.
+
+## Seed 61: the words of the panel and of the refusals on either target
+
+**Question.** The design gives new words to the panel and to the Only refusals of `play` and
+`upload`, and keeps today's on a target without `clock_storage`. It names no saved words for
+`Clocks only` on the new target, and the refusals are worded without knowing the target.
+
+**Answer.** On a target that reports `clock_storage`, `Saved: only the clocks folders
+play.`, the description `Clocks only restricts playback to the clocks folders.`, the title of
+a Play outside, and the two refusals name the clocks folders; on another, every word is
+today's. The words of a refusal take whether the target reports `clock_storage` from the
+status, as they take an invalid show's reason, at every place that words a refusal of an
+upload: the Upload screen, the batch and the archive, a text or a clock, and a move. The
+dropdown says what it saved in the panel's one line, as the mode and the message do.
+
+**Resolution.** `app/www/screens/clocks.js`, `app/www/messages.js` (`ofRefusal`),
+`app/www/main.js`, `app/www/screens/author.js`, `app/www/screens/explorer.js`,
+`docs/android-app.md` ("Clocks", "Messages").
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

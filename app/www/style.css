@@ -1192,7 +1192,8 @@ input[type="checkbox"] {
   margin-bottom: 8px;
 }
 
-#clocks {
+#clocks,
+#clock-storage {
   width: 100%;
   min-height: 48px;
   margin-bottom: 12px;
