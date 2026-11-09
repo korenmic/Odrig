@@ -8,6 +8,7 @@
 
 import * as commands from "./commands.js";
 import {crc32} from "./crc32.js";
+import {Failure} from "./target.js";
 import {ZipWriter, fits} from "./zip-writer.js";
 
 export const MANIFEST = "odrig-backup.json";
@@ -69,15 +70,29 @@ function sameTarget(context) {
   if (context.changed()) throw new Changed("Another target was chosen while it was read: nothing was saved.");
 }
 
-// Waits for a request the client sends in its turn; one withdrawn while the app was hidden
-// is asked again once it is shown, for the same target.
+// How many times in all a line is sent while its reply is lost.
+const SENDS = 3;
+
+// Waits for a request the client sends in its turn. One withdrawn while the app was hidden is
+// asked again once it is shown, for the same target; one whose reply did not come is sent
+// again, as every request of a run only reads, until the reply of one of its lines was lost
+// SENDS times: a request may send more than one line, the probe and a piece. A refusal is the
+// target's answer and is not asked again, nor anything after Stop or a change of target.
 async function again(context, request) {
+  const lost = new Map();
   for (;;) {
     try {
       return await request();
     } catch (error) {
-      if (!(error instanceof context.client.Withdrawn) || context.stopped() || context.changed()) throw error;
-      await context.visible();
+      if (context.stopped() || context.changed()) throw error;
+      if (error instanceof context.client.Withdrawn) {
+        await context.visible();
+        continue;
+      }
+      if (!(error instanceof Failure && error.kind === "no-answer")) throw error;
+      const times = (lost.get(error.line) ?? 0) + 1;
+      if (times >= SENDS) throw error;
+      lost.set(error.line, times);
     }
   }
 }
@@ -152,6 +167,9 @@ async function readChecked(context, file, progress) {
     error.fault = before.fault ?? null;
     throw error;
   }
+  // The key the catalog gives the file now, which serves when the app has forgotten the keys
+  // by the end of the read, as it does when the target answers again after a silence.
+  const known = context.client.keyOf(before.row);
   const parts = [];
   let read = 0;
   for (;;) {
@@ -172,7 +190,7 @@ async function readChecked(context, file, progress) {
     at += part.length;
   }
   const crc = crc32(bytes);
-  const key = context.client.keyOf(before.row);
+  const key = context.client.keyOf(before.row) ?? known;
   if (key !== null && key !== `${crc}-${read}`) throw new Error("Its bytes are not the ones its storage's catalog names.");
   const rows = await rowsAround(context, file);
   const after = sameFile(rows, file);

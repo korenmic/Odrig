@@ -1,7 +1,8 @@
 // The operator downloads an animation from its row's menu, or selects files and folders of
 // a level and presses Download selected, which saves one zip of one storage, and may press
 // Stop or choose another target while it runs. The bytes the app hands to the browser as a
-// download are what the scenario gives the test.
+// download are what the scenario gives the test. Replies of the target may be lost on the
+// way back to the app.
 
 import {choose, menuOf, rowOf, shown, startSelection} from "../reading.js";
 
@@ -20,6 +21,25 @@ function capture(app) {
     saved.push({name: this.download, blob: blobs.get(this.href)});
   };
   return saved;
+}
+
+// Replies the target sends that never reach the app, as if lost on the way: each rule
+// `{line, times, after}` takes the reply of the next `times` lines, one by default, that its
+// pattern matches, once a line matching `after`, when given, has been sent.
+function lose(app, rules) {
+  const view = app.frame.contentWindow;
+  const send = view.fetch.bind(view);
+  const left = rules.map((rule) => ({line: new RegExp(rule.line), times: rule.times ?? 1, after: rule.after === undefined ? null : new RegExp(rule.after)}));
+  view.fetch = async (url, init) => {
+    const line = typeof init?.body === "string" ? init.body : "";
+    const rule = left.find((each) => each.times > 0 && each.after === null && each.line.test(line));
+    for (const each of left) if (each.after !== null && each.after.test(line)) each.after = null;
+    const answer = await send(url, init);
+    if (rule === undefined) return answer;
+    rule.times -= 1;
+    await answer.text();
+    throw new view.TypeError("Failed to fetch");
+  };
 }
 
 async function base64Of(blob) {
@@ -41,8 +61,9 @@ function folderPick(app, path) {
   return row.querySelector(".pick input");
 }
 
-async function saved(app, files, count) {
-  await app.until(() => files.length >= count && !app.byId("message").hidden, "the file saved and the message", 30000);
+// The end of the run: its dialog closed and its message shown, and the files it saved.
+async function saved(app, files) {
+  await app.until(() => app.byId("download-dialog").hidden && !app.byId("message").hidden, "the end of the run and its message", 60000);
   return {message: app.text("message-text"), files: await Promise.all(files.map(async (file) => ({name: file.name, data: await base64Of(file.blob)})))};
 }
 
@@ -50,10 +71,16 @@ export default async function (app) {
   const settings = app.settings;
   await shown(app, settings.rows);
   const files = capture(app);
+  lose(app, settings.lose ?? []);
   const seen = {};
   // The sizes of the animations, which the board knows once it has read them after its start.
   await app.until(() => [...app.doc.querySelectorAll("#animations-list > .row")].every((row) => row.dataset.fault !== "" ||
     !row.querySelector(".meta").textContent.includes("size not read yet")), "the sizes of the animations", 15000);
+  if (settings.keyed) {
+    // The keys of the board's storage, once the app has read its catalog's pages.
+    const client = await app.frame.contentWindow.eval('import("/client.js")');
+    await app.until(() => client.state.keys.internal !== null, "the keys of the board's storage", 10000);
+  }
   for (const path of settings.enter ?? []) await enter(app, path);
   if (settings.rowsThere !== undefined) {
     await app.until(() => app.doc.querySelectorAll("#animations-list > .row").length === settings.rowsThere, "the level's rows", 10000);
@@ -72,7 +99,7 @@ export default async function (app) {
       hidden = false;
       app.doc.dispatchEvent(new Event("visibilitychange"));
     }
-    Object.assign(seen, await saved(app, files, 1));
+    Object.assign(seen, await saved(app, files));
     return seen;
   }
   // The selection: a row's Select, then the files and folders asked for, or all the files.
@@ -117,7 +144,7 @@ export default async function (app) {
       return seen;
     }
   }
-  Object.assign(seen, await saved(app, files, 1));
+  Object.assign(seen, await saved(app, files));
   seen.dialogHidden = app.byId("download-dialog").hidden;
   return seen;
 }

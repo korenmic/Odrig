@@ -15124,6 +15124,78 @@ follows a folder moved inside Clocks, as before.
 
 **Resolution.** `app/www/moves.js` (`follow`), `docs/android-app.md`,
 `tests/app/test_moves.py`.
+## Seed 74: a lost reply of a download's or a backup's read is sent again
+
+**Question.** On the emulated phone about one reply in ten was lost, and one lost reply
+ended a whole `Download`, which may need thousands of reads of 720 bytes: the job asked again
+only for a request withdrawn while the app was hidden. In `Download selected` it failed the
+file, and ended the backup while the selected folders or the catalog's generation were read.
+Is a request whose reply did not come sent again?
+
+**Answer.** Yes. Every request of a download or a backup only reads: `read`, the probe
+`read <id> 0 1`, `list` and `list in`, `saved` and `catalog`; one sent again changes nothing
+on the installation. One whose reply does not come, the client's `no-answer`, is sent again,
+up to three times in all, before the file fails or the run ends as it did, in the same words.
+Three, not the once of `move external`, because a download sends many more lines, each of
+which waits up to five seconds for its reply; the count is for each request, so lost replies
+of different requests do not add up. A refusal is the installation's answer and is never
+sent again; `no-wifi` and a reply that is not one are not lost replies and end as before;
+`Stop`, a change of target and a request withdrawn while the app was hidden keep their
+meaning, and the probe still falls back to 600 bytes after `bad-argument`. Whether replies
+are lost on the installation's own Wi-Fi is for the board to show.
+
+**Resolution.** `app/www/backups.js`, `docs/android-app.md`, `tests/app/test_downloads.py`,
+`tests/app/page/scenarios/downloads.js`.
+
+## Seed 74: a file whose read lost a reply is still checked against its catalog's key
+
+**Question.** The entry "Seed 74: a lost reply of a download's or a backup's read is sent
+again" lets a read go on after a lost reply. The client forgets every key when the target
+answers again after a silence, and asks for `catalog` again only after the download's own
+requests that wait; a file is checked against the key the app knows at the end of its read.
+After a lost reply near the end of the file no key was known then, and a file whose bytes
+are not the ones its catalog names was saved, in a backup as `saved`. Which key is a file
+checked against?
+
+**Answer.** The key the app knows once the file is read, or, when it knows none then, the
+one it knew before the first piece. The keys are forgotten after a silence because another
+storage may answer now; a file whose pieces came from two storages is then not the file of
+the key from before, and fails, which is what the check is for. The client still forgets the
+keys as before: only the job keeps the one of the file it reads.
+
+**Resolution.** `app/www/backups.js`, `docs/android-app.md`, `tests/app/test_downloads.py`,
+`tests/app/page/scenarios/downloads.js`.
+
+## Seed 74: lost replies are counted for each line
+
+**Question.** The entry "Seed 74: a lost reply of a download's or a backup's read is sent
+again" says that the count is for each request, so that lost replies of different requests
+do not add up. One request of the client's may send more than one line: the probe
+`read <id> 0 1` and then the first piece, or after `bad-argument` the piece, the probe again
+and the piece of 600 bytes. Their lost replies were counted together, so a probe whose reply
+was lost twice ended the download at the first lost reply of the piece, sent only once. What
+is counted?
+
+**Answer.** Each line: a request is sent again until the reply of one of its lines was lost
+three times. Each send again follows a lost reply, which adds to the count of its line, so a
+request is sent again at most twice for each of its lines before one ends it. A failure on the way
+names the line it was met for, as a refusal already does.
+
+**Resolution.** `app/www/backups.js`, `app/www/commands.js`, `app/www/target.js`,
+`docs/android-app.md`, `tests/app/test_downloads.py`.
+
+## Seed 74: `saved` is still asked again after `busy` in a backup
+
+**Question.** The entry "Seed 74: a lost reply of a download's or a backup's read is sent
+again" says that a refusal is the installation's answer and is never sent again, and
+`docs/android-app.md` said it is not asked again. A backup asks `saved` again after `busy`,
+up to five times half a second apart, as the same page says. Which holds?
+
+**Answer.** Both, each for its own reason. A refusal never has a request sent again as a
+lost reply does; only `saved` is asked again, after `busy`, because the board answers `busy`
+until it has read what it keeps. `docs/android-app.md` now says so; the code is as it was.
+
+**Resolution.** `docs/android-app.md`.
 
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
