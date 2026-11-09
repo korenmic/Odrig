@@ -15084,6 +15084,28 @@ phone, until Only is left, since finishing it would take its files out of Clocks
 `app/www/screens/explorer.js`, `app/www/messages.js`, `docs/android-app.md`,
 `docs/commands.md`, `tests/app/test_only_both.py`.
 
+## Seeds 61 and 74: a kept move in Clocks only that moves nothing
+
+**Question.** A move cut short whose destination is outside Clocks waits in Clocks only
+until the mode is left. All the kept moves of the target waited when one of them did, and
+a move that would move no file waited too: a file of the board's own Clocks folder moved
+under its own id, whose upload was cut before it installed the file, would only be given
+back the saved brightness and repeat the move took from it before the upload. Meanwhile it
+played in Only without them. A move between the storages cut after its settings were
+carried waited with its old file in Clocks without them as well. Which kept moves end in
+Only, and what does one that waits keep?
+
+**Answer.** Each kept move is judged alone. One whose new file was never installed ends as
+not moved in Only too, as outside it, a file moved under its own id given back its saved
+settings: nothing leaves Clocks. One whose new file is there, or a folder's, waits until
+Only is left, and the others go on. A move between the storages that waits gives its old
+file, while that file is still where the move found it, the saved brightness and repeat it
+carried from it, and takes them again when it finishes.
+
+**Resolution.** `app/www/moves.js` (`reconcile`, `closed`, `giveBack`),
+`app/www/screens/explorer.js`, `docs/android-app.md`, `tests/app/test_moves.py`,
+`tests/app/test_only_both.py`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

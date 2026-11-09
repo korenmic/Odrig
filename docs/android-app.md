@@ -694,8 +694,10 @@ only it offers only the Clocks folders and the folders below them, of the card a
 target that reports `clock_storage`, of the board's own storage, a storage without one
 disabled, and says the words of the boundary of uploads in Only below; a move that a
 confirmed Only meets, in its dialog or under way, sends nothing that would take a file out
-of Clocks, each file or folder failed in those words, and a move cut short that would
-waits until Only is left.
+of Clocks, each file or folder failed in those words. A move cut short whose destination is
+outside Clocks is not finished in Only: it waits until Only is left, its old file given back
+meanwhile the saved brightness and repeat the move took from it; one whose new file was
+never installed ends as not moved, as outside Only.
 
 A selected folder is listed as `Folder External /night/ → External /clocks/night/`, with
 each of its files and the path it takes under the new folder. A folder is skipped whole

@@ -3,9 +3,10 @@ Clocks level of the root's two Clocks folders, whose Back stops there; the folde
 board's own Clocks subtree browsed, played and uploaded into as the card's, by the single
 upload, the batch and the archive, each offering only the storage of the folder explored; no
 upload at the Clocks level; the line of the animation playing now with its storage, and the
-Clocks folder of that storage marked; the words of an upload Only stopped; and a target
-without `clock_storage`, whose Clocks only holds the card's Clocks folder alone, with its own
-words."""
+Clocks folder of that storage marked; the words of an upload Only stopped; moves kept on the
+phone, those that moved nothing ended in Only and the others finished once it is left; and a
+target without `clock_storage`, whose Clocks only holds the card's Clocks folder alone, with
+its own words."""
 
 import io
 import json
@@ -280,6 +281,36 @@ class OnTheEmulator(unittest.TestCase):
         card = board.folder.parent / "card" / "odrig"
         self.assertTrue((card / "clocks" / "cface.odrg").exists())
         self.assertFalse((card / "cface.odrg").exists())
+
+    def test_a_kept_move_that_moved_nothing_ends_in_only_and_one_that_would_take_a_file_out_waits_until_only_is_left(self):
+        board = Board(self, "only")
+        face = (board.folder / "1" / "face.odrg").stat().st_size
+        root = (board.folder / "root.odrg").stat().st_size
+        # The face moved under its own id towards the root, its upload never installed, its
+        # saved brightness 20 taken; and a file whose upload under its own id did put it at the
+        # root, its saved brightness 25 not given yet.
+        jobs = [{"source": {"id": 2, "storage": "internal", "path": "clocks/face.odrg", "folder": "clocks", "bytes": face, "ignored": False},
+                 "destination": {"storage": "internal", "folder": "", "name": "face.odrg", "path": "face.odrg"},
+                 "stage": "sending", "sameId": True, "settings": {"ignored": False, "brightness": 20, "repeat": None}},
+                {"source": {"id": 1, "storage": "internal", "path": "clocks/root.odrg", "folder": "clocks", "bytes": root, "ignored": False},
+                 "destination": {"storage": "internal", "folder": "", "name": "root.odrg", "path": "root.odrg"},
+                 "stage": "sending", "sameId": True, "settings": {"ignored": False, "brightness": 25, "repeat": None}}]
+        during = {}
+
+        def leave():
+            during["saved"] = json.loads(board.emulator.command("saved 2"))["brightness"]
+            during["lines"] = board.lines("brightness")
+            self.assertEqual(json.loads(board.emulator.command("clocks on")), {"ok": True})
+
+        seen = support.run("only-kept-moves", address=board.address, settings={"jobs": jobs, "kept": ["clocks/root.odrg"]}, steps=[leave]).seen
+        self.assertEqual(seen["only"]["mode"], "only")
+        self.assertEqual(seen["only"]["kept"], ["clocks/root.odrg"])
+        self.assertEqual(during, {"saved": 20, "lines": ["brightness 2 20 save"]})
+        self.assertEqual(seen["only"]["message"], "Not moved, left where they were: clocks/face.odrg.")
+        self.assertEqual(seen["left"]["message"], "Finished the interrupted move of clocks/root.odrg.")
+        self.assertEqual(board.lines("brightness"), ["brightness 2 20 save", "brightness 1 25 save"])
+        self.assertEqual(json.loads(board.emulator.command("saved 1"))["brightness"], 25)
+        self.assertTrue((board.folder / "1" / "face.odrg").exists())
 
     def test_an_archive_opened_in_only_keeps_its_folder_and_says_why_without_only_once_only_is_left(self):
         board = Board(self, "only")

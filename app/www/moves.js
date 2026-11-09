@@ -412,17 +412,21 @@ async function finish(job, context) {
     job.stage = "carried";
     record(address, job);
   }
+  if (await oldThere(job, operation)) await operation("move", () => commands.remove(source.id));
+  forget(address, job);
+  return newId;
+}
+
+// Whether a job's old file is still where the job found it: its id with its path and size.
+async function oldThere(job, operation) {
+  const {source} = job;
   // A job that names no folder of its source moves a file of the root of the board's own
   // storage, or one of the card, whose folder is that of its path.
   const folder = typeof source.folder === "string" ? source.folder : source.storage === "external" ? folderOf(source.path) : "";
   const level = await folderId(operation, folder, source.storage);
   const rows = level === undefined ? [] : await levelRows(operation, level);
   const old = rows.find((row) => row.id === source.id);
-  if (old !== undefined && old.file === source.path && old.bytes === source.bytes && storageOf(old) === source.storage) {
-    await operation("move", () => commands.remove(source.id));
-  }
-  forget(address, job);
-  return newId;
+  return old !== undefined && old.file === source.path && old.bytes === source.bytes && storageOf(old) === source.storage;
 }
 
 // A file of the board's own storage that did not move under its own id is given back the
@@ -433,6 +437,26 @@ async function given(job, context) {
   if (settings.brightness !== null) await operation("move", () => commands.brightnessSave(source.id, settings.brightness));
   if (settings.repeat !== null) await operation("move", () => commands.repeatSave(source.id, settings.repeat));
   forget(context.address, job);
+}
+
+// Whether `context.allowed`, false for a destination Clocks only keeps files out of, closes a
+// job's destination.
+function closed(job, context) {
+  const folder = job.kind === "folder" ? folderOf(job.destination.path) : job.destination.folder;
+  return context.allowed !== undefined && !context.allowed(job.destination.storage, folder);
+}
+
+// A job of another file whose destination is closed waits with its old file as it was: the
+// saved settings carried from it are given back while it is there, and taken again when the
+// job finishes.
+async function giveBack(job, context) {
+  const operation = requests(context);
+  if (job.sameId || !await oldThere(job, operation)) return;
+  const {settings, source} = job;
+  if (settings.brightness !== null) await operation("move", () => commands.brightnessSave(source.id, settings.brightness));
+  if (settings.repeat !== null) await operation("move", () => commands.repeatSave(source.id, settings.repeat));
+  job.stage = "sent";
+  record(context.address, job);
 }
 
 // The current playlist as the status says it, `{id, path, storage}`, or null for none.
@@ -564,13 +588,15 @@ export async function moveFolder(planned, context) {
 // Finishes or ends the jobs a lost reply, a lost link or a restart left for this target:
 // a file's job with its new file there goes on from where it was; without it, the old file
 // was never touched and the job ends as not moved. A folder's job then makes its folders
-// and moves the files still where it found them. Gives the paths finished and those not
-// moved, the files that failed with why, the folders given up with why, and the paths of
-// the jobs cut short again, which wait for the next connection.
+// and moves the files still where it found them. A job whose destination `context.allowed`
+// closes is not finished: it is kept, its old file given back the settings carried from it.
+// Gives the paths finished and those not moved, the files that failed with why, the
+// folders given up with why, the paths of the jobs cut short again, which wait for the next
+// connection, and those of the jobs kept for their closed destinations.
 export async function reconcile(context) {
   const {address} = context;
   const operation = requests(context);
-  const done = {finished: [], notMoved: [], failed: [], givenUp: [], cut: []};
+  const done = {finished: [], notMoved: [], failed: [], givenUp: [], cut: [], held: []};
   for (const job of pending(address).filter((each) => each.kind !== "folder")) {
     try {
       if (job.stage === "read" || job.stage === "sending") {
@@ -583,9 +609,17 @@ export async function reconcile(context) {
           done.notMoved.push(job.source.path);
           continue;
         }
+        if (closed(job, context)) {
+          done.held.push(job.source.path);
+          continue;
+        }
         job.newId = made.id;
         job.stage = "sent";
         record(address, job);
+      } else if (closed(job, context)) {
+        await giveBack(job, context);
+        done.held.push(job.source.path);
+        continue;
       }
       await finish(job, context);
       done.finished.push(job.source.path);
@@ -596,6 +630,10 @@ export async function reconcile(context) {
     }
   }
   for (const job of pending(address).filter((each) => each.kind === "folder")) {
+    if (closed(job, context)) {
+      done.held.push(`${job.source.path}/`);
+      continue;
+    }
     try {
       const ran = await runFolder(job, context, true);
       done.failed.push(...ran.failed);

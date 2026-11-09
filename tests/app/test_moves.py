@@ -255,6 +255,25 @@ class Jobs(unittest.TestCase):
         self.assertEqual(case['result'], 60021)
         self.assertEqual(case['sent'], ['move external 60021 day', 'move external 60021 day'])
 
+    def test_in_clocks_only_a_kept_job_whose_destination_is_closed_waits_and_its_source_keeps_its_settings(self):
+        case = self.found['kept jobs in Clocks only']
+        self.assertIsNone(case['error'])
+        self.assertEqual(case['result'], {'finished': [], 'notMoved': ['clocks/face.odrg'], 'held': ['clocks/cface.odrg', 'clocks/dial.odrg', 'clocks/night/'],
+                                          'givenUp': [], 'stages': ['sending', 'folder', 'sent']})
+        self.assertEqual([line for line in case['sent'] if not line.startswith('list')],
+                         ['brightness 2 20 save', 'brightness 60030 30 save', 'repeat 60030 2 save'])
+        self.assertEqual(case['kept'], [{'kind': 'file', 'path': 'clocks/dial.odrg', 'files': None}, {'kind': 'folder', 'path': 'clocks/night', 'files': [60032]},
+                                        {'kind': 'file', 'path': 'clocks/cface.odrg', 'files': None}])
+
+    def test_once_clocks_only_is_left_a_kept_job_that_waited_takes_its_sources_settings_again_and_finishes(self):
+        case = self.found['kept jobs once Clocks only is left']
+        self.assertIsNone(case['error'])
+        self.assertEqual(case['result'], {'finished': ['clocks/dial.odrg', 'clocks/cface.odrg'], 'notMoved': [], 'held': [], 'givenUp': [], 'stages': []})
+        self.assertEqual([line for line in case['sent'] if not line.startswith('list')],
+                         ['brightness 8 40 save', 'brightness 60031 default', 'remove 60031',
+                          'brightness 7 30 save', 'repeat 7 2 save', 'brightness 60030 default', 'repeat 60030 default', 'remove 60030'])
+        self.assertEqual(case['kept'], [])
+
     def test_two_selected_folders_of_one_name_are_not_merged(self):
         case = self.found['two folders of one name']
         self.assertIsNone(case['first'])

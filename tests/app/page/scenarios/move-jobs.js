@@ -101,6 +101,45 @@ export default async function (app) {
   await run("a lost reply of a move on the card", [{line: "^move external 60021 day$", reply: null, times: 1}, {line: "^move external 60021 day$", reply: {ok: true, id: 60021, moved: true}}],
     () => moves.move(moves.plan([night().files[0]], day, [])[0], context()));
 
+  // Kept jobs while Clocks only keeps every destination outside a Clocks folder closed: a file
+  // of the board's own Clocks folder moved under its own id to the root, its upload never
+  // installed; a face of the card's Clocks folder moved to the board's root, its settings
+  // carried; another whose new file is there; and a folder of the card's Clocks folder moved
+  // to the card's root.
+  const inClocks = (storage, folder) => folder === "clocks" || folder.startsWith("clocks/");
+  const closedJobs = [
+    {source: {id: 2, storage: "internal", path: "clocks/face.odrg", folder: "clocks", bytes: 100, ignored: false},
+      destination: {storage: "internal", folder: "", name: "face.odrg", path: "face.odrg"}, stage: "sending", sameId: true,
+      settings: {ignored: false, brightness: 20, repeat: null}},
+    {source: {id: 60030, storage: "external", path: "clocks/cface.odrg", folder: "clocks", bytes: 100, ignored: false},
+      destination: {storage: "internal", folder: "", name: "cface.odrg", path: "cface.odrg"}, stage: "carried", sameId: false, newId: 7,
+      settings: {ignored: false, brightness: 30, repeat: 2}},
+    {source: {id: 60031, storage: "external", path: "clocks/dial.odrg", folder: "clocks", bytes: 100, ignored: false},
+      destination: {storage: "internal", folder: "", name: "dial.odrg", path: "dial.odrg"}, stage: "sending", sameId: false,
+      settings: {ignored: false, brightness: 40, repeat: null}},
+    {kind: "folder", source: {id: 60011, storage: "external", path: "clocks/night"}, destination: {storage: "external", path: "night"},
+      folders: [{path: "night", ignored: false}], files: [{source: {id: 60032, file: "clocks/night/n.odrg", external: true, bytes: 100, ignored: false},
+        storage: "external", folder: "night", name: "n.odrg", path: "night/n.odrg"}]},
+  ];
+  const clocksRules = [
+    {line: "^list 0$", reply: {ok: true, items: [
+      {id: 1, file: "root.odrg", external: false, bytes: 50},
+      {id: 7, file: "cface.odrg", external: false, bytes: 100},
+      {id: 8, file: "dial.odrg", external: false, bytes: 100},
+      {id: 20, playlist: "clocks", external: false, files: 0},
+      {id: 60001, playlist: "clocks", external: true, files: 2}], next: null}, times: 99},
+    {line: "^list in 60001 0$", reply: {ok: true, items: [
+      {id: 60030, file: "clocks/cface.odrg", external: true, bytes: 100},
+      {id: 60031, file: "clocks/dial.odrg", external: true, bytes: 100},
+      {id: 60011, playlist: "clocks/night", external: true, files: 1}], next: null}, times: 99},
+    {line: "^(brightness|repeat|remove|ignore) ", reply: {ok: true}, times: 99},
+  ];
+  const settled = (done) => ({finished: done.finished, notMoved: done.notMoved, held: done.held ?? null, givenUp: done.givenUp.map((each) => [each.path, described(each.error)]),
+    stages: moves.pending(ADDRESS).map((job) => job.stage ?? job.kind)});
+  await run("kept jobs in Clocks only", clocksRules, async () => settled(await moves.reconcile(context({allowed: inClocks}))), closedJobs);
+  const waiting = moves.pending(ADDRESS).filter((job) => job.kind !== "folder");
+  await run("kept jobs once Clocks only is left", clocksRules, async () => settled(await moves.reconcile(context())), waiting);
+
   const shows = {folders: [{id: 5, playlist: "night", external: false, ignored: false}], files: []};
   const first = moves.folderPlan(night(), day, []);
   const second = moves.folderPlan(shows, day, [], new Map(), new Map(), [first.name]);

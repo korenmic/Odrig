@@ -20,6 +20,8 @@ let folderAt = null;
 let moving = null;
 let running = null;
 let reconciledFor = null;
+// The target whose kept moves wait until Clocks only is left.
+let heldFor = null;
 
 function byId(id) {
   return document.getElementById(id);
@@ -458,20 +460,22 @@ async function runMove() {
 // Finishes the moves a lost reply, a lost link or a restart of the app left for this
 // target, once its list answers while the app is on the screen. Moves cut short again are
 // taken up when the target answers again after it did not, or when the app is shown again;
-// a move the target refuses is said and not asked again.
+// a move the target refuses is said and not asked again. In Clocks only a move whose
+// destination is outside Clocks is not finished, since that would take its files out of
+// Clocks: it waits until the mode is left, and one that moved nothing ends.
 async function reconcile(state) {
   const address = target.address();
   if (state.link !== "answers" || document.hidden) {
     if (running === null) reconciledFor = null;
     return;
   }
+  if (heldFor === address && running === null && !client.clocksOnly()) {
+    heldFor = null;
+    reconciledFor = null;
+  }
   if (reconciledFor === address || running !== null || state.animations === null || client.contentBusy()) return;
-  const jobs = moves.pending(address);
-  // A move cut short that takes files where Clocks only keeps them out of waits until the mode
-  // is left.
-  if (jobs.some((job) => !client.canMoveInto(job.destination.storage, job.kind === "folder" ? moves.folderOf(job.destination.path) : job.destination.folder))) return;
   reconciledFor = address;
-  if (jobs.length === 0) return;
+  if (moves.pending(address).length === 0) return;
   const version = client.targetVersion();
   running = {stop: false};
   client.setContentBusy("move");
@@ -483,6 +487,7 @@ async function reconcile(state) {
     const words = [];
     if (done.finished.length) words.push(`Finished the interrupted move of ${done.finished.join(", ")}.`);
     if (done.notMoved.length) words.push(`Not moved, left where they were: ${done.notMoved.join(", ")}.`);
+    if (done.held.length) heldFor = address;
     if (done.failed.length) words.push(`Failed ${done.failed.length}: ${done.failed.map((each) => `${each.file}: ${refusalText(each.error)}`).join("; ")}.`);
     for (const each of done.givenUp) words.push(`The interrupted move of ${each.path}/ was given up: ${refusalText(each.error)}`);
     if (done.cut.length) {
