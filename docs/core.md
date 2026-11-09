@@ -87,7 +87,7 @@ Every function receives `ctx` as its first argument.
 | `write` | `int write(void *ctx, const uint8_t *bytes, size_t length)`: adds bytes to the file being written. `length` is 1 to 1,500. Returns 1, or -1. |
 | `write_close` | `int write_close(void *ctx)`: ends the writing. When it has returned 1, the file is whole in storage and stays so through a power cut. Returns 1, or -1 on a failure. |
 | `rename` | `int rename(void *ctx, const char *from, const char *to)`: gives the file `from` the name `to`, in place of a file that has it. After a power cut during the call, `to` is its old file or the new one, whole. Returns 1, or -1. |
-| `remove` | `int remove(void *ctx, const char *name)`: removes the file of this name. A file being written under it is given up. Returns 1 when it removed one, 0 when there was none, -1 on a failure. Given the number of a folder of the storage, `<n>`, it removes that folder while it is empty, -1 while it holds a file. |
+| `remove` | `int remove(void *ctx, const char *name)`: removes the file of this name. A file being written under it is given up. Returns 1 when it removed one, 0 when there was none, -1 on a failure. Given the number of a folder of the storage, `<n>`, or `drive/<path>` of a folder of the drive's folder `odrig`, it removes that folder while it is empty: 1, 0 when there was none, -1 while it holds anything. |
 | `space` | `int space(void *ctx, uint32_t *free_bytes, uint32_t *total_bytes)`: the free and the total bytes of the storage the files are in; a value above 4,294,967,295 is given as that. Returns 1, or -1 when the host cannot tell. |
 | `read_at` | `int32_t read_at(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity)`: reads a file apart from the one that `open`, `read` and `close` hold: up to `capacity` bytes from this offset. Returns the number read, 0 at or after the end of the file, -1 on a failure and when there is no such file. `capacity` is never above 512. |
 | `drive` | `uint32_t drive(void *ctx)`: the number of the drive of animations that is plugged in now: a number other than 0 that changes each time a drive is plugged in, or 0 while none is. The core calls it at each refresh, before the LED data is made. `NULL` for a host without a drive; see [a drive](#a-drive). |
@@ -906,7 +906,11 @@ core no memory: every figure of [Memory](#memory) is as it is without them.
   its line, and so does each folder above it left empty the same way, and then the core
   removes the numbered folders with `remove("<n>")`. A removal while a rebuild runs or an
   upload is received, or one that a power cut ends before the prune, leaves the emptied
-  folder with its line, as a folder never filled is. Numbers are given in turn from the
+  folder with its line, as a folder never filled is. `folder remove` of an empty folder
+  drops its line alone through `folders.part`, renamed onto the file, and then removes
+  `<n>`; the header keeps its next number, and a numbered folder the host cannot remove
+  then stays, without a line, as after a cut of `folder make internal`. Nothing above it
+  is pruned. Numbers are given in turn from the
   header's, back to 1 after 255, passing over one a line or a stored name of the file
   table has. A folder's id is the lowest that no item and no folder has.
 - **Limits.** 32 folders, three levels, a folder's path of 93 bytes, a file's path of 100

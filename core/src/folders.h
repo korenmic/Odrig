@@ -81,6 +81,11 @@ uint32_t internal_folder_ignore(Core &core, uint32_t id, bool ignored, Reply &re
 // empty the same way, and then their folders of the storage.
 void internal_folders_prune(Core &core, uint32_t number);
 
+// `folder remove <id>` of an internal folder: the folder, when it holds no file and has no
+// sub-folder, leaves `folders.txt`, and then its folder of the storage goes. Only that
+// folder goes; a folder of the storage that cannot be removed stays, listed nowhere.
+uint32_t internal_folder_remove(Core &core, uint32_t id, Reply &reply);
+
 // Makes the internal folder with this id the current playlist. False when there is none.
 bool internal_choose(Core &core, uint32_t id);
 

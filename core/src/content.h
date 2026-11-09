@@ -22,6 +22,11 @@ uint32_t content_list(const Core &core, uint32_t level, uint32_t from, Reply &re
 // Carries out `remove` on a valid show and writes the reply: the item with this id leaves
 // the show, in storage and in the tables.
 uint32_t content_remove(Core &core, uint32_t id, Reply &reply);
+
+// Carries out `folder remove` on a valid show and writes the reply: the empty folder with
+// this id, of the card or of the board's own storage, leaves its list of folders and then
+// its folder of the storage. An item's id, or an animation's of a drive, is no folder's.
+uint32_t content_folder_remove(Core &core, uint32_t id, Reply &reply);
 uint32_t content_remove_many(Core &core, const uint16_t *ids, uint32_t count, Reply &reply);
 uint32_t content_ignore(Core &core, uint32_t id, bool ignored, Reply &reply);
 

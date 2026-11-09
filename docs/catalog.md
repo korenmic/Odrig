@@ -143,7 +143,9 @@ but for a folder made by `folder make` ([commands.md](commands.md#making-a-folde
 its line says 0 own files and 0 sub-folders, its CRC-32 `00000000`, its first position the
 walk's position after the folders before it, and it has no file of its own; its parent's file
 has its line `<id> d 0 <path>` among the sub-folders, and the map its line. A rebuild and an
-import list files, and so make no such line.
+import list files, and so make no such line. `folder remove`
+([commands.md](commands.md#removing-an-empty-folder)) takes such a line out again, and that
+of any folder with no own file and no sub-folder.
 
 **The map of the ids, `index-ids.txt`**: lines of 36 bytes, one for each id of the drive,
 sorted by id, so that an id is found by binary search: a file's to its folder's ordinal
@@ -259,6 +261,7 @@ What each change writes, besides its page and the marker:
 | A move of a file among its folder's files, before another or last | the folder's file, the table, the map; no page, the mask `0000` |
 | A move of a file to another folder, `move external` | the old folder's file without its row, and when nothing is left at or below it, that folder and each ancestor left so out of the table as a removal takes them; the new folder's file with the row last among its files, its id kept; the rows of both folders' parents for their own files, a parent of both with both rows; the table (the files of both, the first positions of the folders after the earlier of the two up to the later one, one less or one more); the map (the id's line at its new folder and row, the rows after it in the old folder one less); the old page without its line and the new name's page with it |
 | A folder made empty, `folder make` | its parent's file with the folder's line, the table (the new line in the listing's order, every ordinal and end after it one more, the end of each ancestor one more, the parent's sub-folders one more), the map (the folder's line in id order, every ordinal at or after its own one more); no page, the mask `0000` |
+| An empty folder removed, `folder remove` | its parent's file without the folder's line, removed when no line is left in it; the table (the folder's line out, every ordinal and end after it one less, the end of each ancestor one less, the parent's sub-folders one less); the map (the folder's line out, every ordinal after its own one less); the record's `remove index-<id>.txt` of the folder, which has no file; no page, the mask `0000`; the folder on the drive is removed after the commit, outside the record |
 | A rebuild or an import | everything: every page, every folder's file, the table and the map, and the removal of the files of the old table's folders whose ids the new one does not have |
 
 A rebuild and an import keep the order the drive's files were moved into. For each folder of

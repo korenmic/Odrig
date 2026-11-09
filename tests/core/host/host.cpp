@@ -1022,6 +1022,16 @@ private:
         if (from_ == kFromFiles && !of_the_drive(name)) {
             return files_.erase(name) != 0 ? 1 : 0;
         }
+        struct stat status;
+        if (of_the_drive(name) && stat(path_of(name).c_str(), &status) == 0 && S_ISDIR(status.st_mode)) {
+            // A folder of the drive goes only while it is empty, as the drive's host takes it.
+#ifdef _WIN32
+            std::error_code failure;
+            return std::filesystem::remove(path_of(name), failure) ? 1 : -1;
+#else
+            return ::rmdir(path_of(name).c_str()) == 0 ? 1 : -1;
+#endif
+        }
 #ifdef _WIN32
         if (std::remove(path_of(name).c_str()) == 0) {
             return 1;

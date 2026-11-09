@@ -1029,3 +1029,15 @@ large to build safely: its folders made with `folder make external` and its file
 at a time with `move external`, each keeping its id and its saved settings, the new folder
 with an id of its own. Folders move between the board's own storage and the card as jobs of
 the app over their files, their folders made first. The core's memory is as it was.
+
+### Seed 85: removing an empty folder
+
+On 2026-11-09 the owner approved a new seed in which `folder remove <id>` removes an empty
+folder of the board's own storage or of the card, with a `Remove folder` action in the app;
+the approval covers the addition to the command list. The folder's entry goes first, its
+line of `folders.txt` or its line of the card's index in one commit of the card's catalog,
+and its folder of the storage after it, a folder the host cannot remove then staying,
+listed nowhere. Only the folder named goes, and a folder that holds a file or a folder is
+`in-use`. The card's catalog format, its commit record and the Python library are as they
+were; the host interface's `remove` also removes an empty folder of the drive. The core's
+memory is as it was.
