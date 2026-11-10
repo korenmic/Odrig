@@ -76,9 +76,8 @@ the getting-started page has the command of each.
 
 ## Never touch
 
-- `esp32-backup/` and `firmware/wled-16.0.1/`. They exist, untracked, on the first
-  computer only, and they are what brings a board back. Never change, move, delete or
-  commit them.
+- `esp32-backup/` and `firmware/wled-16.0.1/`. They exist, untracked, on the first computer
+  only, and they are what brings a board back. Never change, move, delete or commit them.
 - An untracked file that you did not make. The checkout on the first computer holds some.
 - The board, except through `firmware/fw.py` and `odrigctl`, and then under the rules "If
   you have a board": a brightness of 40 or less, one program at a time, the flash never
@@ -140,6 +139,7 @@ recorded in its spec and verification documents without keeping the seed in prog
 - **The app over the board's USB serial port**, seed 82: planned; a switch on the Target screen between Wi-Fi and USB serial, one `Connect over Wi-Fi` control in place of `Use` and `Board`, and every command line of the app sent over the board's USB serial port with the same replies, the port opened without a reset; APK only, no command, firmware, wiring or power change.
 - **Display tests whenever play, and a kept mapping lock**, seeds 83 and 84: planned; seed 83 (core only) stops answering the diagonal and snake tests `busy` while the board reads its animations after a start or while an upload is open, the open upload going on to its end, and `mapping set` no longer waits for that reading; seed 84 (app only) keeps `Lock mapping edits` on the phone, one value for every link, target and board, changed only by the operator's confirmed press, never by leaving Settings, another app, a lost reply, a reconnection or a restart.
 - **Remove an empty folder, and move a folder inside the board's storage**, seeds 85 and 86: planned, built after seed 74 part B (pull request #64), both commands approved by the owner on 2026-11-09; seed 85 adds `folder remove <id>`, which removes an empty folder of either storage, its entry first and then its folder of the storage, with `Remove folder` in the app; seed 86 adds `move internal <folder id> <path>`, which moves or renames a folder of the board's own storage and its sub-folders by one rewrite of its list of folders, every id, file, setting and catalog key kept, with Rename and Move to in the app. No core memory.
+- **A live mirror of the board in the emulator**, seed 87: planned, built on pull request #63's branch, its commands approved by the owner on 2026-11-10; while `plan on` asks, the board decides its next turns ahead, at most 8 within 10 minutes, a widget's seed drawn as it is planned, and reports them by version with `plan`, `plan since <version>` and the `#plan` lines `plan push on` writes on a serial way; the emulator with `--mirror-port`, `--mirror-tcp` or `--mirror-http` plays the same files by their keys at the same board times, and carries every line of the app, a phone and the command tool to the board and back. The app is unchanged.
 
 The state of every seed is in the `state.json` of its folder.
 

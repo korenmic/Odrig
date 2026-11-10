@@ -1,0 +1,9 @@
+{
+  "number": 87,
+  "slug": "87-p2-a-live-mirror-of-the-board-in-the-emulator",
+  "state": "remaining",
+  "title": "A live mirror of the board in the emulator",
+  "priority": "P2",
+  "addedAt": "2026-11-10",
+  "summary": "While `plan on` asks it (off at every start, not saved), the board decides its turns ahead, the one on the LEDs and those beginning within 10 minutes, at most 8, shuffled clocks and messages among them with each widget's seed drawn when it is placed, and reports them by a version that grows at every change: `plan` gives each item's start, end, point, id, file key, seed and brightness with the LEDs' on, brightness, rotation, miniature and test state in one reply of at most 1,024 bytes, `plan since <version>` answers unchanged or the whole plan, and `plan push on|off` writes `#plan` lines at every new version on that serial way (unsupported over HTTP); the six forms approved by the owner on 2026-11-10. The emulator started with `--mirror-port`, `--mirror-tcp` or `--mirror-http` plays the same files, found by key in the collection, the share or fetched once with `read` into build/mirror/, at the same board times with its own core through a library entry no command reaches, and stands between the app and the board as a man in the middle: every line of the Controller view, a phone through `--lan` and the command tool goes to the board and its reply back to its sender, one at a time on a serial link opened without a reset, `#plan` lines kept by the mirror and other `#` lines passed to serial and line-port clients. The app, its files and the APK are unchanged in every way of working. Built on pull request #63's branch."
+}
