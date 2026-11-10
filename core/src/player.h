@@ -181,8 +181,13 @@ void player_counts_start(Core &core, uint64_t at);
 // animation the break was to give way to, which opens anew.
 void player_break_leave(Core &core);
 
-// Produces a refresh when a grid time is due: 1 when it did, 0 when none was due.
+// Produces a refresh when a grid time is due: 1 when it did, 0 when none was due. While a
+// mirror is set, the refresh shows its turn in place of the show.
 int player_poll(Core &core, uint64_t now_ms);
+
+// A mirror ends: its file is closed and its test no longer shows; the show goes on from
+// where it was.
+void player_mirror_end(Core &core);
 
 void player_set_brightness(Core &core, uint8_t value);
 

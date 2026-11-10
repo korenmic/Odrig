@@ -34,9 +34,10 @@ into the commit message. Code carries no history.
   - Suites: core, onboarding.
   - Requirements: 4.1–4.6.
 
-- [ ] 3. The mirror's entry in the core
-  - `core/include/odrig_core.h`: `odrig_mirror`, `odrig_core_mirror`. `core/src/mirror.cpp`
-    and `mirror.h`, new; `core/src/player.cpp` (`kMirrorPosition` in `length_of`, `type_of`,
+- [x] 3. The mirror's entry in the core
+  - `core/include/odrig_core.h`: `odrig_mirror`, `odrig_core_mirror`. `core/src/player.cpp`
+    (`mirror_poll`, `player_mirror_end`), `core/src/mapping_control.cpp` (`mapping_mirror_test`);
+    `core/src/player.cpp` (`kMirrorPosition` in `length_of`, `type_of`,
     `id_of`, `open_stream`, `show_at`; the mirror's refresh in `player_poll`);
     `core/src/brightness.cpp`; `core/src/core_state.h` (the pointer).
   - `tests/core/host/host.cpp`: `mirror MS NAME ZERO LOOP SEED BRIGHTNESS ON ROTATION TEST

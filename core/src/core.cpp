@@ -877,6 +877,17 @@ int odrig_core_leg(const odrig_core *core, uint32_t index, odrig_leg *out) {
     return 1;
 }
 
+int odrig_core_mirror(odrig_core *core, const odrig_mirror *turn) {
+    if (core == nullptr) {
+        return 0;
+    }
+    if (turn == nullptr && core->state.mirror != nullptr) {
+        odrig::player_mirror_end(core->state);
+    }
+    core->state.mirror = turn;
+    return 1;
+}
+
 int odrig_core_power(const odrig_core *core) {
     return core != nullptr && core->state.on != 0 ? 1 : 0;
 }

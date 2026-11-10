@@ -444,6 +444,10 @@ struct Core {
 
     Mini *mini;
 
+    // The turn a mirror shows in place of the show, as the host describes it; null while the
+    // core plays its show.
+    const odrig_mirror *mirror;
+
     LegInfo *legs;
 
     uint16_t *led_pixel;    // for each LED, the position of its pixel in pixel order

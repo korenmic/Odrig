@@ -350,6 +350,7 @@ class HostInterface(unittest.TestCase):
                 "odrig_core_mini",
                 "odrig_core_mini_complete",
                 "odrig_core_mini_support",
+                "odrig_core_mirror",
                 "odrig_core_plan_line",
                 "odrig_core_poll",
                 "odrig_core_power",

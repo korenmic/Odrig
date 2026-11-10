@@ -29,14 +29,14 @@ class CoreDocument(unittest.TestCase):
 
     def test_it_names_every_function_of_the_header(self):
         functions = set(re.findall(r"\b(odrig_core_[a-z_]+)\(", self.header))
-        self.assertEqual(len(functions), 14)
+        self.assertEqual(len(functions), 15)
         for function in sorted(functions):
             self.assertTrue(function in self.named, function)
             self.assertTrue(f"{function}(" in self.text, function)
 
     def test_it_names_every_member_of_the_public_structs(self):
         structs = dict(re.findall(r"typedef struct (odrig_[a-z]+) \{(.*?)\}", self.header, flags=re.S))
-        self.assertEqual(sorted(structs), ["odrig_host", "odrig_leg", "odrig_mini"])
+        self.assertEqual(sorted(structs), ["odrig_host", "odrig_leg", "odrig_mini", "odrig_mirror"])
         members = {}
         for struct, body in structs.items():
             members[struct] = re.findall(r"(?:\(\*|[ *])([a-z_]+)\)?(?:\([^;]*\))?;", body)
@@ -56,7 +56,7 @@ class CoreDocument(unittest.TestCase):
 
     def test_it_names_the_types_and_the_limits_of_the_header(self):
         types = set(re.findall(r"\b(odrig_[a-z_]+)\b", self.header)) - set(re.findall(r"\b(odrig_core_[a-z_]+)\(", self.header))
-        self.assertEqual(types, {"odrig_core", "odrig_host", "odrig_leg", "odrig_mini", "odrig_reply_fn"})
+        self.assertEqual(types, {"odrig_core", "odrig_host", "odrig_leg", "odrig_mini", "odrig_mirror", "odrig_reply_fn"})
         limits = dict(re.findall(r"#define (ODRIG_[A-Z_]+)\s+([0-9]+)", self.header))
         self.assertEqual(limits, {"ODRIG_LINE_MAX": "2048", "ODRIG_REPLY_MAX": "1024"})
         for name in sorted(types | set(limits)):

@@ -169,6 +169,7 @@ as for a file that is not there.
 | `void odrig_core_mini_support(odrig_core *core)` | Opts the host into checked miniature output transitions, on a 60x60 canvas. |
 | `int odrig_core_mini(const odrig_core *core, odrig_mini *out)` | Reads miniature support, revision, requested/active/pending/failure state and its borrowed 180-byte RGB buffer. The chain index is `x*6+y` in a 10x6 bottom-left coordinate system. Normal legs are unchanged. |
 | `int odrig_core_mini_complete(odrig_core *core, uint32_t revision, int success)` | Completes only the matching pending revision. A failed host setup must hold outputs dark until successful retry. No allocation or persistence. |
+| `int odrig_core_mirror(odrig_core *core, const odrig_mirror *turn)` | Shows at every poll, in place of the show, the turn `turn` describes, until a call with `NULL`: see [A mirror](#a-mirror). Returns 1, or 0 for a null core. |
 
 `odrig_leg` describes one leg:
 
@@ -303,7 +304,7 @@ normal brightness rounding at `min(selected brightness,40)`, then their 100 samp
 summed and divided with floor rounding. All side columns stay black. Physical
 order is `x*6+y`, bottom left, in the [README orientation](../README.md#approved-connection-and-orientation).
 The core uses three local channel sums per cell, with no per-frame allocation or
-second decoder. The measured host allocation with a drive is 131061 bytes, below
+second decoder. The measured host allocation with a drive is 131069 bytes, below
 131072. Off, invalid or blank output clears the image.
 
 `debug mini on|off` requests a RAM-only transition. Only the host acknowledgement
@@ -724,6 +725,35 @@ is written by `core/src/plan.cpp`.
   its size in its entry of the file table and its CRC-32 in the line of its name of the
   internal catalog, which `catalog_key` reads with `read_at`, 256 bytes at a time, on the
   page of its name.
+
+## A mirror
+
+`odrig_core_mirror` lets a host show a turn that another player plays, as the core would play
+it: the emulator's mirror of a board, [emulator.md](emulator.md), shows with it what the
+board's plan says. The host describes the turn in an `odrig_mirror` that it keeps and may
+change between polls; the core keeps a pointer to it.
+
+| Member | Meaning |
+|---|---|
+| `name` | The file, as `open` takes it; an empty name shows nothing. |
+| `type` | What the file holds: 1 frames, 2 a text, 3 a widget. |
+| `on` | 1 while the LEDs are on; 0 shows every LED dark. |
+| `brightness` | The brightness the file plays at, 0 to 255, in place of the show's. |
+| `rotation` | The quarter turns clockwise of a square canvas, 0 to 3. |
+| `test` | 0, or the test that shows in the turn's place: 1 the diagonal, 2 a snake's test. |
+| `snake` | The snake of a snake's test, 1 to 20. |
+| `serial` | A number the host changes whenever the turn changes: the file is opened anew. |
+| `loop_ms` | The length of the file's loop in milliseconds, 0 while it is not known: then the first loop is decoded to the turn's time. |
+| `seed` | A widget's seed, which the turn draws with in place of one of its own. |
+| `zero_ms` | The moment the turn's time was 0, on the clock of the polls; a turn joined late shows the point it has come to. |
+
+While a mirror is set, a refresh takes the clock, the grid and the counts of refreshes, and
+then shows the turn: `show_at` draws the file at the position `kMirrorPosition`, which no item
+and no drive's file has, so its picture at a time of the turn is the one its own playback
+shows. A test shows as `mapping test` shows it, without stopping or saving the show's
+playback. No step of the show, of an upload, of the checks, of a drive, of the catalogs or of
+the schedule is taken, and nothing is written. A call with `NULL` closes the file and ends the
+test; the show goes on from where it was.
 
 ## A drive
 
@@ -1193,7 +1223,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,808 |
+| The core object | fixed | 3,816 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -1211,13 +1241,13 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
 | Miniature state and physical RGB, only for a 60x60 canvas | fixed | 188 |
-| **Total** | | **125,273** |
+| **Total** | | **125,281** |
 
 That is about 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-45,776 of them. The example show on the two-leg mapping asks for 88,562 bytes. A host
+45,776 of them. The example show on the two-leg mapping asks for 88,570 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,733 bytes for the target file. A host with a drive
+of the check and the saved order: 77,741 bytes for the target file. A host with a drive
 is asked for three blocks more, after the three of the check: the table of a drive
 without a catalog, 12 bytes for each of 256 places, 3,072 bytes; the boot's memory of 16
 files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive's index,
@@ -1228,9 +1258,9 @@ a table of 33 records of 8 bytes and 104 bytes of room for the current playlist'
 368, the saved repeats of32 drive files at6 bytes each (192), and32 brightness
 preferences at5 bytes each (160), followed by128 external exclusion records at5 bytes
 each (640). Positions retain all32 bits. With it
-the target file takes 131,061 bytes, below 131,072. The clocks between the animations add
+the target file takes 131,069 bytes, below 131,072. The clocks between the animations add
 no block: their settings, their counts, the paused turn and the key and the place of their
-order are fields of the core object, and the order is a permutation computed from its key. The plan adds no block either: its version, the noise of its draws, a sign of the latest refresh and two bits are 16 bytes of the core object, and a reply of `plan` decides the turns ahead on the stack. The size and the number of frames
+order are fields of the core object, and the order is a permutation computed from its key. The plan adds no block either: its version, the noise of its draws, a sign of the latest refresh and two bits are 16 bytes of the core object, and a reply of `plan` decides the turns ahead on the stack. A mirror's turn is the host's: the core keeps a pointer to it, 8 bytes more. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 256 bytes its source last read. The host API still permits512-byte reads, and drive
 quarantine still fingerprints the complete first512 bytes across refills. Picture clocks add no block either: a picture is decoded into
@@ -1303,6 +1333,8 @@ leg; and `ready`.
 | `lineon <way> <ms> <text>` | `odrig_core_command_on` with the text, on that way | `reply <json>` |
 | `byteson <way> <ms> <hex>` | `odrig_core_feed_on` with these bytes, on that way | `fed <hex of the line>` and `reply <json>` for each line |
 | `planline <way> <ms>` | `odrig_core_plan_line` for that way | `planline #plan <json>`, or `planline none` |
+| `mirror <name> <type> <zero> <loop> <seed> <brightness> <on> <rotation> <test> <snake> <serial>` | `odrig_core_mirror` with a turn of these members, `-` for an empty name | nothing |
+| `mirror none` | `odrig_core_mirror` with `NULL` | nothing |
 | `error` | `odrig_core_error` | `error <text>` or `error none` |
 | `fault` | Reads the context the core keeps of the latest fault of a file | `fault <work> <record> <bytes> <reason> <name>`, the work `start`, `play`, `upload` or `drive`; or `fault none` |
 | `drive plug` | With `--drive`: a drive is plugged in, with a number one higher than the last one; its folder is listed when the core calls `drive_list`, as it is then. The core sees it at its next refresh. | nothing |
@@ -1545,8 +1577,8 @@ values/presence use existing item padding/flags.32 external values use 5-byte
 records beside compact 6-byte repeat records with full 32-bit positions/16-bit counts.
 The independent 128-byte reader preserves the 512-byte stack-frame compiler bound.
 
-The measured 100-item Windows host requests 131061 bytes with a drive,21 allocation
-blocks, and the Core object is 3808 bytes. Existing 128 KiB/4096 limits remain unchanged;
+The measured 100-item Windows host requests 131069 bytes with a drive,21 allocation
+blocks, and the Core object is 3816 bytes. Existing 128 KiB/4096 limits remain unchanged;
 no allocation is added per frame. The store streams and verifies a part before
 publishing it, keeps prior usable cache after failed updates, and discards partial
 startup application if the settings file is damaged. `dimming` is additive status;
@@ -1585,7 +1617,7 @@ The zone grammar and commands are in [commands.md](commands.md#board-time). A
 complete snapshot fits the existing 1500-byte chunk and 2048-byte command line.
 Publication verifies the complete staged bytes before atomic rename. Missing or
 damaged rules never supply invented time. Routine clock sets write no storage.
-The combined clock and schedule state uses56 Core bytes; the target with a drive takes131,061 bytes in
+The combined clock and schedule state uses56 Core bytes; the target with a drive takes131,069 bytes in
 21 blocks, below the unchanged128 KiB bound. No allocation occurs after startup,
 and the512-byte compiler frame bound remains enabled.
 
@@ -1605,8 +1637,8 @@ no tick or boundary writes timing settings.
 The atomic grammar, revision guards and error semantics are specified in
 [commands.md](commands.md#daily-schedule-and-manual-control). Manual control is
 immediate even on a persistence failure, which remains explicitly observable.
-The current target takes131,061 host bytes with a drive in21blocks, and Core is
-3808 bytes. The existing128KiB/4096-byte limits and512-byte frame guard remain.
+The current target takes131,069 host bytes with a drive in21blocks, and Core is
+3816 bytes. The existing128KiB/4096-byte limits and512-byte frame guard remain.
 
 ## Output rotation
 

@@ -1603,6 +1603,40 @@ private:
             poll(now);
             return true;
         }
+        if (word == "mirror") {
+            // `mirror none`, or `mirror <name> <type> <zero> <loop> <seed> <brightness> <on>
+            // <rotation> <test> <snake> <serial>`, `-` for an empty name.
+            if (rest == "none") {
+                guard::InCore inside;
+                odrig_core_mirror(core_, nullptr);
+                return true;
+            }
+            std::istringstream args(rest);
+            std::string name;
+            unsigned long long zero = 0;
+            unsigned long loop = 0, seed = 0, serial = 0;
+            unsigned type = 0, brightness = 0, on = 0, rotation = 0, test = 0, snake = 0;
+            if (!(args >> name >> type >> zero >> loop >> seed >> brightness >> on >> rotation >> test >> snake >> serial) || name.size() > 32) {
+                return false;
+            }
+            mirror_ = odrig_mirror{};
+            if (name != "-") {
+                std::memcpy(mirror_.name, name.data(), name.size());
+            }
+            mirror_.type = static_cast<uint8_t>(type);
+            mirror_.on = static_cast<uint8_t>(on);
+            mirror_.brightness = static_cast<uint8_t>(brightness);
+            mirror_.rotation = static_cast<uint8_t>(rotation);
+            mirror_.test = static_cast<uint8_t>(test);
+            mirror_.snake = static_cast<uint8_t>(snake);
+            mirror_.serial = static_cast<uint32_t>(serial);
+            mirror_.loop_ms = static_cast<uint32_t>(loop);
+            mirror_.seed = static_cast<uint32_t>(seed);
+            mirror_.zero_ms = zero;
+            guard::InCore inside;
+            odrig_core_mirror(core_, &mirror_);
+            return true;
+        }
         if (word == "lineon" || word == "byteson" || word == "planline") {
             // The way, the timestamp, and after one space whatever the line is made of.
             const size_t first = rest.find(' ');
@@ -1842,6 +1876,8 @@ private:
 
     Host host_;
     odrig_core *core_ = nullptr;
+    // The turn a `mirror` line describes, which the core reads at every poll.
+    odrig_mirror mirror_ = {};
 };
 
 // Does what the test host must stop: asks the host for memory, or the program, as the core

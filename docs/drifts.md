@@ -15437,6 +15437,24 @@ reply.
 **Resolution.** `core/include/odrig_core.h`, `core/src/plan.cpp`, `core/src/commands.cpp`,
 `docs/core.md`.
 
+## Seed 87: the mirror's turn in the core
+
+**Question.** The mirror's entry plays a file the host names, with a seed, a brightness and the
+board's state, in place of the show. Where does the core keep that turn, with 11 bytes left
+under 131,072 once the plan's fields are in, and where does its refresh live?
+
+**Answer.** The host keeps the turn in an `odrig_mirror` and may change it between polls; the
+core keeps a pointer to it, 8 bytes, which leaves 3. The host gives the file's type too, as
+the core must know it before the file is opened. The refresh is `mirror_poll` of
+`player.cpp`, beside `show_at`, `fill_leds` and the stream it shares, in place of the
+`mirror.cpp` the design named; the position `kMirrorPosition` lies in the drive's range, so
+the functions that take it look at it first. The entry takes any host, not only one whose
+storage can be changed, as the turn is the host's and nothing is written. Ending a mirror
+closes its file and its test, and the show goes on from where it was.
+
+**Resolution.** `core/include/odrig_core.h`, `core/src/player.cpp`,
+`core/src/mapping_control.cpp`, `core/src/brightness.cpp`, `docs/core.md`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

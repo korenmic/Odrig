@@ -158,9 +158,9 @@ typedef struct odrig_mirror {
 int odrig_core_mirror(odrig_core *, const odrig_mirror *turn);
 ```
 
-`odrig_core_mirror` keeps the pointer and returns 1, or 0 for a host whose storage cannot be
-changed. `player_poll`, with `mirror` set, takes the clock, the grid and the counts as always
-and then `mirror_refresh(core, now)` in a new `mirror.cpp` in place of the playlist: the
+`odrig_core_mirror` keeps the pointer and returns 1, or 0 for a null core. `player_poll`, with
+`mirror` set, takes the clock, the grid and the counts as always and then `mirror_poll(core,
+now)` of `player.cpp`, beside the helpers it shares, in place of the playlist: the
 position `kMirrorPosition` stands for the host's file in `length_of` (`loop_ms`), `type_of`
 (the header read at its open, kept in `stream_item`'s turn), `id_of` (0) and `open_stream`
 (the name); `show_at(core, kMirrorPosition, serial, now - zero_ms, zero_ms)` draws it, a widget

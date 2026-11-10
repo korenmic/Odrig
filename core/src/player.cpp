@@ -24,6 +24,10 @@ namespace odrig {
 
 namespace {
 
+// The position of the file a mirror shows, which no item and no drive's file has. It lies in
+// the drive's range, so every function that takes it looks at it before it looks for a drive.
+const uint32_t kMirrorPosition = 0xFFFFFFFDu;
+
 void close_stream(Core &core) {
     core.file.close();
     core.stream_open = 0;
@@ -33,6 +37,9 @@ void close_stream(Core &core) {
 // The length of the animation at a position of the playlist, 0 while it is not known. A
 // drive's animation is in the playlist only once its length is known.
 uint64_t length_of(const Core &core, uint32_t animation) {
+    if (animation == kMirrorPosition) {
+        return core.mirror != nullptr ? core.mirror->loop_ms : 0;
+    }
     if (is_drive(animation)) {
         const DriveRow *row = drive_row(core, animation - kDriveBase);
         return row != nullptr ? row->total_ms : 0;
@@ -52,6 +59,9 @@ uint32_t seconds_of(const Core &core, uint32_t animation) {
 
 // The id `list` and `status` give the animation at a position of the playlist.
 uint32_t id_of(const Core &core, uint32_t animation) {
+    if (animation == kMirrorPosition) {
+        return 0;
+    }
     if (is_drive(animation)) {
         const DriveRow *row = drive_row(core, animation - kDriveBase);
         return row != nullptr ? row->id : 0;
@@ -61,6 +71,9 @@ uint32_t id_of(const Core &core, uint32_t animation) {
 
 // What the animation at a position of the playlist holds, as its header says.
 uint8_t type_of(const Core &core, uint32_t animation) {
+    if (animation == kMirrorPosition) {
+        return core.mirror != nullptr ? core.mirror->type : kTypeFrames;
+    }
     if (is_drive(animation)) {
         const DriveRow *row = drive_row(core, animation - kDriveBase);
         return row != nullptr ? row->type : kTypeFrames;
@@ -119,7 +132,9 @@ Reason open_stream(Core &core, uint32_t animation, uint64_t turn, uint64_t loop)
     close_stream(core);
     char drive_name[kDriveOpenRoom];
     const char *name = drive_name;
-    if (is_drive(animation)) {
+    if (animation == kMirrorPosition) {
+        name = core.mirror->name;
+    } else if (is_drive(animation)) {
         if (!drive_open_name(core, animation - kDriveBase, drive_name)) {
             return kFileMissing;
         }
@@ -197,8 +212,9 @@ Reason first_loop_to(Core &core, uint32_t animation, uint64_t turn, uint64_t tim
         core.frame_end += duration;
         ++core.stream_records;
     }
-    if (reason == kNone && core.frame_end <= time) {
-        // A drive's animation has its length before it plays: here it is an item's file.
+    if (reason == kNone && core.frame_end <= time && animation != kMirrorPosition) {
+        // A drive's animation has its length before it plays: here it is an item's file. A
+        // mirror's length is the host's.
         core.files[core.items[animation].first].total_ms = kept_length(core.frame_end);
     }
     return reason;
@@ -224,7 +240,9 @@ Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn, 
             }
             // A clock's turn gets its seed when it begins: its file is opened once in a turn.
             // While planning is on, the noise is the one the plan drew it from.
-            if (type == kTypeWidget) {
+            if (type == kTypeWidget && animation == kMirrorPosition) {
+                core.seed = core.mirror->seed;
+            } else if (type == kTypeWidget) {
                 core.seed = core.resume_seed != 0 ? core.resume_seed : clock_seed(draw_noise(core), id_of(core, animation), start);
                 core.resume_seed = 0;
             }
@@ -1451,9 +1469,89 @@ void player_item_leaves(Core &core, uint32_t item) {
     }
 }
 
+namespace {
+
+// A refresh of a mirror: the turn the host describes, at its time, in place of the show. No
+// step of the show, its uploads, checks, drive, catalogs or schedule is taken, and nothing
+// is written.
+int mirror_poll(Core &core, uint64_t now) {
+    if (core.leg_count == 0 || core.pixels == nullptr || core.window == nullptr || now < core.next_due) {
+        return 0;
+    }
+    const uint64_t grid = core.t0 + (now - core.t0) / kGridStep * kGridStep;
+    core.next_due = grid + kGridStep;
+    core.had_refresh = 1;
+    core.last_grid = grid;
+    const uint64_t second = (now - core.t0) / 1000;
+    if (second != core.second_running) {
+        core.second_before = core.second_running;
+        core.count_before = core.count_running;
+        core.second_running = second;
+        core.count_running = 0;
+    }
+    ++core.count_running;
+    const odrig_mirror &turn = *core.mirror;
+    core.on = turn.on != 0 ? 1 : 0;
+    core.rotation = turn.rotation & 3u;
+    Shown shows = kShowsNothing;
+    const uint32_t snake = turn.test == 2 ? turn.snake : 0;
+    if (turn.test != 0 && (turn.test == 1 || (snake >= 1 && snake <= 20)) && mapping_editable(core)) {
+        if (!core.mapping_test || core.mapping_snake != snake) {
+            close_stream(core);
+            mapping_mirror_test(core, snake);
+        }
+        if (core.mapping_test) {
+            shows = kShowsPicture;
+            if (core.mapping_snake != 0) {
+                snake_test_draw(core, now);
+            }
+        }
+    } else {
+        if (core.mapping_test) {
+            // The diagonal took the decoder: the turn's file opens anew.
+            core.mapping_test = 0;
+            core.mapping_snake = 0;
+            close_stream(core);
+        }
+        if (turn.name[0] != '\0') {
+            core.catch_up_left = kCatchUpBytes;
+            core.catch_up_begun = 0;
+            const uint64_t in_turn = now > turn.zero_ms ? now - turn.zero_ms : 0;
+            const Reason reason = show_at(core, kMirrorPosition, turn.serial, in_turn, turn.zero_ms);
+            if (reason == kNone) {
+                shows = kShowsPicture;
+            } else if (reason == kPendingWork) {
+                shows = kShowsBefore;
+            } else {
+                close_stream(core);
+            }
+        } else if (core.stream_open) {
+            close_stream(core);
+        }
+    }
+    if (shows == kShowsPicture && core.on) {
+        fill_leds(core);
+    } else if (shows != kShowsBefore || !core.on) {
+        memset(core.led_data, 0, 3u * core.led_total);
+        mini_clear(core);
+    }
+    return 1;
+}
+
+}  // namespace
+
+void player_mirror_end(Core &core) {
+    close_stream(core);
+    core.mapping_test = 0;
+    core.mapping_snake = 0;
+}
+
 int player_poll(Core &core, uint64_t now_ms) {
     core.noise = clock_stir(core.noise, now_ms);
     const uint64_t now = clock_touch(core, now_ms);
+    if (core.mirror != nullptr) {
+        return mirror_poll(core, now);
+    }
     upload_touch(core, now);
     schedule_touch(core, now);
     breaks_poll(core, now);
