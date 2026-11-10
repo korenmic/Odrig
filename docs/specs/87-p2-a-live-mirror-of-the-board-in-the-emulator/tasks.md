@@ -5,7 +5,7 @@ request #63, `all-unmerged-seeds`, with master's seed 87 merged, with only its o
 ticked. Every test of a fault is seen failing before the change, and the failure seen goes
 into the commit message. Code carries no history.
 
-- [ ] 1. Planning and the plan in the core
+- [x] 1. Planning and the plan in the core
   - `core/src/plan.cpp` and `plan.h`, new: `PlayState`, `take`, `put`, `plan_reply`,
     `item_end`, `sign`, `plan_bump`. `core/src/core_state.h`: the plan's fields.
     `core/src/player.cpp`: `player_project`, the projecting guards of `playlist_turn` and

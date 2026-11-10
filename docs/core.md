@@ -300,7 +300,7 @@ normal brightness rounding at `min(selected brightness,40)`, then their 100 samp
 summed and divided with floor rounding. All side columns stay black. Physical
 order is `x*6+y`, bottom left, in the [README orientation](../README.md#approved-connection-and-orientation).
 The core uses three local channel sums per cell, with no per-frame allocation or
-second decoder. The measured host allocation with a drive is 131045 bytes, below
+second decoder. The measured host allocation with a drive is 131061 bytes, below
 131072. Off, invalid or blank output clears the image.
 
 `debug mini on|off` requests a RAM-only transition. Only the host acknowledgement
@@ -681,6 +681,35 @@ of [reasons.md](reasons.md), "Widgets in ODRGX", and held in the window while it
   2, missing or out of form. `clocks storage` writes it and sets both orders to be drawn
   anew. Nothing of it is a
   block or a table: [Memory](#memory) is as it is without it.
+
+## The plan
+
+`plan` of [commands.md](commands.md#the-plan) reports the turns the core will play. They are
+decided by the code that decides them as they come, in `core/src/player.cpp`, and the reply
+is written by `core/src/plan.cpp`.
+
+- **No table.** The core keeps no list of the plan: the core object with a drive has 27 bytes
+  left under 131,072. A reply of `plan` decides the turns when it is asked. It copies every
+  field the end of a turn may change, `PlayState`, about 130 bytes on the stack, runs
+  `playlist_turn` at the end of each turn in turn, with `plan_projecting` set, and puts the
+  fields back. While it is set, no file is opened: a turn whose loop's length is not known
+  stays in progress, and the plan stops at it; no stream is closed and nothing is halted.
+  The window's end, which makes the next playlist current and writes `playlist.txt`'s due
+  flag, is never passed: the plan stops at the turn during which it comes.
+- **The span** is counted from the start of the turn on the LEDs, so the reply holds still
+  through a turn: at most 8 turns, the last beginning less than 10 minutes after that start.
+- **The draws.** `draw_noise` gives the noise of the moment `plan on` was answered while
+  planning is on: `show_at` draws a widget's seed and `pick` of `breaks.cpp` a new order from
+  it, so the decided turn and the turn that plays draw the same values.
+- **The version.** `command_answer` makes a new version after every line that does more than
+  read, and the refresh after it when a 16-bit sign of what it found changed: what plays and
+  from when, the turn's stream, its length, the LEDs, the miniature, a test, the clocks, the
+  drive, the catalog's marker, the check, the current playlist, and whether the show is
+  invalid. A file quarantined or a drive's file left out makes one at once.
+- **The keys.** A drive's file has its key in its row. A file of the board's own storage has
+  its size in its entry of the file table and its CRC-32 in the line of its name of the
+  internal catalog, which `catalog_key` reads with `read_at`, 256 bytes at a time, on the
+  page of its name.
 
 ## A drive
 
@@ -1150,7 +1179,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,792 |
+| The core object | fixed | 3,808 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -1168,13 +1197,13 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
 | Miniature state and physical RGB, only for a 60x60 canvas | fixed | 188 |
-| **Total** | | **125,257** |
+| **Total** | | **125,273** |
 
 That is about 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-45,776 of them. The example show on the two-leg mapping asks for 88,546 bytes. A host
+45,776 of them. The example show on the two-leg mapping asks for 88,562 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,717 bytes for the target file. A host with a drive
+of the check and the saved order: 77,733 bytes for the target file. A host with a drive
 is asked for three blocks more, after the three of the check: the table of a drive
 without a catalog, 12 bytes for each of 256 places, 3,072 bytes; the boot's memory of 16
 files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive's index,
@@ -1185,9 +1214,9 @@ a table of 33 records of 8 bytes and 104 bytes of room for the current playlist'
 368, the saved repeats of32 drive files at6 bytes each (192), and32 brightness
 preferences at5 bytes each (160), followed by128 external exclusion records at5 bytes
 each (640). Positions retain all32 bits. With it
-the target file takes 131,045 bytes, below 131,072. The clocks between the animations add
+the target file takes 131,061 bytes, below 131,072. The clocks between the animations add
 no block: their settings, their counts, the paused turn and the key and the place of their
-order are fields of the core object, and the order is a permutation computed from its key. The size and the number of frames
+order are fields of the core object, and the order is a permutation computed from its key. The plan adds no block either: its version, the noise of its draws, a sign of the latest refresh and two bits are 16 bytes of the core object, and a reply of `plan` decides the turns ahead on the stack. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 256 bytes its source last read. The host API still permits512-byte reads, and drive
 quarantine still fingerprints the complete first512 bytes across refills. Picture clocks add no block either: a picture is decoded into
@@ -1499,8 +1528,8 @@ values/presence use existing item padding/flags.32 external values use 5-byte
 records beside compact 6-byte repeat records with full 32-bit positions/16-bit counts.
 The independent 128-byte reader preserves the 512-byte stack-frame compiler bound.
 
-The measured 100-item Windows host requests 131045 bytes with a drive,21 allocation
-blocks, and the Core object is 3792 bytes. Existing 128 KiB/4096 limits remain unchanged;
+The measured 100-item Windows host requests 131061 bytes with a drive,21 allocation
+blocks, and the Core object is 3808 bytes. Existing 128 KiB/4096 limits remain unchanged;
 no allocation is added per frame. The store streams and verifies a part before
 publishing it, keeps prior usable cache after failed updates, and discards partial
 startup application if the settings file is damaged. `dimming` is additive status;
@@ -1539,7 +1568,7 @@ The zone grammar and commands are in [commands.md](commands.md#board-time). A
 complete snapshot fits the existing 1500-byte chunk and 2048-byte command line.
 Publication verifies the complete staged bytes before atomic rename. Missing or
 damaged rules never supply invented time. Routine clock sets write no storage.
-The combined clock and schedule state uses56 Core bytes; the target with a drive takes131,045 bytes in
+The combined clock and schedule state uses56 Core bytes; the target with a drive takes131,061 bytes in
 21 blocks, below the unchanged128 KiB bound. No allocation occurs after startup,
 and the512-byte compiler frame bound remains enabled.
 
@@ -1559,8 +1588,8 @@ no tick or boundary writes timing settings.
 The atomic grammar, revision guards and error semantics are specified in
 [commands.md](commands.md#daily-schedule-and-manual-control). Manual control is
 immediate even on a persistence failure, which remains explicitly observable.
-The current target takes131,045 host bytes with a drive in21blocks, and Core is
-3792 bytes. The existing128KiB/4096-byte limits and512-byte frame guard remain.
+The current target takes131,061 host bytes with a drive in21blocks, and Core is
+3808 bytes. The existing128KiB/4096-byte limits and512-byte frame guard remain.
 
 ## Output rotation
 

@@ -138,7 +138,10 @@ turn of 12 seconds. The turns of an animation of frames are as above. `play`, `o
 The loop of a clock is its `seconds`, and its turn is its loops as an animation's of
 frames, cut by `max_seconds` in the middle of a loop if need be. Each turn of a clock gets
 a seed when it begins, a `play` too, and keeps it to its end through all its loops; the
-clock's time runs on from the turn's start, not from the start of a loop.
+clock's time runs on from the turn's start, not from the start of a loop. While planning is
+on, [commands.md](commands.md#the-plan), the seed is drawn from the noise of the moment
+planning was switched on, so the plan names it before the turn begins, and the turn takes
+that seed when it begins.
 
 A turn begins with the first frame of its animation, and at the moment the turn before
 it ended. The time of the playlist goes on while the LEDs are switched off.
@@ -435,7 +438,7 @@ both settings are off, the player plays as the rest of this page says.
   break is due and no clock can play; then nothing plays in its place.
 - **A break.** The clock's turn is as long as its turn in the playlist would be: its saved
   repeat, else the fewest whole loops that last `min_seconds`; its seed is drawn when its
-  turn begins. The message plays once: one loop, a text's pass, never cut. After the
+  turn begins, from the noise of the plan while planning is on. The message plays once: one loop, a text's pass, never cut. After the
   break the playlist goes on with the paused turn, or with the animation whose turn was to
   begin, or with the one after it when that can no longer play. `status` reports a break's
   turns as turns: `animation`, `repeat`, `loop` and `saved` are the clock's or the
@@ -443,7 +446,8 @@ both settings are off, the player plays as the rest of this page says.
 - **The order of the clocks.** Each break takes the next clock of an order drawn at random
   among all the orders of the clocks there are, the card's and the board's together, each
   once; a clock that cannot play when its place comes is passed over. When the order is used
-  up a new one is drawn, and the last clock of one may be the first of the next. A new order
+  up a new one is drawn, and the last clock of one may be the first of the next. While
+  planning is on, an order and the messages' bag are drawn from the noise of the plan. A new order
   is drawn at the start, when a card is taken up or dropped, when its tree changes, and when
   the number of the clocks of both storages changes. A card's clock followed by a message of
   the board's storage, or the board's clock by a card's message, is a break as any other.

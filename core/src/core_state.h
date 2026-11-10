@@ -860,6 +860,15 @@ struct Core {
     // The id of the internal folder `clocks`, 0 while there is none.
     uint16_t clocks_internal_id;
 
+    // The plan: the count of its changes, the noise the draws take while planning is on,
+    // and a sign of what the latest refresh found; whether planning is on, and whether a
+    // reply is deciding the turns ahead.
+    uint16_t plan_sign;
+    uint32_t plan_version;
+    uint32_t plan_noise;
+    uint8_t plan_on : 1;
+    uint8_t plan_projecting : 1;
+
 };
 
 // Keeps the context of a file's fault, in place of the one before.

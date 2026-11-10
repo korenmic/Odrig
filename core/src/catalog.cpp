@@ -1571,6 +1571,50 @@ uint32_t catalog_page_of(const char *name, uint32_t length) {
     return hash & 15u;
 }
 
+ODRIG_NOINLINE bool catalog_key(Core &core, const char *name, uint32_t *crc) {
+    if (core.catalogs[kInternal].state != kCatalogOk || core.host.read_at == nullptr) {
+        return false;
+    }
+    const uint32_t length = static_cast<uint32_t>(strlen(name));
+    const char *page = kPageNames[kInternal][catalog_page_of(name, length)];
+    // Each line is `<crc> <size> <width> <height> <length> <type> <name>`: its CRC-32 is
+    // kept while its name is compared, field by field, as the bytes come.
+    uint8_t piece[256];
+    uint32_t offset = 0;
+    uint32_t field = 0;
+    uint32_t at_name = 0;
+    bool same = true;
+    uint32_t found = 0;
+    for (;;) {
+        const int32_t got = core.host.read_at(core.host.ctx, page, offset, piece, sizeof piece);
+        if (got <= 0) {
+            return false;
+        }
+        offset += static_cast<uint32_t>(got);
+        for (int32_t at = 0; at < got; ++at) {
+            const uint8_t byte = piece[at];
+            if (byte == '\n') {
+                if (field == 6 && same && at_name == length) {
+                    *crc = found;
+                    return true;
+                }
+                field = 0;
+                at_name = 0;
+                same = true;
+                found = 0;
+            } else if (field < 6 && byte == ' ') {
+                ++field;
+            } else if (field == 0) {
+                const uint32_t digit = byte >= 'a' ? byte - 'a' + 10u : byte - '0';
+                found = found << 4 | (digit & 15u);
+            } else if (field == 6) {
+                same = same && at_name < length && static_cast<uint8_t>(name[at_name]) == byte;
+                ++at_name;
+            }
+        }
+    }
+}
+
 void catalog_finish_internal(Core &core) {
     CatalogState &catalog = core.catalogs[kInternal];
     catalog.state = kCatalogNone;

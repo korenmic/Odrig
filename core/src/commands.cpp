@@ -12,6 +12,7 @@
 #include "mapping_control.h"
 #include "odrig_core.h"
 #include "order.h"
+#include "plan.h"
 #include "player.h"
 #include "mini.h"
 #include "rotation.h"
@@ -703,7 +704,8 @@ uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
 
 }  // namespace
 
-uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t length, char *bytes) {
+// Carries out one command line and writes its reply.
+uint32_t answer_line(Core &core, uint64_t now_ms, const char *line, uint32_t length, char *bytes) {
     const uint64_t now = clock_touch(core, now_ms);
     upload_touch(core, now);
     schedule_touch(core, now);
@@ -1132,7 +1134,25 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (words.count >= 2 && words.is(1, "begin") && (core.mapping_test || catalog_rebuilding(core))) return refuse(reply, "busy");
         return upload(core, now, words, reply);
     }
+    if (words.is(0, "plan")) {
+        if (words.count == 1) return plan_answer(core, now, reply);
+        uint32_t version = 0;
+        if (words.count == 3 && words.is(1, "since") && number_word(words, 2, 0, 0xFFFFFFFFu, &version)) {
+            return plan_since(core, now, version, reply);
+        }
+        if (words.count == 2 && (words.is(1, "on") || words.is(1, "off"))) return plan_switch(core, words.is(1, "on"), reply);
+        return refuse(reply, "bad-argument");
+    }
     return refuse(reply, "unknown-command");
+}
+
+uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t length, char *bytes) {
+    const uint32_t answered = answer_line(core, now_ms, line, length, bytes);
+    // A line that may change what plays or how it shows makes a new version of the plan.
+    if (!plan_reads_only(line, length)) {
+        plan_bump(core);
+    }
+    return answered;
 }
 
 }  // namespace odrig

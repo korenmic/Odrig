@@ -15355,6 +15355,71 @@ Clocks folders alone, as the chooser already did.
 **Resolution.** `app/www/screens/explorer.js`, `docs/android-app.md`,
 `tests/app/test_only_both.py`, `tests/app/page/scenarios/only-folder-moves.js`.
 
+## Seed 87: the plan without a table
+
+**Question.** The seed asks for a fixed table of the plan, counted in the memory table, with
+one turn decided at a refresh. With a drive, the core has 27 bytes left under the 131,072 the
+suite allows, and a table of 8 turns with the state to go on deciding takes hundreds. What
+keeps the plan?
+
+**Answer.** Nothing but its version, the noise of its draws, a 16-bit sign of the latest
+refresh and two bits, 16 bytes in all: a reply of `plan` decides the turns when it is asked,
+on a copy of the playback's fields on the stack that is put back afterwards. A reply decides
+up to 8 turns at once rather than one a refresh; on the board it takes some milliseconds of
+one command, which may make one refresh late, and time is not stretched by it.
+
+**Resolution.** `core/src/plan.cpp`, `core/src/player.cpp`, `docs/core.md`.
+
+## Seed 87: the span of the plan
+
+**Question.** The plan holds the turns that begin within the next 10 minutes. Counted from
+the moment of the reply, a turn would enter the reply in the middle of a turn with nothing
+that changed, and the version could not know it. From when?
+
+**Answer.** From the start of the turn on the LEDs: the reply then holds still through a turn,
+and a new turn makes a new version anyway.
+
+**Resolution.** `core/src/player.cpp` (`kPlanSpanMs`), `docs/commands.md`.
+
+## Seed 87: what an item of the plan says
+
+**Question.** The seed names an item's start, end, point, id, key, seed and brightness. The
+mirror also needs the length of the file's loop to find the picture of a late point, and a
+turn that went on after a break may be the one on the LEDs. What else does an item say?
+
+**Answer.** `loop`, the loop's length in milliseconds when it is known. The item on the LEDs
+of a turn that went on after a break gives the moment its turn's time was 0 as `start`, with
+no `from`, since the core keeps no mark of the resume: the point at any moment is the same.
+A later item that goes on after a break gives the moment it goes on and its `from`.
+
+**Resolution.** `core/src/plan.cpp`, `docs/commands.md`.
+
+## Seed 87: where the plan stops
+
+**Question.** Deciding past the end of the current playlist's window would make the next
+playlist current, write its path and mark `playlist.txt` to be written. Does the plan go
+through it?
+
+**Answer.** No: it stops at the turn during which the window passes; the turns of the next
+playlist are planned once it has passed, at the new version that the turn's change makes.
+It stops too at a turn whose loop's length is not known yet, its `end` null, and where nothing
+would play.
+
+**Resolution.** `core/src/player.cpp`.
+
+## Seed 87: the lines that only read
+
+**Question.** Every command line that may change what plays makes a new version. Which lines
+do not?
+
+**Answer.** `status`, `space`, `fault`, `list`, `read`, `saved`, `catalog` alone and `catalog
+page`, `order get`, `mapping get`, and `rotation`, `time`, `schedule` and `plan` alone, and
+`plan since`. Every other line counts, a refused one too: a version that grows for a change
+that left the reply as it was costs a client one reply, and one that stays when the reply
+changed would cost it the mirror.
+
+**Resolution.** `core/src/plan.cpp` (`plan_reads_only`), `core/src/commands.cpp`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

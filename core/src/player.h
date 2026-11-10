@@ -194,6 +194,39 @@ bool player_seed(const Core &core, uint32_t *seed);
 
 uint32_t player_fps(const Core &core, uint64_t now);
 
+// One turn of the plan: when its part begins on the LEDs and when it ends, while `ends`; the
+// turn's own time at its start; the position of its animation; and a widget's seed, while
+// `seeded`.
+struct PlanItem {
+    uint64_t start;
+    uint64_t end;
+    uint64_t from;
+    uint32_t position;
+    uint32_t seed;
+    uint8_t ends;
+    uint8_t seeded;
+};
+
+// The most turns a plan holds, and how long after the start of the turn on the LEDs a turn
+// it holds may begin.
+const uint32_t kPlanMost = 8;
+const uint64_t kPlanSpanMs = 600000;
+
+// Gives the turns of the plan to `take`, the one on the LEDs first, until `take` returns
+// false: with planning off that one alone, with it on the turns decided after it by the code
+// that decides them as they come, run ahead on a copy of the playback's state that is put
+// back afterwards. Nothing while the show is invalid, a test shows or nothing plays.
+void player_plan(Core &core, bool (*take)(const PlanItem &item, void *context), void *context);
+
+// The length of the loop of the animation at a position of the playlist, 0 while it is not
+// known, and the id `list` gives it.
+uint64_t player_loop_of(const Core &core, uint32_t position);
+uint32_t player_id_of(const Core &core, uint32_t position);
+
+// A sign of what a refresh found that the plan follows: what plays and from when, its
+// length, the LEDs' state, the drive, the check and the current playlist.
+uint16_t player_sign(const Core &core);
+
 }  // namespace odrig
 
 #endif

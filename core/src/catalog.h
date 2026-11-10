@@ -42,6 +42,11 @@ bool catalog_name_allowed(const char *name, uint32_t length);
 // The page of a name: the low four bits of the FNV-1a hash of its bytes.
 uint32_t catalog_page_of(const char *name, uint32_t length);
 
+// The CRC-32 of a file of the board's own storage, as the line of its name in the internal
+// catalog gives it, read with `read_at`: false while the catalog is not whole or does not
+// name it.
+bool catalog_key(Core &core, const char *name, uint32_t *crc);
+
 // The start, before anything else is read: finishes the change of the internal catalog whose
 // commit record is whole, on a host that can change its storage. A record that a failed call
 // leaves makes the catalog damaged, `interrupted`, for this boot.

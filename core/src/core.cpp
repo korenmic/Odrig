@@ -12,6 +12,7 @@
 #include "rotation.h"
 #include "odrig_core.h"
 #include "order.h"
+#include "plan.h"
 #include "player.h"
 #include "playlist.h"
 #include "reasons.h"
@@ -612,6 +613,7 @@ void drive_log_left_out(Core &core, const char *name, Reason reason) {
 }
 
 void drive_faulted(Core &core, uint32_t position, Reason reason) {
+    plan_bump(core);
     if (!core.indexed) {
         core.drive[position].state = kDriveLeftOut;
         drive_left_out(core, position, reason);
@@ -762,6 +764,7 @@ void quarantine_file(Core &core, uint32_t file, Reason reason, uint8_t work, uin
         return;
     }
     info.fault = static_cast<uint8_t>(reason);
+    plan_bump(core);
     note_fault(core, work, info.name, record, body_bytes, reason);
     if (core.host.log != nullptr) {
         // `file <name> unavailable: <reason>`.
@@ -844,6 +847,7 @@ odrig_core *odrig_core_begin(const odrig_host *host) {
     }
     core->state.host = *host;
     core->state.starting = 1;
+    odrig::plan_start(core->state);
     odrig::schedule_start(core->state);
     odrig::start(core->state);
     odrig::rotation_start(core->state);

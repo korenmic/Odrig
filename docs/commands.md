@@ -78,6 +78,10 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `move internal <folder-id> <path>` | Moves or renames a folder of the board's own storage, its sub-folders with it, every id and setting kept. |
 | `debug mini on` | Requests temporary miniature output; status reports host acknowledgement. |
 | `debug mini off` | Requests restoration of normal output. |
+| `plan` | Reports the plan: the turn on the LEDs and, while planning is on, the turns decided after it. |
+| `plan since <version>` | Reports the plan only when its version is not the one given. |
+| `plan on` | Switches planning on, until `plan off` or a restart. |
+| `plan off` | Switches planning off. |
 
 At power-on brightness comes from `show.json` and the show plays what
 [show.md](show.md) specifies. The LEDs start on unless a saved manual override says
@@ -792,6 +796,71 @@ Read [the wiring and reboot boundaries](../README.md#miniature-display-debug-mod
 before a physical check. Firmware compilation and physical acceptance are open.
 The host description is at most 127 input bytes and 256 escaped bytes, ending at a
 character boundary, so expanded status remains within the fixed reply limit.
+
+## The plan
+
+`plan` reports what the board will play: the turn on the LEDs and, while planning is on, the
+turns it has decided to play after it, so that a client can show what the LEDs show without
+asking at every turn and without a pixel. The emulator's mirror of a board,
+[emulator.md](emulator.md), is such a client. The six forms of `plan` were approved by the
+owner on 2026-11-10.
+
+```
+plan
+{"ok":true,"planning":true,"version":41,"now":5120334,"on":true,"brightness":128,"rotation":0,"mini":false,"test":false,"snake":null,"items":[{"start":5101200,"end":5131200,"id":60004,"key":"9f3a10c2-52340","loop":4000},{"start":5131200,"end":5137200,"id":11,"key":"0c11d2e4-40","loop":3000,"seed":2271034987},{"start":5137200,"end":5138200,"id":13,"key":"77ab0f10-1052","loop":1000},{"start":5138200,"end":5150000,"from":30000,"id":60004,"key":"9f3a10c2-52340","loop":4000}]}
+plan since 41
+{"ok":true,"planning":true,"version":41,"now":5122410,"unchanged":true}
+```
+
+| Member | Meaning |
+|---|---|
+| `planning` | Whether planning is on. |
+| `version` | 1 at the start, one more at each change of what the reply says, `now` aside; counted with planning off too. |
+| `now` | The core's time of the reply: the milliseconds of the clock of its refreshes, since its start. Every time of the reply is on that clock. |
+| `on`, `brightness` | Whether the LEDs are on now, and the runtime default brightness, as `status` gives them. |
+| `rotation` | The saved output orientation, in degrees. |
+| `mini` | Whether the miniature output is acknowledged on. |
+| `test`, `snake` | As `mapping get` gives them: whether a test of the mapping shows, and the snake whose test it is, else `null`. |
+| `items` | The turns, the one on the LEDs first; empty while nothing plays, while the show is invalid and while a test shows. |
+
+An item: `start`, when its part begins on the LEDs; `end`, when it ends, or `null` while that
+is not known yet; `from`, the turn's own time at `start` in milliseconds, given when it is
+not 0, as for a turn that goes on after a break; `id`, its animation's id, as `play` and
+`read` take it; `key`, its file's key, `crc-size` as [catalog.md](catalog.md) writes it, or
+`null` while no catalog names the file; `loop`, the length of its loop in milliseconds when
+it is known; `seed`, a widget's seed when it is known; and `brightness`, when the file's saved
+brightness makes it differ from the default. The turn's point at a moment T of its part is
+`from + (T - start)`. The item on the LEDs of a turn that went on after a break may give the
+moment its turn's time was 0 as `start`, with no `from`: its point at any moment is the same.
+The reply holds as many items as fit into 1,024 bytes, in order.
+
+- **Planning.** `plan on` and `plan off` switch planning on and off for the whole board and
+  answer `{"ok":true}`. It is off at every start and is not saved. With planning off each
+  turn is decided as it begins, and the reply holds the item on the LEDs alone, its `seed`
+  only once the turn has drawn it. With planning on the board decides, when it is asked, the
+  turns that begin within 10 minutes of the start of the turn on the LEDs, at most 8 with
+  it, as the end of each turn decides the next; what the plan holds is what plays, unless a
+  change comes first.
+- **The draws.** While planning is on, a widget's seed and a new order of the clocks or of the
+  messages are drawn from the noise of the moment planning was switched on, in place of the
+  noise of the moment, so the plan names a seed before its turn begins.
+- **Where it stops.** The plan ends at a turn whose end is not known yet, an animation whose
+  loop's length the board has not learnt, at the turn during which the current playlist's
+  window passes, and where nothing would play.
+- **A cycle** gives its turns: each animation of its list for its `seconds`, a text's rounded
+  up to whole passes.
+- **Versions.** Every command line makes a new version but the lines that only read:
+  `status`, `space`, `fault`, `list`, `read`, `saved`, `catalog`, `catalog page`, `order get`,
+  `mapping get`, `rotation`, `time`, `schedule`, `plan` and `plan since`. So do the turn on the
+  LEDs that changes, a drive taken up or dropped, a file read whole or found faulty, a catalog
+  read again, the window that passes, the schedule switching the LEDs and the miniature output
+  acknowledged. A change may leave the reply as it was; the version never stays when it
+  changed.
+- **`plan since <version>`** answers the short reply above while the board's version is the one
+  given, and the whole plan otherwise, so a client that polls gets the plan only when it
+  changed, and one whose board restarted gets it at once. `<version>` is 0 to 4,294,967,295
+  in decimal.
+- Another form of `plan` is `bad-argument`. `plan` is answered while the show is invalid too.
 
 ## Error codes
 
