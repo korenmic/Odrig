@@ -161,6 +161,9 @@ as for a file that is not there.
 | `int odrig_core_leg(const odrig_core *core, uint32_t index, odrig_leg *out)` | Fills in leg `index`, counted from 0 in the order of the mapping file. Returns 1, or 0 for an index that is not a leg. |
 | `size_t odrig_core_command(odrig_core *core, uint64_t now_ms, const char *line, size_t length, char *reply, size_t capacity)` | Takes one command line and writes its reply. Returns the length of the reply. `capacity` must be at least `ODRIG_REPLY_MAX`; with less the core does nothing and returns 0. |
 | `void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, size_t length, odrig_reply_fn on_reply, void *reply_ctx)` | Takes bytes of a transport, cuts them into lines, answers each line, and calls `on_reply` once for each. |
+| `size_t odrig_core_command_on(odrig_core *core, uint64_t now_ms, uint32_t way, const char *line, size_t length, char *reply, size_t capacity)` | `odrig_core_command` for a line of a serial way, 1 to 8, see [Command lines](#command-lines). |
+| `void odrig_core_feed_on(odrig_core *core, uint64_t now_ms, uint32_t way, const uint8_t *bytes, size_t length, odrig_reply_fn on_reply, void *reply_ctx)` | `odrig_core_feed` for the bytes of a serial way. |
+| `size_t odrig_core_plan_line(odrig_core *core, uint64_t now_ms, uint32_t way, char *line, size_t capacity)` | Writes the `#plan` line due on a way and returns its length, or 0 when none is due. `capacity` must be at least `ODRIG_REPLY_MAX` + 6. |
 | `int odrig_core_power(const odrig_core *core)` | Effective LED visibility after the latest command/poll; reads only,0 for a null core. Hosts mirror it without issuing a manual request. |
 | `const char *odrig_core_error(const odrig_core *core)` | The reason the show is invalid, as a text that ends in a zero, or `NULL` when the show is valid. |
 | `void odrig_core_mini_support(odrig_core *core)` | Opts the host into checked miniature output transitions, on a 60x60 canvas. |
@@ -339,6 +342,17 @@ The unfinished line and the reply of this entry are two blocks the core takes at
 of 2,049 and of 1,024 bytes. When the host could supply neither or only one of them, the
 show is invalid with `out-of-memory`, `odrig_core_feed` takes no bytes and calls nothing,
 and `odrig_core_command` works as ever.
+
+A serial way is a route that carries lines the client did not ask for, numbered by its host
+from 1 to 8: the board's UART on the socket marked COM and its own USB socket, the
+emulator's serial port and each connection of its line port. `odrig_core_command_on` and
+`odrig_core_feed_on` take the way a line came by; `odrig_core_command` and `odrig_core_feed`
+are of no way, as HTTP is, and `plan push on` and `plan push off` are refused there with
+`unsupported`. `odrig_core_plan_line` gives a way its due `#plan` line, `#plan `, the reply of
+`plan` and a newline, into a room of at least 1,030 bytes, once for each version: two bits of
+the core object for each way, its push on and a line due, which every new version sets for
+the ways whose push is on. The host writes the line between replies, never inside one, and
+sends `plan push off` on a way that ends.
 
 A line that is no valid command is answered with the first code that applies, in the
 order of the table of [commands.md](commands.md): `line-too-long`, `unknown-command`,
@@ -1286,6 +1300,9 @@ leg; and `ready`.
 | `line <ms> <text>` | `odrig_core_command` with the text | `reply <json>` |
 | `linehex <ms> <hex>` | `odrig_core_command` with exactly these bytes | `reply <json>` |
 | `bytes <ms> <hex>` | `odrig_core_feed` with these bytes | `fed <hex of the line>` and `reply <json>` for each line |
+| `lineon <way> <ms> <text>` | `odrig_core_command_on` with the text, on that way | `reply <json>` |
+| `byteson <way> <ms> <hex>` | `odrig_core_feed_on` with these bytes, on that way | `fed <hex of the line>` and `reply <json>` for each line |
+| `planline <way> <ms>` | `odrig_core_plan_line` for that way | `planline #plan <json>`, or `planline none` |
 | `error` | `odrig_core_error` | `error <text>` or `error none` |
 | `fault` | Reads the context the core keeps of the latest fault of a file | `fault <work> <record> <bytes> <reason> <name>`, the work `start`, `play`, `upload` or `drive`; or `fault none` |
 | `drive plug` | With `--drive`: a drive is plugged in, with a number one higher than the last one; its folder is listed when the core calls `drive_list`, as it is then. The core sees it at its next refresh. | nothing |

@@ -113,6 +113,7 @@ bool write_item(const PlanItem &item, void *context) {
 
 void plan_start(Core &core) {
     core.plan_version = 1;
+    core.plan_ways = 0;
     core.plan_on = 0;
     core.plan_projecting = 0;
 }
@@ -122,6 +123,30 @@ void plan_bump(Core &core) {
     if (core.plan_version == 0) {
         core.plan_version = 1;
     }
+    // Every way whose push is on has a line due.
+    core.plan_ways = static_cast<uint16_t>(core.plan_ways | (core.plan_ways & 0x5555u) << 1);
+}
+
+uint32_t plan_push(Core &core, uint32_t way, bool on, Reply &reply) {
+    const uint16_t bits = static_cast<uint16_t>(3u << (2 * (way - 1)));
+    core.plan_ways = static_cast<uint16_t>(on ? core.plan_ways | bits : core.plan_ways & ~bits);
+    return succeed(reply);
+}
+
+uint32_t plan_line(Core &core, uint64_t now, uint32_t way, char *line, size_t capacity) {
+    if (way == 0 || way > kPlanWays || capacity < ODRIG_REPLY_MAX + 6) {
+        return 0;
+    }
+    const uint16_t due = static_cast<uint16_t>(2u << (2 * (way - 1)));
+    if ((core.plan_ways & due) == 0) {
+        return 0;
+    }
+    core.plan_ways = static_cast<uint16_t>(core.plan_ways & ~due);
+    memcpy(line, "#plan ", 6);
+    Reply reply;
+    reply.bytes = line + 6;
+    reply.length = 0;
+    return 6 + plan_answer(core, now, reply);
 }
 
 void plan_refreshed(Core &core) {

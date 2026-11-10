@@ -1,6 +1,7 @@
 #ifndef ODRIG_PLAN_H
 #define ODRIG_PLAN_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "commands.h"
@@ -35,6 +36,18 @@ uint32_t plan_answer(Core &core, uint64_t now, Reply &reply);
 
 // `plan since <version>`: a short reply while the version is the one given, else the plan.
 uint32_t plan_since(Core &core, uint64_t now, uint32_t version, Reply &reply);
+
+// The ways that carry lines the client did not ask for: 1 to kPlanWays. Way 0 is HTTP's,
+// which carries none.
+const uint32_t kPlanWays = 8;
+
+// `plan push on` and `plan push off` on a way from 1 to kPlanWays: on, the way is given the
+// plan at once and after every new version.
+uint32_t plan_push(Core &core, uint32_t way, bool on, Reply &reply);
+
+// The line `#plan ` and the plan, with its newline, due on a way: its length, or 0 when
+// none is due or the room is under ODRIG_REPLY_MAX + 6 bytes. A line given is no longer due.
+uint32_t plan_line(Core &core, uint64_t now, uint32_t way, char *line, size_t capacity);
 
 }  // namespace odrig
 

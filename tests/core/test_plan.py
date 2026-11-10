@@ -188,6 +188,73 @@ class Versions(unittest.TestCase):
         self.assertGreater(after, within)
 
 
+def given(run):
+    """What a session's ways were given: each `#plan` line's plan, or None when none was due."""
+    lines = []
+    for line in run.lines:
+        if line.startswith("planline "):
+            rest = line[len("planline "):]
+            if rest == "none":
+                lines.append(None)
+            else:
+                assert rest.startswith("#plan "), rest
+                lines.append(json.loads(rest[len("#plan "):]))
+    return lines
+
+
+class Push(unittest.TestCase):
+    def source(self):
+        return show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}], {"a.odrg": loop_of(2, 1), "b.odrg": loop_of(3, 2)}, min_seconds=4)
+
+    def test_no_way_has_a_push_and_a_way_of_1_to_8_has_one(self):
+        at = T0 + 100
+        script = [f"poll {T0}", *asked(100, "plan push on", "plan push off"), f"lineon 1 {at} plan push on", f"lineon 8 {at} plan push off",
+                  f"lineon 0 {at} plan push on", f"lineon 9 {at} plan push on", f"lineon 1 {at} plan push", f"lineon 1 {at} status"]
+        answers = replies(support.start(self.source(), script))
+        unsupported = {"ok": False, "error": "unsupported"}
+        self.assertEqual(answers[:6], [unsupported, unsupported, {"ok": True}, {"ok": True}, unsupported, unsupported])
+        self.assertEqual(answers[6], {"ok": False, "error": "bad-argument"})
+        self.assertEqual(answers[7]["playing"], "all")
+
+    def test_a_way_is_given_the_plan_at_once_and_after_every_new_version(self):
+        script = [f"poll {T0}", f"lineon 1 {T0 + 100} plan push on", f"planline 1 {T0 + 100}", f"planline 1 {T0 + 100}", f"planline 2 {T0 + 100}",
+                  support.line(T0 + 200, "status"), f"planline 1 {T0 + 200}", support.line(T0 + 200, "play 2"), f"planline 1 {T0 + 200}",
+                  *asked(4300, "status"), f"planline 1 {T0 + 4300}", f"planline 1 {T0 + 4300}"]
+        first, again, other, unread, played, turned, after = given(support.start(self.source(), script))
+        self.assertEqual((again, other, unread, after), (None, None, None, None))
+        self.assertEqual(first["items"][0]["id"], 1)
+        self.assertGreater(played["version"], first["version"])
+        self.assertEqual(played["items"][0]["id"], 2)
+        self.assertGreater(turned["version"], played["version"])
+
+    def test_the_line_given_is_the_reply_of_plan(self):
+        at = T0 + 300
+        script = [f"poll {T0}", f"lineon 3 {at} plan push on", f"lineon 3 {at} plan on", f"planline 3 {at}", support.line(at, "plan")]
+        run = support.start(self.source(), script)
+        (line,) = given(run)
+        self.assertEqual(line, plans(run)[-1])
+        self.assertEqual(len(line["items"]), 8)
+
+    def test_push_off_ends_it_on_its_way_alone(self):
+        at = T0 + 100
+        script = [f"poll {T0}", f"lineon 1 {at} plan push on", f"lineon 2 {at} plan push on", f"planline 1 {at}", f"planline 2 {at}",
+                  f"lineon 1 {at} plan push off", support.line(at, "play 2"), f"planline 1 {at}", f"planline 2 {at}"]
+        one, two, stopped, going = given(support.start(self.source(), script))
+        self.assertIsNotNone(one)
+        self.assertIsNotNone(two)
+        self.assertIsNone(stopped)
+        self.assertEqual(going["items"][0]["id"], 2)
+
+    def test_the_bytes_of_a_way_carry_its_push(self):
+        at = T0 + 100
+        script = [f"poll {T0}", f"byteson 4 {at} {b'plan push on'.hex()}0a", f"planline 4 {at}", f"bytes {at} {b'plan push on'.hex()}0a"]
+        run = support.start(self.source(), script)
+        answers = replies(run)
+        self.assertEqual(answers, [{"ok": True}, {"ok": False, "error": "unsupported"}])
+        self.assertEqual(len(given(run)), 1)
+        self.assertIsNotNone(given(run)[0])
+
+
 class Draws(unittest.TestCase):
     def test_while_planning_is_on_a_seed_is_the_same_however_the_refreshes_come(self):
         source = show_of([{"id": 1, "file": "a.odrg"}, {"id": 3, "file": "c.odrgx"}], {"a.odrg": loop_of(2, 1), "c.odrgx": clock_of(seconds=2)}, min_seconds=4)

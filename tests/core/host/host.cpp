@@ -1603,6 +1603,28 @@ private:
             poll(now);
             return true;
         }
+        if (word == "lineon" || word == "byteson" || word == "planline") {
+            // The way, the timestamp, and after one space whatever the line is made of.
+            const size_t first = rest.find(' ');
+            const std::string after = first == std::string::npos ? "" : rest.substr(first + 1);
+            const size_t second = after.find(' ');
+            std::string given = second == std::string::npos ? "" : after.substr(second + 1);
+            const std::string way_text = rest.substr(0, first);
+            uint64_t now;
+            if (way_text.empty() || way_text.size() > 2 || way_text.find_first_not_of("0123456789") != std::string::npos ||
+                !timestamp(after.substr(0, second), &now) || (word == "byteson" && !unhex(&given))) {
+                return false;
+            }
+            const uint32_t way = static_cast<uint32_t>(std::stoul(way_text));
+            if (word == "planline") {
+                plan_line(way, now);
+            } else if (word == "byteson") {
+                feed_on(way, now, given);
+            } else {
+                command_on(way, now, given);
+            }
+            return true;
+        }
         if (word == "line" || word == "linehex" || word == "bytes") {
             // The timestamp, and after one space whatever the line is made of.
             size_t gap = rest.find(' ');
@@ -1690,6 +1712,49 @@ private:
         }
         print_reply(reply.data(), length);
         trace_call();
+    }
+
+    // A command line of a serial way, as `command` does it for a line of no way.
+    void command_on(uint32_t way, uint64_t now, const std::string &text) {
+        std::vector<char> line(text.begin(), text.end());
+        std::vector<char> reply(ODRIG_REPLY_MAX);
+        size_t length;
+        {
+            guard::InCore inside;
+            host_.in_command_ = true;
+            length = odrig_core_command_on(core_, now, way, line.data(), line.size(), reply.data(), reply.size());
+            host_.in_command_ = false;
+        }
+        print_reply(reply.data(), length);
+        trace_call();
+    }
+
+    // Bytes of a serial way, as `feed` takes them for no way.
+    void feed_on(uint32_t way, uint64_t now, const std::string &bytes) {
+        std::vector<uint8_t> given(bytes.begin(), bytes.end());
+        guard::InCore inside;
+        host_.in_command_ = true;
+        odrig_core_feed_on(core_, now, way, given.data(), given.size(), on_reply, nullptr);
+        host_.in_command_ = false;
+    }
+
+    // The `#plan` line due on a way: `planline <line>` without its newline, or
+    // `planline none`.
+    void plan_line(uint32_t way, uint64_t now) {
+        std::vector<char> line(ODRIG_REPLY_MAX + 6);
+        size_t length;
+        {
+            guard::InCore inside;
+            length = odrig_core_plan_line(core_, now, way, line.data(), line.size());
+        }
+        if (length == 0) {
+            std::printf("planline none\n");
+            return;
+        }
+        if (length < 8 || line[length - 1] != '\n') {
+            stop("bad reply", kBadReply);
+        }
+        std::printf("planline %.*s\n", static_cast<int>(length - 1), line.data());
     }
 
     // Bytes of a transport. Prints `fed <hex of the line>` and `reply <json>` for every

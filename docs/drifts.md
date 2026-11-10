@@ -15420,6 +15420,23 @@ changed would cost it the mirror.
 
 **Resolution.** `core/src/plan.cpp` (`plan_reads_only`), `core/src/commands.cpp`.
 
+## Seed 87: the ways of the push
+
+**Question.** `plan push on` is for the serial way it came by, and the core's entries do not
+know where a line came from. How does the core tell the ways apart, and how many may there be?
+
+**Answer.** By a number its host gives each way, 1 to 8, through `odrig_core_command_on`,
+`odrig_core_feed_on` and `odrig_core_plan_line`; the entries without a way are way 0, as HTTP
+is, where the push is `unsupported`. The board's UART is way 1 and its own USB socket way 2;
+the emulator's serial port is way 1 and its line port's connections take 2 to 8. Two bits of
+the core object for each way, the push on and a line due, fit into the padding of the plan's
+fields: the core's memory is as it was. A host sends `plan push off` on a way that ends. The
+header names no number for the ways, as its suite admits only the limits of a line and of a
+reply.
+
+**Resolution.** `core/include/odrig_core.h`, `core/src/plan.cpp`, `core/src/commands.cpp`,
+`docs/core.md`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

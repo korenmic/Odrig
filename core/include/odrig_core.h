@@ -197,6 +197,27 @@ void odrig_core_feed(odrig_core *core, uint64_t now_ms,
                      const uint8_t *bytes, size_t length,
                      odrig_reply_fn on_reply, void *reply_ctx);
 
+/* A serial way: a route that carries lines the client did not ask for, numbered by its host
+   from 1 to 8, as a board's two USB sockets or an emulator's serial port and each connection
+   of its line port. odrig_core_command and odrig_core_feed are the lines of no way, which
+   `plan push on` and `plan push off` are refused on. A host whose way ends sends
+   `plan push off` on it. */
+
+/* odrig_core_command and odrig_core_feed for a line that came by a way, 1 to 8. */
+size_t odrig_core_command_on(odrig_core *core, uint64_t now_ms, uint32_t way,
+                             const char *line, size_t length,
+                             char *reply, size_t capacity);
+void odrig_core_feed_on(odrig_core *core, uint64_t now_ms, uint32_t way,
+                        const uint8_t *bytes, size_t length,
+                        odrig_reply_fn on_reply, void *reply_ctx);
+
+/* The line a way is due, while `plan push on` holds for it: `#plan `, the reply of `plan` and
+   a newline, written to line without a terminating zero; returns its length, which is no line
+   given anew until the plan's version changes, or 0 when none is due. capacity must be at
+   least ODRIG_REPLY_MAX + 6. The host writes it between replies, never inside one. */
+size_t odrig_core_plan_line(odrig_core *core, uint64_t now_ms, uint32_t way,
+                            char *line, size_t capacity);
+
 /* The reason the show is invalid, as status reports it, or NULL when it is valid. */
 const char *odrig_core_error(const odrig_core *core);
 

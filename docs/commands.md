@@ -82,6 +82,8 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `plan since <version>` | Reports the plan only when its version is not the one given. |
 | `plan on` | Switches planning on, until `plan off` or a restart. |
 | `plan off` | Switches planning off. |
+| `plan push on` | Gives the serial way the line came by the plan as a `#plan` line, at once and after every new version. |
+| `plan push off` | Ends the push of that way. |
 
 At power-on brightness comes from `show.json` and the show plays what
 [show.md](show.md) specifies. The LEDs start on unless a saved manual override says
@@ -860,6 +862,13 @@ The reply holds as many items as fit into 1,024 bytes, in order.
   given, and the whole plan otherwise, so a client that polls gets the plan only when it
   changed, and one whose board restarted gets it at once. `<version>` is 0 to 4,294,967,295
   in decimal.
+- **The push.** A serial way carries lines the client did not ask for: the board's two USB
+  sockets, the emulator's serial port and each connection of its line port. `plan push on`
+  sent by such a way makes the board write on it, between replies and never inside one,
+  `#plan ` and the reply `plan` would give, at once and after every new version, the newest
+  alone when versions come faster than the way takes them; `plan push off` ends it. Both
+  answer `{"ok":true}`. The push is not saved, and a restart ends it on every way. HTTP
+  carries no line the client did not ask for: there both are answered `unsupported`.
 - Another form of `plan` is `bad-argument`. `plan` is answered while the show is invalid too.
 
 ## Error codes
@@ -870,7 +879,7 @@ The reply holds as many items as fit into 1,024 bytes, in order.
 | `unknown-command` | The first word is not a command. |
 | `bad-argument` | An argument is missing, extra, not a number, out of range, or not in its form: a file name outside the naming rule, base64 that is not as described or stands for more bytes than `chunk`, a CRC-32 that is not eight hexadecimal digits, or a word after `upload` that is not `begin`, `data`, `end` or `cancel`; `move external` of a file whose new path would pass 100 bytes; `move internal` of a folder into itself or below it, or one whose subtree would pass the limits of a folder's or a file's path. |
 | `show-invalid` | `play`, `list`, `read`, `remove`, `repeat`, `clocks` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
-| `unsupported` | `debug mini` needs a supporting host and an installed60x60 canvas; `folder make` on a host that makes no folders, `folder make internal`, `move internal`, and `folder remove` of a folder of the board's own storage, on one whose storage cannot be changed, and `play` of a folder of the board's own storage on a host that keeps no current playlist. Judged after syntax. |
+| `unsupported` | `debug mini` needs a supporting host and an installed60x60 canvas; `folder make` on a host that makes no folders, `folder make internal`, `move internal`, and `folder remove` of a folder of the board's own storage, on one whose storage cannot be changed, and `play` of a folder of the board's own storage on a host that keeps no current playlist; `plan push on` and `plan push off` over HTTP, which is no serial way. Judged after syntax. |
 | `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
@@ -903,9 +912,10 @@ replies are the same on every transport.
 
 **Lines that are no reply.** On the board's serial ports, a line that begins with `#` is
 no reply: the firmware writes its log there between replies, as
-[firmware.md](firmware.md#the-log) describes, and the chip's loader prints lines at a
-start. A reply is a line that is a JSON object with `ok`; a client passes over every
-other line.
+[firmware.md](firmware.md#the-log) describes, the `#plan` lines of a way whose push is on,
+[The plan](#the-plan), and the chip's loader prints lines at a start. The emulator's serial
+port and line port carry `#plan` lines as well. A reply is a line that is a JSON object with
+`ok`; a client passes over every other line.
 
 **HTTP.** A command is sent as `POST /odrig` with the command line as the request body, with
 or without the final newline. The response body is the reply line, with content type

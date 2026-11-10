@@ -861,9 +861,11 @@ struct Core {
     uint16_t clocks_internal_id;
 
     // The plan: the count of its changes, the noise the draws take while planning is on,
-    // and a sign of what the latest refresh found; whether planning is on, and whether a
-    // reply is deciding the turns ahead.
+    // a sign of what the latest refresh found, and for ways 1 to 8 two bits each, the
+    // push on and a line due; whether planning is on, and whether a reply is deciding the
+    // turns ahead.
     uint16_t plan_sign;
+    uint16_t plan_ways;
     uint32_t plan_version;
     uint32_t plan_noise;
     uint8_t plan_on : 1;

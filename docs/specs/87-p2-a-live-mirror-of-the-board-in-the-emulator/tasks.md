@@ -24,7 +24,7 @@ into the commit message. Code carries no history.
   - Suites: core, onboarding, emulator.
   - Requirements: 1.1–1.6, 2.1–2.8, 3.1–3.4, 5.1–5.3, 7.1–7.4, 18.1.
 
-- [ ] 2. The ways and the push in the core
+- [x] 2. The ways and the push in the core
   - `core/include/odrig_core.h`: `odrig_core_command_on`, `odrig_core_feed_on`,
     `odrig_core_plan_line`. `core/src/commands.cpp`: the way of a line, `plan push on|off`,
     `unsupported` on way 0. `core/src/core.cpp` or `plan.cpp`: the entries.
