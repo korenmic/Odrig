@@ -140,7 +140,9 @@ class Includes(unittest.TestCase):
         self.assertGreaterEqual(len(calls), 3)
         for call in calls:
             block = text[text.rfind("\n}", 0, call.start()):call.start()]
-            self.assertRegex(block, r"\bLocked held;", f"odrig_core_{call.group(1)}")
+            # Held for the call, or tried without waiting where a pass of the loop asks and
+            # goes on when another holds it.
+            self.assertRegex(block, r"\bLocked held;|xSemaphoreTake\(lock, 0\) != pdTRUE\) return 0;", f"odrig_core_{call.group(1)}")
 
     def test_the_usermod_names_no_function_of_wleds_serial_handling(self):
         for path in SOURCES:
@@ -279,10 +281,10 @@ class TheTask(unittest.TestCase):
 
     def test_the_port_hands_a_line_on_under_one_hold_of_the_lock(self):
         feed = self.usermod[self.usermod.index("size_t feedBytes("):self.usermod.index("// One command line of the web server")]
-        self.assertEqual((feed.count("Locked held;"), feed.count("odrig_core_feed(core, OdrigFiles::nowMs(), bytes, length, keepReply, &kept);")), (1, 1))
+        self.assertEqual((feed.count("Locked held;"), feed.count("odrig_core_feed_on(core, OdrigFiles::nowMs(), USB_WAY, bytes, length, keepReply, &kept);")), (1, 1))
         serial = text_of(USERMOD / "odrig_serial.cpp")
         self.assertIn("if (byte == '\\n' || waitingBytes == sizeof(waiting)) handOn();", serial)
-        self.assertRegex(serial, r"(?s)void OdrigSerial::poll\(Feed feed\) \{.*\n  handOn\(\);\n\}")
+        self.assertRegex(serial, r"(?s)void OdrigSerial::poll\(Feed feed, Plan plan\) \{.*\n  handOn\(\);\n\}")
         self.assertEqual(serial.count("feedNow(waiting, waitingBytes, reply, sizeof(reply))"), 1)
 
 
@@ -311,8 +313,10 @@ class TheUart(unittest.TestCase):
 
     def test_a_line_goes_to_the_core_by_the_entry_the_web_server_uses(self):
         loop = self.usermod[self.usermod.index("void loop() override {"):self.usermod.index("void addToJsonInfo")]
-        self.assertEqual(loop.count("OdrigUart::poll(commandLine);"), 1)
-        self.assertLess(loop.index("OdrigSerial::poll(feedBytes);"), loop.index("OdrigUart::poll(commandLine);"))
+        self.assertEqual(loop.count("OdrigUart::poll(uartLine, uartPlan);"), 1)
+        self.assertLess(loop.index("OdrigSerial::poll(feedBytes, usbPlan);"), loop.index("OdrigUart::poll(uartLine, uartPlan);"))
+        self.assertIn("return commandOn(UART_WAY, line, length, reply, capacity);", self.usermod)
+        self.assertIn("return commandOn(0, line, length, reply, capacity);", self.usermod)
         self.assertNotRegex(self.uart, r"\bodrig_core_\w+\(")
         self.assertEqual(self.uart.count("line(arriving, arrived, reply, sizeof(reply))"), 1)
 
@@ -322,7 +326,7 @@ class TheUart(unittest.TestCase):
         self.assertIn("if (byte == '\\n') {\n      ended = true;", self.uart)
 
     def test_a_line_that_has_ended_waits_while_lines_are_held_back(self):
-        poll = self.uart[self.uart.index("void OdrigUart::poll(Line line) {"):]
+        poll = self.uart[self.uart.index("void OdrigUart::poll(Line line, Plan plan) {"):]
         self.assertRegex(poll, r"if \(ended\) \{\n\s+if \(OdrigFiles::holding\(\)\) return;")
         self.assertLess(poll.index("if (OdrigFiles::holding()) return;"), poll.index("line(arriving, arrived, reply, sizeof(reply))"))
 
@@ -330,7 +334,9 @@ class TheUart(unittest.TestCase):
         self.assertIn("const int BYTES_PER_PASS = 256;", self.uart)
         self.assertIn("for (int taken = 0; taken < BYTES_PER_PASS; taken++) {", self.uart)
         self.assertIn("static char reply[ODRIG_REPLY_MAX];", self.uart)
-        self.assertNotRegex(self.uart.replace("static char reply[ODRIG_REPLY_MAX];", ""), r"\bchar\s+\w+\[[^\]]*(ODRIG_REPLY_MAX|1024)[^\]]*\]")
+        self.assertIn("static char line[ODRIG_REPLY_MAX + 8];", self.uart)
+        kept = self.uart.replace("static char reply[ODRIG_REPLY_MAX];", "").replace("static char line[ODRIG_REPLY_MAX + 8];", "")
+        self.assertNotRegex(kept, r"\bchar\s+\w+\[[^\]]*(ODRIG_REPLY_MAX|1024)[^\]]*\]")
 
     def test_no_pin_of_a_leg_is_one_of_the_uart(self):
         # The UART is on the pins 43 and 44 of the chip.
@@ -585,14 +591,14 @@ class Pacing(unittest.TestCase):
             self.assertIn(expected, holding)
 
     def test_the_port_takes_nothing_while_lines_are_held_back_and_asks_again_after_a_line(self):
-        poll = self.serial[self.serial.index("void OdrigSerial::poll(Feed feed) {"):]
+        poll = self.serial[self.serial.index("void OdrigSerial::poll(Feed feed, Plan plan) {"):]
         loop = poll.index("for (int taken = 0;")
         self.assertLess(poll.index("if (OdrigFiles::holding()) return;"), loop)
         self.assertRegex(poll[loop:], r"if \(lineHandedOn\) \{\n\s+lineHandedOn = false;\n\s+if \(OdrigFiles::holding\(\)\) break;")
         self.assertIn("if (byte == '\\n') lineHandedOn = true;", self.serial)
 
     def test_a_request_waits_before_it_takes_the_lock(self):
-        command = self.usermod[self.usermod.index("size_t commandLine("):self.usermod.index("// Physical output resources remain fixed.")]
+        command = self.usermod[self.usermod.index("size_t commandOn("):self.usermod.index("size_t commandLine(")]
         steps = [command.index(step) for step in ("while (OdrigFiles::holding()) delay(1);", "Locked held;", "odrig_core_command(")]
         self.assertEqual(steps, sorted(steps))
 
@@ -625,7 +631,10 @@ class Pacing(unittest.TestCase):
 
     def test_the_reply_of_the_port_is_not_on_the_stack(self):
         self.assertIn("static char reply[ODRIG_REPLY_MAX];", self.serial)
-        self.assertNotRegex(self.serial.replace("static char reply[ODRIG_REPLY_MAX];", ""), r"\bchar\s+\w+\[[^\]]*(ODRIG_REPLY_MAX|1024)[^\]]*\]")
+        # The `#plan` line being written is kept at the file's level, between the polls.
+        self.assertIn("\nchar planLine[ODRIG_REPLY_MAX + 8];\n", self.serial)
+        kept = self.serial.replace("static char reply[ODRIG_REPLY_MAX];", "").replace("\nchar planLine[ODRIG_REPLY_MAX + 8];\n", "\n")
+        self.assertNotRegex(kept, r"\bchar\s+\w+\[[^\]]*(ODRIG_REPLY_MAX|1024)[^\]]*\]")
 
     def test_the_probes_times_of_storage_are_in_the_probe_build_only(self):
         for name in ("odrig_files.h", "odrig_files.cpp", "odrig_usermod.cpp", "odrig_serial.cpp", "odrig_http.cpp"):

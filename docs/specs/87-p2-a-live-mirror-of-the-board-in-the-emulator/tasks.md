@@ -48,7 +48,7 @@ into the commit message. Code carries no history.
   - Suites: core, onboarding.
   - Requirements: 6.1–6.3, 7.1–7.2.
 
-- [ ] 4. `#plan` lines in the firmware
+- [x] 4. `#plan` lines in the firmware
   - `firmware/usermod/odrig_uart.cpp`, `odrig_serial.cpp`, `odrig_usermod.cpp`: the ways 1 and
     2, the UART's whole line, the USB socket's pieces.
   - Tests of `tests/firmware` for both ways, seen failing first.

@@ -28,8 +28,8 @@ class TheLog(unittest.TestCase):
         cls.usermod = text_of(USERMOD / "odrig_usermod.cpp")
 
     def test_the_serial_ports_code_writes_the_logs_lines_between_replies_and_never_waits(self):
-        poll = body(self.uart, "void OdrigUart::poll(Line line) {")
-        self.assertTrue(poll.startswith("void OdrigUart::poll(Line line) {\n  writeLog();\n  for ("), poll)
+        poll = body(self.uart, "void OdrigUart::poll(Line line, Plan plan) {")
+        self.assertTrue(poll.startswith("void OdrigUart::poll(Line line, Plan plan) {\n  writeLog();\n  writePlan(plan);\n  for ("), poll)
         self.assertEqual(poll.count("writeLog();"), 1)
         write = body(self.uart, "void writeLog() {")
         self.assertIn("const int space = Serial0.availableForWrite() - WRITE_MARGIN;", write)

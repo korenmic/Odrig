@@ -35,6 +35,16 @@ void writeLog() {
   }
 }
 
+// Writes the `#plan` line due, whole, when the UART takes all of it now without waiting: it
+// is asked for only then, so a line due waits in the player until there is room. A line is
+// never written inside a reply, which poll writes whole after the line it answers.
+void writePlan(OdrigUart::Plan plan) {
+  static char line[ODRIG_REPLY_MAX + 8];
+  if (ended || Serial0.availableForWrite() - WRITE_MARGIN < (int)sizeof(line)) return;
+  const size_t length = plan(line, sizeof(line));
+  if (length > 0) Serial0.write((const uint8_t *)line, length);
+}
+
 }  // namespace
 
 void OdrigUart::begin() {
@@ -43,8 +53,9 @@ void OdrigUart::begin() {
   Serial0.begin(BITS_PER_SECOND);
 }
 
-void OdrigUart::poll(Line line) {
+void OdrigUart::poll(Line line, Plan plan) {
   writeLog();
+  writePlan(plan);
   for (int taken = 0; taken < BYTES_PER_PASS; taken++) {
     if (ended) {
       if (OdrigFiles::holding()) return;
