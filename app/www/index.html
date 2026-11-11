@@ -11,6 +11,7 @@
 <p id="app-name">odrig</p>
 <p id="top-link" class="pill" role="status">Checking</p>
 </header>
+<p id="batch-line" class="pill" role="status" hidden></p>
 <p id="mini-indicator" class="pill" role="status" hidden></p>
 <main>
 <section id="animations" hidden>
@@ -104,8 +105,25 @@
 <div class="panel">
 <label id="choose" class="button primary" for="media">Choose a video or a GIF</label>
 <input id="media" type="file" accept="video/*,image/gif" hidden>
-<label class="button" for="ready-file">Choose a ready-made animation</label>
-<input id="ready-file" type="file" accept=".odrg,.odrgx" hidden>
+<label class="button" for="ready-file">Choose ready-made animations</label>
+<input id="ready-file" type="file" accept=".odrg,.odrgx" multiple hidden>
+<div id="batch" hidden>
+<p id="batch-sum" role="status"></p>
+<p id="batch-capacity" class="small"></p>
+<div id="batch-store">
+<label for="batch-storage">Storage</label>
+<select id="batch-storage" aria-describedby="batch-destination-reason"><option value="external">External storage</option><option value="internal">Internal storage</option></select>
+<p id="batch-destination" role="status"></p>
+<p id="batch-destination-reason" class="small"></p>
+</div>
+<ol id="batch-rows"></ol>
+<label id="batch-add" class="button" for="batch-more">Add more</label>
+<input id="batch-more" type="file" accept=".odrg,.odrgx" multiple hidden>
+<button id="batch-upload" type="button" class="primary" aria-describedby="batch-locked-reason">Upload 2 animations</button>
+<p id="batch-locked-reason" class="small" hidden></p>
+<button id="batch-stop" type="button" hidden>Stop</button>
+<button id="batch-retry" type="button" hidden>Try the failed again</button>
+</div>
 <div id="chosen" hidden>
 <p id="media-name"></p>
 <div id="media-controls">
@@ -137,7 +155,8 @@
 <p id="upload-destination" role="status"></p>
 <p id="upload-destination-reason" class="small"></p>
 </div>
-<button id="upload-made" type="button" class="primary">Upload to the installation</button>
+<button id="upload-made" type="button" class="primary" aria-describedby="upload-locked-reason">Upload to the installation</button>
+<p id="upload-locked-reason" class="small" hidden></p>
 <p id="uploading" hidden></p>
 <button id="cancel-upload" type="button" hidden>Cancel</button>
 </div>
@@ -196,7 +215,8 @@
 </div>
 <canvas id="author-preview"></canvas>
 <p id="author-says" role="status" aria-live="polite"></p>
-<button id="author-upload" type="button" class="primary">Upload to the installation</button>
+<button id="author-upload" type="button" class="primary" aria-describedby="author-locked-reason">Upload to the installation</button>
+<p id="author-locked-reason" class="small" hidden></p>
 <p id="author-uploading" hidden></p>
 <button id="author-cancel" type="button" hidden>Cancel</button>
 <button id="author-close" type="button">Close</button>
