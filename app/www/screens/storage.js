@@ -1,5 +1,8 @@
 // New animations: converted media or original ready-made bytes, with a visible destination.
 
+import * as batch from "../batch.js";
+import * as archivePanel from "./archive.js";
+import * as batchList from "./batch-list.js";
 import * as capacity from "../capacity.js";
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
@@ -57,6 +60,20 @@ function locked() {
   return preparing || sending !== null || client.contentBusy() || client.state.link !== "answers";
 }
 
+// Why the button is disabled now, the first of these reasons that holds: the installation
+// does not answer, this screen checks the destination, an upload of any screen is under
+// way, or a deletion runs on Animations. Null while none holds.
+function lockReason(state) {
+  if (batch.running()) return "A batch upload is under way.";
+  if (state.link === "checking") return "The installation has not answered yet.";
+  if (state.link !== "answers") return `The installation does not answer.${state.failure === null ? "" : ` ${messages.ofFailure(state.failure)}`}`;
+  const holder = client.contentHolder();
+  if (preparing || holder === "preflight") return "Checking the destination with the installation.";
+  if (sending !== null || holder === "upload") return "An upload is under way.";
+  if (holder === "deletion") return "A deletion is under way on Animations.";
+  return null;
+}
+
 function draw(state) {
   byId("upload-space").textContent = `Internal storage: ${capacity.internal(state.space, undefined)}`;
   say("upload-card-space", capacity.external(state.space, undefined));
@@ -76,9 +93,14 @@ function draw(state) {
       : destinations.reason(form, state.space);
   }
   for (const id of ["upload-name", "media", "ready-file", "make"]) byId(id).disabled = frozen;
-  byId("upload-made").disabled = locked();
+  const button = byId("upload-made");
+  button.disabled = locked();
+  // The line under the button says why it is disabled, while it is on the screen.
+  say("upload-locked-reason", button.hidden || !button.disabled ? null : lockReason(state));
   byId("upload-space").classList.toggle("stale", state.link === "no-answer");
   byId("upload-card-space").classList.toggle("stale", state.link === "no-answer");
+  batchList.draw(state, lockReason(state));
+  archivePanel.draw(state, lockReason(state));
 }
 
 // Milliseconds of a field, or null for an empty field where `empty` allows it. A text
@@ -186,7 +208,7 @@ async function upload(message) {
   const captured = form;
   const bytes = prepared.bytes;
   preparing = true;
-  client.setContentBusy(true);
+  client.setContentBusy("preflight");
   draw(client.state);
   try {
   const fresh = await client.uploadSnapshot(captured.storage === "external" ? captured.level : {path: "", id: null});
@@ -227,26 +249,14 @@ async function upload(message) {
         } else {
           shown.hidden = true;
           const error = how.error;
-          if (error instanceof Refusal && error.code === "no-space" && external) {
-            const card = client.state.space === null ? null : client.state.space.external;
-            message(messages.ofNoSpace(bytes.length, card === null || card.free === null ? null : card.free, "the card"));
-          } else if (error instanceof Refusal && error.code === "no-space") {
-            message(messages.ofNoSpace(bytes.length, client.state.space === null ? null : client.state.space.free));
-          } else if (error instanceof Refusal && !external && ["unsupported", "stale"].includes(error.code)) {
-            message("The chosen id was taken, or the firmware cannot confirm a safe new upload. No file bytes were sent. Select the file again or update the firmware.");
-          } else if (error instanceof Refusal && external && ["bad-argument", "unknown-command", "no-upload", "stale"].includes(error.code)) {
-            message("The destination changed, already exists, or the firmware lacks safe folder uploads. Check the folder and filename, or update the firmware. Nothing was acknowledged as installed.");
-          } else if (error instanceof Refusal) {
-            message(messages.ofRefusal(error, client.state.status === null ? null : client.state.status.error));
-          } else if (error instanceof Failure) {
-            message(`${messages.ofFailure(error)} The upload was not acknowledged as installed; check the destination before retrying.`);
-          }
+          if (error instanceof Refusal || error instanceof Failure) message(destinations.refusalWords(error, external, bytes.length, client.state));
         }
       },
       wake: client.wake,
     },
   );
   client.upload(sending);
+  batch.otherUpload();
   } catch (error) {
     if (error instanceof Refusal) message(messages.ofRefusal(error, client.state.status?.error ?? null));
     else if (error instanceof Failure) message(messages.ofFailure(error));
@@ -365,13 +375,31 @@ export function start(options) {
     }
   });
   byId("ready-file").addEventListener("change", () => {
-    const files = byId("ready-file").files;
+    const files = [...byId("ready-file").files];
+    byId("ready-file").value = "";
     if (files.length === 1) {
-      const file = files[0];
-      byId("ready-file").value = "";
-      chooseReady(file, message);
+      batchList.close();
+      chooseReady(files[0], message);
+    } else if (files.length > 1) {
+      if (!batchList.open() && sending === null && !preparing) {
+        picked = null;
+        forget();
+        byId("chosen").hidden = true;
+      }
+      batchList.take(files, message);
     }
   });
+  byId("batch-more").addEventListener("change", () => {
+    const files = [...byId("batch-more").files];
+    byId("batch-more").value = "";
+    if (files.length > 0) batchList.take(files, message);
+  });
+  byId("batch-storage").addEventListener("change", () => batchList.choose(byId("batch-storage").value, client.state));
+  byId("batch-upload").addEventListener("click", () => batchList.press(message));
+  byId("batch-stop").addEventListener("click", () => batch.stop());
+  byId("batch-retry").addEventListener("click", () => batchList.retry());
+  batch.watch(() => draw(client.state));
+  archivePanel.start({message});
   for (const name of Object.keys(FITS)) {
     byId(`fit-${name}`).addEventListener("click", () => chooseFit(name));
   }

@@ -132,6 +132,9 @@ the entry links to it.
   known are kept in `thumbnails/`, the default preview catalog; a phone keeps those of what
   it uploaded. Not the moving picture of the form of a text or a clock, which the app draws
   itself, and not `python -m preview`, which plays one animation in the emulator.
+- **archive**: One zip file of animation files that the operators' app opens on the phone,
+  lists, and uploads the ticked files of one after another; nothing of the zip reaches the
+  board but those files. See [android-app.md](../docs/android-app.md#an-archive-of-animations).
 - **collection**: Every animation file the installation has been given, kept as the file
   that is played, with its preview and a readme of where it came from beside it, in
   `collection/`. Git tracks the small ones; the heavy ones, the groups of a long video and
