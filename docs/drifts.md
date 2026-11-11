@@ -12791,3 +12791,23 @@ as it is, when it has one. The page needs no change: the legs come from the core
 file from that route.
 
 **Resolution.** `emulator/httpd.py`, `docs/emulator.md`.
+
+## Seed 83: an upload's end under a test, and where the emulator sees the check
+
+**Question.** What does an upload that ends under a test do to what plays, and how is a
+test seen taken while the emulator's check after the start goes on?
+
+**Answer.** A test halts the player, and an upload's end that adds an item or replaces a
+file called `player_item_added`, which plays the playlist when nothing plays: it would
+have started an animation under the test, over the diagonal's picture. It now does nothing
+while a test shows; the test's end plays the saved selection, else the playlist's first
+animation, the new one among them. Under a test a line `upload` whose second word is not
+`begin` reaches the upload's own checks, so a malformed one is `bad-argument` where it was
+`busy`. The emulator has read the demo show and a clip of 3,000 records before its TCP
+line answers, about 4.7 seconds after it is started on Windows, so its suite sees the test
+taken during the check in record mode, whose time is the script's, and the upload ended
+under a test over TCP.
+
+**Resolution.** `core/src/player.cpp`, `core/src/commands.cpp`,
+`core/src/mapping_control.cpp`, `tests/core/test_snakes.py`,
+`tests/emulator/test_display_tests.py`.
