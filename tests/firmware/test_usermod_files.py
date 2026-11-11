@@ -383,10 +383,19 @@ class Host(unittest.TestCase):
         self.assertEqual(users, {"odrig_files.cpp"})
         for path in SOURCES:
             text = text_of(path)
-            self.assertNotRegex(text, r"ODRIG_FS\.(rmdir|format)\b", path.name)
+            self.assertNotRegex(text, r"ODRIG_FS\.format\b", path.name)
+            # The folder of the show is made by a write; a numbered folder of it by the
+            # core's `make_folder`, and removed by its `remove` while it is empty.
             self.assertEqual(re.findall(r"ODRIG_FS\.mkdir\(([^)]*)\)", text),
-                             ["FOLDER_PATH"] if path.name == "odrig_files.cpp" else [], path.name)
+                             ["FOLDER_PATH", "path"] if path.name == "odrig_files.cpp" else [], path.name)
+            self.assertEqual(re.findall(r"ODRIG_FS\.rmdir\(([^)]*)\)", text), ["path"] if path.name == "odrig_files.cpp" else [], path.name)
             self.assertNotRegex(text, r"serializeConfig|writeObjectToFile|doSerializeConfig|configNeedsWrite", path.name)
+        made = self.files[self.files.index("int makeFolder(void *"):]
+        self.assertIn("if (!folderPathOf(name, path)) return -1;", made[:made.index("\n}\n")])
+        removed = self.files[self.files.index("int removeFile(void *"):]
+        self.assertIn("if (folderPathOf(name, path)) {", removed[:removed.index("\n}\n")])
+        numbered = self.files[self.files.index("bool folderPathOf(const char *name, char *path) {"):self.files.index("bool isFolder(")]
+        self.assertIn("if (numberLength(name, 0) == 0) return false;", numbered)
 
     def test_every_path_given_to_the_file_system_is_in_the_shows_folder(self):
         calls = re.findall(r"ODRIG_FS\.(open|exists|remove|rename)\(([^)]*)\)", self.files)
@@ -399,7 +408,9 @@ class Host(unittest.TestCase):
         self.assertEqual(set(re.findall(r"strcpy\((\w+), FOLDER\);", self.files)), {"path", "given"})
         self.assertEqual(set(re.findall(r"pathOf\(\w+, (\w+)\)", self.files)), {"path", "pathFrom", "pathTo"})
         made = self.files[self.files.index("bool pathOf(const char *name, char *path) {"):self.files.index("int openNamed(")]
-        self.assertIn("if (!isName(name)) return false;", made)
+        self.assertIn("if (!isStored(name)) return false;", made)
+        stored = self.files[self.files.index("bool isStored(const char *name) {"):self.files.index("bool pathOf(")]
+        self.assertIn("return isName(number == 0 ? name : name + number + 1);", stored)
         self.assertIn("strcpy(path, FOLDER);", made)
         self.assertNotRegex(self.files, r'"/[^o"]')
 

@@ -5,7 +5,9 @@
 #include "catalog.h"
 #include "crc32.h"
 #include "drive.h"
+#include "folders.h"
 #include "json_reader.h"
+#include "show.h"
 #include "storage.h"
 
 namespace odrig {
@@ -87,6 +89,22 @@ void upload_discard(Core &core) {
     core.upload.state = kUploadNone;
 }
 
+namespace {
+
+// Keeps the fault the check of the upload found: of a file of the storage by its stored name,
+// of one of the drive by its name.
+ODRIG_NOINLINE void upload_fault(Core &core, uint32_t record, uint64_t body_bytes, Reason reason) {
+    char stored[kStoredNameRoom];
+    if (core.upload.id != 0) {
+        upload_stored_name(core.upload, stored);
+        note_fault(core, kWorkUpload, stored, record, body_bytes, reason);
+    } else {
+        note_fault(core, kWorkUpload, core.upload.name, record, body_bytes, reason);
+    }
+}
+
+}  // namespace
+
 void upload_step(Core &core, uint64_t now) {
     Upload &upload = core.upload;
     if (upload.state != kUploadChecking) {
@@ -147,7 +165,7 @@ void upload_step(Core &core, uint64_t now) {
             return;
         }
     }
-    note_fault(core, kWorkUpload, upload.name, record, upload.header_read ? checker.decoder.body_read : 0, reason);
+    upload_fault(core, record, upload.header_read ? checker.decoder.body_read : 0, reason);
     check_ended(core, reason == kReadError ? kCheckStorageFailed : kCheckBadFile, reason);
 }
 
@@ -164,8 +182,8 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
     if (!is_new && core.items[position].is_cycle) {
         return refuse(reply, "in-use");
     }
-    if (is_new && drive_id_taken(core, id)) {
-        // The id is a file's of the drive, or a folder's of its tree.
+    if (is_new && (drive_id_taken(core, id) || internal_folder_id(core, id))) {
+        // The id is a file's of the drive, or a folder's of its tree or of the storage.
         return refuse(reply, "in-use");
     }
     // The file name is the item's own, or one that no item has.
@@ -189,16 +207,24 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
     if (told && static_cast<uint64_t>(bytes) + bytes / 256 + kUploadReserve > free_bytes) {
         return refuse(reply, "no-space");
     }
-    if (!told || !storage_changes(core) || core.checker == nullptr || !catalog_settle(core, kInternal) || host.write_open(host.ctx, kUploadPart) != 1) {
+    // The file's folder of the storage is made again, which costs nothing when it is there.
+    const uint32_t folder = stored_folder(name);
+    char number[4] = {0, 0, 0, 0};
+    for (uint32_t at = 0; folder != 0 && name[at] != '/'; ++at) {
+        number[at] = name[at];
+    }
+    if (!told || !storage_changes(core) || core.checker == nullptr || !catalog_settle(core, kInternal) ||
+        (folder != 0 && host.make_folder != nullptr && host.make_folder(host.ctx, number) == -1) || host.write_open(host.ctx, kUploadPart) != 1) {
         return refuse(reply, "storage-error");
     }
     // The upload's check takes the second decoders from the check of a drive's file.
     drive_check_yields(core);
     upload.state = kUploadReceiving;
     upload.id = static_cast<uint16_t>(id);
+    const char *base = stored_base(name);
     uint32_t length = 0;
-    for (; name[length] != '\0'; ++length) {
-        upload.name[length] = name[length];
+    for (; base[length] != '\0'; ++length) {
+        upload.name[length] = base[length];
     }
     upload.name[length] = '\0';
     upload.size = bytes;
@@ -206,7 +232,7 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
     upload.crc = kCrcStart;
     upload.header_read = 0;
     upload.absent = 0;
-    upload.folder = 0;
+    upload.folder = folder;
     upload.installed = 0;
     upload.progress = static_cast<uint32_t>(now);
     reply.text("{\"ok\":true,\"chunk\":");
@@ -218,6 +244,34 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
     reply.text("}\n");
     return reply.length;
 }
+
+namespace {
+
+// Makes each folder of a path of the drive that is not there, from the top down, on a host
+// that makes folders: a folder of the index whose folder an operator removed while it was
+// empty is there again before a file is written into it. False on a failed call.
+ODRIG_NOINLINE bool folders_there(const Core &core, const char *path) {
+    const odrig_host &host = core.host;
+    if (host.make_folder == nullptr || path[0] == '\0') {
+        return true;
+    }
+    char name[kDriveOpenRoom] = "drive/";
+    uint32_t length = 6;
+    for (const char *at = path;; ++at) {
+        if (*at == '/' || *at == '\0') {
+            name[length] = '\0';
+            if (host.make_folder(host.ctx, name) != 1) {
+                return false;
+            }
+            if (*at == '\0') {
+                return true;
+            }
+        }
+        name[length++] = *at;
+    }
+}
+
+}  // namespace
 
 uint32_t upload_begin_external(Core &core, uint64_t now, const char *name, uint32_t bytes, Reply &reply) {
     Upload &upload = core.upload;
@@ -248,7 +302,7 @@ uint32_t upload_begin_external(Core &core, uint64_t now, const char *name, uint3
         return refuse(reply, "no-space");
     }
     upload.id = 0;
-    if (core.checker == nullptr || !catalog_settle(core, kExternal) || host.write_open(host.ctx, upload_part(core)) != 1) {
+    if (core.checker == nullptr || !catalog_settle(core, kExternal) || !folders_there(core, parent) || host.write_open(host.ctx, upload_part(core)) != 1) {
         return refuse(reply, "storage-error");
     }
     drive_check_yields(core);
@@ -278,7 +332,8 @@ uint32_t upload_begin_known(Core &core, uint64_t now, uint32_t id, const char *n
     while (position < core.item_count && core.items[position].id != id) {
         ++position;
     }
-    if (last.installed && last.id == id && same_text(last.name, name) && last.size == bytes && crc_value(last.crc) == crc &&
+    if (last.installed && last.id == id && last.folder == stored_folder(name) && same_text(last.name, stored_base(name)) && last.size == bytes &&
+        crc_value(last.crc) == crc &&
         position < core.item_count && !core.items[position].is_cycle) {
         const FileInfo &file = core.files[core.items[position].first];
         if (same_text(file.name, name) && file.fault == kNone) {

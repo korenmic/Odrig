@@ -537,7 +537,12 @@ def parse_do(data):
     for line in lines[2:-1]:
         move = _DO_MOVE.fullmatch(line)
         removal = _DO_REMOVE.fullmatch(line)
-        if move is not None:
+        if line.endswith(f" {PART}") and move is not None:
+            # A file of a drive onto the upload's part, the first half of its move to another
+            # folder: its name may hold spaces and begin with the part's name, and no name of
+            # a catalog ends in it.
+            actions.append(("move", line[len("move "):-len(f" {PART}")], PART))
+        elif move is not None:
             actions.append(("move", move.group(1), move.group(2)))
         elif removal is not None:
             actions.append(("remove", removal.group(1)))

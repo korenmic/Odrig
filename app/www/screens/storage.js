@@ -189,7 +189,7 @@ async function upload(message) {
   client.setContentBusy(true);
   draw(client.state);
   try {
-  const fresh = await client.uploadSnapshot(captured.storage === "external" ? captured.level : {path: "", id: null});
+  const fresh = await client.uploadSnapshot(destinations.snapshotLevel(captured));
   if (form !== captured || made !== prepared) throw new Error("The selected animation changed. Prepare it again.");
   if (destinations.synchronize(captured, fresh.space)) {
     message(`The destination changed to ${destinations.label(captured, byId("upload-name").value)}. Review it and press Upload again.`);
@@ -201,7 +201,7 @@ async function upload(message) {
     message(messages.ofNoSpace(bytes.length, checked.noSpace, external ? "the card" : undefined));
     return;
   }
-  const id = external ? null : freeId(new Set(fresh.root.map(item => item.id)));
+  const id = external ? null : freeId(new Set(fresh.ids ?? fresh.root.map(item => item.id)));
   if (!external && id === null) throw new Error("Internal storage has no free animation id.");
   const shown = byId("uploading");
   shown.hidden = false;

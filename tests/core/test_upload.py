@@ -339,11 +339,14 @@ class Arguments(Uploads):
             "upload begin 0 new.odrg 10", "upload begin 65536 new.odrg 10", "upload begin -1 new.odrg 10", "upload begin x new.odrg 10", "upload begin 9.0 new.odrg 10",
             "upload begin 9 new.odrg 0", "upload begin 9 new.odrg 4294967296", "upload begin 9 new.odrg 99999999999999999999", "upload begin 9 new.odrg -5", "upload begin 9 new.odrg 1k",
             "upload begin 9 new.odrg ", "upload begin 9 new 10", "upload begin 9 new.ODRG 10", "upload begin 9 New.odrg 10", "upload begin 9 new.odrg.part 10", "upload begin 9 ../new.odrg 10",
-            "upload begin 9 a/b.odrg 10", "upload begin 9 " + "n" * 28 + ".odrg 10", "upload begin 9 show.json 10", "upload begin 9 odrg 10", "upload begin 9 néw.odrg 10",
+            "upload begin 9 " + "n" * 28 + ".odrg 10", "upload begin 9 show.json 10", "upload begin 9 odrg 10", "upload begin 9 néw.odrg 10",
             "upload begin 9 new.odrg\t 10",
         ]
         printed = self.run_both(files, [support.linehex(T0, line.encode("utf-8")) for line in broken])
         self.assertEqual(replies(printed), [refused("bad-argument")] * len(broken))
+        # A path names a folder of the board's storage, which this show has none of.
+        printed = self.run_both(files, [support.line(T0, "upload begin 9 a/b.odrg 10")])
+        self.assertEqual(replies(printed), [refused("unknown-id")])
         sound = ["upload begin 9 .odrg 1", "upload begin 65535 " + "n" * 27 + ".odrg 4000000", "upload begin 0009 a-b_c.9.odrg 0010"]
         for line in sound:
             self.assertEqual(self.play(files, Script().line(line, "upload cancel")), [CHUNK, OK], line)

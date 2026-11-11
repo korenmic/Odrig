@@ -213,7 +213,7 @@ class Sources(unittest.TestCase):
         # The check reads the arrays the sources have: names of files and ids, the tables
         # of a Huffman code, the start of a file and of a frame record.
         self.assertGreaterEqual(len(found), 15)
-        self.assertLessEqual({("show.cpp", "file", 33), ("odrg_decoder.cpp", "header", 16), ("inflate.cpp", "offset", 32), ("commands.cpp", "text", 48), ("clock.cpp", "made", 140)}, set(found))
+        self.assertLessEqual({("show.cpp", "file", 37), ("odrg_decoder.cpp", "header", 16), ("inflate.cpp", "offset", 32), ("commands.cpp", "text", 48), ("clock.cpp", "made", 140)}, set(found))
         # The compiler holds every function to a frame of 512 bytes, and the core object to
         # 4,096 bytes.
         makefile = (support.CORE / "Makefile").read_text(encoding="utf-8")
@@ -275,8 +275,8 @@ static void on_reply(void *ctx, const char *line, size_t line_length, const char
 int main(void) {
     odrig_host host = {0, give, open_file, read_file, close_file, log_line,
                        begin_file, add_bytes, end_file, rename_file, remove_file, tell_space, read_part,
-                       drive_number, drive_name, 0, 0, 0, 0, 0};
-    odrig_host plain = {0, give, open_file, read_file, close_file, log_line, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+                       drive_number, drive_name, 0, 0, 0, 0, 0, 0};
+    odrig_host plain = {0, give, open_file, read_file, close_file, log_line, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     odrig_leg leg;
     char line[ODRIG_LINE_MAX + 1] = "status";
     char reply[ODRIG_REPLY_MAX];

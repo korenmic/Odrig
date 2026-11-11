@@ -53,7 +53,7 @@ const size_t READ_BUFFER = 4096;
 const size_t LONGEST_DRIVE_NAME = 100;
 const size_t CORE_NAME_ROOM = sizeof(PREFIX) + LONGEST_DRIVE_NAME;
 // The room for a name of the installed files with its 0.
-const size_t FILES_NAME_ROOM = 33;
+const size_t FILES_NAME_ROOM = 37;
 
 // The tasks run on the processor of WLED's loop. The drive's task mounts and lists media.
 #ifndef ODRIG_DRIVE_SD_SPI
@@ -707,6 +707,21 @@ int renameDriveFile(const char *from, const char *to) {
   return -1;
 }
 
+// A folder of the card: made under the guard, a folder that is there already being one.
+int makeDriveFolder(void *, const char *name) {
+  OdrigFiles::StorageCall call;
+  Guarded held;
+  char path[PATH_ROOM];
+  if (!changedPath(name, path)) return -1;
+  invalidateCapacity();
+  changing(path);
+  struct stat found;
+  if (mkdir(path, 0777) == 0) return 1;
+  if (stat(path, &found) == 0 && S_ISDIR(found.st_mode)) return 1;
+  capacityWriteFailed();
+  return -1;
+}
+
 int removeDriveFile(const char *name) {
   OdrigFiles::StorageCall call;
   Guarded held;
@@ -780,6 +795,17 @@ int removeFile(void *ctx, const char *name) {
   if (placeOf(name) >= 0) return removeDriveFile(name);
   letGoOf(name);
   return files.remove(ctx, name);
+}
+
+// A folder of the drive goes to the drive, a numbered folder of the storage to `files`. A
+// drive that cannot make folders says so with 0.
+int makeFolder(void *ctx, const char *name) {
+  if (placeOf(name) < 0) return files.make_folder != nullptr ? files.make_folder(ctx, name) : 0;
+#ifdef ODRIG_DRIVE_SD_SPI
+  return makeDriveFolder(ctx, name);
+#else
+  return 0;
+#endif
 }
 
 #ifndef ODRIG_DRIVE_SD_SPI
@@ -1118,6 +1144,7 @@ odrig_host OdrigDrive::withDrive(const odrig_host &given) {
   made.drive_list = driveList;
   made.drive_bind = driveBind;
   made.drive_writable = driveWritable;
+  made.make_folder = makeFolder;
   if (given.write_open != nullptr) {
     made.write_open = beginFile;
     made.write = addBytes;

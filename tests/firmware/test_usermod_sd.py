@@ -190,6 +190,8 @@ inline int closedir(DIR *dir) {
   delete dir;
   return closed ? 0 : -1;
 }
+#include <io.h>
+inline int mkdir(const char *path, int) { return mkdir(path); }
 """
 
 PROGRAM = r"""
@@ -693,6 +695,16 @@ int main(int argc, char **argv) {
     assert(contents("odrig/A.ODRG") == "hello card" && !exists("odrig/new.odrg"));
     assert(host.rename(nullptr, "drive/new.odrg", "drive/A.ODRG") == -1 && contents("odrig/A.ODRG") == "hello card");
     assert(host.rename(nullptr, "drive/A.ODRG", "drive/c d.odrg") == 1 && contents("odrig/c d.odrg") == "hello card" && !exists("odrig/A.ODRG"));
+    // A file moved to another folder through the upload's part, its old folder left in
+    // place, and the journal of the move written through its part and removed.
+    assert(host.make_folder(nullptr, "drive/night") == 1 && host.make_folder(nullptr, "drive/clocks") == 1 && host.make_folder(nullptr, "drive/clocks") == 1);
+    assert(host.write_open(nullptr, "drive/night/m n.odrg") == 1 && host.write(nullptr, bytesOf("moved"), 5) == 1 && host.write_close(nullptr) == 1);
+    assert(host.rename(nullptr, "drive/night/m n.odrg", "drive/upload.part") == 1 && host.rename(nullptr, "drive/upload.part", "drive/clocks/m n.odrg") == 1);
+    assert(contents("odrig/clocks/m n.odrg") == "moved" && !exists("odrig/night/m n.odrg") && !exists("odrig/upload.part") && exists("odrig/night"));
+    assert(host.rename(nullptr, "drive/night", "drive/upload.part") == -1 && exists("odrig/night"));
+    assert(host.write_open(nullptr, "drive/moving.part") == 1 && host.write(nullptr, bytesOf("j"), 1) == 1 && host.write_close(nullptr) == 1);
+    assert(host.rename(nullptr, "drive/moving.part", "drive/moving.txt") == 1 && contents("odrig/moving.txt") == "j" && !exists("odrig/moving.part"));
+    assert(host.remove(nullptr, "drive/moving.txt") == 1 && host.remove(nullptr, "drive/clocks/m n.odrg") == 1);
     // A file removed, and then none.
     assert(host.remove(nullptr, "drive/c d.odrg") == 1 && !exists("odrig/c d.odrg"));
     assert(host.remove(nullptr, "drive/c d.odrg") == 0);

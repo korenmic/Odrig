@@ -62,20 +62,24 @@ bool catalog_settle(Core &core, uint32_t storage);
 void catalog_read_internal(Core &core);
 
 // A change of a storage's catalog: the entry `added` (a name, with its size, CRC-32, length,
-// the loop of a text or a clock, and type, for the mapping's canvas) put in the place of the
-// entry of its name or added; the entries whose names `drops` gives true for taken out, on
-// the pages of `drop_pages`; and the actions of the commit record, `move upload.part
-// <added>` and `remove <removed_file>`.
+// the loop of a text or a clock, and type, for the mapping's canvas, or for the canvas given
+// when it is not 0) put in the place of the entry of its name or added; the entries whose
+// names `drops` gives true for taken out, on the pages of `drop_pages`; and the actions of
+// the commit record, `move <moved_from> upload.part`, `move upload.part <added>` and
+// `remove <removed_file>`.
 struct CatalogChange {
     const char *added = nullptr;
     uint32_t added_bytes = 0;
     uint32_t added_crc = 0;
     uint64_t added_total_ms = 0;
     uint8_t added_type = kTypeFrames;
+    uint16_t added_width = 0;
+    uint16_t added_height = 0;
     bool (*drops)(const Core &core, const char *name, uint32_t length, const void *context) = nullptr;
     const void *context = nullptr;
     uint32_t drop_pages = 0;
     bool moves_part = false;
+    const char *moved_from = nullptr;
     const char *removed_file = nullptr;
 };
 
@@ -128,6 +132,28 @@ bool catalog_move_external(Core &core, uint32_t position, uint32_t before);
 // out of the catalog and its index, with the folders left without a file, and removes the
 // file. False on a failed storage call.
 bool catalog_remove_external(Core &core, uint32_t position);
+
+// `folder make external <path>`: makes the folder of the drive with this path, whose parent is
+// the root or a folder of the index, and adds it to the index empty, in one commit of the
+// drive's catalog; a folder the index has at that path is answered with its id and nothing is
+// written. `busy` while an upload is open, a rebuild runs, a test shows or the drive's catalog
+// is read; `read-only` when the core may not change the drive; `unknown-id` for a parent the
+// index has not; `in-use` for a file or a folder of the parent whose name is the same in any
+// case; `no-space` without a free id; `storage-error` on a failed storage call.
+uint32_t catalog_folder_make(Core &core, const char *path, Reply &reply);
+// `move external <id> <folder>`: moves the drive's file with the id into the folder of the
+// index with this path, the root for an empty one, in one commit of the drive's catalog: the
+// file renamed through the upload's part, its line on the page of its new name with its
+// fields, its row last among the folder's own files with its id, its old folder left as a
+// removal leaves it, and the drive's saved settings of its old path given to its new one
+// through the journal `moving.txt`. A file in that folder already is answered `moved:false`
+// and nothing is written. Refusals in this order: `busy` as for `folder make external`;
+// `unknown-id` for an id that is no file of the drive, or an item's, and for a folder the
+// drive has not; `in-use` for a folder's id; `bad-argument` for a new path over
+// kCatalogNameMost bytes; `in-use` for a file or a folder of the destination whose name is
+// the file's in any case; `read-only` while the core may not change the drive;
+// `storage-error` on a failed storage call.
+uint32_t catalog_move(Core &core, uint32_t id, const char *folder, Reply &reply);
 
 // `catalog rebuild internal` and `catalog rebuild external`: reads every animation of the
 // storage with the check's steps and commits its catalog anew at the end. `busy` while an

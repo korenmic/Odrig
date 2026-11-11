@@ -80,10 +80,13 @@ function seen(app) {
   };
 }
 
-function enter(app, path) {
-  const found = app.doc.querySelector(`#animations-list > .folder-row[data-path="${path}"]`);
+// Enters a folder by its row: by its path, or by its id when a number names it, since a
+// folder of the board's own storage and one of the card may have one path.
+function enter(app, folder) {
+  const key = typeof folder === "number" ? "id" : "path";
+  const found = app.doc.querySelector(`#animations-list > .folder-row[data-${key}="${folder}"]`);
   if (found === null) {
-    throw new Error(`no folder row ${path}`);
+    throw new Error(`no folder row ${folder}`);
   }
   found.click();
 }
