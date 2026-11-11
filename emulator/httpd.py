@@ -157,8 +157,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.empty(404)
 
     def empty(self, status, headers=None):
-        """An answer without a body. The connection is closed after it, because a body the
-        request may carry is not read."""
+        """An answer without a body, after which the connection is closed. A body whose
+        length the request declares with a `Content-Length` is read to its end and dropped
+        first, since closing a connection with bytes unread resets it and the client can
+        lose the answer; when the connection ends inside that body, nothing is written. A
+        request with a `Transfer-Encoding` has no such length."""
+        length = None if "Transfer-Encoding" in self.headers else self.declared_length()
+        if length is not None and self.read_body(length) is None:
+            return
         self.close_connection = True
         self.send_response(status)
         for name, value in (headers or {}).items():
@@ -167,14 +173,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.end_headers()
 
-    def body(self):
-        """The first bytes of the request's body, or `None` after a 411 or a connection
-        that ended inside the body."""
+    def declared_length(self):
+        """The length of the body that the request declares with a `Content-Length` that is
+        a whole number, or `None`."""
         length = self.headers.get("Content-Length")
         if length is None or not WHOLE_NUMBER.fullmatch(length.strip()):
-            self.empty(411)
             return None
-        left = int(length.strip())
+        return int(length.strip())
+
+    def read_body(self, left):
+        """Reads `left` bytes of the request's body and gives the first of them, or `None`
+        when the connection ends inside the body."""
         kept = b""
         while left > 0:
             piece = self.rfile.read(min(left, CHUNK))
@@ -185,6 +194,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if len(kept) < BODY_KEPT:
                 kept += piece[:BODY_KEPT - len(kept)]
         return kept
+
+    def body(self):
+        """The first bytes of the request's body, or `None` after a 411 or a connection
+        that ended inside the body."""
+        length = self.declared_length()
+        if length is None:
+            self.empty(411)
+            return None
+        return self.read_body(length)
 
     def command_line(self):
         kept = self.body()

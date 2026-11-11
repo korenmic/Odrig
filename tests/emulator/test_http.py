@@ -255,6 +255,35 @@ class WhatTheServerPassesOn(unittest.TestCase):
         self.assertRegex(received, rb"\AHTTP/1\.1 411 ")
         self.assertEqual(self.engine.lines, [])
 
+    def test_a_body_that_comes_after_its_head_is_read_and_the_404_and_the_405_arrive_whole(self):
+        for method, path, status in (("POST", "/odrig/x", 404), ("PUT", "/odrig", 405)):
+            with self.subTest(method=method, path=path):
+                head = f"{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 2\r\n\r\n".encode("ascii")
+                received = support.raw_request(self.server.port, head, later=b"on", pause=0.2)
+                self.assertRegex(received, rb"\AHTTP/1\.1 %d " % status)
+                answer, _, rest = received.partition(b"\r\n\r\n")
+                fields = dict(line.split(b": ", 1) for line in answer.split(b"\r\n")[1:])
+                self.assertEqual((fields.get(b"Content-Length"), fields.get(b"Connection"), fields.get(b"Allow")), (b"0", b"close", b"POST" if status == 405 else None), received)
+                self.assertEqual(rest, b"")
+        self.assertEqual(self.engine.lines, [])
+
+    def test_a_body_of_300000_bytes_is_read_to_its_end_before_the_404(self):
+        self.assertEqual(self.request("POST", "/odrig/x", b"x" * 300000), (404, b""))
+        self.assertEqual(self.engine.lines, [])
+
+    def test_a_connection_that_ends_inside_the_body_it_declares_gets_no_answer(self):
+        head = b"POST /odrig/x HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 10\r\n\r\n"
+        self.assertEqual(support.raw_request(self.server.port, head + b"on", end=True), b"")
+        self.assertEqual(self.engine.lines, [])
+
+    def test_a_404_to_a_body_with_no_length_to_read_is_given_at_once(self):
+        for length in (b"", b"Content-Length: many\r\n", b"Transfer-Encoding: chunked\r\nContent-Length: 10\r\n"):
+            with self.subTest(length=length):
+                received = support.raw_request(self.server.port, b"POST /odrig/x HTTP/1.1\r\nHost: 127.0.0.1\r\n" + length + b"\r\n")
+                self.assertRegex(received, rb"\AHTTP/1\.1 404 ")
+                self.assertTrue(received.endswith(b"\r\n\r\n"), received)
+        self.assertEqual(self.engine.lines, [])
+
     def test_a_port_that_is_taken_is_address_in_use(self):
         with self.assertRaises(failure.Failure) as caught:
             httpd.Server(self.server.port, self.engine, self.folder, lambda: {})

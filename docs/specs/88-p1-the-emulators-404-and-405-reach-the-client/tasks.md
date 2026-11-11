@@ -23,7 +23,7 @@ Rules for every task:
 - Code and tests state what they do now: no comment about seeds, tasks, dates or earlier
   versions.
 
-- [ ] 1. The body is read before a 404 or a 405
+- [x] 1. The body is read before a 404 or a 405
   - Set `"state": "in_progress"` in
     `project-seeds/88-p1-the-emulators-404-and-405-reach-the-client/state.json`.
   - `tests/emulator/support.py`: `raw_request` with `later`, `pause` and `end`, as the
