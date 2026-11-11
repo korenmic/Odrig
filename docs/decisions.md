@@ -903,3 +903,14 @@ the app is not changed.
   stays as it is. `status` names in its host text the external memory the board found
   and the internal memory free when the core started, which the app shows unchanged. No
   new command; no APK; nothing of the wiring, the power or the LEDs is touched.
+
+### Seed 84: the mapping lock keeps the operator's choice
+
+The owner ruled on 2026-11-07, after the APK over USB serial locked mapping edits again by
+itself: "Locking versus unlocking should be persistent forever and never fall back into
+some defaults. It can only change when I manually change it." The lock is "an APK
+individual setting and should be unaffected by the medium used forever". This replaces seed
+69's rule that an unlock holds for one Settings session: the app keeps one value on the
+phone for every link, target and board, changed only by a confirmed press, and locked only
+on a phone that never stored one. Unsent edits are still dropped when Settings is left, the
+app hidden, the link lost or the target changed. No command is added.
