@@ -629,6 +629,18 @@ and uncertain completion are distinct from an acknowledged installed file. After
 success the destination catalog/list/preview refresh normally. Authored texts and
 clocks remain in Internal; ready-made containers can use either selected storage.
 
+While `Upload to the installation` is disabled, a line under it says why, one reason at a
+time: `The installation has not answered yet.` or `The installation does not answer.`
+with the failure's sentence and its kind, as the target screen words it; `Checking the
+destination with the installation.` while the press is being checked; `An upload is under
+way.` while this screen, a text or a clock sends; `A deletion is under way on Animations.`
+while the selection deletes. The sentence about the card, `External storage is
+disconnected or not detected. Using Internal /.`, waits for a reply of `space` that names
+no card: until the first reply the destination line says `Storage not known yet: the
+installation has not answered.` and the form keeps its storage, Internal chosen and
+External offered only after a reply said a card is present. A request that fails keeps the
+last capacity, dimmed, and moves the form nowhere; the next reply refreshes both.
+
 To make a text, press `Make a text` on Upload. A form opens under it: the text, written
 with English letters, digits, signs and Hebrew letters, and line feeds; its font,
 `Small`, `Medium` or `Large`; its colour and its background; its effect, `Still`,
@@ -1125,7 +1137,14 @@ installed; the phone with mobile data on.
     Include. Check dark recovery when all faces are excluded, mode restoration, reconnect
     and another controller's changes. Repeat upright and sideways. These physical and
     phone observations remain open until actually performed.
-24. **Note** the phone's model, its Android version, the web view's version from the
+24. **The reason under Upload.** With the spare board and no card: on Upload choose a
+    ready-made animation, with `Internal storage` selected. *Seen:* `Upload to the
+    installation` enabled, the line `External storage is disconnected or not detected.
+    Using Internal /.` under the form, and after the press `Uploaded as animation <id>
+    <file>. It plays in the playlist.`; then switch the installation off: within five
+    seconds the button is gray and the line under it says `The installation does not
+    answer.` with the failure's kind in brackets.
+25. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1229,6 +1248,15 @@ By programs, on a Mac:
 - Uploading in Chrome: a GIF and an mp4 uploaded to the emulator, listed and played;
   `Cancel`; nothing sent while the app is away, and the upload finished when it is back;
   a file that does not fit; `upload end` answered `busy`; every refusal.
+- The reason under `Upload to the installation`, in Chrome against stand-in targets at
+  320, 360 and 740 pixels: a status that fails named under the disabled button with its
+  kind, the destination line, the form and the capacity kept and the capacity dimmed,
+  the line in the colour and the size of the capacity line inside the screen; a `space`
+  that never answers, with `Storage not known yet` and the form where it is until a
+  reply without a card enables the button with the card's sentence; a slow deletion on
+  Animations and a slow check of the destination each named; the destination invariants
+  of no reply, an absent card and an older target; and, against the emulator without a
+  drive, the Internal fallback upload unchanged.
 - That a long press or a right click marks text and opens a menu only in a field one
   types into, in Chrome: every element of the screens, of a message and of the
   question, fields and other elements made later, and the page for an old web view. A
@@ -1328,6 +1356,9 @@ By programs, on a Mac:
 - **Seed 47 on a phone.** Nobody has typed a brightness into the field on a phone: the
   owner's check is to type 8, press Done, and see the installation at 8 and the slider at 8,
   and to see the field show the slider's number while it moves.
+- **Seed 75 on a phone.** Nobody has seen the line under `Upload to the installation` on
+  a phone: step 24 above, with the spare board and no card, and with the installation
+  off.
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.
