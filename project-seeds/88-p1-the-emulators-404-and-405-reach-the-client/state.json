@@ -1,0 +1,9 @@
+{
+  "number": 88,
+  "slug": "88-p1-the-emulators-404-and-405-reach-the-client",
+  "state": "remaining",
+  "title": "The emulator's 404 and 405 reach the client",
+  "priority": "P1",
+  "addedAt": "2026-11-11",
+  "summary": "The emulator's web server reads the body a request declares, to its end and with no new limit, before it answers 404 or 405, so closing the connection no longer resets it and Windows no longer drops the answer: tests.emulator.test_http failed with ConnectionAbortedError [WinError 10053] about one run of the emulator suite in five, on master and on the fused branch alike. The answers, their headers and Connection: close are unchanged; a body without a usable length and the 411 stay as they are. Emulator and tests only, built on master; no command, core, app or firmware change, and no owner check."
+}
