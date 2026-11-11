@@ -92,7 +92,8 @@ class Recording(unittest.TestCase):
 
     def test_a_script_that_uploads_acts_on_the_folder_and_gives_the_same_recording_from_the_same_folder(self):
         # An upload opened at the start holds the check of the show's files until it ends.
-        clip = core_support.clip(9, 60, 6, (20,) * 10)
+        # The check of this file ends between the two `upload end`.
+        clip = core_support.clip(9, 60, 6, (20,) * 30)
         lines = core_support.upload_lines(9, "clip.odrg", clip, 100)
         commands = [(0, f"upload begin 9 clip.odrg {len(clip)}")]
         commands += [(1100 + number, line) for number, line in enumerate(lines)]

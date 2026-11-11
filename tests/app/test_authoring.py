@@ -1,3 +1,4 @@
+import base64
 import json
 import pathlib
 import subprocess
@@ -12,7 +13,7 @@ from tests.emulator import support as emulator_support
 
 from . import support
 from .test_target import entered
-from .test_upload import OK, SPACE, begun, taken
+from .test_upload import OK, SPACE, assert_counted, begun, checked_after, checking_texts, taken
 
 # The text the tests make, as its JSON source has it, for a canvas.
 TEXT = {
@@ -147,6 +148,39 @@ class MakingAClock(unittest.TestCase):
         self.assertIn({"id": 4, "file": "clock-digital.odrgx", "bytes": len(data), "ignored": False, "external": False, "type": "widget"},
                       json.loads(emulator.command("list"))["items"])
         self.assertEqual([row["id"] for row in found["after"]["rows"]], [1, 2, 4])
+
+
+class TheLineWhileTheInstallationChecks(unittest.TestCase):
+    def test_the_upload_of_a_text_counts_the_seconds_of_the_check(self):
+        target = stand_in_of(60, 6, begin=begun, data=taken, end=checked_after(3.5))
+        with support.StandIn(target) as stand_in:
+            found = support.run("author-text", address=stand_in.address, settings={"rows": 2, "fields": [["text-words", "Hi"], ["text-motion", "up"]], "upload": True, "listed": False}).seen
+        texts = checking_texts(self, found["sending"])
+        assert_counted(self, texts)
+        self.assertEqual(found["cancelShown"], [True] * len(texts))
+        self.assertEqual(found["message"], "Uploaded as animation 3 hi.odrgx. It plays in the playlist.")
+        self.assertTrue(found["lineHidden"])
+
+    def test_the_save_of_a_clock_counts_the_seconds_of_the_check(self):
+        clock = encoded({**CLOCK, "width": 60, "height": 6})
+        item = {"id": 7, "file": "clock-analog.odrgx", "bytes": len(clock), "ignored": False, "external": False, "type": "widget"}
+        listed = (200, json.dumps({"ok": True, "items": [item], "next": None}, separators=(",", ":")) + "\n")
+
+        def read(line):
+            offset = int(line.split(b" ")[2])
+            data = base64.urlsafe_b64encode(clock[offset:offset + 600]).rstrip(b"=").decode("ascii")
+            return (200, json.dumps({"ok": True, "bytes": len(clock), "data": data}, separators=(",", ":")) + "\n")
+
+        target = {**stand_in_of(60, 6, begin=begun, data=taken, end=checked_after(3.5)), "list": listed, "read": read}
+        with support.StandIn(target) as stand_in:
+            found = support.run("author-edit", address=stand_in.address, settings={"rows": 1, "edit": 7, "fields": [["clock-seconds", "20"]]}).seen
+            sent = [line for _, line in stand_in.lines if line.startswith(b"upload")]
+        self.assertTrue(any(line.startswith(b"upload expect ") for line in sent), sent)
+        texts = checking_texts(self, found["sending"])
+        assert_counted(self, texts)
+        self.assertEqual(found["cancelShown"], [True] * len(texts))
+        self.assertEqual(found["message"], "Saved animation 7 clock-analog.odrgx.")
+        self.assertTrue(found["lineHidden"])
 
 
 class EditingAnInstalledOne(unittest.TestCase):

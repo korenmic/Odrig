@@ -10,7 +10,7 @@ import * as previews from "../previews.js";
 import {crc32} from "../crc32.js";
 import * as destinations from "../upload-destination.js";
 import {prepare} from "../ready.js";
-import {fileName, freeId, uploading} from "../upload.js";
+import {fileName, freeId, showChecking, uploading} from "../upload.js";
 import {Failure} from "../target.js";
 
 // What each way of fitting a picture to the canvas does, in words.
@@ -208,13 +208,18 @@ async function upload(message) {
   shown.textContent = "Sending: 0%";
   byId("upload-made").hidden = true;
   byId("cancel-upload").hidden = false;
+  let stopChecking = () => {};
   sending = uploading(
     {id, file, bytes, external, create: true, expect: external ? "00000000" : null},
     {
       report(part, speed) {
         shown.textContent = `Sending: ${Math.floor(part * 100)}%, ${Math.round(speed / 1000)} KB a second`;
       },
+      checking(since) {
+        stopChecking = showChecking(shown, since);
+      },
       end(how) {
+        stopChecking();
         sending = null;
         byId("upload-made").hidden = false;
         byId("cancel-upload").hidden = true;

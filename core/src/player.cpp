@@ -1341,7 +1341,8 @@ int player_poll(Core &core, uint64_t now_ms) {
     core.last_grid = grid;
 
     const uint64_t second = (now - core.t0) / 1000;
-    if (second != core.second_running) {
+    const bool new_second = second != core.second_running;
+    if (new_second) {
         core.second_before = core.second_running;
         core.count_before = core.count_running;
         core.second_running = second;
@@ -1371,12 +1372,10 @@ int player_poll(Core &core, uint64_t now_ms) {
         memset(core.led_data, 0, 3u * core.led_total);
         mini_clear(core);
     }
-    // The LED data is complete. The check of an uploaded file takes one step now, and
-    // none when the host was late for this refresh. The check after the start takes its
-    // steps; when it finds a fault, the show is invalid from this refresh on.
-    if (in_step) {
-        upload_step(core, now);
-    }
+    // The LED data is complete. The check of an uploaded file takes its steps at every
+    // refresh, in step or late, as its pace and its debt allow. The check after the start
+    // takes its own steps; when it finds a fault, the show is invalid from this refresh on.
+    upload_refresh(core, now, new_second);
     const bool was_valid = !core.invalid;
     const bool steady = second == 0 || player_fps(core, now) >= kCheckLeastRate;
     check_after_start(core, in_step, now - grid <= kCheckOnTimeMs && steady);

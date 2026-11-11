@@ -903,3 +903,22 @@ the app is not changed.
   stays as it is. `status` names in its host text the external memory the board found
   and the internal memory free when the core started, which the app shows unchanged. No
   new command; no APK; nothing of the wiring, the power or the LEDs is touched.
+- 2026-11-06: Seed 81, under the owner's approval of that day. The owner, whose phone
+  stayed at `Sending: 100%` while the spare board checked the rotated clock of 14,399
+  frames, wrote: "It is incredibly unreasonable that it takes more than half a minute to
+  validate 400K of animation." Offered to skip the check, which would let a broken file
+  onto the board, or to check at full speed with a Checking line in the app, the owner
+  approved the second: "So you saw a problem with validation and you say you can optimize
+  it with a fixed seed. If you believe truly you can do this, then I approve. Create that
+  fixed seed right now, autonomously S2S it, and queue, implement, and push to a branch
+  from a temp work tree, then make a PR". The check of an upload no longer takes one
+  record at a refresh in step: it takes its steps at every refresh, in step or late, each
+  charged by its work, within a budget of 256 to 2,048 bytes of charge a refresh paced by
+  the refresh rate, a larger record leaving a debt that the refreshes after it pay. The
+  board still takes the file only after it has decoded all of it, with every verdict and
+  reason as before. A board at 22 refreshes a second or more before the check stays at 20
+  or more during it; a board already at 20 or 21 shows about 19 while it checks an upload,
+  where before its check never ended. The app says `Checking the animation on the
+  installation: m:ss` until `upload end` answers, and the command tool waits up to
+  10,800 s. This follows the entry of seed 07 of 2026-10-12 ("its check takes as long as
+  the animation lasts"), which stands as the record of that day.
