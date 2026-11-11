@@ -26,10 +26,10 @@ class AnimationManagement(unittest.TestCase):
             with emulator_support.Emulator(folder) as emulator:
                 found = support.run('manage', address=f'127.0.0.1:{emulator.port}', settings={'rows': 39, 'selectable': 39, 'toggle': True}, steps=[lambda: emulator.command('ignore 1 0')]).seen
                 self.assertTrue(found['before'])
-                self.assertEqual(found['menu'], ['Ignore in playlist', 'Move up (disabled)', 'Move down', 'Select', 'Delete'])
+                self.assertEqual(found['menu'], ['Ignore in playlist', 'Move up (disabled)', 'Move down', 'Download', 'Select', 'Delete'])
                 self.assertTrue(found['pending'])
                 self.assertEqual(found['ignoredNote'], '\u2298 Ignored')
-                self.assertEqual(found['ignoredMenu'], ['Restore to playlist', 'Move up (disabled)', 'Move down', 'Select', 'Delete'])
+                self.assertEqual(found['ignoredMenu'], ['Restore to playlist', 'Move up (disabled)', 'Move down', 'Download', 'Select', 'Delete'])
                 self.assertTrue(found['restored'])
                 self.assertEqual(found['hiddenBefore'], 0)
                 self.assertEqual(found['selected'], 39)
@@ -75,8 +75,10 @@ class AnimationManagement(unittest.TestCase):
             folder = self.folder(root, 1, first=60001)
             emulator_support.installed(pathlib.Path(drive, 'odrig'), {'external.odrg': (folder / 'a.odrg').read_bytes()})
             with emulator_support.Emulator(folder, '--drive', drive) as emulator:
-                found = support.run('manage', address=f'127.0.0.1:{emulator.port}', settings={'rows': 2, 'selectable': 1, 'cancel': True}).seen
+                found = support.run('manage', address=f'127.0.0.1:{emulator.port}', settings={'rows': 2, 'selectable': 2, 'cancel': True}).seen
+                # The card's file has a checkbox, for a download; Select all leaves it out.
                 self.assertEqual((found['selected'], found['removable']), (1, 1))
+                self.assertNotIn('external.odrg', found['question'])
                 self.assertIn('External', found['external'])
                 self.assertNotIn('unavailable', found['external'])
                 self.assertTrue(pathlib.Path(drive, 'odrig', 'external.odrg').exists())
@@ -106,7 +108,7 @@ class AnimationManagement(unittest.TestCase):
         for external in [True, False, 'true', 1, None]:
             replies.append({'command': 'list', 'reply': {'ok': True, 'items': [{'id': 60001, 'file': 'a.odrg', 'bytes': 1, 'external': external}], 'next': None}})
         replies.append({'command': 'list', 'reply': {'ok': True, 'items': [{'id': 3, 'cycle': [1], 'seconds': 1, 'external': False}], 'next': None}})
-        # A folder of the card: its id, its path and `external` true, and nothing of a file.
+        # A folder: its id, its path and `external`, true for the card's and false for the board's own, and nothing of a file.
         folders = [{'id': 60004, 'playlist': 'night', 'external': True}, {'id': 60005, 'playlist': 'night/deep', 'external': True},
                    {'id': 60004, 'playlist': '', 'external': True}, {'id': 60004, 'playlist': 7, 'external': True}, {'id': 60004, 'playlist': 'night'},
                    {'id': 60004, 'playlist': 'night', 'external': False}, {'id': 60004, 'playlist': 'night', 'external': True, 'file': 'a.odrg', 'bytes': 1},
@@ -121,8 +123,8 @@ class AnimationManagement(unittest.TestCase):
         self.assertEqual([item.get('error') for item in found['results'][7:12]], [None]*2 + ['bad-reply']*3)
         self.assertEqual([item.get('error') for item in found['results'][12:18]], [None]*2 + ['bad-reply']*4)
         self.assertEqual([item['items'][0]['external'] for item in found['results'][12:14]], [True, False])
-        self.assertEqual([item.get('error') for item in found['results'][18:27]], [None]*2 + ['bad-reply']*7)
-        self.assertEqual([item['items'][0] for item in found['results'][18:20]], [{'id': 60004, 'playlist': 'night'}, {'id': 60005, 'playlist': 'night/deep'}])
+        self.assertEqual([item.get('error') for item in found['results'][18:27]], [None]*2 + ['bad-reply']*3 + [None] + ['bad-reply']*3)
+        self.assertEqual([item['items'][0] for item in found['results'][18:20]], [{'id': 60004, 'playlist': 'night', 'external': True}, {'id': 60005, 'playlist': 'night/deep', 'external': True}])
         self.assertEqual([item.get('error') for item in found['results'][27:]], [None]*3 + ['bad-reply']*3)
         self.assertEqual([(item['playing'], item['left']) for item in found['results'][27:30]], [(60004, 86400), (60004, 0), (60004, None)])
         self.assertEqual(found['sent'][-3:], ['ignore 60001 1', 'ignore 60001 0', 'remove many 1,60001'])

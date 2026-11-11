@@ -1,15 +1,20 @@
+#include <string.h>
+
 #include "commands.h"
+#include <string.h>
 
 #include "breaks.h"
 #include "catalog.h"
 
 #include "content.h"
 #include "drive.h"
+#include "folders.h"
 #include "mapping_control.h"
 #include "odrig_core.h"
 #include "order.h"
 #include "player.h"
 #include "mini.h"
+#include "rotation.h"
 #include "playlist.h"
 #include "repeats.h"
 #include "brightness.h"
@@ -81,15 +86,25 @@ Readiness readiness_of(const Core &core) {
     return counts;
 }
 
+// The path the operator sees of a file of the show, cut to its first 32 characters as the
+// names of a drive's files are.
+void checked_path(const Core &core, uint32_t file, char *path) {
+    logical_path(core, core.files[file].name, path);
+    path[kFaultNameSize - 1] = '\0';
+}
+
 // Writes the name of the file the check is at, as a JSON string, or null: of a rebuild the
-// file it is at, and `catalog` while a drive's catalog is read.
-void checking_of(const Core &core, Reply &reply) {
+// file it is at, and `catalog` while a drive's catalog is read. A file of the show is named
+// by the path the operator sees, each name cut to 32 characters.
+ODRIG_NOINLINE void checking_of(const Core &core, Reply &reply) {
+    char path[kDrivePathRoom];
     if (!core.invalid && catalog_rebuilding(core)) {
         const uint32_t at = core.rebuild_at;
         char name[kFaultNameSize];
         if (core.rebuild == 1 + kInternal && at < core.file_count) {
+            checked_path(core, at, path);
             reply.text("\"");
-            reply.text(core.files[at].name);
+            reply.escaped(path);
             reply.text("\"");
             return;
         }
@@ -106,8 +121,9 @@ void checking_of(const Core &core, Reply &reply) {
         return;
     }
     if (!core.invalid && !check_complete(core) && core.check_at < core.file_count) {
+        checked_path(core, core.check_at, path);
         reply.text("\"");
-        reply.text(core.files[core.check_at].name);
+        reply.escaped(path);
         reply.text("\"");
         return;
     }
@@ -181,11 +197,14 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text(",\"brightness\":");
     reply.number(mini_brightness(core));
     reply.text("}");
+    // In Clocks only, the folder `clocks` of the card when it has one, else the internal one.
+    const uint32_t clocks_folder = core.clocks_id != 0 ? core.clocks_id : core.clocks_internal_id;
     reply.text(",\"playing\":");
-    if (core.clocks_on == kClocksOnly && core.playing == kPlaylist && core.clocks_id != 0) {
-        reply.number(core.clocks_id);
-    } else if (core.playing == kPlaylist && core.tree_known && core.current != 0) {
-        // The playlist of a folder of the drive, while the drive is in and holds it.
+    if (core.clocks_on == kClocksOnly && core.playing == kPlaylist && clocks_folder != 0) {
+        reply.number(clocks_folder);
+    } else if (core.playing == kPlaylist && playlist_is_folder(core)) {
+        // The playlist of an internal folder, or of a folder of the drive while the drive
+        // is in and holds it.
         reply.number(core.current_folder.id);
     } else {
         reply.id_or_null(core, core.playing);
@@ -213,7 +232,7 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     }
     // How far the check is, and what is unavailable.
     const Readiness counts = readiness_of(core);
-    reply.text(",\"readiness\":\"");
+    reply.text(",\"timing\":true,\"readiness\":\"");
     reply.text(core.invalid ? "recovery" : counts.to_check != 0 ? "checking" : counts.unavailable != 0 ? "degraded" : "ready");
     reply.text("\",\"checked\":");
     reply.number(counts.checked);
@@ -276,8 +295,9 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     char name[kDriveListedName];
     reply.text(",\"file\":");
     if (shown != kNothing && !is_drive(shown) && shown < core.item_count && !core.items[shown].is_cycle) {
+        logical_path(core, core.files[core.items[shown].first].name, name);
         reply.text("\"");
-        reply.text(core.files[core.items[shown].first].name);
+        reply.escaped(name);
         reply.text("\"");
     } else if (shown != kNothing && is_drive(shown) && drive_row(core, shown - kDriveBase) != nullptr) {
         reply.text("\"");
@@ -287,8 +307,12 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
         reply.text("null");
     }
     reply.text(",\"playlist\":");
-    if (core.clocks_on == kClocksOnly && core.playing == kPlaylist && core.clocks_id != 0) {
+    if (core.clocks_on == kClocksOnly && core.playing == kPlaylist && clocks_folder != 0) {
         reply.text("\"clocks\"");
+    } else if (core.playing == kPlaylist && (core.current & kInternalLevel) != 0 && core.playlist_path != nullptr) {
+        reply.text("\"");
+        reply.escaped(core.playlist_path + 1);
+        reply.text("\"");
     } else if (core.playing == kPlaylist && core.tree_known && core.current != 0 && drive_folder_path(core, core.current, name, sizeof name) != 0) {
         reply.text("\"");
         reply.escaped(name);
@@ -301,26 +325,49 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text(core.clock_message_on != 0 ? ",\"clock_message\":true" : ",\"clock_message\":false");
     reply.text(",\"clock_mode\":\"");
     reply.text(breaks_mode(core));
+    reply.text("\",\"clock_storage\":\"");
+    reply.text(breaks_storage(core));
     reply.text("\",\"clock_only\":");
     if (core.clocks_on == kClocksOnly) {
         reply.text("{\"folder\":");
-        if (core.clocks_id != 0) reply.number(core.clocks_id);
+        if (clocks_folder != 0) reply.number(clocks_folder);
         else reply.text("null");
         reply.text(",\"state\":\"");
         reply.text(breaks_only_state(core));
         reply.text("\"}");
     } else reply.text("null");
-    // The seconds left in the current playlist's window, the last member.
+    if (core.clocks_error) reply.text(",\"clock_error\":\"unreadable\"");
+    // The seconds left in the current playlist's window.
     reply.text(",\"left\":");
     reply.number(player_window_left(core));
     reply.text("}\n");
     return reply.length;
 }
 
+// `play <id>` in Clocks only: an animation or a folder inside the Clocks subtree of either
+// storage plays as a manual turn, and the folder `clocks` of either restarts the clocks.
 uint32_t play_only(Core &core, uint32_t id, bool all, Reply &reply) {
+    if (core.clocks_error) return refuse(reply, "storage-error");
     if (all) return refuse(reply, "in-use");
-    if (core.clocks_id != 0 && id == core.clocks_id) {
+    if ((core.clocks_id != 0 && id == core.clocks_id) || (core.clocks_internal_id != 0 && id == core.clocks_internal_id)) {
         player_only_restart(core);
+        return succeed(reply);
+    }
+    for (uint32_t position = 0; position < core.item_count; ++position) {
+        if (core.items[position].id != id) continue;
+        if (!breaks_position_allowed(core, position)) return refuse(reply, "in-use");
+        if (!item_usable(core, position)) return refuse(reply, "unavailable");
+        player_jump(core, position);
+        return succeed(reply);
+    }
+    uint32_t low = 0;
+    uint32_t high = 0;
+    uint8_t clock = kNotClock;
+    if (internal_subtree(core, id, &low, &high, &clock)) {
+        if (clock == kNotClock) return refuse(reply, "in-use");
+        const uint32_t item = player_first_usable(core, low, high);
+        if (item == kNothing) player_only_restart(core);
+        else player_jump(core, item);
         return succeed(reply);
     }
     uint32_t value = 0;
@@ -383,6 +430,19 @@ struct Words {
     uint32_t count;
 };
 
+ODRIG_NOINLINE const char *board_guard(const Core &core, const Words &words) {
+    if (words.count < 3 || words.size[1] == 0 || words.size[1] > 31) return "bad-argument";
+    for (uint32_t at = 0; at < words.size[1]; ++at) {
+        const char byte = words.text[1][at];
+        if (!((byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') ||
+              (byte >= '0' && byte <= '9') || byte == '-' || byte == '_')) return "bad-argument";
+    }
+    if (!words.is(2, "time") && !words.is(2, "schedule")) return "bad-argument";
+    char board[32];
+    if (!civil_board(core, board)) return "unsupported";
+    return strlen(board) == words.size[1] && memcmp(board, words.text[1], words.size[1]) == 0 ? nullptr : "stale";
+}
+
 // The value of a word that must be a number from `least` to `most`, written in decimal
 // digits only. False for an empty word, for any other character and for any other value.
 bool number_word(const Words &words, uint32_t word, uint32_t least, uint32_t most, uint32_t *value) {
@@ -440,7 +500,9 @@ bool level_words(const Core &core, const Words &words, uint32_t first, uint32_t 
             return false;
         }
         uint32_t value = 0;
-        *level = drive_find(core, id, &value) == 'd' ? value : kNoFolder;
+        FolderLine line;
+        const uint8_t kind = drive_find(core, id, &value);
+        *level = kind == 'd' ? value : kind == 0 && folder_by_id(core, id, line, nullptr) ? kInternalLevel | line.number : kNoFolder;
         at += 2;
     }
     if (words.count == at) {
@@ -449,8 +511,10 @@ bool level_words(const Core &core, const Words &words, uint32_t first, uint32_t 
     return words.count == at + 1 && number_word(words, at, 0, 0xFFFFFFFFu, from);
 }
 
-// Decodes a URI path argument; spaces and percent signs cannot be raw command words.
-bool external_path(const char *word, uint32_t size, char *name) {
+// Decodes a URI path argument once into `name`, with its length; spaces and percent signs
+// cannot be raw command words. False for a bad escape, a byte outside printable ASCII or a
+// path too long.
+bool decoded_path(const char *word, uint32_t size, char *name, uint32_t *decoded) {
     uint32_t length = 0;
     for (uint32_t at = 0; at < size; ++at) {
         uint32_t value = static_cast<uint8_t>(word[at]);
@@ -470,9 +534,91 @@ bool external_path(const char *word, uint32_t size, char *name) {
         name[length++] = static_cast<char>(value);
     }
     name[length] = '\0';
+    *decoded = length;
+    return true;
+}
+
+// The path of a file of the drive, decoded once and checked whole.
+bool external_path(const char *word, uint32_t size, char *name) {
+    uint32_t length = 0;
+    if (!decoded_path(word, size, name, &length)) return false;
     const char *base = name;
     for (uint32_t at = 0; at < length; ++at) if (name[at] == '/') base = name + at + 1;
     return catalog_name_allowed(name, length) && is_file_name(base);
+}
+
+// The path of a folder of the drive, decoded once: one to kCatalogDeepest names that leave
+// room for a file in it under the catalog's rule, the last not ending in `.odrg` or `.odrgx`.
+bool folder_path(const char *word, uint32_t size, char *name) {
+    uint32_t length = 0;
+    if (!decoded_path(word, size, name, &length) || length == 0 || length + 7 > kCatalogNameMost) return false;
+    char probe[kCatalogNameMost + 1];
+    memcpy(probe, name, length);
+    memcpy(probe + length, "/a.odrg", 8);
+    if (!catalog_name_allowed(probe, length + 7)) return false;
+    uint32_t parts = 1;
+    const char *base = name;
+    for (uint32_t at = 0; at < length; ++at) {
+        if (name[at] == '/') {
+            ++parts;
+            base = name + at + 1;
+        }
+    }
+    const uint32_t base_length = static_cast<uint32_t>(name + length - base);
+    const uint32_t ending = base_length > 0 && (base[base_length - 1] == 'x' || base[base_length - 1] == 'X') ? 6 : 5;
+    bool animation = base_length >= ending;
+    for (uint32_t at = 0; animation && at < ending; ++at) {
+        const char c = base[base_length - ending + at];
+        animation = (c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c) == ".odrgx"[at];
+    }
+    return parts <= kCatalogDeepest && !animation;
+}
+
+// What the path of an upload to the internal storage names: a file in a folder that is
+// there; a path out of form; a folder there is none of; a folder the core cannot read.
+const uint32_t kNamedSound = 0;
+const uint32_t kNamedBad = 1;
+const uint32_t kNamedMissing = 2;
+const uint32_t kNamedUnreadable = 3;
+
+// The stored name of the path of an upload to the internal storage, decoded once: a file
+// name, or the path of a folder of the storage, `/` and a file name, 100 bytes at most.
+ODRIG_NOINLINE uint32_t internal_path(const Core &core, const char *word, uint32_t size, char *stored) {
+    char path[kDrivePathRoom];
+    uint32_t length = 0;
+    if (!decoded_path(word, size, path, &length)) {
+        return kNamedBad;
+    }
+    uint32_t base = length;
+    while (base != 0 && path[base - 1] != '/') {
+        --base;
+    }
+    const uint32_t base_length = length - base;
+    if (base_length < 1 || base_length > 32 || !is_file_name(path + base) || (base != 0 && folder_path_depth(path, base - 1) == 0)) {
+        return kNamedBad;
+    }
+    if (base == 0) {
+        memcpy(stored, path, length + 1);
+        return kNamedSound;
+    }
+    FolderLine line;
+    bool twin = false;
+    const int32_t found = folder_by_path(core, path, base - 1, line, &twin);
+    if (found <= 0) {
+        return found == 0 ? kNamedMissing : kNamedUnreadable;
+    }
+    uint32_t at = 0;
+    char figures[3];
+    uint32_t count = 0;
+    for (uint32_t number = line.number; number != 0; number /= 10) {
+        figures[count++] = static_cast<char>('0' + number % 10);
+    }
+    while (count != 0) {
+        stored[at++] = figures[--count];
+    }
+    stored[at++] = '/';
+    memcpy(stored + at, path + base, base_length + 1);
+    return kNamedSound;
 }
 
 // Upload's words are read first, then the show is asked for.
@@ -494,25 +640,25 @@ uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
         uint32_t id;
         uint32_t bytes;
         uint32_t crc = 0;
-        char name[33];
-        if ((words.count != 5 && words.count != 6) || !number_word(words, 2, 1, 65535, &id) || words.size[3] < 1 || words.size[3] > 32 ||
+        char stored[kStoredNameRoom];
+        if ((words.count != 5 && words.count != 6) || !number_word(words, 2, 1, 65535, &id) ||
             !number_word(words, 4, 1, 0xFFFFFFFFu, &bytes) || (words.count == 6 && !crc_word(words, 5, &crc))) {
             return refuse(reply, "bad-argument");
         }
-        for (uint32_t at = 0; at < words.size[3]; ++at) {
-            name[at] = words.text[3][at];
-        }
-        name[words.size[3]] = '\0';
-        if (!is_file_name(name)) {
+        const uint32_t named = internal_path(core, words.text[3], words.size[3], stored);
+        if (named == kNamedBad) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        if (words.count == 6) {
-            return upload_begin_known(core, now, id, name, bytes, crc, reply);
+        if (named != kNamedSound) {
+            return refuse(reply, named == kNamedMissing ? "unknown-id" : "storage-error");
         }
-        return upload_begin(core, now, id, name, bytes, reply);
+        if (words.count == 6) {
+            return upload_begin_known(core, now, id, stored, bytes, crc, reply);
+        }
+        return upload_begin(core, now, id, stored, bytes, reply);
     }
     if (words.count >= 2 && words.is(1, "data")) {
         uint32_t offset;
@@ -560,6 +706,7 @@ uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
 uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t length, char *bytes) {
     const uint64_t now = clock_touch(core, now_ms);
     upload_touch(core, now);
+    schedule_touch(core, now);
     Reply reply;
     reply.bytes = bytes;
     reply.length = 0;
@@ -576,6 +723,44 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
 
     Words words;
     words.split(line, length);
+
+    if (words.is(0, "guard")) {
+        const char *error = board_guard(core, words);
+        if (error != nullptr) return refuse(reply, error);
+        const char *inner = words.text[2];
+        words.split(inner, length - static_cast<uint32_t>(inner - line));
+    }
+
+    if (words.is(0, "schedule")) {
+        if (words.count == 1) return schedule_reply(core, now, reply);
+        uint32_t revision = 0;
+        if (words.count == 3 && words.is(1, "resume") && crc_word(words, 2, &revision)) {
+            return schedule_resume(core, now, revision, reply);
+        }
+        uint16_t on = 0, off = 0;
+        if (words.count == 6 && words.is(1, "set") && crc_word(words, 2, &revision) &&
+            schedule_minute(words.text[3], words.size[3], &on) && schedule_minute(words.text[4], words.size[4], &off) &&
+            (words.is(5, "on") || words.is(5, "off"))) return schedule_set(core, now, revision, on, off, words.is(5, "on"), reply);
+        return refuse(reply, "bad-argument");
+    }
+
+    if (words.is(0, "time")) {
+        if (words.count == 1) return civil_reply(core, now, reply);
+        if (words.count == 3 && words.is(1, "zone")) return civil_zone(core, now, words.text[2], words.size[2], reply);
+        uint32_t utc = 0, revision = 0;
+        if (words.count == 4 && words.is(1, "set") && number_word(words, 2, 946684800u, 4102444799u, &utc) && crc_word(words, 3, &revision)) {
+            return civil_set(core, now, utc, revision, reply);
+        }
+        return refuse(reply, "bad-argument");
+    }
+
+    if (words.is(0, "rotation")) {
+        if (words.count == 1) return rotation_reply(core, reply);
+        uint32_t revision = 0, degrees = 0;
+        if (words.count == 4 && words.is(1, "set") && number_word(words, 2, 0, 0xFFFFFFFFu, &revision) &&
+            number_word(words, 3, 0, 270, &degrees)) return rotation_set(core, revision, degrees, reply);
+        return refuse(reply, "bad-argument");
+    }
 
     if (words.is(0, "mapping")) {
         if (words.count == 2 && words.is(1, "get")) return mapping_get(core, reply);
@@ -645,17 +830,24 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (words.count != 1) {
             return refuse(reply, "bad-argument");
         }
-        core.on = switch_on ? 1 : 0;
-        return succeed(reply);
+        return schedule_manual(core, switch_on, reply);
     }
     if (words.is(0, "clocks")) {
-        // `clocks on`, `clocks off`, `clocks message on` and `clocks message off`.
+        // `clocks on`, `clocks off`, `clocks only`, `clocks message on`, `clocks message off`,
+        // `clocks storage sd` and `clocks storage internal`.
+        if (words.count == 3 && words.is(1, "storage")) {
+            if (!words.is(2, "sd") && !words.is(2, "internal")) {
+                return refuse(reply, "bad-argument");
+            }
+            return breaks_command(core, kClockSettingStorage, words.is(2, "internal") ? 1 : 0, reply);
+        }
         const bool message = words.count == 3 && words.is(1, "message");
         const uint32_t last = message ? 2 : 1;
         if ((words.count != 2 && !message) || !(words.is(last, "on") || words.is(last, "off") || (!message && words.is(last, "only")))) {
             return refuse(reply, "bad-argument");
         }
-        return breaks_command(core, message, words.is(last, "only") ? kClocksOnly : words.is(last, "on") ? kClocksBetween : kClocksOff, reply);
+        return breaks_command(core, message ? kClockSettingMessage : kClockSettingMode,
+                              words.is(last, "only") ? kClocksOnly : words.is(last, "on") ? kClocksBetween : kClocksOff, reply);
     }
     if (words.is(0, "brightness")) {
         uint32_t value = 0;
@@ -709,6 +901,20 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             if (row != nullptr && row->listed) {
                 item = kDriveBase + value;
             }
+        }
+        // An internal folder: its playlist becomes current, as a folder of the drive's
+        // does, on a host that keeps the current playlist.
+        if (!all && item == kNothing && kind == 0 && internal_folder_id(core, id)) {
+            if (core.playlist_path == nullptr) {
+                return refuse(reply, "unsupported");
+            }
+            if (!internal_choose(core, id)) {
+                return refuse(reply, "unknown-id");
+            }
+            folder = core.current;
+            player_playlist_chosen(core, core.latest);
+            playlist_changed(core);
+            item = player_first_in_playlist(core);
         }
         // A folder of the drive's tree: its playlist becomes current, and it plays from
         // its first animation, or the root does in its place.
@@ -783,13 +989,15 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
     if (words.is(0, "read")) {
         uint32_t id;
         uint32_t offset;
-        if (words.count != 3 || !number_word(words, 1, 1, 0xFFFFFFFFu, &id) || !number_word(words, 2, 0, 0xFFFFFFFFu, &offset)) {
+        uint32_t count = kReadMost;
+        if ((words.count != 3 && words.count != 4) || !number_word(words, 1, 1, 0xFFFFFFFFu, &id) || !number_word(words, 2, 0, 0xFFFFFFFFu, &offset) ||
+            (words.count == 4 && !number_word(words, 3, 1, kReadCountMost, &count))) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        return content_read(core, id, offset, reply);
+        return content_read(core, id, offset, count, reply);
     }
     if (words.is(0, "ignore")) {
         uint32_t id, value;
@@ -849,8 +1057,39 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         return save ? repeats_save(core, id, loops, now, reply) : repeats_restore(core, id, now, reply);
     }
+    if (words.is(0, "saved")) {
+        uint32_t id = 0;
+        if (words.count != 2 || !number_word(words, 1, 1, 0xFFFFFFFFu, &id)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        if (catalog_rebuilding(core) || !check_complete(core) || core.upload.state != kUploadNone) {
+            return refuse(reply, "busy");
+        }
+        return repeats_saved_reply(core, id, reply);
+    }
+    if (words.is(0, "folder")) {
+        char path[kDrivePathRoom];
+        if (words.count != 4 || !words.is(1, "make") || (!words.is(2, "external") && !words.is(2, "internal")) ||
+            !folder_path(words.text[3], words.size[3], path)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        if (words.is(2, "internal")) {
+            return internal_folder_make(core, path, reply);
+        }
+        if (core.host.make_folder == nullptr) {
+            return refuse(reply, "unsupported");
+        }
+        return catalog_folder_make(core, path, reply);
+    }
     if (words.is(0, "upload")) {
-        if (core.mapping_test || (catalog_rebuilding(core) && words.count >= 2 && words.is(1, "begin"))) return refuse(reply, "busy");
+        // An upload already open goes on under a test; a new one waits for its end.
+        if (words.count >= 2 && words.is(1, "begin") && (core.mapping_test || catalog_rebuilding(core))) return refuse(reply, "busy");
         return upload(core, now, words, reply);
     }
     return refuse(reply, "unknown-command");

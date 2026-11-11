@@ -3,10 +3,10 @@ import {measure} from "./look.js";
 
 function look(app) {
   return {
-    screen: app.shown(), level: app.raw("level-title"),
+    screen: app.shown(), level: app.raw("level-title"), backHidden: app.byId('level-back').hidden,
     mode: app.byId("clocks").value, message: app.byId("clock-message").checked,
     disabled: app.byId("clocks").disabled, said: app.raw("clocks-said"),
-    reason: app.raw("clocks-state"), support: app.raw("clocks-support"),
+    reason: app.raw("clocks-state"), reasonHidden: app.byId("clocks-state").hidden, support: app.raw("clocks-support"),
     notice: app.text("message-text"),
     onlyDisabled: app.byId("clocks").querySelector('option[value="only"]').disabled,
     global: {text: app.raw("play-all"), disabled: app.byId("play-all").disabled},
@@ -63,7 +63,7 @@ export default async function(app) {
     if (act.target) {
       app.press('Target');
       app.fill('address', act.target);
-      app.press('Use');
+      app.press("Connect over Wi-Fi");
     }
     if (act.reload) await app.reload();
     if (act.until) await settled(app, act.until);

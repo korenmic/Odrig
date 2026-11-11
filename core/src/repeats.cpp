@@ -2,7 +2,9 @@
 
 #include <string.h>
 
+#include "brightness.h"
 #include "drive.h"
+#include "folders.h"
 #include "order.h"
 #include "player.h"
 #include "show.h"
@@ -57,7 +59,7 @@ bool parse(char *text, uint32_t length, Line *line) {
     line->length = length - at - 3;
     if (line->kind == 'f') {
         text[length] = '\0';
-        return is_file_name(line->name);
+        return is_stored_name(line->name);
     }
     if (line->kind != 'x' || line->length == 0 || line->length > kNameMost) {
         return false;
@@ -293,7 +295,7 @@ uint32_t animation_with(const Core &core, uint32_t id, bool *in_use) {
             return kDriveBase + value;
         }
     }
-    *in_use = kind == 'd';
+    *in_use = kind == 'd' || (kind == 0 && internal_folder_id(core, id));
     return kNothing;
 }
 
@@ -522,6 +524,30 @@ uint32_t repeats_save(Core &core, uint32_t id, uint32_t loops, uint64_t now, Rep
 
 uint32_t repeats_restore(Core &core, uint32_t id, uint64_t now, Reply &reply) {
     return change(core, id, 0, now, reply);
+}
+
+uint32_t repeats_saved_reply(Core &core, uint32_t id, Reply &reply) {
+    bool in_use = false;
+    const uint32_t position = animation_with(core, id, &in_use);
+    if (position == kNothing) {
+        return refuse(reply, in_use ? "in-use" : "unknown-id");
+    }
+    const int brightness = brightness_saved(core, position);
+    const uint32_t loops = repeats_of(core, position);
+    reply.text("{\"ok\":true,\"brightness\":");
+    if (brightness < 0) {
+        reply.text("null");
+    } else {
+        reply.number(static_cast<uint32_t>(brightness));
+    }
+    reply.text(",\"repeat\":");
+    if (loops == 0) {
+        reply.text("null");
+    } else {
+        reply.number(loops);
+    }
+    reply.text(core.has_start && core.start_item == position ? ",\"start\":true}\n" : ",\"start\":false}\n");
+    return reply.length;
 }
 
 }  // namespace odrig

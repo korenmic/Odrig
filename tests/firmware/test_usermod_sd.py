@@ -190,6 +190,8 @@ inline int closedir(DIR *dir) {
   delete dir;
   return closed ? 0 : -1;
 }
+#include <io.h>
+inline int mkdir(const char *path, int) { return mkdir(path); }
 """
 
 PROGRAM = r"""

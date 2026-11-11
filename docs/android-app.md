@@ -57,13 +57,14 @@ a top bar with the app's name and whether the installation answers.
   unavailable.` until a fresh reply arrives. A fresh absent reply alone says `absent`.
   Below them, when
   Settings says so, stands the pinned Tests group; then two filters and the one list of
-  animations, one level of the card's folders at a time, as a file explorer shows them.
+  animations, one level of the folders at a time, as a file explorer shows them.
   Above the list stands the level's heading, `Root` or the folder's whole path, as
   `night/deep`, with `Back` inside a folder and the button `Play this folder`, which
   makes the level's playlist current. At the root the list holds the board's own
   animations and the loose files of the card, in the saved order of the playlist, then
-  one row for each folder of the card, with the folder's name, how many animations it
-  holds itself and a chevron; a tap on a folder row enters it, and the list then holds
+  one row for each folder, those of the board's own storage before the card's, with the
+  folder's name, how many animations it holds itself and a chevron; a tap on a folder row
+  enters it, and the list then holds
   that folder's own files and the rows of its sub-folders. A folder with no file of its
   own keeps its row, `0 animations` and its way in. The app reads the level it shows and
   no other, in parts, with `list` and `order get` at the root and `list in` and `order get
@@ -86,8 +87,9 @@ a top bar with the app's name and whether the installation answers.
   on the square plays as a tap on the name does. The previews are those of the default
   preview catalog that comes with the app, `thumbnails/`, found by each animation's key
   (see "The keys of the animations" below), then the phone's own; while a row's key is not
-  known yet, the preview its file's name and size find in the default catalog, so that a
-  file of other bytes with the same name and size shows that preview until its own key is
+  known yet, the key this phone kept for the place it uploaded the file to, when its size is
+  the row's; else the preview its file's name and size find in the default catalog, so that
+  a file of other bytes with the same name and size shows that preview until its own key is
   read. Each square shows its preview as soon as its own row has one, without waiting for
   the others. Folder rows and the Tests group have none. The row then
   names its file, its id and its size, or `size not read yet` while the installation has
@@ -133,7 +135,8 @@ maps its actions to command lines, each sent as `POST /odrig` to the address tha
 | Presses `Upload to the installation` for a new internal file | `upload begin <id> <file> <bytes> <crc32>`, confirm replacing is false, then `upload data <offset> <base64>` for each piece and `upload end <crc32>`, sent again while the installation checks it |
 | Presses `Upload to the installation` with `External storage` chosen | `upload begin external <file> <bytes>`, `upload expect 00000000`, then the pieces and the end as for an upload |
 | Presses `Cancel` while it uploads | `upload cancel` |
-| Chooses Edit in the menu of a text's or a clock's row | `read <id> <offset>`, from offset 0 until the whole file is read |
+| Chooses Edit in the menu of a text's or a clock's row, or Download in any row's menu | `read <id> 0 1` once for each target, then `read <id> <offset> <count>` from offset 0 until the whole file is read, 720 bytes at a time, or `read <id> <offset>` from an installation that refused the first with `bad-argument` |
+| Presses `Save the backup` after `Download selected` | `list in <id>` for each selected folder and every folder below it; `catalog`; for each file `saved <id>` and its reads as for Download, with `list <from>` or `list in <id> <from>` from the position of its row before and after them |
 | Presses `Save` for a text or a clock it edits | `upload begin <id> <file> <bytes>`, then `upload expect <crc32>` with the CRC-32 of the file it read, then the pieces and the end as for an upload |
 | Opens Settings, reloads, or waits two seconds while Settings is visible; on Animations every two seconds while nothing plays, which is so during a test, and after a test is started or stopped | `mapping get` |
 | Drags a pin of the mapping into another place, presses an arrow key on its handle, or presses Restore defaults | `mapping set <revision> <pins>` |
@@ -145,11 +148,17 @@ maps its actions to command lines, each sent as `POST /odrig` to the address tha
 | Presses `Save` on that bar | `repeat <id> <n> save` |
 | Presses `Restore default` on that bar | `repeat <id> default` |
 | Chooses `Off`, `Between animations` or `Clocks only`, or changes `The message after each clock` | `clocks off`, `clocks on`, `clocks only`, `clocks message on`, `clocks message off` |
+| Chooses SD card or Internal storage under Preferred storage | `clocks storage sd`, `clocks storage internal` |
 | Opens the target screen while the installation answers | `fault` |
 | Opens Settings, or waits two seconds while Settings is visible, and after it sent a rebuild or a cancel; nothing: when the target first answers, when it answers again after a silence, and after every complete list | `catalog` |
 | Nothing: after `catalog` showed a storage's catalog of another generation or number of entries than the one the app read, every page of it from offset 0 to its end, one request after the other | `catalog page <storage> <page> <offset>` |
 | Presses `Rebuild the board's catalog` or `Rebuild the card's catalog`, and then `Rebuild` | `catalog rebuild internal`, `catalog rebuild external` |
 | Presses `Cancel the rebuild` | `catalog cancel` |
+| Connects with timing-capable firmware; reads time, then follows the phone's zone and sets UTC when due | `time`, `guard <board-id> time`, `guard <board-id> time zone <base64>`, `guard <board-id> time set <utc-seconds> <zone-crc32>`, `guard <board-id> schedule` |
+| Saves the daily hours and whether to use them | `guard <board-id> schedule set <revision> <on-HH:MM> <off-HH:MM> <on-or-off>` |
+| Ends manual On/Off and returns to the saved hours | `guard <board-id> schedule resume <revision>` |
+| Opens Settings, reconnects there or taps Refresh rotation | `rotation` |
+| Chooses0/90/180/270 clockwise output orientation | `rotation set <revision> <degrees>` |
 
 It uses the shared command protocol and shows only what a reply said. Mapping saves
 require firmware that supports the mapping commands; an older target gives a readable
@@ -167,9 +176,55 @@ replies cannot change the new target's screen. Leaving the app stops unsent batc
 Uploads and deletions disable conflicting controls until their operation has ended.
 
 The web code, `app/www/`, is plain JavaScript, HTML and CSS: a browser runs the files as
-they are. Capacitor wraps them into the Android app. One class of Java, the sender,
-carries each line to the target; see [The phone and the installation's
-network](#the-phone-and-the-installations-network).
+they are. Capacitor wraps them into the Android app. The app's own classes of Java include
+the sender, which carries each line to the target, see [The phone and the installation's
+network](#the-phone-and-the-installations-network); and `Save`, which saves a download or a
+backup where the operator chooses, see [Downloads and backups](#downloads-and-backups).
+
+## USB diagnostics from a phone
+
+Target also offers **USB diagnostics** in the Android APK, independently of Wi-Fi.
+It uses Android USB host/OTG and the pinned
+[usb-serial-for-android 3.11.0](https://github.com/mik3y/usb-serial-for-android/tree/3.11.0)
+driver for CDC-ACM and supported USB/UART bridges. The browser shares the panel but
+explains that physical capture needs the Android app. USB host is an optional device
+feature, so phones without it can still use the Wi-Fi app.
+
+1. Close the flasher and other USB apps. Connect the board's **COM/UART** USB socket
+   to the phone through OTG. That socket carries the full player/startup log; the
+   chip's native USB interface may disappear during a crash and has different output.
+2. In Target, refresh the USB ports, select the port and tap **Start capture**.
+   Accept Android's permission prompt. Capture uses 115200, 8N1; opening does not send
+   commands or request a reset/bootloader sequence. RTS is cleared before DTR, as in
+   the existing command tools. Actual adapter/reset-line behavior needs physical checking.
+3. **Read status + fault** explicitly sends only the existing `status` and `fault`
+   commands. Their raw replies and arriving log text remain visible without JSON parsing.
+   There is no generic serial terminal, firmware flash, erase or automatic time sync.
+4. **Stop capture** preserves the text. Unplugging, leaving Target or backgrounding the
+   app also stops it; no automatic reconnect happens. **Share log** stops capture and
+   opens Android's share chooser for `odrig-usb-log.txt`. Choose where to send/save it.
+
+The displayed tail is at most 32 KiB; the full capture stops at 1 MiB and its beginning
+is retained. Starting another capture replaces that log. The private UTF-8 export
+contains device/driver, phone start time, settings, state, received byte count and the
+complete captured text; invalid UTF-8 bytes are replaced. Logs are not uploaded by the
+app. Share uses a temporary FileProvider read grant, with no broad storage permission.
+Permission denial, an absent/unsupported/busy device and disconnects are reported in
+the panel. Closing the app loses the in-memory log unless it was shared/saved.
+
+The board's native USB port, `303a:1001`, is also the port of the `USB serial` link, and
+only one of them holds it at a time. While the link is `USB serial`, **Start capture** on
+that port opens nothing and says that the link uses it: choose `Wi-Fi` first, or capture
+from the COM/UART port. With `Wi-Fi` chosen, a capture closes the link's idle port and
+opens it. Choosing `USB serial` during such a capture stops it, keeps its text and says
+that the link took the port. Captures of the other ports never touch the link.
+
+Capture cannot recover bytes printed before it was started. Collect `status`/`fault`
+before any reset when possible. A silent port does not prove a healthy board. Host
+tests cover bounded capture, fragmented text, cancellation, stale callbacks and UI;
+Android VM verifies the actual plugin and no-device behavior, not physical USB hardware.
+Phone/adapter permissions, reset lines, real boot/panic logs and sharing to an actual
+recipient remain the operator's checks.
 
 ## What you need
 
@@ -487,12 +542,14 @@ show is invalid is said on the target screen, and in the message of a refused pl
 A tap on an available row plays its animation within the active mode's boundary.
 Its `...` button opens its menu and plays nothing. Files whose target reports inclusion
 have `Ignore in playlist` or `Restore to playlist`, including external files on read-only
-media: their preference is saved on the target, not on the card. Internal animations
-also have `Select` and `Delete`; external deletion requires a writable card. Moves keep
-their existing rules. Older targets without the inclusion flag expose no inclusion action.
+media: their preference is saved on the target, not on the card. Every animation's menu has
+`Download`, disabled while it is unavailable or its size is not known yet, and every one whose
+target reports inclusion has `Select`; internal animations also have `Delete`, and external deletion
+requires a writable card. Moves keep their existing rules. Older targets without the
+inclusion flag expose no inclusion action and no `Select`.
 
 A folder whose inclusion is reported has its own `...` menu with `Ignore folder` or
-`Include folder`. Ignored files and folders stay browsable, with muted names and an
+`Include folder`, and `Select`. Ignored files and folders stay browsable, with muted names and an
 `Ignored` note. An inherited exclusion says `Excluded by a parent folder`; when both
 apply it says so. The menu explains that changing the child's own choice does not
 override an ignored ancestor. A change says `Saving…` until acknowledgement, refreshes
@@ -506,9 +563,10 @@ removes it, and `Keep it` sends nothing. Afterwards the app says `Removed animat
 plays, or that a USB stick or a card the installation cannot write holds, cannot be
 removed: the installation refuses it, and the app says why. A file of a card the
 installation can write that has a fault is deleted from its menu, or uploaded again under
-its name, which keeps its id. `Select`, in an internal row's menu or on the bar of the
-animation playing now, starts the selection mode with that row ticked: a checkbox on
-each internal row, `Select all`, `Clear selection`, `Delete selected` and `Done`. The list
+its name, which keeps its id. `Select`, in a row's menu or on the bar of the animation
+playing now, starts the selection mode with that row ticked: a checkbox on each row of an
+animation and of a folder, `Select all`, `Clear selection`, `Delete selected`, `Move to…`,
+`Download selected` and `Done`. The list
 has no `Select` of its own, so while nothing plays the selection starts from a row's menu.
 The question names the count and the files before anything is sent; the deletion goes in
 batches of at most 32, and a refusal or a lost reply says how many were deleted. The back
@@ -583,20 +641,128 @@ colours do. A video is drawn at most 1,280 pixels wide or high before it is fitt
   The app's status keeps coming meanwhile. While the app is not on the screen of the
   phone it sends nothing, and when it is back the upload goes on; when the installation
   dropped it meanwhile, after a minute, the app says so.
-- The installation checks the whole file before it takes it, which takes about a
-  fiftieth of a second for each frame. Then the app says
-  `Uploaded as animation <id> <file>. It plays in the playlist.` The animation is last in
-  the list of Animations and in the playlist until it is moved, and plays when it is
-  tapped.
+- The installation checks the whole file before it takes it. From the reply to the last
+  piece the line says `Checking the animation on the installation: 0:12`, the minutes and
+  seconds since then by the app's own clock, counted on once a second, the time the app
+  was not on the screen included; `Cancel` stays and stops it. The check takes its steps
+  beside the show at every refresh, at most 2,048 bytes of the file's body and one frame
+  more a refresh, up to about 2.6 times that on average for a file of large frames: about
+  8 s for a clock of 14,399 small frames on an installation that
+  refreshes 50 times a second, longer on a slower one or for a larger file. Then the app
+  says `Uploaded as animation <id> <file>. It plays in the playlist.` The animation is
+  last in the list of Animations and in the playlist until it is moved, and plays when it
+  is tapped.
+
+### Folders of the card, and moves
+
+In the selection mode a row of either storage can be selected, also one of a card the board
+may not write, and so can a folder of either storage, by the checkbox on its row or `Select` in its
+menu; a line under the bar says how many are selected in Internal storage and in External
+storage, and how many folders of each. `Select all` takes the files the filters show of the
+board's storage and of a card the board may write: not the files of a read-only card, which
+are selected by hand, nor the folders. `Delete selected` removes internal animations only, and is disabled while an
+external one or a folder is selected; `Move to…` moves files, and is disabled while a folder
+or a file of a read-only card is selected.
+
+At a level of the card that the board may write, `New folder` and `New playlist folder` ask
+for a name and make that folder there with `folder make external`: both make the same real
+folder, since every folder of the card is a playlist, and neither plays anything. A board
+whose firmware answers `unknown-command` is told so.
+
+The board's own storage has folders too, listed at the root among the card's, each row
+saying its storage, and entered as the card's are: its rows give each file's path,
+`Internal /shows/night/stars.odrg`, and the name the board keeps it under, by which its
+preview is found in the internal catalog. At a level of the board's storage `New folder` and
+`New playlist folder` make the folder there with `folder make internal`; at the root the
+dialog asks for the storage, `Internal` or `External`, the card only while the board may
+write it. A new animation's id is chosen free among the root's ids and those of every
+folder of the board's storage, which the app lists for that. An upload prepared at a level
+of the board's storage goes into that folder, `Internal /shows/x.odrg`.
+
+`Move to…` opens a chooser of the destination: `External storage` with every folder of the
+card, or `Internal storage`, the card disabled with its reason while it is absent, read-only
+or without a ready catalog. Before anything is sent it lists each file's new full path, and
+the files it skips and why: a name the destination has already, in any case on the card, a
+name the storage does not take, a file a cycle lists or another item names, or one whose size
+is not known yet. A skipped name can be given another name in the preview. Nothing is
+replaced or merged.
+
+`Move` moves the files one at a time, each as a job the phone keeps until it is done: the
+file read back with `read` and checked against its size and its catalog key; its saved
+brightness, repeat and whether it is the show's start read with `saved` (the start is not
+moved); the bytes uploaded to the destination with the absence guard, the card's folders
+made again when one is missing; the new file given the old one's ignore choice, brightness
+and repeat, and the old one's brightness and repeat removed; and the old file removed only
+after a fresh listing of its own level shows its id with its path and size: a file of a
+folder of the board's storage is looked for in that folder, and a folder is found by its
+path among the folders of its own storage alone, since both storages may have a folder of
+one path. `Stop` ends the run after the file
+under way; the end says what was moved, skipped, failed and left unstarted. The run waits
+while the app is hidden and ends with a change of target.
+
+A move cut by a lost reply, a lost link or a restart of the app is found again the next time
+the list of the same target answers: with the new file there it is finished; without it the
+old file was never touched and the move ends as not moved.
+
+### Downloads and backups
+
+`Download` in the menu of an animation's row, of either storage and of a read-only card too,
+saves its file's bytes as the installation keeps them, under its own name. `Download
+selected` in the selection bar saves one zip of the selected files and folders of one
+storage. Its dialog shows, before anything is read, the storage and the level its entries
+are named from, `From External /night/`, and what is selected; a selection of both storages
+is backed up one storage at a time, the dialog's `Storage` choosing which. `Save the backup`
+then reads the selected folders whole, every folder below them too, and saves the zip:
+entries are paths from the level shown, so that `night/x.odrg` backed up from
+`External /night` is `x.odrg`, and a selected folder keeps its name, `deep/old.odrg`. A
+folder with no file and no folder in it is an entry of its own. The manifest
+`odrig-backup.json`, version 1, comes last: `sourceStorage`, `base`, the target's address,
+the moment, the generation of the storage's catalog, `partial`, and for each file its full
+path, its entry, its id, `stored` for a file of the board's storage, its size, its CRC-32,
+its saved settings from `saved` with its own and inherited ignore, and `savedUnknown`, null
+when `saved` answered, else why its saved settings are not known: the code of the refusal,
+`busy` after five tries half a second apart, or `not-asked` for a file that was not read; its
+fault and its outcome:
+`saved`, `failed` with the reason, `stopped`, or `not-started` after `Stop`; and for each
+folder its path, its entry and its ignore. A backup with any file not saved says
+`partial: true`, and the message says it is a partial backup and names each failed file.
+
+The app reads with `read <id> <offset> <count>`, 720 bytes at a time, after `read <id> 0 1`
+has shown once for each target that the installation takes a count; one that answers
+`bad-argument` is read 600 bytes at a time. Each file is read whole before its entry is
+written, one file at a time: its row is looked for before and after it in the part of its
+level's list from the position the row was last seen at, one request, and in the whole level
+when it is not there; the part after a file serves before the next when it holds that file's
+row. A file whose id no longer names the same path and size, whose size changes between two
+pieces, or whose bytes are not the ones its storage's catalog names, fails and has no entry.
+The pieces go in their turn among the app's other requests, a status still once a second.
+`Stop` ends the run between two pieces, or as the piece under way ends, whatever its reply:
+a backup is saved with the files read whole before, as a partial backup, and a download saves
+nothing. A change of target ends either with nothing saved; while the app is hidden it waits.
+The app makes no other change while one runs. Nothing on the installation is changed. Each
+file, once read whole and checked, is written as one entry, stored as it is with its CRC-32
+in a data descriptor after it, and without zip64: a selection of 65,535 entries or more, or
+of 4 GiB or more, is refused before anything is read. A sink that cannot be written ends the
+run with nothing saved.
+
+In a browser, the emulator's Controller, the file is saved as a download. The app saves it
+through its own plugin `Save`: the bytes are written to one file of the app's cache, and the
+system's dialog of where to save a file asks for the place and the name, its own dialog of
+the Storage Access Framework; the file is copied there and removed from the cache. A dialog
+closed without a place saves nothing, and the message says so. A run that ends without saving,
+after a failure or a change of target, has the plugin remove the cache's file at once.
 
 ### Ready-made files and upload destinations
 
-`Choose a ready-made animation` accepts `.odrg` and `.odrgx`. Actual headers identify
+`Choose ready-made animations` accepts `.odrg` and `.odrgx`, one file or several; one
+file opens the form below, several the batch list of the next section. Actual headers identify
 the format. Wrong/unsupported headers, damaged bounded containers and another canvas
 are refused in words. The exact encoded bytes are uploaded, without conversion,
-resizing or timing changes. Compressed frame bodies never inflate on the phone for
-a preview. The app reuses its content-key preview catalog/cache; otherwise it says
-that no preview is available and the target will check the complete animation.
+resizing or timing changes. Every file the checks take gets a preview made on the
+phone, a compressed body read through a DEFLATE stream in two passes so that it is never
+held inflated: the note under it says `Preview from the animation catalog. The original
+animation bytes are kept.` for one of the default catalog, and `Preview made on this
+phone. The original animation bytes are kept.` for one this phone made.
 
 Every new ready-made or converted-media selection starts with `External storage`
 when detected, even if Internal was chosen for the previous form. Choose `Internal
@@ -608,8 +774,10 @@ do not determine whether storage is present.
 
 The form captures the folder browsed when selecting the file, independent of playback.
 External in `night/deep` shows `External /night/deep/file.odrg`. Combined root uses
-the chosen storage root. Internal always shows its flat root, `Internal /file.odrg`,
-and explains that a browsed SD folder was not retained. Navigation cannot move the
+the chosen storage root. A folder of the board's own storage, `shows`, starts with
+`Internal` and shows `Internal /shows/file.odrg`. Internal chosen at a level of the card
+shows its root, `Internal /file.odrg`, and explains that a browsed SD folder was not
+retained. Navigation cannot move the
 prepared destination. The editable basename must obey the32-byte naming rule; the
 external full path obeys the100-byte/three-level catalog rule. Folders must exist.
 
@@ -628,6 +796,96 @@ manual attempt can use the visibly updated fallback. Cancellation, failed checks
 and uncertain completion are distinct from an acknowledged installed file. After
 success the destination catalog/list/preview refresh normally. Authored texts and
 clocks remain in Internal; ready-made containers can use either selected storage.
+
+### An archive of animations
+
+The panel `Archive` on Upload opens one zip from the phone's chooser with `Choose an
+archive`. The zip is read in the page, where it stays until the page reloads or another
+is chosen: its directory, and each entry stored or deflated, the deflated ones through the
+converter's inflate, each checked against its size and CRC-32. An entry encrypted, packed
+another way, in zip64 or damaged is listed `unreadable:` with its reason; at most 512
+entries and 64 MB unpacked are read, and the app says so of more. The `.odrg` and `.odrgx`
+entries, in any folder, are the animations, each checked as a ready-made file is and listed
+with its size, its kind and its length, or `refused:` with the reason; the other entries
+are `passed over: not an animation`. The animations start ticked; `Tick all` and `Tick
+none` change every row.
+
+A file goes to the board's storage under the last part of its path, and to the card under
+its path from the archive's root, into a folder the card has; each name can be changed in
+its row before the upload. A name the destination cannot take, or one ticked twice, is
+said under it; a name the destination's list has says `A file of this name is there.`, and
+the file replaces it only when `Replace` beside it is ticked. Under the list the sum of the
+ticked files stands with the destination's capacity, and `Upload ticked` is disabled with
+its reason while nothing is ticked, a name must be mended or allowed to replace, or the
+sum does not fit. The press sends the ticked files one after another as the run of a batch
+of ready-made files does, with its row states, its line on every screen and `Stop`; each
+file is extracted and checked again at its turn. The room for items is not shown, since no
+reply gives it.
+
+### A batch of ready-made files
+
+Two or more files picked at once, where the phone's file app lets several be ticked,
+open a list in place of the form; `Add more` picks more into it, and `Remove` takes a row
+out. A list left with one row stays a list; one left with none closes, and a pick of one
+file closes a list that has not been sent and opens the form. A file picked twice, by
+name and size, is listed once, and at most 512 are listed: of more, the app says `At most
+512 animations are listed; <k> were left out.` At the pick each file is checked by its
+start, its ending, its header, its canvas and a container's payload size; a file that
+fails is listed `refused: <reason>` in the words of a single file and is never sent.
+
+Each row is named as a converted file is, its name in lower case with every other
+character a `-`, and `-2`, `-3` and so on when the destination's list or a row above has
+the name; the destination's list is that of the folder the files go to: the root's of the
+board's storage, or the browsed folder's, of the board's storage or of the card. Unedited
+names are made again when the storage changes. A name stays editable until the press; one
+that breaks the rule, makes a path of more than 100 bytes, or repeats another row's says
+why under it, and `Upload <n> animations` is disabled with
+`Mend the names marked in the list.` The list shows `<n> animations, <a> KB.` and the
+destination's capacity; while the sum does not fit the known free space the button says
+`These animations need <a> KB and the installation has <b> KB free.`, or the card. The
+batch takes the storage and folder the form would take, with the same choice, and holds
+them for every file; a fallback the press's preflight finds moves the list and needs
+another press.
+
+One press sends the files one after another through the app's upload, each with its own
+preflight, its lowest id free in the board's storage and its folders, and today's
+refusals; the first file sent after the press is guarded by the catalog generation of the
+pick, the others by their own preflight. Each file is read whole only at its turn and
+checked again; one damaged in its body fails there. A row says `waiting`, `checking`,
+`sending 45%`, `waiting: the installation is busy (try <k> of 30)`,
+`uploaded as animation <id>` or `uploaded to the card`, `failed: <reason>` or `not sent`.
+A file that fails is marked and the run goes on: `busy` is tried again every 2 seconds on
+the screen, 30 times; a `stale` begin of the board's storage, a drop while the app was
+away, and a lost link before the last byte's reply start the file again once; an
+`upload end` without a reply fails it. A card gone, read-only or without a ready catalog,
+a folder changed, or a change of target ends the run, the rest `not sent`. `Stop` lets the
+file in progress end and sends no more; `Try the failed again` sends the failed and the
+unsent once more with their names and destination.
+
+While the run lasts the content is locked as during one upload: deleting and moving on
+Animations wait, and the form's `Upload to the installation` and the text or clock form's
+upload are disabled, saying `A batch upload is under way.`; play, brightness, browsing and
+Settings work. A line under the top of every screen, staying there while the screen
+scrolls, says `Uploading 3 of 12: sunrise.odrg, 45%`, `Waiting for the installation to
+answer.` or `Paused while the app was not on the screen.`; a tap opens Upload. At the end
+it says `<a> of <n> uploaded`, with the failed and the unsent where there are any, until it
+is tapped or another upload starts. The run goes on while the app is open on any screen,
+with the phone's screen kept on as always; another app, the phone locked, or the app
+closed pauses or ends it, since no service runs it outside the app.
+
+While `Upload to the installation` is disabled, a line under it says why, one reason at a
+time: `The installation has not answered yet.` or `The installation does not answer.`
+with the failure's sentence and its kind, as the target screen words it; `Checking the
+destination with the installation.` while the press is being checked; `An upload is under
+way.` while this screen, a text or a clock sends; `A deletion is under way on Animations.`
+while the selection deletes; `A download is under way on Animations.` while files are read
+back to be saved; `A move is under way on Animations.` while files are moved. The sentence
+about the card, `External storage is
+disconnected or not detected. Using Internal /.`, waits for a reply of `space` that names
+no card: until the first reply the destination line says `Storage not known yet: the
+installation has not answered.` and the form keeps its storage, Internal chosen and
+External offered only after a reply said a card is present. A request that fails keeps the
+last capacity, dimmed, and moves the form nowhere; the next reply refreshes both.
 
 To make a text, press `Make a text` on Upload. A form opens under it: the text, written
 with English letters, digits, signs and Hebrew letters, and line feeds; its font,
@@ -652,6 +910,16 @@ will, with a time, a speed and, for the melting watch, a shape chosen at random 
 turn of it on the installation chooses them; `New random time` shows another. A line says
 `One loop takes 30.00 seconds.`, or names a number that is out of its range. It is
 uploaded as a text is, as `clock-<kind>.odrgx`, `clock-analog.odrgx` for one with hands.
+
+New texts and clocks wait for the installed animation names before choosing the
+lowest free id and a filename. The form explains that wait and disables Upload.
+New uploads use the existing creation-only begin form, so a place taken by another
+controller is refused without replacing an installed animation. Editing retains
+its separate existing-file CRC guard.
+While a text or a clock is sent, by `Upload to the installation` or by `Save` below, the
+line under the form says `Sending: 45%`, and from the reply to the last piece `Checking
+the animation on the installation: 0:01`, counted as on Upload, until the installation
+has checked it; `Cancel` stops it meanwhile.
 
 A text or a clock of the board's own storage has `Edit` in its row's menu. The app reads its
 file back from the installation, opens its form on Upload, titled with its id and its
@@ -683,10 +951,14 @@ pulled out, when the app asks for the list again. Besides Upload's choice and a 
 `Delete` while the installation can write the card, the app has no code of its own for
 them.
 
-To point the app at an emulator, write the emulator's address on the target screen and
-press `Use`; `Board` puts `4.3.2.1` back. An address is a host name or an IPv4 address,
+The target screen has a switch of two links, `Wi-Fi` and `USB serial`, which the phone
+keeps, `Wi-Fi` until the operator chooses otherwise; choosing the other is a change of
+target. On `Wi-Fi`, write the address and press `Connect over Wi-Fi`; a field left empty
+connects to `4.3.2.1`, the board. To point the app at an emulator, write the emulator's
+address there. An address is a host name or an IPv4 address,
 alone or with a port, as in `192.168.1.23:8600`. For a phone to reach an emulator, start
-it with `--lan`; see [emulator.md](emulator.md#from-a-phone).
+it with `--lan`; see [emulator.md](emulator.md#from-a-phone). In a browser, the emulator's
+Controller among them, `USB serial` is disabled: only the Android app has the port.
 
 A long press marks text, and opens the phone's menu of copying and pasting, only in a
 field one types into: the brightness on Animations, the address on the target screen, and
@@ -772,12 +1044,21 @@ it, its read under way first; else by its file's name and size in the default ca
 one key of that size the catalog gives the name, or, for a card file whose path it does
 not name, its own name; else none, and the square stays empty and dark.
 
-**The phone's own previews.** After an upload from Upload, or from the form of a text or a
-clock, a new one or an edited one, has ended with success and its message is shown, the app
-makes the preview of the bytes it sent with the converter's library, a step at a time so
-that the screen keeps answering, and keeps it in the phone's own catalog of previews, in the
-web view's IndexedDB, under the key of those bytes; the row keeps its empty square until the
-preview is made, and shows it once the catalog's pages give the row that key. The app looks
+**The phone's own previews.** As an upload starts, from Upload, from the form of a text or a
+clock, a new one or an edited one, or as a file of a batch or an archive, the app starts
+making the preview of the bytes it sends with the converter's library, one preview at a
+time in the order the uploads started, a step at a time so that the screen keeps answering;
+a ready-made file starts it when it is picked. A preview made is this run's at once. It is
+written to the phone's own catalog of previews, in the web view's IndexedDB, under the key
+of those bytes, only when an upload of them has ended with success; a refused, failed or
+cancelled upload writes nothing. With the success the app keeps the upload's place, the
+target's address, the storage and the file's name as the list names it, with the key, in
+the store `uploads` of the database's version 3, and the row shows the preview at once by
+that place: on a storage without a catalog too, and before the catalog's pages are read. The
+name's key of an earlier read is set aside until a page read after the upload names it; a
+key the board gives decides over the kept place. A place goes when a complete list of its
+folder, asked after the upload, no longer names the file, when this app deletes it, or when
+a later upload to the name replaces it; two boards at one address share their places. The app looks
 a key up in the default catalog first and in the phone's own after, and at its start drops
 each preview of its own whose key the default catalog has; the phone's catalog has no other
 limit. It never leaves the phone, and each phone has its own; the Controller view and
@@ -785,16 +1066,28 @@ limit. It never leaves the phone, and each phone has its own; the Controller vie
 kept, a web view without IndexedDB, or one that refuses a write, keeps the preview for the
 run alone, and nothing of this is said. No plugin is added for it.
 
-**Mapping edit lock.** `Lock mapping edits` is a toggle, pressed by default, with the
-status `Mapping edits are locked.` Both unlocking and relocking open an "Are you sure?"
+**Mapping edit lock.** `Lock mapping edits` is a checkbox in the Mapping panel of Settings,
+checked by default, with the status `Mapping edits are locked.` A press does not change the
+box by itself. Both unlocking and relocking open an "Are you sure?"
 dialog with explicit confirm/cancel buttons. Cancel or Escape keeps the existing state.
-While locked, pin handles, held-row/keyboard moves, Restore defaults, photo Apply and
-Other reading cannot save. Their handlers also enforce the lock. Mapping reads/Reload,
-photo analysis and display diagnostics remain available. Unlocking applies only to
-this Settings session on this app; leaving Settings, hiding the app, losing the link
-or changing target relocks and closes a pending confirmation. Unsent queued edits are
-dropped before transport; an already-sent edit still needs its normal reconciliation.
-The lock adds no board command and does not restrict another controller or odrigctl.
+While locked, pin fields, pin handles, held-row/keyboard moves, Restore defaults, photo
+Apply and Other reading cannot save. Their handlers also enforce the lock. Mapping reads/Reload,
+photo analysis and display diagnostics remain available. The confirmed value is kept on
+the phone, `odrig.mappingLock` in the web view's storage, one value for Wi-Fi and USB
+serial, every target and every board, and only a confirmed press changes it: leaving
+Settings, hiding the app, a lost reply, a reconnection, a change of target or of link, a
+restart of the app or of the phone, and an update of the APK keep it. A phone that never
+stored a value, or holds one of no meaning, starts locked. The control answers with or
+without a board, and waits only while a pin is held or a save is under way. Unlocked,
+edits still need a board that answers, a fresh read and an editable mapping, and the
+status says why they wait: `Mapping edits are unlocked. Edits wait until the installation
+answers.` or `... Edits wait for the mapping to be read.` When the phone refuses to store
+the value, the choice holds while the app runs and the status adds `This choice could not
+be kept on this phone; it holds until the app is closed.` Leaving Settings or hiding the
+app closes a pending confirmation, which changes nothing; leaving Settings, hiding the
+app, losing the link or changing target drops unsent queued edits before transport, and
+an already-sent edit still needs its normal reconciliation. The lock adds no board
+command and does not restrict another controller or odrigctl.
 
 **Mapping.** After confirmed unlock, the twenty snakes stand in a fixed column, `Snake n · columns a–b`, left to
 right when viewed from the front, each starting at the bottom and running up, down, up;
@@ -806,7 +1099,14 @@ permutation is saved at once with the revision it was read with, while the finge
 still down, so that the LEDs follow the drag; the summary says `Saved: GPIO p drives snake
 n.`. Several quick places are saved one after another, the latest last; after the pin is
 let go the assignment is read once and shown. The arrow keys on a handle move its pin one
-place and save it the same way. When another controller changed the mapping meanwhile the
+place and save it the same way. Each pin is also a field, `GPIO` and the pin's number,
+with a numeric keyboard: a number typed into a snake's field and committed with Enter or
+by leaving the field moves that pin to that snake, the pins between moving one place, as a
+drag there does, and saves it the same way. Escape puts the pin back. Text that is not the
+number of one of the twenty pins writes nothing, the field shows its pin again, and the
+error line says `Type the number of a GPIO.` or `GPIO n is not one of the installation's
+twenty pins.` A poll that changes nothing keeps what is typed; a changed assignment,
+leaving Settings, hiding the app or another target drops it. When another controller changed the mapping meanwhile the
 save is refused, said, the drag ends and the target's assignment is shown; when no reply
 confirms a save, the drag ends, the assignment is read once again and nothing is sent
 twice. Restore defaults saves the default assignment at once, offered only when the
@@ -849,12 +1149,26 @@ photo leaves the phone.
 
 **Clocks.** The Settings panel has one `Clocks` dropdown: `Off`, `Between animations`,
 `Clocks only`. Between inserts a clock after five animations or five minutes and resumes
-the interrupted animation. Only plays the external `clocks` program exclusively. The
+the interrupted animation. Only plays the `clocks` programs exclusively: the card's, and on
+a target whose status reports `clock_storage` the board's own too, whose description says
+`Clocks only restricts playback to the clocks folders.`; on another the external `clocks`
+program alone, as its description says. The
 independent `The message after each clock` checkbox inserts one complete animation from
 `clocks/message` in either enabled mode. Messages and clock faces each use their own
 shuffled bag; every eligible direct child has a turn before that bag reshuffles.
 
-The controls follow fresh target status. While a change is pending, both controls are
+Under the mode's dropdown stands a second, `Preferred storage for matching clock/message
+files`, with the explanation `Applies when the same relative path and file type exist in
+both storages.` and two options, `SD card` and `Internal storage`, which send `clocks
+storage sd` and `clocks storage internal`. It is a control of its own, apart from the mode,
+and follows the target's `clock_storage` as the mode's follows `clock_mode`; once a status
+confirms a choice, the panel says `Saved: matching files play from the SD card.` or `Saved:
+matching files play from internal storage.`. It is disabled while the saved clock settings
+are unreadable. A target whose status has no `clock_storage`, an older firmware, shows it
+disabled at `SD card` with the words `This target plays the card's clocks and messages
+only. Update its firmware to use those of the board's own storage.`
+
+The controls follow fresh target status. While a change is pending, the three controls are
 disabled. A successful command acknowledgement is followed by status confirmation before
 the panel says `Saved:`. A refusal restores the reported setting and explains busy,
 invalid-show or storage failure. A lost reply is explicitly unconfirmed; a later fresh
@@ -862,14 +1176,79 @@ status shows the actual setting without claiming the reply was acknowledged. A d
 reported choice is shown as such. Reconnect and other controllers update the controls;
 changing targets clears pending state and ignores replies belonging to the old target.
 
-Selecting Only initially opens the resolved Clocks folder on Animations once. Later
-browsing may go to root or any other folder without changing playback or being forced
-back on each poll. Outside Play buttons are disabled with an explanation. `Restart clocks`
-targets the currently resolved Clocks folder ID even while another level is browsed;
+On a target that reports `clock_storage` the waiting reasons of Only name both storages:
+`no-card` says `Clocks only is waiting: internal storage has no clocks folder and no external
+storage is present.`, `missing-folder` says `Clocks only is waiting: neither storage has a
+clocks folder.`, and `playing` says `Only the clocks folders play.` before the browsing
+boundary. On another target they name the external clocks folder.
+
+Selecting Only opens the resolved Clocks folder on Animations. Browsing stays inside
+that folder and its descendants; Back stops at Clocks. On a target that reports
+`clock_storage` and has a Clocks folder in each storage, Only opens the Clocks level of the
+two instead, and Back stops there (below). Direct navigation uses the same
+guard as the visible controls. Later status reconciles the folder's current ID while
+preserving valid Clocks descendants. If automatic recovery cannot resolve that location,
+the app shows an unavailable Clocks view and retries its ancestry without publishing
+Root. While the target's status names no Clocks folder, that view lists nothing, not
+even a `clocks` folder a list of the root still names, and the status that names a
+folder again resolves it at once. Unknown mode metadata preserves the confirmed Only context; confirmed Off or
+Between, or a target change, releases the boundary. Settings and Target remain
+available. An unresolved ID keeps `Restart clocks` disabled and is not sent by a direct
+restart. `Restart clocks`
+targets the currently resolved Clocks folder ID;
 the raw `play all` command remains refused by the core. Inside files and folders remain
 manually playable when ignored or when automatic messages are off. Display tests require
 leaving Only first. Missing storage, missing Clocks or no eligible face keeps Only
 selected, with an explanation and dark output; a missing resolved folder disables restart.
+
+On a target that reports `clock_storage` the boundary holds the Clocks subtrees of both
+storages. The board's own `clocks`, `clocks/message` and their sub-folders are shown,
+played and uploaded into as the card's are. The storage of the folder `clock_only.folder`
+names is told by its id, the card's above 60,000. When the root's list has a `clocks` folder
+of each storage, Only opens the Clocks level: a level titled `Clocks` that shows only the two,
+`Internal /clocks` and `External /clocks`, and takes no upload. Back from either Clocks
+folder goes there and no higher. When one storage has one, its Clocks folder is the level of
+Only, as before. Until the root's list is known, Only opens the folder the status names; when
+the root's list, which the app reads in the background while a Clocks folder is shown, names
+the other storage's Clocks folder too, the Clocks level is put under the folder shown, so
+that Back reaches it. A status that names another folder takes the trail back to the Clocks
+level while the root's list names the other storage's Clocks folder, else to the folder it
+names. A root's list that no longer has one of the two takes the Clocks level from under the
+trail: a level shown inside the Clocks folder that remains stays, and else the trail goes to
+that folder, without the unavailable Clocks view. The status names the card's Clocks folder
+as the playlist whichever storage's file plays, so of the two the one of the storage of the
+file playing is marked. A turn of a file of the other storage, which has the path of a file
+of the level shown, reads no list again. On a target without `clock_storage` no folder of
+the board's own storage is inside the boundary, whatever its path.
+
+The line of the animation playing now and the brightness screen's line of the animation name
+the storage of a file of a Clocks subtree on a target that reports `clock_storage`: `Now 12
+Internal /clocks/message/v7-the-time.odrgx`, `Animation 60004: External /clocks/analog.odrgx`.
+The storage is told by the file's row in a list, an id of 60,000 or less being the board's
+own. When no list the app read named the row, it reads, once for that file and in the
+background, the root's list and the lists of the file's folder of each storage, the card's
+first; a read that gets no answer, or is answered busy, is made again at a later status.
+Other files, and every file on another target, read as before.
+
+In Only, upload preparation and final preflight require a destination inside a Clocks
+folder: a writable one on the card, or on a target that reports `clock_storage` one of the
+board's own too. The Upload screen's, the batch's and the archive's storage selectors offer
+only the storage of the folder explored, and the archive goes into that folder under the
+last part of each path. At the Clocks level, at the board's root and in the unavailable
+Clocks view nothing is uploaded: the three forms say `Clocks only: choose a folder inside
+Clocks, a writable one on the card, or leave this mode in Settings.` on a target that reports
+`clock_storage`, and `Clocks only: choose a writable external folder inside Clocks, or leave
+this mode in Settings.` on another. Missing external storage cannot redirect the attempt to
+internal root, and in a folder of the card Internal is unavailable in the storage selector.
+A prepared destination stays fixed: entering Only later cannot move an outside draft into
+Clocks silently, and an archive opened in Only keeps its folder after Only is left, a name
+with `/` refused in the words `An archive opened in a folder goes into that folder: use a
+name without /.` An upload that a confirmed Only stops, of a text, a clock or a move too, is
+said in the words of the target's boundary above. Shared upload
+jobs recheck the boundary before each next step and cancel an opened staging upload
+when a confirmed mode change makes its destination invalid. The text/clock authoring
+form still previews, but its internal-root Upload/Save stays disabled until leaving Only.
+Ordinary Off/Between uploads retain their normal storage choices and fallback behavior.
 
 Older clock-capable firmware without explicit mode metadata maps its existing booleans
 to Off and Between; the Only option is unavailable, with an update explanation. A target
@@ -896,6 +1275,58 @@ app reads the target once to reconcile, preserves the draft and asks for Reload 
 new attempt. Storage failures, busy/invalid shows, stale revisions and unsupported targets
 have readable messages in Settings.
 
+### Automatic phone time
+
+On a successful connection, the shared app reads the board's time and daily settings.
+Automatic phone-time synchronization is on by default and kept on the phone. Each
+physical board has its own last confirmed sync: a valid clock is set only after at
+least15 minutes, on the next connection. Expiry and ordinary status polls do not
+send a time set. An invalid clock bypasses the cooldown; a backwards phone clock
+also makes a sync due. A deliberate sync shares the same confirmation record.
+
+The phone's current time zone always supplies the offline rules, including DST.
+Preparation runs in a worker, leaving playback controls responsive. A zone-only
+update does not reset the UTC cooldown. Limits are checked explicitly: unsupported
+rules are reported, never truncated or guessed. The board's rules survive reset;
+its UTC validity does not. Manual LED On/Off remains in force until Resume schedule.
+
+Time operations share the ordinary serialized request queue. Every mutation and
+follow-up read binds to the physical board ID, in addition to address/connection
+generations, protecting boards with the same Wi-Fi address. Failed or unconfirmed
+time writes do not start a cooldown; a matching valid readback confirms a set.
+Older firmware keeps its ordinary controls without receiving unsupported timing
+writes. No APK-only web code or extra USB transport is introduced.
+
+Browser fixtures explicitly turn auto-sync off when testing unrelated behavior,
+so the real time of day cannot change their expected LED visibility. Timing tests
+also run the real app with the preference absent and prove the product default-on
+behavior against the native core. Phone/board acceptance remains separate.
+
+### Time and schedule controls
+
+Settings has a Time and schedule card after Clocks. Board time shows the confirmed
+local date, time and phone-supplied zone at the last refresh. An unset clock explains
+that the schedule is ignored. Sync now follows the phone even with automatic sync
+off. The automatic-sync choice is kept on the phone; a storage failure explains
+that the choice applies only for this session. Refresh reads the board again and,
+only after a successful read, reloads its saved hours.
+
+Use scheduled hours and the On at / Off at fields are saved together by Save scheduled
+hours. The default is enabled,18:00 to06:00. Equal, empty or invalid times cannot be
+saved. Edited hours say Save to apply; pending and refused writes never claim success.
+The app confirms the saved pair and enabled flag with a guarded read. A lost reply
+keeps its error visible, preserves the draft and never replays the save on reconnect.
+Another controller's revision requires Refresh before trying again.
+
+Manual On or Off takes priority across restarts until Resume schedule. Saving hours
+or setting time does not release it. The card says when manual mode is temporary
+because it could not be saved. Resume confirms that manual mode ended. Save or refresh
+edited hours before resuming. Ordinary reads, syncs and reconnects to the same board
+preserve typed values; changing target or reading a different board clears them.
+Unsupported firmware leaves ordinary app controls working and timing controls
+disabled. Unreadable schedule metadata is shown explicitly and cannot be overwritten
+by guessed defaults. Every control has a label and at least a48-pixel touch target.
+
 ## Messages
 
 The shared message panel gives each failure as a sentence with its code in brackets at
@@ -907,6 +1338,9 @@ it is dismissed with `OK` or another takes its place.
 | `bad-address` | The text written as the address is none. | That is not an address. Write it like 4.3.2.1 or 192.168.1.23:8600. |
 | `no-wifi` | The phone is on no Wi-Fi network. | This phone is not on a Wi-Fi network. Join the network odrig in the phone's Wi-Fi settings. |
 | `no-answer` | No reply came within five seconds. | No answer from `<address>`. Check that the phone is on the installation's Wi-Fi network and that the installation has power. |
+| `no-answer`, over USB serial | No reply came over the cable within five seconds. | No answer over USB serial. Check the cable to the board's USB port and that the installation has power. |
+| `no-usb` | The link is USB serial and no board is connected by USB, or it was unplugged. | No board is connected by USB. Connect the phone to the board's USB port with a cable, then press Connect over USB. |
+| `usb-refused` | Android did not give the app the USB device. | Android did not let the app use the board's USB port. Press Connect over USB and allow it. |
 | `bad-reply` | Something answered that is not an installation. | Something answered at `<address>`, but it is not an odrig installation. |
 | `line-too-long`, `unknown-command`, `bad-argument` | The installation's software is older or newer than the app. | The installation did not understand the app. Its software and this app do not match. |
 | `show-invalid` | The installed show cannot be played. | The installed show is invalid: `<reason>`. Nothing can be played until a show is installed over USB. |
@@ -916,14 +1350,18 @@ it is dismissed with `OK` or another takes its place.
 | `busy` | A removal while the installation still reads what it has installed after a start, or while an upload is open; a rebuild while another runs or an upload is open; an upload to the card while its catalog is read. | The installation is busy. Try again in a moment. |
 | `in-use` | A removal of an animation that a cycle plays or that a USB stick holds. | Animation `<id>` cannot be removed: a cycle plays it, or it is on a USB stick. |
 | `in-use` | Play outside Clocks only, or raw `play all` in that mode. | Clocks only allows playback inside the Clocks folder. Leave Clocks only in Settings to play elsewhere. |
+| `in-use` | The same, on a target that reports `clock_storage`. | Clocks only allows playback inside the clocks folders. Leave Clocks only in Settings to play elsewhere. |
+| `in-use` | An upload outside the boundary of Clocks only. | Clocks only: choose a writable external folder inside Clocks, or leave this mode in Settings. |
+| `in-use` | The same, on a target that reports `clock_storage`. | Clocks only: choose a folder inside Clocks, a writable one on the card, or leave this mode in Settings. |
 | `in-use` | A display-taking mapping test while Only owns playback. | Leave Clocks only in Settings before starting a display test. |
 | `in-use` | Inclusion of an unsupported item or on older firmware. | This target does not support playlist inclusion for that item. |
 | `read-only` | A removal of an animation of the card while the installation cannot write it. | Animation `<id>` cannot be removed: the card cannot be written now. |
 | `read-only` | An upload to the card while the installation cannot write it. | The card cannot be written now. Choose Internal storage to store the animation on the board. |
 | `read-only` | A rebuild of the catalog of a storage the installation cannot write. | That storage cannot be written now, so its catalog cannot be rebuilt. |
 | `storage-error` | The installation could not read or write its storage. | The installation could not use its storage. |
+| `zone-unset` | Time was set before usable time-zone rules were supplied. | Set the board's time from this phone first. |
 | `in-use` | An upload whose id or file name another item took meanwhile. | That name or id is in use on the installation. The list is asked for again; upload again. |
-| `in-use` | `Save` or `Restore default` of the bar for a cycle or a folder of the card. | That is a cycle or a folder, which keeps no repeat. |
+| `in-use` | `Save` or `Restore default` of the bar for a cycle or a folder. | That is a cycle or a folder, which keeps no repeat. |
 | `no-space` | An upload that does not fit, before it is sent or as the installation judges it. | The animation needs `<size>` KB, and the installation has `<free>` KB free. |
 | `no-space` | An upload to the card that does not fit on it. | The animation needs `<size>` KB, and the card has `<free>` KB free. |
 | `no-space` | `Save` of the bar when the installation keeps no more saved repeats. | The installation has no room for another saved repeat: it keeps them for at most 32 files of a card or drive and 512 files in all. |
@@ -994,6 +1432,16 @@ The target screen says how requests travel:
 | `The phone offers to sign in to it. That is not needed.` | Added when the phone takes the network for one with a sign-in page. |
 | `This phone is not on a Wi-Fi network.` | Join `odrig` in the phone's Wi-Fi settings. |
 | `Sent from this browser.` | The web code runs in a browser and not in the app. |
+| `Sent over USB serial.` | The link is `USB serial`: the lines go over the cable to the board's USB port. |
+
+On `USB serial` the app sends every line it sends over Wi-Fi over the board's USB serial
+port, the port the command tool uses from a computer, with the same replies, so that every
+screen works as on Wi-Fi. The APK finds the board by the ids of the ESP32-S3's USB serial
+port, `303a:1001`, asks Android for it once, and opens it at 115,200 baud with both modem
+lines low, which never resets the chip. Before a line the app drops what the port holds;
+after it, it passes over the board's log, lines beginning with `#`, until the reply. Android
+offers the app when the board is plugged in. Installing firmware stays with the existing
+ways.
 
 The app allows plain HTTP, because the installation speaks nothing else, and it sends to
 no address but the one that is set. Anyone on the network can send the same commands with
@@ -1009,7 +1457,7 @@ installed; the phone with mobile data on.
 1. **Install.** `python3 app/app.py install` with the phone on USB, or copy
    `build/app/odrig-debug.apk` to the phone and open it. *Seen:* the app `odrig` is on the
    phone and starts on the target screen with the address `4.3.2.1`.
-2. **The emulator.** On the Mac: `python -m emulator build/demo-20/show --lan`; allow
+2. **The emulator.** On the computer: `python -m emulator build/demo-20/show --lan`; allow
    incoming connections if macOS asks. Phone and Mac on the same Wi-Fi network. Give the
    app the address of the emulator's `lan:` line. *Seen:* `Answers`, `Sent over Wi-Fi.`,
    and then the show screen.
@@ -1031,7 +1479,8 @@ installed; the phone with mobile data on.
    nothing answers, in words. Start it again: the app recovers by itself.
 6. **The installation's network.** Power the board. In the phone's Wi-Fi settings join
    `odrig` with the password. Leave mobile data on. Note what the phone says about the
-   network and what you answered. In the app press `Board`. *Seen:* `Answers`, and a line
+   network and what you answered. In the app empty the address and press
+   `Connect over Wi-Fi`. *Seen:* `Answers`, and a line
    that says the Wi-Fi network has no internet.
 7. **Mobile data at the same time.** Open a web page in the phone's browser. *Seen:* it
    loads, and the app still shows the board's status.
@@ -1119,13 +1568,69 @@ installed; the phone with mobile data on.
 23. **The clocks.** With current firmware and populated `clocks` and `clocks/message`,
     *Seen:* choose Between in Settings and enable messages. Check the clock break, complete
     message turns and persistence after restart. Choose Only: Clocks opens once, outside
-    playback stops, and browsing elsewhere leaves outside Play disabled. Restart clocks
+    playback stops, browsing stays inside Clocks and Back stops at Clocks. Restart clocks
     still targets Clocks. Play an inside message with automatic messages off; try Ignore
     on a face, a message and their folders, including an inherited child choice, then
     Include. Check dark recovery when all faces are excluded, mode restoration, reconnect
-    and another controller's changes. Repeat upright and sideways. These physical and
-    phone observations remain open until actually performed.
-24. **Note** the phone's model, its Android version, the web view's version from the
+    and another controller's changes. Repeat upright and sideways. With a firmware whose
+    status reports `clock_storage`, choose `Internal storage` under `Preferred storage for
+    matching clock/message files`, see `Saved: matching files play from internal storage.`,
+    and see the choice again after a restart of the board; choose `SD card` again. With a
+    `clocks` folder on the card and in the board's own storage, choose Only: the Clocks level
+    shows `Internal /clocks` and `External /clocks`, Back stops at `Clocks`, a face and a
+    message of the board's own `clocks/message` play, and an upload goes into it with only
+    `Internal` offered. These physical and phone observations remain open until actually
+    performed.
+24. **Time and scheduled hours.** Keep board brightness at40 or less. In Settings,
+    *Seen:* the confirmed time/zone matches the phone, automatic sync starts on, and
+    disabling it survives reopening. Set a short daily interval excluding now, save,
+    and see the LEDs off while playback progresses. Manual On wins through a restart;
+    Resume schedule returns to the saved hours. With automatic sync off, reset and
+    see that invalid time ignores the schedule; Sync now restores it. Check a changed
+    phone zone/DST, a due reconnection after15 minutes, and no periodic time writes
+    while connected. Restore the original hours, auto-sync choice and manual mode.
+    These physical phone/LED observations remain unperformed.
+25. **USB serial.** Connect the phone to the board's USB port with a USB-C cable or an
+   OTG adapter. On the target screen choose `USB serial` and press `Connect over USB`;
+   allow the app when Android asks. *Seen:* `Answers`, `Sent over USB serial.`, the list,
+   and every action of steps 3, 4 and 12 on the LEDs, with the board not reset by the
+   connection. Pull the cable: the app says that no board is connected by USB; plug it in
+   and press `Connect over USB`: the app answers again. Choose `Wi-Fi`: the app answers over
+   Wi-Fi.
+26. **The mapping lock.** In Settings, press `Lock mapping edits` and confirm the
+    unlock. *Seen:* it stays unlocked after another app is opened and the app brought
+    back, after Settings is left and opened again, after the phone's screen is turned off
+    and on, after the app is closed and opened again, and after the link is lost and the
+    installation answers again; a pin moved then is saved. Lock it again and close the
+    app: it opens locked.
+27. **Typed pins.** With the mapping unlocked, type the pin of snake 5 into snake 1's field
+    and press the keyboard's Enter. *Seen:* the pin moves to snake 1, the pins between move
+    one place, `Saved: GPIO p drives snake 1.`, and the LEDs follow; `99` typed into a field
+    is refused with its words and nothing changes.
+28. **The reason under Upload.** With the spare board and no card: on Upload choose a
+    ready-made animation, with `Internal storage` selected. *Seen:* `Upload to the
+    installation` enabled, the line `External storage is disconnected or not detected.
+    Using Internal /.` under the form, and after the press `Uploaded as animation <id>
+    <file>. It plays in the playlist.`; then switch the installation off: within five
+    seconds the button is gray and the line under it says `The installation does not
+    answer.` with the failure's kind in brackets.
+29. **A batch of ready-made files.** On Upload, `Choose ready-made animations` and tick ten
+    files in the phone's file app. *Seen:* the list of ten, `Upload 10 animations`; after
+    the press, Animations opened shows the line `Uploading <k> of 10: ...` and all ten play
+    after `10 of 10 uploaded.`; the same into a folder of the card; another app opened for
+    two minutes during a run, and the app brought back: the line said `Paused while the app
+    was not on the screen.`, and the run went on to its end.
+30. **An archive.** On Upload, `Choose an archive` and pick `clocks_rotated_right.zip`.
+    *Seen:* its 113 animations listed and ticked; `Tick none`, then a dozen ticked, and
+    `Upload ticked` to the board's storage: the line on every screen shows the run, and the
+    clocks play.
+31. **Previews made on this phone.** With the spare board, whose storage has no catalog,
+    upload a converted GIF, a compressed ready-made file whose preview the default catalog
+    does not hold, and a text. *Seen:* each row shows its moving preview within seconds after
+    the upload's message, and the panel of what plays too; after the app is closed and
+    opened again they are still there; after one is deleted, a new file of another size at
+    its name has no preview of the old.
+32. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1136,8 +1641,9 @@ python3 -m unittest discover -s tests/apk -t .
 ```
 
 The first runs the web code in Chrome without a window against an emulator and against
-stand-in targets of its own, and takes about two minutes. It needs the core's library,
-`make -C core shared`, and Chrome: the one in `/Applications`, or the program the
+stand-in targets of its own. Duration depends on the host; the parallel runner bounds
+the app to four workers. It needs the core's library (`python core/build.py shared`
+on Windows, `make -C core shared` on macOS) and installed Chrome, or the program the
 variable `ODRIG_CHROME` names. Nothing it does reaches another computer: what the app
 would send to the installation's address ends at the suite's own server.
 
@@ -1150,7 +1656,12 @@ Neither needs a phone.
 
 ## What is verified
 
-By programs, on a Mac:
+By programs, on macOS and Windows:
+
+Board-time and Settings tests cover real native scheduling blackout, sticky manual
+On/Off and Resume, clock loss, named-zone DST, guarded target changes, confirmation,
+lost replies, preserved edits and phone-size controls. Release evidence and remaining
+physical acceptance are in [verification.md](specs/64-p2-board-time-and-daily-on-off-schedule/verification.md).
 
 - The four tabs and every action of the web code, in Chrome against the emulator:
   the address, the status, the list for shows of up to 40 animations, `play`,
@@ -1229,6 +1740,15 @@ By programs, on a Mac:
 - Uploading in Chrome: a GIF and an mp4 uploaded to the emulator, listed and played;
   `Cancel`; nothing sent while the app is away, and the upload finished when it is back;
   a file that does not fit; `upload end` answered `busy`; every refusal.
+- The reason under `Upload to the installation`, in Chrome against stand-in targets at
+  320, 360 and 740 pixels: a status that fails named under the disabled button with its
+  kind, the destination line, the form and the capacity kept and the capacity dimmed,
+  the line in the colour and the size of the capacity line inside the screen; a `space`
+  that never answers, with `Storage not known yet` and the form where it is until a
+  reply without a card enables the button with the card's sentence; a slow deletion on
+  Animations and a slow check of the destination each named; the destination invariants
+  of no reply, an absent card and an older target; and, against the emulator without a
+  drive, the Internal fallback upload unchanged.
 - That a long press or a right click marks text and opens a menu only in a field one
   types into, in Chrome: every element of the screens, of a message and of the
   question, fields and other elements made later, and the page for an old web view. A
@@ -1267,6 +1787,14 @@ By programs, on a Mac:
   `This board` chosen instead, each refusal in words, and no choice for a card it cannot
   write; `Delete` of a card's animation, one with a fault among them, and none on a card
   that cannot be written; the storage lines and the badges of both kinds of card.
+- Downloads and backups, in Chrome against the emulator and against stand-in targets: an
+  animation of the board and one of a read-only card's folder downloaded byte for byte under
+  its name; a zip of a card's level with a file, a folder and an empty folder, read back by
+  Python's own reader, its entries named from the level shown and its manifest last; a
+  selection of both storages backed up one storage at a time; a partial backup with a
+  damaged file; a file whose size changes while it is read, left out; the probe `read <id>
+  0 1`, then 720 bytes at a time, and 600 at a time from an installation without the count;
+  the zip writer's data descriptors, folders, names and limits.
 - That the web code uses the documented protocol and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
@@ -1277,6 +1805,21 @@ By programs, on a Mac:
   and the rule that allows plain HTTP.
 
 ## What is open
+
+- **Board time and scheduled hours on the owner's phone and board.** Step 24 above
+  remains unperformed. Browser/native and Android virtual-device evidence cannot
+  observe real LEDs, real power loss or the phone's network behavior.
+- **The mapping checkbox and typed pins on a phone.** No person has typed a pin on a phone
+  and seen the LEDs follow: step 27 above.
+- **The kept mapping lock on a phone.** No person has seen `Lock mapping edits` keep its
+  value through another app, a restart and a lost link on a phone: step 26 above.
+- **Previews made on this phone, on a phone.** No person has seen a preview this phone made
+  in a row of a storage without a catalog: the step `Previews made on this phone` above.
+- **An archive on a phone.** No person has opened a zip on a phone and uploaded its
+  animations from it: step 30 above.
+
+- **A batch of ready-made files on a phone.** No person has ticked several files in a
+  phone's file app, nor watched a run on the installation and the card: step 29 above.
 
 - **Message clock modes and external inclusion on a phone and on the board.** The
   shared browser/emulator proofs do not replace physical acceptance of all seven
@@ -1293,6 +1836,10 @@ By programs, on a Mac:
 
 - **Seed 54 on a phone and on the board.** No program has seen the panel `Clocks` on a
   phone, nor a clock between the animations on the LEDs: step 23 above.
+- **Seed 61 on a phone.** Nobody has chosen the preferred storage on a phone and seen it kept
+  across a restart of the board, nor seen Clocks only show the Clocks level of both storages,
+  play and take an upload inside the board's own `clocks/` and `clocks/message/`: step 23
+  above.
 
 - **Seed 33 on a phone and on the board.** Nobody has seen the line of the reading, the
   name of the board and its last fault on a phone; that belongs to the seed's board
@@ -1328,10 +1875,40 @@ By programs, on a Mac:
 - **Seed 47 on a phone.** Nobody has typed a brightness into the field on a phone: the
   owner's check is to type 8, press Done, and see the installation at 8 and the slider at 8,
   and to see the field show the slider's number while it moves.
+- **Seed 75 on a phone.** Nobody has seen the line under `Upload to the installation` on
+  a phone: step 28 above, with the spare board and no card, and with the installation
+  off.
+- **Downloads and backups on a phone.** No phone has saved a download or a backup yet: the
+  plugin `Save`, the system's dialog of where to keep a file and the file it writes there are
+  untried. The owner's check is to press `Download` in a row's menu and `Download selected`
+  for a folder of the card on the phone, choose a place, and open the file and the zip there.
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.
-- The build is verified on one system, macOS on Apple Silicon. `app/toolchain.json` has
-  no entry for another.
+- Automatic toolchain setup remains pinned to macOS on Apple Silicon in
+  `app/toolchain.json`. Windows packaging has also been verified with the existing
+  Android Studio JDK/SDK and the persistent dedicated signing key. That does not
+  claim automatic setup support for another entry in the toolchain file.
 - `npm audit` names three advisories of moderate severity in a package that Capacitor's
   command line uses at build time. Nothing of it is in the APK.
+
+### Square output rotation
+
+Settings offers exactly0,90,180,270 degrees clockwise from the front of the square
+display. The installation is permanently1:1, so there is no fit/crop/stretch choice.
+Opening Settings or reconnecting there reads the board's saved orientation. Refresh
+rotation rereads it after changes by another controller. A selection stays on the
+last confirmed value while saving; only the full board acknowledgement changes it.
+Refusals/lost replies are reconciled by reading, never automatic write replay.
+Leaving Settings, hiding the app, changing targets or losing the link cancels unsent
+changes and invalidates old callbacks. Old firmware disables only this control.
+Current firmware lets the orientation be saved even when animation files or the show
+are missing or invalid. An older target that reports rotation unavailable alongside
+a configuration fault shows that fault and refresh guidance, rather than claiming
+the feature is unsupported. Its control stays disabled until support is confirmed.
+
+Rotation is installation-wide and survives reset; source previews/files and mapping
+diagnostics keep their canonical/physical orientation. Miniature output rotates the
+same square picture before its centered projection. Mapping edits remain separately
+locked until explicitly confirmed. Physical wall/miniature direction still requires
+the owner's acceptance after installing the paired APK/FW.

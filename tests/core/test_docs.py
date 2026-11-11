@@ -29,7 +29,7 @@ class CoreDocument(unittest.TestCase):
 
     def test_it_names_every_function_of_the_header(self):
         functions = set(re.findall(r"\b(odrig_core_[a-z_]+)\(", self.header))
-        self.assertEqual(len(functions), 10)
+        self.assertEqual(len(functions), 11)
         for function in sorted(functions):
             self.assertTrue(function in self.named, function)
             self.assertTrue(f"{function}(" in self.text, function)
@@ -40,7 +40,7 @@ class CoreDocument(unittest.TestCase):
         members = {}
         for struct, body in structs.items():
             members[struct] = re.findall(r"(?:\(\*|[ *])([a-z_]+)\)?(?:\([^;]*\))?;", body)
-        self.assertEqual(members["odrig_host"], ["ctx", "alloc", "open", "read", "close", "log", "write_open", "write", "write_close", "rename", "remove", "space", "read_at", "drive", "drive_name", "drive_space", "about", "drive_list", "drive_bind", "drive_writable"])
+        self.assertEqual(members["odrig_host"], ["ctx", "alloc", "open", "read", "close", "log", "write_open", "write", "write_close", "rename", "remove", "space", "read_at", "drive", "drive_name", "drive_space", "about", "drive_list", "drive_bind", "drive_writable", "identity", "make_folder"])
         self.assertEqual(members["odrig_leg"], ["leg", "pin", "led_count", "rgb"])
         for struct, names in members.items():
             self.assertTrue(struct in self.named, struct)
@@ -120,7 +120,7 @@ class CoreDocument(unittest.TestCase):
 class CommandsDocument(unittest.TestCase):
     """docs/commands.md against the core's command front-end."""
 
-    ORDER = ["line-too-long", "unknown-command", "bad-argument", "show-invalid", "unsupported", "no-upload", "incomplete", "bad-checksum", "busy", "unknown-id", "unavailable", "in-use", "read-only", "mapping-conflict", "stale", "order-conflict", "no-space", "bad-offset",
+    ORDER = ["line-too-long", "unknown-command", "bad-argument", "show-invalid", "unsupported", "no-upload", "incomplete", "bad-checksum", "busy", "unknown-id", "unavailable", "in-use", "read-only", "mapping-conflict", "rotation-conflict", "zone-unset", "stale", "order-conflict", "no-space", "bad-offset",
              "bad-file", "storage-error"]
 
     @classmethod
@@ -142,21 +142,32 @@ class CommandsDocument(unittest.TestCase):
     def test_its_commands_are_the_ones_the_front_end_reads(self):
         table = self.text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "brightness <id> <n> save", "brightness <id> default", "status", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save", "repeat <id> default", "clocks on", "clocks off", "clocks only", "clocks message on", "clocks message off", "upload begin <id> <file> <bytes>",
-                                      "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel", "debug mini on", "debug mini off"])
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "brightness <id> <n> save", "brightness <id> default", "status", "schedule", "schedule set <revision> <on-HH:MM> <off-HH:MM> <on-or-off>", "schedule resume <revision>", "time", "time zone <base64>", "time set <utc-seconds> <zone-crc32>", "guard <board-id> <timing-command>", "rotation", "rotation set <revision> <degrees>", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save", "repeat <id> default", "saved <id>", "clocks on", "clocks off", "clocks only", "clocks message on", "clocks message off", "clocks storage sd", "clocks storage internal", "upload begin <id> <file> <bytes>",
+                                      "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel", "folder make internal <path>", "folder make external <path>", "debug mini on", "debug mini off"])
         self.assertEqual(set(re.findall(r'words\.is\(0, "([a-z]+)"\)', self.sources)), {command.split(" ")[0] for command in documented})
-        self.assertEqual(set(re.findall(r'words\.is\(1, "([a-z]+)"\)', self.sources)), {"all", "begin", "data", "end", "cancel", "get", "set", "test", "many", "move", "expect", "rebuild", "page", "message", "mini"})
+        self.assertEqual(set(re.findall(r'words\.is\(1, "([a-z]+)"\)', self.sources)), {"all", "begin", "data", "end", "cancel", "get", "set", "test", "many", "move", "expect", "rebuild", "page", "message", "storage", "mini", "make", "zone", "resume"})
 
     def test_its_limits_are_the_cores(self):
         limits = dict(re.findall(r"#define (ODRIG_[A-Z_]+)\s+([0-9]+)", self.header))
         self.assertEqual(limits, {"ODRIG_LINE_MAX": "2048", "ODRIG_REPLY_MAX": "1024"})
         for phrase in ("A line is at most 2,048 characters.", "a JSON object on one line of at most 1,024 bytes.", "| `line-too-long` | The line is longer than 2,048 characters. |",
                        '{"ok":true,"chunk":1500}', "`<id>` is 1 to 65,535.", "`<bytes>` is the size of the file, 1 to 4,294,967,295.", "`<from>` is 0 to 4,294,967,295.",
-                       "An upload on which nothing has moved for 60\nseconds is discarded too"):
+                       "An upload on which nothing has moved for 60\nseconds is discarded too", "`<count>` is 1 to 720", "a reply of 1,001 bytes"):
             self.assertIn(phrase, self.text)
         self.assertIn("const uint32_t kChunkSize = 1500;", self.sources)
+        self.assertIn("const uint32_t kReadMost = 600;", self.sources)
+        self.assertIn("const uint32_t kReadCountMost = 720;", self.sources)
         self.assertIn("const uint64_t kUploadQuietMs = 60000;", self.sources)
         self.assertIn("const uint32_t kUploadReserve = 16384;", self.sources)
+
+    def test_the_clock_error_member_names_every_line_refused_while_it_is_given(self):
+        row = re.findall(r"(?m)^\| `clock_error` \|.*$", self.text)
+        self.assertEqual(len(row), 1)
+        settings = re.findall(r"const uint8_t kClockSetting([A-Za-z]+) = ", self.sources)
+        self.assertEqual(settings, ["Mode", "Message", "Storage"])
+        for setting in settings[1:]:
+            self.assertIn(f"{setting.lower()}-only", row[0])
+        self.assertIn("`storage-error`", row[0])
 
     def test_its_examples_are_sound(self):
         import base64

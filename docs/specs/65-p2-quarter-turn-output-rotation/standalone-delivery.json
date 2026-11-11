@@ -1,0 +1,1212 @@
+{
+  "version": 2,
+  "variant": "rotation",
+  "pr": "https://github.com/korenmic/Odrig/pull/44",
+  "publishedUtc": "2026-11-02T10:42:13.132172+00:00",
+  "runtimeSourceCommit": "e08ba55e4c16cac91af5896a820ccbfd4690063f",
+  "firmwareSourceCommit": "9d7aa6a453763eb270403ebb9345e465f8d94fd0",
+  "firmwareInputsByteIdentical": true,
+  "apk": {
+    "file": "odrig-rotation-debug.apk",
+    "bytes": 19088118,
+    "sha256": "fb2f13e5afb561c48dbd22316159f01b7f0100947205d2e2fc7d8d9b76c894c3",
+    "certificateSha256": "5a489ec294e53cdec085d71092cf4e7285ae08d4d43c19929d84130f3649f0f1"
+  },
+  "firmware": {
+    "file": "odrig-rotation-firmware.bin",
+    "bytes": 1885056,
+    "sha256": "062de8d4723e9db8b3246f0984f8c0409483b5a67005b5d21ef27bc26b99929a",
+    "offset": "0x10000"
+  },
+  "firmwareOfflineInspection": {
+    "version": 1,
+    "source": {
+      "commit": "9d7aa6a453763eb270403ebb9345e465f8d94fd0",
+      "trackedDirty": false
+    },
+    "host": {
+      "system": "win32",
+      "architecture": "x86_64",
+      "os": "Windows-11-10.0.26200-SP0"
+    },
+    "inputsSha256": "74484c6aa6d08a20f75e0660b075e46af1edd939f58ab2f2eacfce3475cbd12d",
+    "image": {
+      "file": "odrig-firmware.bin",
+      "bytes": 1885056,
+      "sha256": "062de8d4723e9db8b3246f0984f8c0409483b5a67005b5d21ef27bc26b99929a"
+    },
+    "elf": {
+      "bytes": 33006200,
+      "sha256": "9d4ad236082b96e780c1c95ba1065032c59afd4490552183d766f5cfee1c24c9"
+    },
+    "chip": "ESP32-S3",
+    "environment": "odrig_microsd",
+    "symbolTool": "xtensa-esp-elf-gcc-nm.exe",
+    "symbols": [
+      "420238fc T odrig_core_begin",
+      "420215ec T odrig_core_feed",
+      "4202bc88 T odrig_core_poll"
+    ],
+    "physicalAcceptance": false
+  },
+  "apkPackagingTests": {
+    "testedUtc": "2026-11-02T10:38:44.276667+00:00",
+    "tests": 8,
+    "sha256": "fb2f13e5afb561c48dbd22316159f01b7f0100947205d2e2fc7d8d9b76c894c3",
+    "allPassed": true
+  },
+  "android": {
+    "testedUtc": "2026-11-02T10:40:57.773949+00:00",
+    "variant": "rotation",
+    "androidVersion": "16",
+    "avd": "Odrig_Usb_Diagnostics_70",
+    "ownedAvdOnly": true,
+    "readOnly": true,
+    "cleanInstallPassed": true,
+    "previousPublishedUpgradePassed": true,
+    "launchPassed": true,
+    "apkSha256": "fb2f13e5afb561c48dbd22316159f01b7f0100947205d2e2fc7d8d9b76c894c3",
+    "previousApkSha256": "8333dbe332189b3610b7f15bd23c0e6ced473d64cfdf00c5459d35cb8a37cf9a",
+    "actualEsp32S3FirmwareFeature": {
+      "nativeAndroidWifi": true,
+      "variant": "rotation",
+      "unrelatedTimeSettingsAbsent": true,
+      "fourAnglesConfirmed": true,
+      "nativeTargetSendsConfirmed": true,
+      "nativeTargetRotationSaves": [
+        {
+          "at": 1793616053476,
+          "plugin": "Target",
+          "method": "send",
+          "line": "rotation set 3523407757 90",
+          "reply": {
+            "status": 200,
+            "body": "{\"ok\":true,\"supported\":true,\"degrees\":90,\"revision\":2768625435,\"error\":null}\n"
+          }
+        },
+        {
+          "at": 1793616054085,
+          "plugin": "Target",
+          "method": "send",
+          "line": "rotation set 2768625435 180",
+          "reply": {
+            "status": 200,
+            "body": "{\"ok\":true,\"supported\":true,\"degrees\":180,\"revision\":1007455905,\"error\":null}\n"
+          }
+        },
+        {
+          "at": 1793616054472,
+          "plugin": "Target",
+          "method": "send",
+          "line": "rotation set 1007455905 270",
+          "reply": {
+            "status": 200,
+            "body": "{\"ok\":true,\"supported\":true,\"degrees\":270,\"revision\":1259060791,\"error\":null}\n"
+          }
+        },
+        {
+          "at": 1793616054885,
+          "plugin": "Target",
+          "method": "send",
+          "line": "rotation set 1259060791 0",
+          "reply": {
+            "status": 200,
+            "body": "{\"ok\":true,\"supported\":true,\"degrees\":0,\"revision\":3523407757,\"error\":null}\n"
+          }
+        }
+      ]
+    },
+    "httpTransport": "The unchanged native Android Target sender and Wi-Fi availability gate use an ADB reverse TCP tunnel and transparent HTTP adapter to the actual ESP32-S3 firmware binary executing in ESP-EMU. All commands/replies are unmocked; the model starts with an empty LittleFS image. Direct VM slirp transport dropped replies (unexpected EOF) in retained earlier attempts; this does not verify physical Wi-Fi/radio reliability.",
+    "physicalAcceptance": false,
+    "actualEsp32S3Model": true,
+    "nativeCoreStandIn": false,
+    "ownedAvdConfigUnchanged": true
+  },
+  "firmwareEmulator": {
+    "summary": {
+      "applicationSha256": "062de8d4723e9db8b3246f0984f8c0409483b5a67005b5d21ef27bc26b99929a",
+      "applicationBytes": 1885056,
+      "positiveCases": [
+        {
+          "label": "after",
+          "fixtureKind": "fresh",
+          "hostSeconds": 42.539,
+          "totalEmulatedSeconds": 1.3425598916666666,
+          "rotationDegrees": [
+            0,
+            90,
+            180,
+            270
+          ],
+          "restoredDegrees": 270,
+          "statusError": null,
+          "width": 60,
+          "height": 60,
+          "passed": true
+        },
+        {
+          "label": "after-invalid",
+          "fixtureKind": "missing-mapping",
+          "hostSeconds": 38.281,
+          "totalEmulatedSeconds": 1.3014805916666667,
+          "rotationDegrees": [
+            0,
+            90,
+            180,
+            270
+          ],
+          "restoredDegrees": 270,
+          "statusError": "mapping-missing",
+          "width": null,
+          "height": null,
+          "passed": true
+        },
+        {
+          "label": "after-malformed",
+          "fixtureKind": "malformed-show",
+          "hostSeconds": 46.352,
+          "totalEmulatedSeconds": 1.3144036,
+          "rotationDegrees": [
+            0,
+            90,
+            180,
+            270
+          ],
+          "restoredDegrees": 270,
+          "statusError": "show-malformed",
+          "width": 60,
+          "height": 60,
+          "passed": true
+        }
+      ],
+      "negativeControlFolders": [
+        "before",
+        "before-invalid",
+        "before-malformed"
+      ],
+      "renderingDemonstrated": false,
+      "physicalAcceptance": false,
+      "limitations": [
+        "Instruction/peripheral model with retained vendor bootloader; model-only16MB flash header adjustment.",
+        "Control and persistence verified; physical WiFi/USB/SD/LED/power and sustained FPS require hardware."
+      ]
+    },
+    "results": {
+      "after": {
+        "expectation": "supported",
+        "expectedStatus": "valid",
+        "passed": true,
+        "failure": null,
+        "hostSeconds": 42.539,
+        "emulatedSeconds": 0.09196267916666667,
+        "cycles": 22071043,
+        "batches": 23422,
+        "pc": "4037b132",
+        "pcs": [
+          "4037b132",
+          "403757ac"
+        ],
+        "spontaneousResets": 0,
+        "softwareResets": 1,
+        "restartCheckpoint": {
+          "cyclesBefore": 300143331,
+          "pcBefore": "4037b132",
+          "uartBytes": 1274,
+          "replyCount": 6,
+          "cyclesAfter": 0,
+          "pcAfter": "40000400"
+        },
+        "initial": {
+          "ok": true,
+          "supported": true,
+          "degrees": 0,
+          "revision": 3523407757,
+          "error": null
+        },
+        "status": {
+          "ok": true,
+          "on": true,
+          "brightness": 32,
+          "dimming": {
+            "value": 32,
+            "saved": null,
+            "error": null
+          },
+          "mini": {
+            "supported": true,
+            "on": false,
+            "pending": false,
+            "requested": false,
+            "error": null,
+            "brightness": 32
+          },
+          "playing": null,
+          "animation": null,
+          "fps": 0,
+          "error": null,
+          "width": 60,
+          "height": 60,
+          "readiness": "ready",
+          "checked": 0,
+          "to_check": 0,
+          "unavailable": 0,
+          "checking": null,
+          "host": "odrig_ESP32-S3_16MB_opi Nov  1 2026 23:45:59 internal+microsd reset power-on",
+          "seed": null,
+          "repeat": null,
+          "loop": null,
+          "saved": null,
+          "file": null,
+          "playlist": null,
+          "clocks": false,
+          "clock_message": false,
+          "clock_mode": "off",
+          "clock_only": null,
+          "left": 86391
+        },
+        "rotations": [
+          {
+            "ok": true,
+            "supported": true,
+            "degrees": 0,
+            "revision": 3523407757,
+            "error": null
+          },
+          {
+            "ok": true,
+            "supported": true,
+            "degrees": 90,
+            "revision": 2768625435,
+            "error": null
+          },
+          {
+            "ok": true,
+            "supported": true,
+            "degrees": 180,
+            "revision": 1007455905,
+            "error": null
+          },
+          {
+            "ok": true,
+            "supported": true,
+            "degrees": 270,
+            "revision": 1259060791,
+            "error": null
+          }
+        ],
+        "restored": {
+          "ok": true,
+          "supported": true,
+          "degrees": 270,
+          "revision": 1259060791,
+          "error": null
+        },
+        "commands": [
+          {
+            "hostMs": 25,
+            "emulatedSeconds": 0.0004166125,
+            "phase": "initial",
+            "command": "rotation"
+          },
+          {
+            "hostMs": 9969,
+            "emulatedSeconds": 0.2504623916666667,
+            "phase": "angles",
+            "command": "rotation set 3523407757 0"
+          },
+          {
+            "hostMs": 16609,
+            "emulatedSeconds": 0.5004838875000001,
+            "phase": "angles",
+            "command": "rotation set 3523407757 90"
+          },
+          {
+            "hostMs": 24162,
+            "emulatedSeconds": 0.7505131958333333,
+            "phase": "angles",
+            "command": "rotation set 2768625435 180"
+          },
+          {
+            "hostMs": 33243,
+            "emulatedSeconds": 1.0005470208333334,
+            "phase": "angles",
+            "command": "rotation set 1007455905 270"
+          },
+          {
+            "hostMs": 41622,
+            "emulatedSeconds": 1.2505698333333333,
+            "phase": "before-restart",
+            "command": "status"
+          },
+          {
+            "hostMs": 41640,
+            "emulatedSeconds": 0,
+            "phase": "restart",
+            "command": "rotation"
+          }
+        ],
+        "replies": [
+          {
+            "phase": "initial",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 0,
+              "revision": 3523407757,
+              "error": null
+            }
+          },
+          {
+            "phase": "angles",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 0,
+              "revision": 3523407757,
+              "error": null
+            }
+          },
+          {
+            "phase": "angles",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 90,
+              "revision": 2768625435,
+              "error": null
+            }
+          },
+          {
+            "phase": "angles",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 180,
+              "revision": 1007455905,
+              "error": null
+            }
+          },
+          {
+            "phase": "angles",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 270,
+              "revision": 1259060791,
+              "error": null
+            }
+          },
+          {
+            "phase": "before-restart",
+            "reply": {
+              "ok": true,
+              "on": true,
+              "brightness": 32,
+              "dimming": {
+                "value": 32,
+                "saved": null,
+                "error": null
+              },
+              "mini": {
+                "supported": true,
+                "on": false,
+                "pending": false,
+                "requested": false,
+                "error": null,
+                "brightness": 32
+              },
+              "playing": null,
+              "animation": null,
+              "fps": 0,
+              "error": null,
+              "width": 60,
+              "height": 60,
+              "readiness": "ready",
+              "checked": 0,
+              "to_check": 0,
+              "unavailable": 0,
+              "checking": null,
+              "host": "odrig_ESP32-S3_16MB_opi Nov  1 2026 23:45:59 internal+microsd reset power-on",
+              "seed": null,
+              "repeat": null,
+              "loop": null,
+              "saved": null,
+              "file": null,
+              "playlist": null,
+              "clocks": false,
+              "clock_message": false,
+              "clock_mode": "off",
+              "clock_only": null,
+              "left": 86391
+            }
+          },
+          {
+            "phase": "restart",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 270,
+              "revision": 1259060791,
+              "error": null
+            }
+          }
+        ],
+        "renderingDemonstrated": false,
+        "physicalAcceptance": false,
+        "limitations": [
+          "ESP32-S3 instruction/peripheral model; not physical flash, radio, SD or LED acceptance.",
+          "This test validates real firmware startup and rotation control/persistence; native-core pixel tests separately validate output permutation."
+        ],
+        "cyclesPerUs": 240,
+        "totalEmulatedSeconds": 1.3425598916666666,
+        "timingDerivation": "Final model cycles plus pre-restart checkpoint; clock inferred from recorded cycles/emulatedSeconds"
+      },
+      "after-invalid": {
+        "expectation": "supported",
+        "expectedStatus": "mapping-missing",
+        "passed": true,
+        "failure": null,
+        "hostSeconds": 38.281,
+        "emulatedSeconds": 0.050776537499999996,
+        "cycles": 12186369,
+        "batches": 20187,
+        "pc": "4037b132",
+        "pcs": [
+          "4037b132",
+          "4037f552"
+        ],
+        "spontaneousResets": 0,
+        "softwareResets": 1,
+        "restartCheckpoint": {
+          "cyclesBefore": 300168973,
+          "pcBefore": "403740d8",
+          "uartBytes": 1294,
+          "replyCount": 6,
+          "cyclesAfter": 0,
+          "pcAfter": "40000400"
+        },
+        "initial": {
+          "ok": true,
+          "supported": true,
+          "degrees": 0,
+          "revision": 3523407757,
+          "error": null
+        },
+        "status": {
+          "ok": true,
+          "on": true,
+          "brightness": 0,
+          "dimming": null,
+          "mini": {
+            "supported": false,
+            "on": false,
+            "pending": false,
+            "requested": false,
+            "error": null,
+            "brightness": 0
+          },
+          "playing": null,
+          "animation": null,
+          "fps": 0,
+          "error": "mapping-missing",
+          "width": null,
+          "height": null,
+          "readiness": "recovery",
+          "checked": 0,
+          "to_check": 0,
+          "unavailable": 0,
+          "checking": null,
+          "host": "odrig_ESP32-S3_16MB_opi Nov  1 2026 23:45:59 internal+microsd reset power-on",
+          "seed": null,
+          "repeat": null,
+          "loop": null,
+          "saved": null,
+          "file": null,
+          "playlist": null,
+          "clocks": false,
+          "clock_message": false,
+          "clock_mode": "off",
+          "clock_only": null,
+          "left": 86392
+        },
+        "rotations": [
+          {
+            "ok": true,
+            "supported": true,
+            "degrees": 0,
+            "revision": 3523407757,
+            "error": null
+          },
+          {
+            "ok": true,
+            "supported": true,
+            "degrees": 90,
+            "revision": 2768625435,
+            "error": null
+          },
+          {
+            "ok": true,
+            "supported": true,
+            "degrees": 180,
+            "revision": 1007455905,
+            "error": null
+          },
+          {
+            "ok": true,
+            "supported": true,
+            "degrees": 270,
+            "revision": 1259060791,
+            "error": null
+          }
+        ],
+        "restored": {
+          "ok": true,
+          "supported": true,
+          "degrees": 270,
+          "revision": 1259060791,
+          "error": null
+        },
+        "commands": [
+          {
+            "hostMs": 27,
+            "emulatedSeconds": 0.0004166125,
+            "phase": "initial",
+            "command": "rotation"
+          },
+          {
+            "hostMs": 12365,
+            "emulatedSeconds": 0.25047505416666666,
+            "phase": "angles",
+            "command": "rotation set 3523407757 0"
+          },
+          {
+            "hostMs": 19454,
+            "emulatedSeconds": 0.5005387166666667,
+            "phase": "angles",
+            "command": "rotation set 3523407757 90"
+          },
+          {
+            "hostMs": 26505,
+            "emulatedSeconds": 0.7505836875,
+            "phase": "angles",
+            "command": "rotation set 2768625435 180"
+          },
+          {
+            "hostMs": 32540,
+            "emulatedSeconds": 1.0006376166666666,
+            "phase": "angles",
+            "command": "rotation set 1007455905 270"
+          },
+          {
+            "hostMs": 37925,
+            "emulatedSeconds": 1.2506492708333332,
+            "phase": "before-restart",
+            "command": "status"
+          },
+          {
+            "hostMs": 37939,
+            "emulatedSeconds": 0,
+            "phase": "restart",
+            "command": "rotation"
+          }
+        ],
+        "replies": [
+          {
+            "phase": "initial",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 0,
+              "revision": 3523407757,
+              "error": null
+            }
+          },
+          {
+            "phase": "angles",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 0,
+              "revision": 3523407757,
+              "error": null
+            }
+          },
+          {
+            "phase": "angles",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 90,
+              "revision": 2768625435,
+              "error": null
+            }
+          },
+          {
+            "phase": "angles",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 180,
+              "revision": 1007455905,
+              "error": null
+            }
+          },
+          {
+            "phase": "angles",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 270,
+              "revision": 1259060791,
+              "error": null
+            }
+          },
+          {
+            "phase": "before-restart",
+            "reply": {
+              "ok": true,
+              "on": true,
+              "brightness": 0,
+              "dimming": null,
+              "mini": {
+                "supported": false,
+                "on": false,
+                "pending": false,
+                "requested": false,
+                "error": null,
+                "brightness": 0
+              },
+              "playing": null,
+              "animation": null,
+              "fps": 0,
+              "error": "mapping-missing",
+              "width": null,
+              "height": null,
+              "readiness": "recovery",
+              "checked": 0,
+              "to_check": 0,
+              "unavailable": 0,
+              "checking": null,
+              "host": "odrig_ESP32-S3_16MB_opi Nov  1 2026 23:45:59 internal+microsd reset power-on",
+              "seed": null,
+              "repeat": null,
+              "loop": null,
+              "saved": null,
+              "file": null,
+              "playlist": null,
+              "clocks": false,
+              "clock_message": false,
+              "clock_mode": "off",
+              "clock_only": null,
+              "left": 86392
+            }
+          },
+          {
+            "phase": "restart",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 270,
+              "revision": 1259060791,
+              "error": null
+            }
+          }
+        ],
+        "renderingDemonstrated": false,
+        "physicalAcceptance": false,
+        "limitations": [
+          "ESP32-S3 instruction/peripheral model; not physical flash, radio, SD or LED acceptance.",
+          "This test validates real firmware startup and rotation control/persistence; native-core pixel tests separately validate output permutation."
+        ],
+        "cyclesPerUs": 240,
+        "totalEmulatedSeconds": 1.3014805916666667,
+        "timingDerivation": "Final model cycles plus pre-restart checkpoint; clock inferred from recorded cycles/emulatedSeconds"
+      },
+      "after-malformed": {
+        "expectation": "supported",
+        "expectedStatus": "show-malformed",
+        "passed": true,
+        "failure": null,
+        "hostSeconds": 46.352,
+        "emulatedSeconds": 0.06377205,
+        "cycles": 15305292,
+        "batches": 23630,
+        "totalEmulatedSeconds": 1.3144036,
+        "pc": "4037b132",
+        "pcs": [
+          "4037b132",
+          "42059cf6"
+        ],
+        "spontaneousResets": 0,
+        "softwareResets": 1,
+        "restartCheckpoint": {
+          "cyclesBefore": 300151572,
+          "pcBefore": "4037b132",
+          "uartBytes": 1287,
+          "replyCount": 6,
+          "cyclesAfter": 0,
+          "pcAfter": "40000400"
+        },
+        "initial": {
+          "ok": true,
+          "supported": true,
+          "degrees": 0,
+          "revision": 3523407757,
+          "error": null
+        },
+        "status": {
+          "ok": true,
+          "on": true,
+          "brightness": 0,
+          "dimming": null,
+          "mini": {
+            "supported": true,
+            "on": false,
+            "pending": false,
+            "requested": false,
+            "error": null,
+            "brightness": 0
+          },
+          "playing": null,
+          "animation": null,
+          "fps": 0,
+          "error": "show-malformed",
+          "width": 60,
+          "height": 60,
+          "readiness": "recovery",
+          "checked": 0,
+          "to_check": 0,
+          "unavailable": 0,
+          "checking": null,
+          "host": "odrig_ESP32-S3_16MB_opi Nov  1 2026 23:45:59 internal+microsd reset power-on",
+          "seed": null,
+          "repeat": null,
+          "loop": null,
+          "saved": null,
+          "file": null,
+          "playlist": null,
+          "clocks": false,
+          "clock_message": false,
+          "clock_mode": "off",
+          "clock_only": null,
+          "left": 86391
+        },
+        "rotations": [
+          {
+            "ok": true,
+            "supported": true,
+            "degrees": 0,
+            "revision": 3523407757,
+            "error": null
+          },
+          {
+            "ok": true,
+            "supported": true,
+            "degrees": 90,
+            "revision": 2768625435,
+            "error": null
+          },
+          {
+            "ok": true,
+            "supported": true,
+            "degrees": 180,
+            "revision": 1007455905,
+            "error": null
+          },
+          {
+            "ok": true,
+            "supported": true,
+            "degrees": 270,
+            "revision": 1259060791,
+            "error": null
+          }
+        ],
+        "restored": {
+          "ok": true,
+          "supported": true,
+          "degrees": 270,
+          "revision": 1259060791,
+          "error": null
+        },
+        "commands": [
+          {
+            "hostMs": 28,
+            "emulatedSeconds": 0.0004166125,
+            "phase": "initial",
+            "command": "rotation"
+          },
+          {
+            "hostMs": 11921,
+            "emulatedSeconds": 0.250471525,
+            "phase": "angles",
+            "command": "rotation set 3523407757 0"
+          },
+          {
+            "hostMs": 20573,
+            "emulatedSeconds": 0.5005095208333333,
+            "phase": "angles",
+            "command": "rotation set 3523407757 90"
+          },
+          {
+            "hostMs": 29208,
+            "emulatedSeconds": 0.7505414666666667,
+            "phase": "angles",
+            "command": "rotation set 2768625435 180"
+          },
+          {
+            "hostMs": 37532,
+            "emulatedSeconds": 1.0005805875,
+            "phase": "angles",
+            "command": "rotation set 1007455905 270"
+          },
+          {
+            "hostMs": 45683,
+            "emulatedSeconds": 1.2506118791666667,
+            "phase": "before-restart",
+            "command": "status"
+          },
+          {
+            "hostMs": 45702,
+            "emulatedSeconds": 0,
+            "phase": "restart",
+            "command": "rotation"
+          }
+        ],
+        "replies": [
+          {
+            "phase": "initial",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 0,
+              "revision": 3523407757,
+              "error": null
+            }
+          },
+          {
+            "phase": "angles",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 0,
+              "revision": 3523407757,
+              "error": null
+            }
+          },
+          {
+            "phase": "angles",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 90,
+              "revision": 2768625435,
+              "error": null
+            }
+          },
+          {
+            "phase": "angles",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 180,
+              "revision": 1007455905,
+              "error": null
+            }
+          },
+          {
+            "phase": "angles",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 270,
+              "revision": 1259060791,
+              "error": null
+            }
+          },
+          {
+            "phase": "before-restart",
+            "reply": {
+              "ok": true,
+              "on": true,
+              "brightness": 0,
+              "dimming": null,
+              "mini": {
+                "supported": true,
+                "on": false,
+                "pending": false,
+                "requested": false,
+                "error": null,
+                "brightness": 0
+              },
+              "playing": null,
+              "animation": null,
+              "fps": 0,
+              "error": "show-malformed",
+              "width": 60,
+              "height": 60,
+              "readiness": "recovery",
+              "checked": 0,
+              "to_check": 0,
+              "unavailable": 0,
+              "checking": null,
+              "host": "odrig_ESP32-S3_16MB_opi Nov  1 2026 23:45:59 internal+microsd reset power-on",
+              "seed": null,
+              "repeat": null,
+              "loop": null,
+              "saved": null,
+              "file": null,
+              "playlist": null,
+              "clocks": false,
+              "clock_message": false,
+              "clock_mode": "off",
+              "clock_only": null,
+              "left": 86391
+            }
+          },
+          {
+            "phase": "restart",
+            "reply": {
+              "ok": true,
+              "supported": true,
+              "degrees": 270,
+              "revision": 1259060791,
+              "error": null
+            }
+          }
+        ],
+        "renderingDemonstrated": false,
+        "physicalAcceptance": false,
+        "limitations": [
+          "ESP32-S3 instruction/peripheral model; not physical flash, radio, SD or LED acceptance.",
+          "This test validates real firmware startup and rotation control/persistence; native-core pixel tests separately validate output permutation."
+        ],
+        "cyclesPerUs": 240,
+        "timingDerivation": "Final model cycles plus pre-restart checkpoint; clock inferred from recorded cycles/emulatedSeconds"
+      }
+    },
+    "fixtures": {
+      "after": {
+        "application": "C:\\Users\\koren\\.codex\\worktrees\\standalone-rotation\\Odrig\\build\\firmware\\out\\odrig-firmware.bin",
+        "applicationSha256": "062de8d4723e9db8b3246f0984f8c0409483b5a67005b5d21ef27bc26b99929a",
+        "applicationBytes": 1885056,
+        "originalLoaderSha256": "53f1e17c81e72cdd99ce362ad9a8181a229d3879b11561b2e76052e1afa17c45",
+        "modelLoaderSha256": "c9f1a7d30d5f81053b04bea05ddc1f45bbe8209eac1742c4275dbb55a1436f93",
+        "loaderAdjustment": "8MB-to-16MB header only; hash recomputed",
+        "partitions": {
+          "nvs": {
+            "kind": 1,
+            "subtype": 2,
+            "offset": 36864,
+            "size": 20480
+          },
+          "otadata": {
+            "kind": 1,
+            "subtype": 0,
+            "offset": 57344,
+            "size": 8192
+          },
+          "app0": {
+            "kind": 0,
+            "subtype": 16,
+            "offset": 65536,
+            "size": 3145728
+          },
+          "app1": {
+            "kind": 0,
+            "subtype": 17,
+            "offset": 3211264,
+            "size": 3145728
+          },
+          "spiffs": {
+            "kind": 1,
+            "subtype": 130,
+            "offset": 6356992,
+            "size": 10354688
+          },
+          "coredump": {
+            "kind": 1,
+            "subtype": 3,
+            "offset": 16711680,
+            "size": 65536
+          }
+        },
+        "fixtureKind": "fresh",
+        "initialOdrigFiles": {},
+        "expectedStatusError": null,
+        "initialWledFiles": [],
+        "physicalAcceptance": false
+      },
+      "after-invalid": {
+        "application": "C:\\Users\\koren\\.codex\\worktrees\\standalone-rotation\\Odrig\\build\\firmware\\out\\odrig-firmware.bin",
+        "applicationSha256": "062de8d4723e9db8b3246f0984f8c0409483b5a67005b5d21ef27bc26b99929a",
+        "applicationBytes": 1885056,
+        "originalLoaderSha256": "53f1e17c81e72cdd99ce362ad9a8181a229d3879b11561b2e76052e1afa17c45",
+        "modelLoaderSha256": "c9f1a7d30d5f81053b04bea05ddc1f45bbe8209eac1742c4275dbb55a1436f93",
+        "loaderAdjustment": "8MB-to-16MB header only; hash recomputed",
+        "partitions": {
+          "nvs": {
+            "kind": 1,
+            "subtype": 2,
+            "offset": 36864,
+            "size": 20480
+          },
+          "otadata": {
+            "kind": 1,
+            "subtype": 0,
+            "offset": 57344,
+            "size": 8192
+          },
+          "app0": {
+            "kind": 0,
+            "subtype": 16,
+            "offset": 65536,
+            "size": 3145728
+          },
+          "app1": {
+            "kind": 0,
+            "subtype": 17,
+            "offset": 3211264,
+            "size": 3145728
+          },
+          "spiffs": {
+            "kind": 1,
+            "subtype": 130,
+            "offset": 6356992,
+            "size": 10354688
+          },
+          "coredump": {
+            "kind": 1,
+            "subtype": 3,
+            "offset": 16711680,
+            "size": 65536
+          }
+        },
+        "fixtureKind": "missing-mapping",
+        "initialOdrigFiles": {
+          "show.json": {
+            "bytes": 16,
+            "sha256": "a8cc9214dcbbe1dfaa07fb707820a6585f169a2f31116e2943ffdfc4a10bf6c7"
+          }
+        },
+        "expectedStatusError": "mapping-missing",
+        "initialWledFiles": [],
+        "physicalAcceptance": false
+      },
+      "after-malformed": {
+        "application": "C:\\Users\\koren\\.codex\\worktrees\\standalone-rotation\\Odrig\\build\\firmware\\out\\odrig-firmware.bin",
+        "applicationSha256": "062de8d4723e9db8b3246f0984f8c0409483b5a67005b5d21ef27bc26b99929a",
+        "applicationBytes": 1885056,
+        "originalLoaderSha256": "53f1e17c81e72cdd99ce362ad9a8181a229d3879b11561b2e76052e1afa17c45",
+        "modelLoaderSha256": "c9f1a7d30d5f81053b04bea05ddc1f45bbe8209eac1742c4275dbb55a1436f93",
+        "loaderAdjustment": "8MB-to-16MB header only; hash recomputed",
+        "partitions": {
+          "nvs": {
+            "kind": 1,
+            "subtype": 2,
+            "offset": 36864,
+            "size": 20480
+          },
+          "otadata": {
+            "kind": 1,
+            "subtype": 0,
+            "offset": 57344,
+            "size": 8192
+          },
+          "app0": {
+            "kind": 0,
+            "subtype": 16,
+            "offset": 65536,
+            "size": 3145728
+          },
+          "app1": {
+            "kind": 0,
+            "subtype": 17,
+            "offset": 3211264,
+            "size": 3145728
+          },
+          "spiffs": {
+            "kind": 1,
+            "subtype": 130,
+            "offset": 6356992,
+            "size": 10354688
+          },
+          "coredump": {
+            "kind": 1,
+            "subtype": 3,
+            "offset": 16711680,
+            "size": 65536
+          }
+        },
+        "fixtureKind": "malformed-show",
+        "initialOdrigFiles": {
+          "show.json": {
+            "bytes": 16,
+            "sha256": "a8cc9214dcbbe1dfaa07fb707820a6585f169a2f31116e2943ffdfc4a10bf6c7"
+          },
+          "mapping.json": {
+            "bytes": 1544,
+            "sha256": "ad5093270241adcfd72eb6f20648b153de8a22e5c4a17c3a6c86e8614a849b0c"
+          }
+        },
+        "expectedStatusError": "show-malformed",
+        "initialWledFiles": [],
+        "physicalAcceptance": false
+      }
+    },
+    "physicalAcceptance": false,
+    "renderingDemonstrated": false
+  },
+  "physicalAcceptance": false,
+  "existingPayloadLocalIdentityPreserved": true,
+  "usualArtifactAndSigningFilesUnchanged": true,
+  "byteVerification": "Mounted Drive bytes verified; independent cloud/phone readback not performed.",
+  "firmwareUrl": "https://drive.google.com/open?id=1pdoWtNAP3IlBLZYJK4izSeViEuon3Wxf&usp=drive_fs",
+  "apkUrl": "https://drive.google.com/open?id=11GbDEfPwTUKW8IvDhdHdGtUrH9Jr982b&usp=drive_fs",
+  "files": [
+    {
+      "file": "odrig-rotation-debug.apk",
+      "bytes": 19088118,
+      "sha256": "fb2f13e5afb561c48dbd22316159f01b7f0100947205d2e2fc7d8d9b76c894c3"
+    },
+    {
+      "file": "odrig-rotation-firmware.bin",
+      "bytes": 1885056,
+      "sha256": "062de8d4723e9db8b3246f0984f8c0409483b5a67005b5d21ef27bc26b99929a"
+    },
+    {
+      "file": "odrig-rotation-firmware.bin.build.json",
+      "bytes": 15606,
+      "sha256": "c5cc707c8d984f7c83e62a919028066cce042d8af2df5964071a0323725a1811"
+    },
+    {
+      "file": "firmware-verification.json",
+      "bytes": 845,
+      "sha256": "6ed4af452f8f4e8f67097e10c67749bffddc9414f3552eafd1f64d792815f46f"
+    },
+    {
+      "file": "firmware-image-info.txt",
+      "bytes": 1501,
+      "sha256": "e9b9791dffc204fa2cf956af219a577e6307a89fffbe4b7379736367fb0d9897"
+    },
+    {
+      "file": "android-verification.json",
+      "bytes": 2512,
+      "sha256": "3dfd158a451e11b5a4b54c76f0749526e8127b1d7429385e4faf502ebd68dd43"
+    },
+    {
+      "file": "firmware-emulator-verification.json",
+      "bytes": 27582,
+      "sha256": "eca487162739a354b7fa426df486975738340c68057f3b6f0fe21be0100bce9c"
+    },
+    {
+      "file": "SHA256SUMS.txt",
+      "bytes": 185,
+      "sha256": "ace2429664e36a80590abea2a2c9f21b45191515e2c94cd107dbd7394d377d90"
+    },
+    {
+      "file": "README.txt",
+      "bytes": 2047,
+      "sha256": "0c7f4d4feee08eef976fbfbc2e7c9521a8f522c730b7505c0fb79b1c2cbe2f36"
+    }
+  ]
+}

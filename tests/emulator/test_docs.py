@@ -274,6 +274,17 @@ class EmulatorDocument(unittest.TestCase):
         asked = requirements.split("\n## Requirement 18:")[1].split("\n1. ")[1].split("\n2. ")[0]
         self.assertEqual(criteria(asked), set(BY_EYE_ON_THE_TARGET))
 
+    def test_it_names_every_line_of_the_clocks_and_every_version_of_their_file(self):
+        said = [" ".join(part.split()) for part in self.text.split("\n\n") if part.startswith("`clocks on`, `clocks off`, and `clocks only`")]
+        self.assertEqual(len(said), 1)
+        for form in ("`clocks on`", "`clocks off`", "`clocks only`", "`clocks message on|off`", "`clocks storage sd|internal`"):
+            self.assertIn(form, said[0])
+        written = re.findall(r'"odrig-clocks ([0-9]+)\\n"', (support.ROOT / "core" / "src" / "breaks.cpp").read_text(encoding="utf-8"))
+        self.assertEqual(sorted(written), ["1", "2", "3"])
+        for version in written:
+            self.assertRegex(said[0], rf"\bversion[- ]{version}\b")
+        self.assertIn("`storage internal`", said[0])
+
     def test_it_says_what_was_checked_how_and_what_is_left_for_a_person(self):
         checked = " ".join(section(self.text, "The check list by eye").split("\n### What has been checked\n")[1].split())
         for phrase in ("Chrome", "headless", "1280 x 800", "756 x 900", "screenshots", "`build/", "`page`", "Safari", "A person at a screen"):

@@ -35,7 +35,7 @@ class TheAppsPage(unittest.TestCase):
 
     def test_its_sections_are_what_the_app_is_how_it_is_built_installed_and_used_and_what_was_checked(self):
         headings = re.findall(r"(?m)^## (.+)$", self.text)
-        self.assertEqual(headings, ["What it is", "What you need", "The tool", "Installing on a phone", "Using it", "Messages", "The phone and the installation's network",
+        self.assertEqual(headings, ["What it is", "USB diagnostics from a phone", "What you need", "The tool", "Installing on a phone", "Using it", "Messages", "The phone and the installation's network",
                                     "The check on a phone", "The suites", "What is verified", "What is open"])
 
     def test_every_command_of_the_tool_has_an_example(self):
@@ -77,20 +77,23 @@ class TheAppsPage(unittest.TestCase):
         lines = [span for row in table.splitlines() if row.startswith("| ") for span in re.findall(r"`([^`]+)`", row.split("|")[2])]
         self.assertEqual(lines, ["status", "list 0", "list <next>", "play <id>", "play all", "on", "off", "brightness <n>", "brightness <id> <n> save", "brightness <id> default", "space", "remove <id>", "ignore <id> <0-or-1>", "remove many <ids>",
                                  "upload begin <id> <file> <bytes> <crc32>", "upload data <offset> <base64>", "upload end <crc32>", "upload begin external <file> <bytes>", "upload expect 00000000", "upload cancel",
-                                 "read <id> <offset>", "upload begin <id> <file> <bytes>", "upload expect <crc32>", "mapping get", "mapping set <revision> <pins>",
+                                 "read <id> 0 1", "read <id> <offset> <count>", "read <id> <offset>", "bad-argument", "list in <id>", "catalog", "saved <id>", "list <from>", "list in <id> <from>",
+                                 "upload begin <id> <file> <bytes>", "upload expect <crc32>", "mapping get", "mapping set <revision> <pins>",
                                  "mapping test on",
                                  "mapping test off", "mapping test snake <n>", "order get", "order get <next>", "order move <revision> <id> <before>", "repeat <id> <n>",
-                                 "repeat <id> <n> save", "repeat <id> default", "clocks off", "clocks on", "clocks only", "clocks message on", "clocks message off", "fault", "catalog",
-                                 "catalog page <storage> <page> <offset>", "catalog rebuild internal", "catalog rebuild external", "catalog cancel"])
+                                 "repeat <id> <n> save", "repeat <id> default", "clocks off", "clocks on", "clocks only", "clocks message on", "clocks message off", "clocks storage sd", "clocks storage internal", "fault", "catalog",
+                                 "catalog page <storage> <page> <offset>", "catalog rebuild internal", "catalog rebuild external", "catalog cancel", "time", "guard <board-id> time", "guard <board-id> time zone <base64>", "guard <board-id> time set <utc-seconds> <zone-crc32>", "guard <board-id> schedule",
+                                 "guard <board-id> schedule set <revision> <on-HH:MM> <off-HH:MM> <on-or-off>", "guard <board-id> schedule resume <revision>", "rotation", "rotation set <revision> <degrees>"])
         self.assertIn("The table maps its actions to command lines", self.said)
 
     def test_every_message_of_the_app_is_on_the_page(self):
         refusals = [["line-too-long", "on", None], ["show-invalid", "play all", "`<reason>`"], ["unknown-id", "play `<id>`", None], ["unknown-id", "play all", None], ["weird", "on", None],
-                    ["busy", "remove `<id>`", None], ["in-use", "remove `<id>`", None], ["in-use", "play `<id>`", None], ["in-use", "mapping test on", None], ["in-use", "ignore 1 1", None], ["storage-error", "space", None],
+                    ["busy", "remove `<id>`", None], ["in-use", "remove `<id>`", None], ["in-use", "play `<id>`", None], ["in-use", "play `<id>`", None, True], ["in-use", "upload", None], ["in-use", "upload", None, True],
+                    ["in-use", "mapping test on", None], ["in-use", "ignore 1 1", None], ["storage-error", "space", None],
                     ["in-use", "upload begin 1 a.odrg 1", None], ["no-upload", "upload data 0 AA", None], ["bad-offset", "upload data 0 AA", None],
                     ["read-only", "remove `<id>`", None], ["read-only", "upload begin external a.odrg 1", None], ["read-only", "catalog rebuild external", None],
-                    ["in-use", "repeat 9 5 save", None], ["no-space", "repeat 1 5 save", None], ["stale", "repeat 1 5", None]]
-        failures = [["bad-address", ""], ["no-wifi", ""], ["no-answer", "`<address>`"], ["bad-reply", "`<address>`"]]
+                    ["in-use", "repeat 9 5 save", None], ["no-space", "repeat 1 5 save", None], ["stale", "repeat 1 5", None], ["zone-unset", "time set 1800000000 01234567", None]]
+        failures = [["bad-address", ""], ["no-wifi", ""], ["no-answer", "`<address>`"], ["no-usb", ""], ["usb-refused", ""], ["bad-reply", "`<address>`"]]
         found = support.run("texts", settings={"refusals": refusals, "failures": failures}).seen
         messages = section(self.text, "Messages")
         said = flat(messages)
@@ -99,9 +102,10 @@ class TheAppsPage(unittest.TestCase):
             self.assertIn(f"| {sentence} |", said)
         self.assertIn(found["silence"][3].replace("75", "12"), said)
         self.assertIn("The installed show is invalid: <reason>.", said)
+        self.assertIn("| No answer over USB serial. Check the cable to the board's USB port and that the installation has power. |", said)
         rows = [row.split("`")[1] for row in messages.splitlines() if row.startswith("| `")]
-        self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "unavailable", "busy", "in-use", "in-use", "in-use", "in-use",
-                                "read-only", "read-only", "read-only", "storage-error", "in-use", "in-use", "no-space", "no-space", "no-space", "no-upload", "bad-checksum",
+        self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "no-answer", "no-usb", "usb-refused", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "unavailable", "busy", "in-use", "in-use", "in-use", "in-use", "in-use", "in-use", "in-use",
+                                "read-only", "read-only", "read-only", "storage-error", "zone-unset", "in-use", "in-use", "no-space", "no-space", "no-space", "no-upload", "bad-checksum",
                                 "bad-file", "mapping-conflict", "order-conflict", "stale", "stale", "unsupported-character", "does-not-fit", "no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"])
         self.assertIn("`Removed animation <id> <file>.`", said)
         self.assertIn("`Uploaded as animation <id> <file>. It plays in the playlist.`", said)
@@ -125,7 +129,7 @@ class TheAppsPage(unittest.TestCase):
         screen = (support.WWW / "screens" / "target.js").read_text(encoding="utf-8")
         function = screen.split("function routeLine(found) {")[1].split("\n}\n")[0]
         sentences = [flat(sentence) for sentence in re.findall(r'"\s?([A-Z][^"]+)"', function)]
-        self.assertEqual(len(sentences), 6)
+        self.assertEqual(len(sentences), 7)
         network = flat(section(self.text, "The phone and the installation's network"))
         for sentence in sentences:
             if sentence.startswith("This Wi-Fi network has no internet"):
@@ -136,13 +140,21 @@ class TheAppsPage(unittest.TestCase):
     def test_the_check_on_a_phone_is_numbered_steps_that_say_what_must_be_seen(self):
         check = section(self.text, "The check on a phone")
         steps = re.findall(r"(?m)^([0-9]+)\. \*\*([^*]+)\*\*", check)
-        self.assertEqual([int(number) for number, _ in steps], list(range(1, 25)))
-        self.assertEqual(check.count("*Seen:*"), 26)
+        self.assertEqual([int(number) for number, _ in steps], list(range(1, 33)))
+        self.assertEqual(check.count("*Seen:*"), 34)
         for expected in ("This is the owner's. No program can do it.", "python3 app/app.py install", "python -m emulator build/demo-20/show --lan", "`lan:` line",
-                         "press `Board`", "Leave mobile data on", "Switch mobile data off", "**A long press.**", "in the address a word is marked",
+                         "press `Connect over Wi-Fi`", "Leave mobile data on", "Switch mobile data off", "**A long press.**", "in the address a word is marked",
                          "**The phone's bars.**", "wholly above Android's buttons or the line of gesture navigation", "the tabs go away and the address stays in view",
                          "**The numbers of animations.**", "the external line says `absent (read-only).` with no number"):
             self.assertIn(expected, flat(check))
+
+    def test_the_check_of_the_clocks_and_what_is_open_name_both_storages_clocks(self):
+        check = flat(section(self.text, "The check on a phone"))
+        clocks = check.split("23. **The clocks.**")[1].split("24. **")[0]
+        for expected in ("`Preferred storage for matching clock/message files`", "after a restart of the board", "`Internal /clocks` and `External /clocks`",
+                         "Back stops at `Clocks`", "the board's own `clocks/message`"):
+            self.assertIn(expected, clocks)
+        self.assertIn("**Seed 61 on a phone.**", flat(section(self.text, "What is open")))
 
     def test_it_says_what_is_verified_and_what_is_open(self):
         verified = flat(section(self.text, "What is verified"))
@@ -161,6 +173,9 @@ class TheAppsPage(unittest.TestCase):
         links = re.findall(r"\]\(([^)]+)\)", self.said)
         self.assertGreaterEqual(len(links), 6)
         for link in links:
+            if link.startswith("https://"):
+                self.assertRegex(link, r"\Ahttps://[A-Za-z0-9.-]+/\S+\Z")
+                continue
             path, _, part = link.partition("#")
             if path == "":
                 self.assertIn(part, own, link)

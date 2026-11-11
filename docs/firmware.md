@@ -226,7 +226,7 @@ python3 firmware/fw.py build [--stock | --probe] [--standalone | --stick | --mic
 python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py big-storage [--port P] [--wait SECONDS]
-python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS] [--dry-run] [--keep-copies DIR]
+python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS] [--dry-run] [--keep-copies DIR] [--replace-folders]
 python3 firmware/fw.py set-wifi [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py set-limit [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py read-limit [--port P]
@@ -265,7 +265,8 @@ with that environment's Python.
 | `check-not-done` | The board answered, but was still reading its installed animations when the time of `--wait` was over. Nothing is wrong with what was written: the command gave up waiting. |
 | `verify-failed` | What is in the flash differs from what was written, or the new storage image does not hold what it should. |
 | `no-space` | The files of a show do not fit into storage. Nothing was written to the board. |
-| `not-a-show-folder` | The folder to install is no folder, holds something that is no file, or holds a file the show does not name. |
+| `not-a-show-folder` | The folder to install is no folder, holds something that is no file but a folder of the board's storage its `folders.txt` names, or holds a file the show does not name. |
+| `folders-present` | `install-show` would remove files of the board's own folders, the numbered folders of `/odrig`, and `--replace-folders` was not given. Nothing was written to the board. |
 | `output-not-empty` | The folder `read-show` is to write, or the folder of `install-show --keep-copies`, exists and is not an empty folder. |
 | `wifi-settings-missing` | The settings file to read is not there or is not a file. |
 | `wifi-settings-malformed` | The settings file is not a JSON object with exactly the strings `name` and `password`. |
@@ -592,6 +593,15 @@ whether it is sound is not known yet.
    start. A catalog the folder holds, as `read-show` copies it, is made anew. The marker
    names the generation after the board's catalog, or 1, and is the board's own when the
    board's catalog has the same pages: the same folder installed again changes nothing.
+   A folder of the board's own storage, [core.md](core.md#internal-folders), is a
+   sub-folder named by its number, `1` to `255`, that the folder's `folders.txt` names,
+   or that a file of its show is in, as `read-show` writes a file whose folder the board's
+   `folders.txt` lacks; its files are installed into `/odrig/<n>/`, and the board's
+   folders that the new `folders.txt` names are there afterwards, empty or not. A board
+   whose folders hold files that the folder does not have is refused with
+   `folders-present`, which names them: `--replace-folders` removes them, and the lines of
+   the board's `folders.txt` with them unless the folder has its own; the file keeps its
+   first line, so that the board's next folder takes the number it would have taken.
    `--no-check` installs any flat folder of files, without a catalog, for trying what the
    board does with an invalid show.
 2. The tool reads the partition table and takes the place and size of `spiffs` from it.
@@ -606,10 +616,12 @@ whether it is sound is not known yet.
    `show: kept 4 files; nothing added, replaced or removed`. The saved playlist order,
    `order.txt` of [show.md](show.md#the-saved-playlist-order), the saved playlist,
    `playlist.txt` of [core.md](core.md#the-saved-playlist), the saved repeats,
-   `repeats.txt` of [show.md](show.md#the-saved-repeats), and the clocks' two settings,
-   `clocks.txt` of `clocks on|off` and `clocks message on|off`, and saved animation
-   brightness in `brightness.txt` and external inclusion in `ignored.txt`, described in
-   [commands.md](commands.md), may be files of the folder; a folder without them keeps the
+   `repeats.txt` of [show.md](show.md#the-saved-repeats), and the clocks' three settings,
+   `clocks.txt` of `clocks on|off|only`, `clocks message on|off` and `clocks storage
+   sd|internal`, of any version, and saved animation
+   brightness in `brightness.txt`, external inclusion in `ignored.txt` and the board's own
+   folders in `folders.txt`, described in [commands.md](commands.md), may be files of the
+   folder; a folder without them keeps the
    board's, as installing animations does not change the order, the playlist, the repeats
    or the clocks' settings, animation brightness and external inclusion the operator chose. An explicitly
    supplied settings file replaces that file; one omitted from the folder is kept.
@@ -788,7 +800,8 @@ python3 firmware/fw.py read-show build/show-from-board
 ```
 
 Copies the files of `/odrig` on the board into a folder that is new or empty, among them
-`order.txt`, `playlist.txt`, `repeats.txt`, `clocks.txt`, `brightness.txt` and `ignored.txt` when the board has them, prints each name with
+`order.txt`, `playlist.txt`, `repeats.txt`, `clocks.txt`, `brightness.txt`, `ignored.txt` and `folders.txt` when the board has them, the files of
+its numbered folders into sub-folders of those numbers, prints each name with
 its size, and restarts the board. The folder can then be compared with the one
 the emulator ran:
 
@@ -915,9 +928,20 @@ comes from the chip's internal memory, and from the external memory only when th
 internal memory has none. The time the core is given is the milliseconds since the chip
 started, from a 64-bit clock.
 
+On a board whose `/odrig` folder is absent or empty, the core plays on the
+installation's mapping, which it holds, and an empty show, as [core.md](core.md) says:
+the canvas is 60 x 60, nothing of the board's own storage plays and, without a card that
+holds animations, every LED is dark; the rotation is read and saved, and the first upload
+is accepted. Nothing is written at the start: the folder comes with the first
+write, and `mapping.json` with the first `show.json`. So a board flashed with the
+application image alone is usable without a show installed from a computer; its saved
+Wi-Fi settings stay as they were, as [wifi.md](wifi.md) explains.
+
 **Storage.** The usermod gives the core the seven storage functions of [core.md](core.md),
-on WLED's file system. Every path is `/odrig/<name>`, and a name is checked before it is
-used: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, and not dots alone. The
+on WLED's file system, and `make_folder`. Every path is `/odrig/<name>`, and a name is
+checked before it is used: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, and not
+dots alone, alone or after the number of a folder of the storage, `/odrig/<n>/<name>`, 1 to
+255 without a leading zero. The
 firmware writes, renames and deletes a file only there, and only inside one of these
 functions: nothing of the firmware decides to write. The folder itself is made by
 `write_open`, once, when a write finds it missing: a storage that WLED formatted holds
@@ -932,7 +956,8 @@ as `upload.part`, the show file, first as `show.part`, and `pending.txt`; see
 | `write` | The bytes go to the open file in one write. |
 | `write_close` | The file is closed, and it is whole when storage then holds as many bytes as were given. |
 | `rename` | The file system's rename. A file that has the new name is replaced by it. |
-| `remove` | The file is deleted; a name that has no file is told apart from a failure. |
+| `remove` | The file is deleted; a name that has no file is told apart from a failure. The number of a folder, `<n>`, removes `/odrig/<n>` while it is empty. |
+| `make_folder` | The number of a folder, `<n>`, makes `/odrig/<n>`, an existing one a success; it is never asked to make `/odrig`, which only `write_open` makes. A folder of the card is the card host's, which makes it under its guard; a USB stick answers 0, it makes no folder. |
 | `space` | The total size, and the free bytes in whole blocks of 4,096. |
 | `read_at` | A second file is read beside the one the player has open, and stays open from one call to the next while the calls go on where the last one ended. |
 
@@ -940,8 +965,8 @@ The free space is not asked from the file system at every command: the file syst
 its blocks for it, which takes 30 ms with a small show and 377 ms with 9 MB of files. The
 usermod asks once, before the core starts, and keeps the number of used blocks up from
 then on by the sizes of what it writes, replaces and removes: no block for a file of 512
-bytes or less, and for a longer file the blocks the file system needs for it, the
-pointers at the start of every block counted. `space` is answered from that number
+bytes or less, for a longer file the blocks the file system needs for it, the pointers at
+the start of every block counted, and two blocks for each numbered folder. `space` is answered from that number
 without a call to the file system. The number is taken again at every start.
 
 **Storage calls are paced.** A write to storage takes the file system up to a few hundred
@@ -1304,6 +1329,12 @@ so a call that held the lock for seconds would still restart the chip. WLED's ow
 of its loop is off (`WLED_WATCHDOG_TIMEOUT=0`), as it has been since seed 04. The board
 session of seed 31 measures these budgets.
 
+After each request for a refresh, the producer blocks for one scheduler tick outside
+the core lock. This lets idle run even when rendering takes longer than the refresh
+interval and the consumer has already queued its notification. A notification that
+is already queued returns immediately, so waiting for it alone provides no idle time.
+The watchdog remains enabled and is never fed to cover up a blocked core call.
+
 ## What the firmware changes in WLED
 
 | Changed | Left as it is |
@@ -1513,6 +1544,18 @@ the port and asked for `status` once a second through the same session.
   In the second in which a file was put in place, `status` reported 6 or 7. Hello world
   for that canvas, 1,210 bytes, took 11 seconds in all. Every upload succeeded.
 
+The figures above are those of 2026-10-12, when the check took one record at a refresh in
+step. Since seed 81 it takes its steps at every refresh, within a budget of 256 to 2,048
+bytes of charge paced by the refresh rate ([core.md](core.md), "Uploads and the check"),
+and none of them has been measured on the board yet. An estimate, from the core's work on
+a computer scaled by the board's speed at the check of 2026-10-12 and the time of a send
+to twenty outputs: the owner's clock of 14,399 small frames, 498,211 bytes, is checked in
+about 8 s on a board at 50 refreshes a second with room to spare, within 30 s on a board
+at 30 or more while a show that is not dense plays, within a minute at 25 to 29, and
+within two and a half minutes below 25; a board at 22 a second or more before the check
+stays at 20 or more during it, and one at 20 or 21 shows about 19. The owner's check of
+seed 81 measures it.
+
 Not measured, because the hardware is not wired: light on any leg but the one strip on
 pin 1, and the current the LEDs really draw. Not measured either: an upload over Wi-Fi,
 which needs a person to join the board's network; see step 7 of [The owner's
@@ -1556,8 +1599,9 @@ until the old file is gone; [core.md](core.md), "The files the core writes", has
 step. A power cut at any step leaves the old show or the new one, whole; the change is
 committed by one rename. Moving an animation in the saved order writes `order.part` and
 renames it onto `order.txt` the same way, saving or restoring a repeat writes
-`repeats.part` and renames it onto `repeats.txt`, switching the clocks or their message on
-or off writes `clocks.part` and renames it onto `clocks.txt`, and the choice of a playlist
+`repeats.part` and renames it onto `repeats.txt`, a change of the clocks' mode, of their
+message or of their preferred storage writes `clocks.part` and renames it onto
+`clocks.txt`, and the choice of a playlist
 writes `playlist.part` and renames it onto `playlist.txt`. Saved animation brightness
 writes `brightness.part`, closes it durably and verifies it before renaming it onto
 `brightness.txt`; external inclusion writes and verifies `ignored.part` before renaming
@@ -1845,8 +1889,8 @@ refreshes a second, and the owner accepts any rate from 20 to 50. See
    ```
 
    *Seen:* `upload` writes a line with the percentage and the speed, then
-   `upload: checking`, and after about five seconds `{"ok":true}`, while the show plays
-   on; `list` shows `{"id":9,"file":"hello-bench.odrg","bytes":1138}` as the last item;
+   `upload: checking`, and a second or less after the last piece `{"ok":true}`, while the
+   show plays on; `list` shows `{"id":9,"file":"hello-bench.odrg","bytes":1138}` as the last item;
    after `play 9` the words HELLO WORLD begin again and stay for half a minute, which is
    the turn of the new item in the playlist; `remove 9`, sent within that half minute,
    answers `{"ok":true}` and the playlist goes on with its first animation, the same
@@ -2488,3 +2532,23 @@ with physical buses. No firmware compilation, flash, transfer timing measurement
 electrical check or 20–50 FPS board observation was performed for this feature.
 Compilation in this run is deferred by the owner to the future cross-platform
 firmware seed 60; that work is not a prerequisite for the remaining software seeds.
+
+## Board time and daily scheduling
+
+The shared core provides `time`, `schedule` and `guard` on USB serial, the UART and
+HTTP, with the same semantics described in [commands.md](commands.md#board-time).
+Its stable identity is `esp32-` plus the factory MAC read by `ESP.getEfuseMac()`;
+no fuse is written. The boot-local epoch always needs setting after reset. Retained
+zone rules and sticky manual mode do not restore epoch validity.
+
+`install-show` retains `timezone.bin` and `schedule.txt` unless the supplied show
+contains replacements; `read-show` includes both. Unfinished `.part` files never
+become settings. Runtime WLED power mirroring changes no saved WLED, hardware or
+power-supply configuration. Initialization/mirroring cannot create an override;
+explicit JSON On/Off (including reassertions/toggle) and other power transitions
+forward ordinary core manual commands. Colour-only updates do not override hours.
+State callbacks only record power intent under a short memory-only guard. They
+never wait for storage, take the player lock or write files. The main loop applies
+the latest queued request once storage pacing allows it; repeated callbacks cannot
+hold up initialization or WLED's network handling while storage remains busy.
+Physical behavior remains an operator acceptance check.

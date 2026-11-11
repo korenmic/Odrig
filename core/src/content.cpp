@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "drive.h"
+#include "folders.h"
 #include "ignored.h"
 #include "mapping_control.h"
 #include "order.h"
@@ -71,6 +72,22 @@ uint32_t listed_size(const Core &core, const ItemInfo &item, bool with_entries) 
         size += digits(core.items[core.entries[item.first + entry]].id) + (entry != 0 ? 1 : 0);
     }
     return size;
+}
+
+// Whether an item is listed at the root: a cycle, or an animation whose file is not in an
+// internal folder that `folders.txt` names.
+bool at_root(const Core &core, uint32_t position) {
+    const ItemInfo &item = core.items[position];
+    return item.is_cycle || core.files[item.first].rank == 0;
+}
+
+// The number of the show's items listed at the root.
+uint32_t root_items(const Core &core) {
+    uint32_t count = 0;
+    for (uint32_t position = 0; position < core.item_count; ++position) {
+        count += at_root(core, position) ? 1 : 0;
+    }
+    return count;
 }
 
 // The bytes that end a reply of `list` whose first item left out is at this position, of
@@ -195,7 +212,13 @@ uint32_t content_space(const Core &core, Reply &reply) {
     return reply.length;
 }
 
-uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply) {
+// The bytes of `read` are gathered in the chunk buffer, before the part a rebuild of a catalog
+// keeps there between its steps, and its reply is `{"ok":true,"bytes":`, a size of ten digits
+// at most, `,"data":"`, the bytes in base64 without padding, `"}` and a newline.
+static_assert(kReadMost <= kKeptPages && kReadCountMost <= kKeptPages, "the bytes of a read leave the pages a rebuild keeps");
+static_assert(19 + 10 + 9 + (4 * kReadCountMost + 2) / 3 + 2 + 1 <= ODRIG_REPLY_MAX, "the reply of a read fits");
+
+uint32_t content_read(Core &core, uint32_t id, uint32_t offset, uint32_t count, Reply &reply) {
     char drive_name[kDriveOpenRoom];
     const char *name = nullptr;
     uint32_t size = 0;
@@ -229,8 +252,9 @@ uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply) {
         name = drive_name;
     }
     if (name == nullptr) {
-        // A folder of the drive's tree is a playlist, with no file to read.
-        return refuse(reply, kind == 'd' ? "in-use" : "unknown-id");
+        // A folder of the drive's tree or of the internal storage is a playlist, with no
+        // file to read.
+        return refuse(reply, kind == 'd' || (kind == 0 && internal_folder_id(core, id)) ? "in-use" : "unknown-id");
     }
     if (offset > size) {
         return refuse(reply, "bad-argument");
@@ -239,20 +263,20 @@ uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply) {
         // Only the second source reads a file beside the one that plays.
         return refuse(reply, "storage-error");
     }
-    // The bytes are read into the chunk buffer, which holds nothing between commands.
+    // The bytes are read into the chunk buffer, before the part a rebuild keeps there.
     const odrig_host &host = core.host;
-    const uint32_t wanted = size - offset < kReadMost ? size - offset : kReadMost;
+    const uint32_t wanted = size - offset < count ? size - offset : count;
     uint32_t got = 0;
     while (got < wanted) {
         const uint32_t piece = wanted - got < kFileBufferSize ? wanted - got : kFileBufferSize;
-        const int32_t count = host.read_at(host.ctx, name, offset + got, core.chunk + got, piece);
-        if (count < 0) {
+        const int32_t taken = host.read_at(host.ctx, name, offset + got, core.chunk + got, piece);
+        if (taken < 0) {
             return refuse(reply, "storage-error");
         }
-        if (count == 0) {
+        if (taken == 0) {
             break;
         }
-        got += static_cast<uint32_t>(count);
+        got += static_cast<uint32_t>(taken);
     }
     reply.text("{\"ok\":true,\"bytes\":");
     reply.number(size);
@@ -263,20 +287,38 @@ uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply) {
 }
 
 uint32_t content_list(const Core &core, uint32_t level, uint32_t from, Reply &reply) {
+    if ((level & kInternalLevel) != 0) {
+        return internal_list_level(core, level & 0xFFu, from, reply);
+    }
     reply.text(kListHead);
-    // A level's items: the show's at the root, then its sub-folders, then its files of the
-    // drive in the playlist or left out.
-    const uint32_t items = level == 0 ? core.item_count : 0;
+    // A level's items: the show's at the root, then the internal folders of the root, then
+    // its sub-folders, then its files of the drive in the playlist or left out.
+    const uint32_t items = level == 0 ? root_items(core) : 0;
+    const uint32_t internal = level == 0 && core.internal_folders != 0 ? internal_folder_children(core, 0) : 0;
     IndexFolder folder;
     const bool known = drive_folder(core, level, folder);
     const uint32_t folders = known ? folder.folders : 0;
-    const uint32_t total = items + folders + (known ? level_listed(core, folder) : 0);
+    const uint32_t total = items + internal + folders + (known ? level_listed(core, folder) : 0);
     uint32_t position = from;
     bool first = true;
+    // The root's items are found in the item table one after another, from the one at `from`.
+    uint32_t item_at = 0;
+    for (uint32_t skipped = 0; skipped < position && item_at < core.item_count; ++item_at) {
+        skipped += at_root(core, item_at) ? 1 : 0;
+    }
     for (; position < total; ++position) {
         const uint32_t tail = list_tail_size(position + 1, total);
-        if (position >= items && position < items + folders) {
-            const DriveRow *row = drive_subfolder(core, folder, position - items);
+        if (position >= items && position < items + internal) {
+            const uint32_t written = internal_folder_rows(core, 0, position - items, total, position, reply, &first);
+            if (position + written < items + internal) {
+                position += written;
+                break;
+            }
+            position += written - 1;
+            continue;
+        }
+        if (position >= items + internal && position < items + internal + folders) {
+            const DriveRow *row = drive_subfolder(core, folder, position - items - internal);
             if (row == nullptr) {
                 // The drive went while the list was written, or cannot be read: it is no more.
                 continue;
@@ -286,7 +328,7 @@ uint32_t content_list(const Core &core, uint32_t level, uint32_t from, Reply &re
             if (drive_find(core, id, &ordinal) != 'd') continue;
             const bool own = ignored_own(core, 'd', ordinal);
             const bool inherited = ignored_inherited(core, 'd', ordinal);
-            row = drive_subfolder(core, folder, position - items);
+            row = drive_subfolder(core, folder, position - items - internal);
             if (row == nullptr) continue;
             const uint32_t size = (first ? 0 : 1) + text_length(kListId) + digits(row->id) + text_length(kListPlaylist) +
                                   json_escaped(row->name, nullptr) + 1 + text_length(kListExternal) + text_length(kListFiles) + digits(row->files) +
@@ -312,7 +354,7 @@ uint32_t content_list(const Core &core, uint32_t level, uint32_t from, Reply &re
             continue;
         }
         if (position >= items) {
-            const uint32_t at = level_listed_position(core, folder, position - items - folders);
+            const uint32_t at = level_listed_position(core, folder, position - items - internal - folders);
             const bool own = at != kNothing && ignored_own(core, 'f', at);
             const bool inherited = at != kNothing && ignored_inherited(core, 'f', at);
             const DriveRow *row = at == kNothing ? nullptr : drive_row(core, at);
@@ -357,7 +399,13 @@ uint32_t content_list(const Core &core, uint32_t level, uint32_t from, Reply &re
             reply.text("}");
             continue;
         }
-        const ItemInfo &item = core.items[position];
+        while (item_at < core.item_count && !at_root(core, item_at)) {
+            ++item_at;
+        }
+        if (item_at >= core.item_count) {
+            continue;
+        }
+        const ItemInfo &item = core.items[item_at++];
         // A cycle that would not fit into a reply even alone is listed without its entries.
         bool with_entries = true;
         uint32_t size = listed_size(core, item, true);
@@ -434,7 +482,7 @@ uint32_t content_remove(Core &core, uint32_t id, Reply &reply) {
         if (kind == 'f' && core.indexed && catalog_drive_writable(core)) {
             return catalog_remove_external(core, value) ? succeed(reply) : refuse(reply, "storage-error");
         }
-        return refuse(reply, kind != 0 ? "in-use" : "unknown-id");
+        return refuse(reply, kind != 0 || internal_folder_id(core, id) ? "in-use" : "unknown-id");
     }
     // An animation that a cycle lists stays until the cycle is gone.
     for (uint32_t entry = 0; entry < core.entry_count; ++entry) {
@@ -461,6 +509,10 @@ uint32_t content_ignore(Core &core, uint32_t id, bool ignored, Reply &reply) {
     uint32_t position = 0;
     while (position < core.item_count && core.items[position].id != id) ++position;
     if (position == core.item_count) {
+        uint32_t value = 0;
+        if (drive_find(core, id, &value) == 0 && internal_folder_id(core, id)) {
+            return internal_folder_ignore(core, id, ignored, reply);
+        }
         return ignored_change(core, id, ignored, reply);
     }
     ItemInfo &item = core.items[position];
@@ -486,7 +538,7 @@ uint32_t content_remove_many(Core &core, const uint16_t *ids, uint32_t count, Re
         uint32_t position = 0;
         while (position < core.item_count && core.items[position].id != ids[at]) ++position;
         if (position == core.item_count) {
-            return refuse(reply, drive_id_taken(core, ids[at]) ? "in-use" : "unknown-id");
+            return refuse(reply, drive_id_taken(core, ids[at]) || internal_folder_id(core, ids[at]) ? "in-use" : "unknown-id");
         }
     }
     for (uint32_t at = 0; at < count; ++at) {
@@ -585,7 +637,7 @@ bool content_write_show(Core &core, const ShowChange &change) {
 namespace {
 
 // The file of an upload whose check has passed: a new content, which is usable and was
-// read whole.
+// read whole. Its folder's marks are found afterwards.
 void set_file(FileInfo &file, const char *name, uint32_t bytes, uint64_t total_ms, uint8_t type) {
     uint32_t length = 0;
     for (; name[length] != '\0'; ++length) {
@@ -595,8 +647,10 @@ void set_file(FileInfo &file, const char *name, uint32_t bytes, uint64_t total_m
     file.fault = kNone;
     file.checked = 1;
     file.bytes = bytes;
-    file.total_ms = total_ms;
-    file.type = type;
+    file.total_ms = kept_length(total_ms);
+    file.type = stored_type(type);
+    file.held = 0;
+    file.rank = 0;
 }
 
 }  // namespace

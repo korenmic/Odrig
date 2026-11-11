@@ -5,7 +5,7 @@ export default async function (app) {
   app.press("Target");
   const before = {message: app.text("message-text"), kept: app.kept()};
   app.fill("address", app.settings.text);
-  app.press("Use");
+  app.press("Connect over Wi-Fi");
   await app.until(() => app.text("message-text") !== null, "a message");
   const refused = {message: app.text("message-text"), kept: app.kept(), field: app.byId("address").value, link: app.text("link")};
   await app.sleep(1500);

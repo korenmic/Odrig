@@ -36,26 +36,55 @@ def bad_file(reason):
 
 class Script:
     """The input lines of a session, written against a clock. A poll is made at the time
-    of the clock and moves it on by 20 ms; a command line is given at the time of the
-    clock, before the poll of that time."""
+    of the clock and moves it on by 20 ms, or by the period given; a command line is given
+    at the time of the clock, before the poll of that time."""
 
     def __init__(self, time=T0):
         self.lines = []
         self.sent = []      # the command lines given so far, each of which gets one reply
         self.time = time
         self.polled = None  # the time of the latest poll
+        self.last_byte = None   # the polls made before `send` gave the last byte of a file
 
     def copy(self):
         made = Script(self.time)
-        made.lines, made.sent, made.polled = list(self.lines), list(self.sent), self.polled
+        made.lines, made.sent, made.polled, made.last_byte = list(self.lines), list(self.sent), self.polled, self.last_byte
         return made
 
-    def polls(self, count):
+    def polls(self, count, every=20):
         for _ in range(count):
             self.lines.append(f"poll {self.time}")
             self.polled = self.time
-            self.time += 20
+            self.time += every
         return self
+
+    def start(self):
+        """The time of the first call of the session: its power-on moment."""
+        return int(self.lines[0].split()[1]) if self.lines else self.time
+
+    def poll_times(self):
+        return [int(line.split()[1]) for line in self.lines if line.startswith("poll ")]
+
+    def refreshes(self):
+        """The times of the polls of the script so far that produce a refresh."""
+        return support.refresh_times(self.poll_times(), self.start())
+
+    def needed(self, data, steps=None):
+        """The polls every 20 ms from the clock after which the check of a file has ended,
+        by the rule of the check: the file is taken to fit the canvas, or its steps are
+        given. The check began at the first refresh after `send`, or begins at the next one."""
+        polls = self.poll_times()
+        before = polls[:self.last_byte] if self.last_byte is not None else polls
+        first = len(support.refresh_times(before, self.start()))
+        steps = support.check_steps(data) if steps is None else steps
+        count = 0
+        while True:
+            count = max(64, 2 * count)
+            more = [self.time + 20 * step for step in range(count)]
+            refreshes = support.refresh_times(polls + more, self.start())
+            at = support.check_end(steps, refreshes, self.start(), first)
+            if at is not None:
+                return (refreshes[at] - self.time) // 20 + 1 if refreshes[at] >= self.time else 0
 
     def line(self, *texts):
         for text in texts:
@@ -74,15 +103,15 @@ class Script:
 
     def send(self, number, name, data, piece=1500):
         """Opens an upload and sends every piece of a file."""
+        self.last_byte = len(self.poll_times())
         return self.line(*support.upload_lines(number, name, data, piece))
 
     def check(self, data, short=0):
-        """The refreshes the check of a file takes: one for its header, one for each frame
-        record and one for its end; or some fewer. A refresh that does not follow the one
-        before it without a gap takes no step, so one more is asked for first."""
-        if self.polled is None or self.polled != self.time - 20:
-            self.polls(1)
-        return self.polls(frames_of(data) + 2 - short)
+        """The polls every 20 ms that the check of a file still takes, by the rule of the
+        check; or some fewer."""
+        count = self.needed(data)
+        self.last_byte = None
+        return self.polls(max(0, count - short))
 
     def end(self, data):
         return self.line(support.upload_end(data))
@@ -141,7 +170,9 @@ class NewAndReplaced(Uploads):
         before = files["show.json"].encode()
         clip = support.clip(11, 60, 6, (60, 20, 20, 40, 20))
         self.assertNotEqual(clip, files["one.odrg"])
-        script = Script().polls(40).upload(1, "one.odrg", clip).polls(40).line("status", "list")
+        script = Script().polls(40).send(1, "one.odrg", clip)
+        checked = script.needed(clip)
+        script.check(clip).end(clip).polls(40).line("status", "list")
         self.play(files, script, ["--trace-store"])
         self.assertEqual(self.answers("upload end"), [OK])
         self.assertEqual(self.left["one.odrg"], clip)
@@ -153,7 +184,7 @@ class NewAndReplaced(Uploads):
         # The picture after the upload is the new file's, from its first frame.
         produced, _ = refreshes([line for line in self.printed if line.startswith(("refresh", "data"))])
         fresh = support.ReferencePlayer(dict(files, **{"one.odrg": clip}))
-        self.assertEqual(produced[40 + frames_of(clip) + 2][1], dict(fresh.poll(T0)))
+        self.assertEqual(produced[40 + checked][1], dict(fresh.poll(T0)))
 
     def test_a_replacement_under_another_name_deletes_the_old_file_and_keeps_the_position(self):
         files = small_show(ITEMS, start=3)
@@ -339,11 +370,14 @@ class Arguments(Uploads):
             "upload begin 0 new.odrg 10", "upload begin 65536 new.odrg 10", "upload begin -1 new.odrg 10", "upload begin x new.odrg 10", "upload begin 9.0 new.odrg 10",
             "upload begin 9 new.odrg 0", "upload begin 9 new.odrg 4294967296", "upload begin 9 new.odrg 99999999999999999999", "upload begin 9 new.odrg -5", "upload begin 9 new.odrg 1k",
             "upload begin 9 new.odrg ", "upload begin 9 new 10", "upload begin 9 new.ODRG 10", "upload begin 9 New.odrg 10", "upload begin 9 new.odrg.part 10", "upload begin 9 ../new.odrg 10",
-            "upload begin 9 a/b.odrg 10", "upload begin 9 " + "n" * 28 + ".odrg 10", "upload begin 9 show.json 10", "upload begin 9 odrg 10", "upload begin 9 néw.odrg 10",
+            "upload begin 9 " + "n" * 28 + ".odrg 10", "upload begin 9 show.json 10", "upload begin 9 odrg 10", "upload begin 9 néw.odrg 10",
             "upload begin 9 new.odrg\t 10",
         ]
         printed = self.run_both(files, [support.linehex(T0, line.encode("utf-8")) for line in broken])
         self.assertEqual(replies(printed), [refused("bad-argument")] * len(broken))
+        # A path names a folder of the board's storage, which this show has none of.
+        printed = self.run_both(files, [support.line(T0, "upload begin 9 a/b.odrg 10")])
+        self.assertEqual(replies(printed), [refused("unknown-id")])
         sound = ["upload begin 9 .odrg 1", "upload begin 65535 " + "n" * 27 + ".odrg 4000000", "upload begin 0009 a-b_c.9.odrg 0010"]
         for line in sound:
             self.assertEqual(self.play(files, Script().line(line, "upload cancel")), [CHUNK, OK], line)
@@ -471,7 +505,8 @@ class EveryCode(Uploads):
 
     def test_of_two_codes_that_apply_the_first_of_the_order_is_given(self):
         files = small_show(ITEMS)
-        clip = support.clip(48, 60, 6)
+        # A file whose check takes more than one refresh.
+        clip = support.dense_clip(60, 6, 1)
         crc = f"{zlib.crc32(clip):08x}"
         nothing_open = {
             "upload begin 3 one.odrg 0": "bad-argument",
@@ -509,22 +544,32 @@ class EveryCode(Uploads):
         script = Script().line(f"upload begin 9 new.odrg {len(clip)}").line(*receiving)
         self.assertEqual(self.play(files, script)[1:], [refused(code) for code in receiving.values()])
         checking = {"upload data 0 QUJD": "bad-offset", f"upload data {len(clip)} QUJD": "bad-offset", f"upload end {crc}": "busy", "remove 3": "busy", "upload begin 8 x.odrg 5": "busy"}
-        script = Script().polls(2).send(9, "new.odrg", clip).polls(1).line(*checking).line("upload end 00000000", f"upload end {crc}")
-        self.assertEqual(self.play(files, script)[2:], [refused(code) for code in checking.values()] + [refused("bad-checksum"), refused("no-upload")])
+        script = Script().polls(2).send(9, "new.odrg", clip)
+        self.assertGreater(script.needed(clip), 1)
+        script.polls(1).line(*checking).line("upload end 00000000", f"upload end {crc}")
+        self.assertEqual(self.play(files, script)[len(script.sent) - len(checking) - 2:], [refused(code) for code in checking.values()] + [refused("bad-checksum"), refused("no-upload")])
 
 
 class TheCheck(Uploads):
-    def test_end_is_busy_until_the_check_has_taken_a_refresh_for_the_header_each_record_and_the_end(self):
+    def test_end_is_busy_until_the_check_has_taken_its_steps(self):
         files = small_show(ITEMS, start=6)
+        counted = []
         for durations in ((20,), (20, 20, 20), (40,) * 9, (20,) * 30):
             clip = support.clip(51, 60, 6, durations)
-            needed = len(durations) + 2
-            script = Script().polls(3).send(9, "new.odrg", clip).end(clip)
+            script = Script().polls(3).send(9, "new.odrg", clip)
+            needed = script.needed(clip)
+            script.end(clip)
             for _ in range(needed):
                 script.polls(1).end(clip)
             script.line("list")
             self.play(files, script)
             self.assertEqual(self.answers("upload end"), [refused("busy")] * needed + [OK], durations)
+            counted.append(needed)
+        # A file of a few small records is checked at the first refresh, and a refresh
+        # takes several of them.
+        self.assertEqual(counted[:2], [1, 1])
+        self.assertLess(counted[2], 9)
+        self.assertLess(counted[3], 30)
 
     def test_asking_more_often_than_the_grid_does_not_hurry_the_check(self):
         files = small_show(ITEMS, start=6)
@@ -539,44 +584,43 @@ class TheCheck(Uploads):
             refreshes_so_far.append(produced)
             script.time += 5
         ends = replies(support.start(files, script.lines).lines)[2:]
-        # The eighth refresh after the last byte ends the check: the header, six records
-        # and the end. A request that produces no refresh takes no step.
+        # The refresh the rule of the check gives ends it. A request that produces no
+        # refresh takes no step.
+        refreshes = script.refreshes()
+        at = support.check_end(support.check_steps(clip), refreshes, T0, 3)
+        self.assertEqual(len(refreshes), 3 + produced)
         first_ok = ends.index(OK)
-        self.assertEqual(refreshes_so_far[first_ok], 8, f"`upload end` succeeded after {refreshes_so_far[first_ok]} refreshes, not after 8")
+        self.assertEqual(refreshes_so_far[first_ok], at - 3 + 1, f"`upload end` succeeded after {refreshes_so_far[first_ok]} refreshes, not after {at - 3 + 1}")
+        self.assertGreater(refreshes_so_far[first_ok], 1)
         self.assertEqual(ends[:first_ok], [refused("busy")] * first_ok)
         self.assertEqual(ends[first_ok + 1:], [refused("no-upload")] * (len(ends) - first_ok - 1))
         self.play(files, script)
         self.assertEqual(self.answers("upload end"), ends)
 
-    def test_after_a_refresh_before_which_a_grid_time_was_skipped_no_step_is_taken(self):
+    def test_a_late_refresh_takes_its_steps_as_one_in_step(self):
         files = small_show(ITEMS, start=6)
-        clip = support.clip(53, 60, 6, (20,) * 4)
-        script = Script().polls(3).send(9, "new.odrg", clip)
-        # Six steps are needed. Of every two refreshes here the second comes late, so
-        # five pairs take five steps.
-        for _ in range(5):
-            script.polls(1).wait(20).polls(1)
-        script.end(clip).wait(20).polls(1).end(clip).polls(1).end(clip)
-        self.play(files, script)
-        self.assertEqual(self.answers("upload end"), [refused("busy"), refused("busy"), OK])
-
-    def test_a_host_that_is_always_late_never_ends_the_check_and_the_upload_goes_after_60_seconds(self):
-        files = small_show(ITEMS, start=6)
-        clip = support.clip(54, 60, 6, (20,) * 2)
-        script = Script().polls(3).send(9, "new.odrg", clip).wait(20)
-        for _ in range(60000 // 40 - 2):
-            script.polls(1).wait(20)
-        script.end(clip).polls(1).wait(20).polls(1).end(clip)
-        self.play(files, script)
-        self.assertEqual(self.answers("upload end"), [refused("busy"), refused("no-upload")])
-        self.assertNotIn("upload.part", self.left)
+        clip = support.clip(53, 60, 6, (20,) * 20)
+        counted = []
+        # Each refresh comes one grid time late, or in step.
+        for late in (20, 0):
+            script = Script().polls(3).send(9, "new.odrg", clip)
+            for _ in range(12):
+                script.wait(late).polls(1).end(clip)
+            self.play(files, script)
+            ends = self.answers("upload end")
+            first_ok = ends.index(OK)
+            self.assertEqual(ends, [refused("busy")] * first_ok + [OK] + [refused("no-upload")] * (len(ends) - first_ok - 1))
+            at = support.check_end(support.check_steps(clip), script.refreshes(), T0, 3)
+            self.assertEqual(first_ok, at - 3)
+            counted.append(first_ok + 1)
+        self.assertEqual(counted[0], counted[1])
+        self.assertGreater(counted[0], 2)
 
     def test_every_invalid_vector_is_a_bad_file_with_the_reason_of_the_reference_decoder(self):
         paths = sorted(INVALID.iterdir())
         self.assertGreaterEqual(len(paths), 30)
-        decoded = support.decode_each([path.read_bytes() for path in paths])
         reasons = set()
-        for path, by_the_core in zip(paths, decoded):
+        for path in paths:
             data = path.read_bytes()
             with self.subTest(vector=path.name):
                 width, height = struct.unpack_from("<HH", data, 6) if len(data) >= 10 else (0, 0)
@@ -584,11 +628,9 @@ class TheCheck(Uploads):
                     width, height = 5, 4
                 files = {"mapping.json": support.one_leg_mapping(width, height), "show.json": support.show_text([])}
                 reference = support.ReferencePlayer(files)
-                # The reference player is told how many records of the file are sound, as
-                # the core's decoder finds them outside a session.
-                reference.sound_records[zlib.crc32(data)] = len(by_the_core.records)
                 steps, reason, _ = reference._judge(data)
-                script = Script().polls(2).send(9, "new.odrg", data).polls(steps - 1).end(data).polls(1).end(data).line("upload cancel", "list")
+                script = Script().polls(2).send(9, "new.odrg", data)
+                script.polls(script.needed(data, steps) - 1).end(data).polls(1).end(data).line("upload cancel", "list")
                 run, left = support.start_and_keep(files, script.lines)
                 self.assertEqual(replies(run.lines)[-4:], [refused("busy"), bad_file(path.name.split(".")[0]), refused("no-upload"), '{"ok":true,"items":[],"next":null}'])
                 self.assertEqual(reason, path.name.split(".")[0])
@@ -642,13 +684,14 @@ class Quiet(Uploads):
             "begun": Script().polls(3).line(f"upload begin 9 new.odrg {len(clip)}"),
             "some bytes": Script().polls(3).line(f"upload begin 9 new.odrg {len(clip)}", f"upload data 0 {b64(clip[:half])}"),
             "all bytes": Script().polls(3).send(9, "new.odrg", clip),
-            "the check half done": Script().polls(3).send(9, "new.odrg", clip).polls(2),
+            "the check half done": Script().polls(3).send(9, "new.odrg", clip).polls(3),
             "the check done": Script().polls(3).send(9, "new.odrg", clip).check(clip),
         }
 
     def test_cancel_discards_the_upload_at_every_state(self):
         files = small_show(ITEMS, start=6)
-        clip = support.clip(61, 60, 6, (20,) * 3)
+        clip = support.dense_clip(60, 6, 1)
+        self.assertGreater(Script().polls(3).send(9, "new.odrg", clip).needed(clip), 3)
         for state, script in self.states(clip).items():
             with self.subTest(state=state):
                 script.line("upload cancel", "upload cancel", "list").polls(4).upload(9, "new.odrg", clip).line("play 9").polls(4)
@@ -662,10 +705,11 @@ class Quiet(Uploads):
 
     def test_an_upload_on_which_nothing_moves_for_60_seconds_is_discarded(self):
         files = small_show(ITEMS, start=6)
-        clip = support.clip(62, 60, 6, (20,) * 3)
+        clip = support.dense_clip(60, 6, 1)
         states = self.states(clip)
-        # The last step of the check was taken at the last refresh, 20 ms before the clock.
-        moved = {"begun": 0, "some bytes": 0, "all bytes": 0, "the check done": 20}
+        # Every refresh of the check is progress: the last one came 20 ms before the clock,
+        # in the middle of the check and at its end.
+        moved = {"begun": 0, "some bytes": 0, "all bytes": 0, "the check half done": 20, "the check done": 20}
         for state, since in moved.items():
             for quiet, kept in ((59999, True), (60000, False), (60001, False), (300000, False)):
                 with self.subTest(state=state, quiet=quiet):
@@ -739,7 +783,7 @@ class TwoEntries(Uploads):
         with_upload = Script().polls(50).send(9, "new.odrg", clip, 500).polls(20).line("space", "list").check(clip).end(clip).polls(100).line("status")
         self.play(files, with_upload)
         self.assertEqual(self.answers("upload end"), [OK])
-        plain = Script().polls(50 + 20 + frames_of(clip) + 2 + 100)
+        plain = Script().polls(len(with_upload.poll_times()))
         without = support.start(files, plain.lines).lines
         self.assertEqual([line for line in self.printed if line.startswith(("refresh", "data"))], without)
 

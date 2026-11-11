@@ -48,8 +48,18 @@ void player_play_all(Core &core, uint32_t from);
 uint32_t player_first_animation(const Core &core);
 
 // The position of the first animation of the current playlist in the exhausting order, or
-// of the root's in its place: an item or a drive's animation, or kNothing.
+// of the root's in its place: an item or a drive's animation, or kNothing. In Clocks only,
+// the first face that plays, of the preferred storage and then of the other.
 uint32_t player_first_in_playlist(const Core &core);
+
+// Whether a position of the playlist holds an animation that plays automatically: an
+// animation item of the show that is neither ignored, nor in an ignored internal folder,
+// nor unavailable, or a file of the drive that is in the playlist.
+bool player_plays(const Core &core, uint32_t position);
+
+// The show's usable animation of an internal folder ranked from `low` to before `high`
+// with the smallest walk key, ignored or not; kNothing when there is none.
+uint32_t player_first_usable(const Core &core, uint32_t low, uint32_t high);
 
 // A playlist was chosen at a moment, by a command or by the rotation: its window begins
 // there, nothing resumes after a jump, and whether the root plays in its place is judged
@@ -107,6 +117,16 @@ void player_file_replaced(Core &core, uint32_t item);
 // its turn comes. When nothing plays, the playlist starts from its first animation.
 void player_item_added(Core &core);
 void player_inclusion_changed(Core &core, uint32_t item);
+
+// The Ignore of an internal folder changed: the turn of an animation that no longer plays
+// gives way to the next, and the playlist starts when nothing played.
+void player_internal_inclusion_changed(Core &core);
+
+// Whether the current playlist is a folder: an internal folder, or a folder of the drive's
+// tree while the tree is known.
+inline bool playlist_is_folder(const Core &core) {
+    return (core.current & kInternalLevel) != 0 || (core.tree_known && core.current != 0);
+}
 void player_external_inclusion_changed(Core &core);
 void player_clock_mode_changed(Core &core, uint8_t previous);
 void player_only_restart(Core &core);

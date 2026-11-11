@@ -31,6 +31,7 @@ class TheTable(unittest.TestCase):
         refusals = [[code, "play 2", "file-missing dvd.odrg"] for code in cls.codes]
         refusals += [["unknown-id", "play all", None], ["unknown-id", "play 65535", None], ["show-invalid", "play all", None], ["weird", "on", None], ["toString", "off", None]]
         refusals += [["unknown-id", "remove 7", None], ["busy", "remove 7", None], ["in-use", "remove 7", None], ["storage-error", "space", None]]
+        refusals += [["unknown-id", "upload begin 4 shows/night/a.odrg 1138 0badcafe", None]]
         failures = [["bad-address", "x y"], ["no-wifi", "4.3.2.1"], ["no-answer", "4.3.2.1"], ["bad-reply", "192.168.1.23:8600"]]
         cls.found = support.run("texts", settings={"refusals": refusals, "failures": failures}).seen
 
@@ -38,7 +39,7 @@ class TheTable(unittest.TestCase):
         return self.found["refusals"][f"{code} | {line} | {'null' if reason is None else reason}"]
 
     def test_every_error_code_of_the_command_list_has_a_text_or_is_one_the_app_cannot_get(self):
-        self.assertEqual(len(self.codes), 20)
+        self.assertEqual(len(self.codes), 22)
         cannot_get = self.found["notForTheApp"]
         self.assertLessEqual(set(cannot_get), set(self.codes))
         self.assertEqual(len(cannot_get), len(set(cannot_get)))
@@ -59,9 +60,12 @@ class TheTable(unittest.TestCase):
         self.assertEqual(self.text("unknown-id", "play 65535", None), "Animation 65535 is not installed any more. (unknown-id)")
         self.assertEqual(self.text("unknown-id", "play all", None), "No animation is installed. (unknown-id)")
         self.assertEqual(self.text("unknown-id", "remove 7", None), "Animation 7 is not installed any more. (unknown-id)")
+        self.assertEqual(self.text("unknown-id", "upload begin 4 shows/night/a.odrg 1138 0badcafe", None),
+                         "The folder of this upload is not on the installation any more. Select the destination again. (unknown-id)")
         self.assertEqual(self.text("busy", "remove 7", None), "The installation is busy. Try again in a moment. (busy)")
         self.assertEqual(self.text("in-use", "remove 7", None), "Animation 7 cannot be removed: a cycle plays it, or it is on a USB stick. (in-use)")
         self.assertEqual(self.text("mapping-conflict"), "Mapping changed on the target. Reload before saving. (mapping-conflict)")
+        self.assertEqual(self.text("rotation-conflict"), "Another controller changed the rotation. The saved angle is read again. (rotation-conflict)")
         self.assertEqual(self.text("unsupported"), "This target cannot use miniature display mode with its current output setup. (unsupported)")
         self.assertEqual(self.text("storage-error", "space", None), "The installation could not use its storage. (storage-error)")
         # A code the app does not know, also one that is a word of the language.

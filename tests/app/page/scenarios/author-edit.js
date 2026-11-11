@@ -46,11 +46,37 @@ export default async function (app) {
   if (settings.changedElsewhere === true) {
     await app.step();
   }
+  if (settings.beginAgain === true) {
+    // The target is asked again from the start: its status answers, and the root's names
+    // are still being read when Save is pressed.
+    await app.step();
+    const client = await app.frame.contentWindow.eval('import("/client.js")');
+    client.begin();
+    await app.until(() => client.state.link === "answers" && client.state.status !== null && !app.byId("author-upload").disabled,
+      "the target answering again with the form ready", 10000);
+    seen.namesWhileSaving = client.state.rootNames;
+  }
   app.press("Save");
-  await app.until(() => app.text("message-text") !== null, "a message after saving", 20000);
+  // Every text of the line, and for each Checking text whether Cancel is shown with it.
+  seen.sending = [];
+  seen.cancelShown = [];
+  await app.until(() => {
+    const now = app.text("author-uploading");
+    if (now !== null && seen.sending[seen.sending.length - 1] !== now) {
+      seen.sending.push(now);
+      if (now.startsWith("Checking")) {
+        seen.cancelShown.push(app.text("author-cancel") !== null);
+      }
+    }
+    return app.text("message-text") !== null;
+  }, "a message after saving", 20000);
   seen.message = app.text("message-text");
+  seen.lineHidden = app.text("author-uploading") === null;
   seen.after = form(app);
   app.press("OK");
+  if (settings.beginAgain === true) {
+    return seen;
+  }
   app.press("Animations");
   await app.until(() => app.shown() === "animations" && spaceKnown(app) && rows(app).length === settings.rows, "Animations", 10000);
   seen.rows = storage(app).rows;

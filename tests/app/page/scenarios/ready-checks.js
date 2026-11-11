@@ -18,9 +18,20 @@ export default async function () {
   equal("captured_navigation", d.pathOf(form, "new.odrg"), "night/deep/new.odrg");
   d.synchronize(form, {free: 1000000, external: null});
   equal("absent_fallback", [form.storage, d.pathOf(form, "new.odrg")], ["internal", "new.odrg"]);
-  equal("flat_root_explanation", /no matching subfolders/.test(d.reason(form, null)), true);
+  equal("card_root_explanation", d.reason(form, {free: 1000000, external: null}), "External storage is disconnected or not detected. Using Internal /; the explored folder is on the card.");
   d.synchronize(form, space);
   equal("redetection_default", form.storage, "external");
+  // No reply yet: the destination is not known, and the form moves nowhere.
+  equal("no_reply_moves_nothing", [d.synchronize(form, null), form.storage], [false, "external"]);
+  equal("reason_no_reply", d.reason(form, null), "Storage not known yet: the installation has not answered.");
+  equal("reason_absent", /^External storage is disconnected/.test(d.reason(form, {free: 1000000, external: {present: false, free: null, total: null, read_only: true}})), true);
+  // An older target names no external storage: its reply says there is no card.
+  equal("reason_older_target", /^External storage is disconnected/.test(d.reason(form, {free: 1000000})), true);
+  equal("older_target_fallback", [d.synchronize(form, {free: 1000000}), form.storage], [true, "internal"]);
+  d.synchronize(form, space);
+  const unknown = d.capture({...state, space: null}, 3);
+  d.select(unknown, "external", null);
+  equal("external_refused_without_reply", unknown.storage, "internal");
   d.select(form, "internal", space);
   d.synchronize(form, null); d.synchronize(form, space);
   equal("explicit_internal_survives", form.storage, "internal");
@@ -42,7 +53,7 @@ export default async function () {
   bytes.set([79,68,82,71,1,1,60,0,6,0,0,0,255,255,255,255]);
   const file = new File([bytes], "compressed.odrg");
   const prepared = await ready.prepare(file, {width: 60, height: 6});
-  equal("no_inflate_compressed_body", [prepared.previewSafe, [...prepared.bytes]], [false, [...bytes]]);
+  equal("no_inflate_compressed_body", [prepared.previewSafe, [...prepared.bytes]], [true, [...bytes]]);
   let bodyRead = false;
   const wrongCanvas = {name: file.name, size: file.size, slice: (...args) => file.slice(...args), arrayBuffer() {bodyRead=true; throw new Error("body should not be loaded");}};
   try { await ready.prepare(wrongCanvas, {width: 60, height: 60}); throw new Error("accepted wrong canvas"); } catch (error) {

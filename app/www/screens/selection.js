@@ -1,9 +1,12 @@
-// The selection of internal animations in the list, and the removal of one animation or
-// of the selected ones, each asked about first.
+// The selection of the files and the folders of both storages in the list, the
+// removal of one animation or of the selected internal ones, each asked about first, the
+// move of the selected files, and their download.
 
+import * as capacity from "../capacity.js";
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
 import * as messages from "../messages.js";
+import * as downloads from "./downloads.js";
 import * as filters from "./filters.js";
 
 // The most ids one `remove many` carries.
@@ -26,10 +29,42 @@ function byId(id) {
   return document.getElementById(id);
 }
 
-// Whether an animation can be selected: an internal one of a target that reports its
-// inclusion, in the level the screen shows, which the filters show.
+// Whether an animation can be selected: a file of either storage, of a target that reports
+// its inclusion, in the level the screen shows, which the filters show. A file of a card
+// the target may not write is selected by hand, for a download only.
 function selectable(item) {
-  return typeof item.ignored === "boolean" && item.external !== true && visible(item) && filters.matches(item);
+  return typeof item.file === "string" && typeof item.ignored === "boolean" && visible(item) && filters.matches(item);
+}
+
+// Whether `Select all` takes an animation: one that can be selected, of the board's storage
+// or of a card the target may write.
+function takenByAll(item) {
+  return selectable(item) && (item.external !== true || capacity.cardWritable(client.state.space));
+}
+
+function storageName(external) {
+  return external ? "External storage" : "Internal storage";
+}
+
+// Whether a folder of either storage can be selected, for a download: one of a target that
+// reports its inclusion. The filters pass folders by.
+export function folderSelectable(item) {
+  return typeof item.playlist === "string" && typeof item.ignored === "boolean";
+}
+
+// The selected rows of files, as the list has them.
+export function rows() {
+  return (client.state.animations || []).filter((item) => selected.has(item.id));
+}
+
+// The selected rows of folders, as the list has them.
+export function folders() {
+  return client.state.folders.filter((item) => selected.has(item.id));
+}
+
+// Ends the selection mode after a run that changed the list.
+export function finished() {
+  leave();
 }
 
 // Whether a deletion, a refresh after one, an upload or the link keeps the list's
@@ -97,7 +132,7 @@ async function deleteSelected(question) {
   const ids = question.animations.map((item) => item.id);
   let done = 0;
   deleting = true;
-  client.setContentBusy(true);
+  client.setContentBusy("deletion");
   try {
     while (done < ids.length) {
       if (ownVersion !== client.targetVersion() || document.hidden) throw new Error("deletion stopped");
@@ -138,11 +173,12 @@ export function draw(state) {
   }
   const animations = state.animations === null ? [] : state.animations;
   // A row that the list no longer has, or that a filter hides, leaves the selection.
-  const ids = new Set(animations.filter(selectable).map((item) => item.id));
+  const ids = new Set([...animations.filter(selectable), ...state.folders.filter(folderSelectable)].map((item) => item.id));
   for (const id of selected) if (!ids.has(id)) selected.delete(id);
   if (awaitingRefresh !== null && state.listVersion > awaitingRefresh) awaitingRefresh = null;
   byId("bulk-progress").dataset.refreshing = String(awaitingRefresh !== null);
   const canSelect = animations.some(selectable);
+  const canSelectAll = animations.some(takenByAll);
   byId("selection-bar").hidden = !selecting;
   byId("animations-list").classList.toggle("selecting", selecting);
   const mode = byId("select-mode");
@@ -150,9 +186,25 @@ export function draw(state) {
     mode.hidden = selecting;
     mode.disabled = locked() || !canSelect;
   }
-  byId("select-all").disabled = locked() || !canSelect;
+  byId("select-all").disabled = locked() || !canSelectAll;
   byId("clear-selection").disabled = locked() || selected.size === 0;
-  byId("delete-selected").disabled = locked() || selected.size === 0;
+  const chosen = rows();
+  const external = chosen.filter((item) => item.external === true).length;
+  const chosenFolders = folders().length;
+  const externalFolders = folders().filter((item) => item.external === true).length;
+  const readOnly = chosen.some((item) => item.external === true) && !capacity.cardWritable(state.space);
+  byId("delete-selected").disabled = locked() || selected.size === 0 || external > 0 || chosenFolders > 0;
+  byId("delete-selected").title = external > 0 || chosenFolders > 0 ? "Delete selected removes internal animations; clear the folders and the card's files from the selection." : "";
+  byId("move-selected").disabled = locked() || chosen.length === 0 || chosenFolders > 0 || readOnly;
+  byId("move-selected").title = chosenFolders > 0 ? "Move to\u2026 moves files; clear the folders from the selection." :
+    readOnly ? "External storage is read-only: its files can be downloaded, not moved." : "";
+  byId("download-selected").disabled = locked() || selected.size === 0 || downloads.busy();
+  const files = chosen.length;
+  const folderWords = [[chosenFolders - externalFolders, false], [externalFolders, true]].filter(([count]) => count > 0)
+    .map(([count, inCard]) => `${count} folder${count === 1 ? "" : "s"} of ${storageName(inCard)}`);
+  byId("selection-summary").textContent = selected.size === 0 ? "" :
+    `${selected.size} selected: ${files - external} in Internal storage, ${external} in External storage.` +
+    (chosenFolders > 0 ? ` ${folderWords.join(" and ")}, with everything in ${chosenFolders === 1 ? "it" : "them"}.` : "");
   byId("selection-done").disabled = deleting;
 }
 
@@ -163,7 +215,7 @@ export function start(options) {
   byId("select-mode")?.addEventListener("click", () => enter());
   byId("selection-done").addEventListener("click", leave);
   byId("select-all").addEventListener("click", () => {
-    for (const item of client.state.animations || []) if (selectable(item)) selected.add(item.id);
+    for (const item of client.state.animations || []) if (takenByAll(item)) selected.add(item.id);
     redraw();
   });
   byId("clear-selection").addEventListener("click", () => {

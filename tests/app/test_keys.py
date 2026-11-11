@@ -389,6 +389,30 @@ class KeptOnThePhone(unittest.TestCase):
         self.assertEqual(seen["other"]["external"]["byName"], second.keys("external"))
 
 
+class InFolders(Paged):
+    """A target whose board's storage has the folder `shows`, id 20 and number 1, which holds
+    the clock `shows/clock.odrgx`, named in the catalog by its stored name."""
+
+    CLOCK = {"id": 2, "file": "shows/clock.odrgx", "stored": "1/clock.odrgx", "bytes": 500, "ignored": False, "external": False, "type": "widget",
+             "inherited_ignored": False}
+    SHOWS = {"id": 20, "playlist": "shows", "external": False, "files": 1, "ignored": False, "inherited_ignored": False}
+
+    def listed(self, line):
+        items = [self.CLOCK] if line.startswith(b"list in 20") else [self.SHOWS]
+        return (200, json.dumps({"ok": True, "items": items, "next": None}) + "\n")
+
+
+class AnUploadOfThisPhone(unittest.TestCase):
+    def test_a_file_of_a_folder_of_the_boards_storage_takes_the_key_of_its_upload_over_the_catalogs(self):
+        target = InFolders([("1/clock.odrgx", 500, "aaaaaaaa")], [])
+        plan = [{"until": "both", "ms": 20000}, {"enter": "shows"}, {"untilRows": 1}, {"snap": "before"},
+                {"uploaded": ["internal", "shows/clock.odrgx", "bbbbbbbb-500"]}, {"snap": "after"}]
+        with support.StandIn(target.replies()) as stand_in:
+            seen = support.run("keys", address=stand_in.address, settings={"plan": plan}).seen
+        self.assertEqual(seen["before"]["rowKeys"], [["shows/clock.odrgx", "aaaaaaaa-500"]])
+        self.assertEqual(seen["after"]["rowKeys"], [["shows/clock.odrgx", "bbbbbbbb-500"]])
+
+
 class TheOperatorFirst(unittest.TestCase):
     def test_what_the_operator_asks_goes_out_between_two_pages(self):
         target = Paged(INTERNAL, EXTERNAL, piece=20)

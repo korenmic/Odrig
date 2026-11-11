@@ -1,3 +1,4 @@
+import re
 import shutil
 import subprocess
 import tempfile
@@ -7,6 +8,12 @@ from tests.emulator import support as emulator_support
 
 from . import support
 from .test_target import entered
+
+
+def connection_timing(line):
+    return line == "time" or re.fullmatch(
+        r"guard [A-Za-z0-9_-]{1,31} (?:time|schedule|time zone [A-Za-z0-9_-]{160,2000}|time set [0-9]{9,10} [0-9a-f]{8})",
+        line) is not None
 
 
 class TheControllerViewOfTheEmulator(unittest.TestCase):
@@ -28,7 +35,7 @@ class TheControllerViewOfTheEmulator(unittest.TestCase):
         with emulator_support.EventStream(emulator.port) as stream:
             process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             try:
-                events = stream.read_until(lambda events: len(emulator_support.of_kind(events, "log")) >= enough, seconds)
+                events = stream.read_until(lambda events: len([row for row in emulator_support.of_kind(events, "log") if not connection_timing(row["line"])]) >= enough, seconds)
             finally:
                 process.terminate()
                 try:
@@ -44,7 +51,8 @@ class TheControllerViewOfTheEmulator(unittest.TestCase):
         self.assertEqual({transport for transport, _ in lines}, {"http"})
         self.assertEqual(lines[0], ("http", "status"))
         self.assertIn(("http", "list 0"), lines)
-        self.assertLessEqual({line for _, line in lines}, {"status", "list 0", "space", "order get"})
+        ordinary = {line for _, line in lines if not connection_timing(line)}
+        self.assertLessEqual(ordinary, {"status", "list 0", "space", "order get"})
         self.assertIsNone(emulator.status()["error"])
 
     def test_in_the_other_views_the_app_does_not_run(self):

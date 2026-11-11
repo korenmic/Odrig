@@ -127,7 +127,7 @@ export default async function (app) {
   await app.until(() => app.shown() === "target", "the target screen");
   const target = measure(app);
   app.fill("address", "not an address");
-  app.press("Use");
+  app.press("Connect over Wi-Fi");
   await app.until(() => app.text("message-text") !== null, "a message");
   const withMessage = measure(app);
   return {animations, selecting, withMenu, withQuestion, upload, settings, target, withMessage};

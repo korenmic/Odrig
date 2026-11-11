@@ -149,8 +149,9 @@ a file no item names any more is deleted. To keep a show, run a copy of its fold
 folder the emulator was stopped on during an upload holds `upload.part` until the emulator
 is started on it again; `install-show` of the firmware tool refuses such a folder, as it
 refuses any file the show does not name. The emulator paces nothing: its file operations
-take microseconds, and the check of an uploaded file takes one frame of it for each
-refresh, as on the board.
+take microseconds, and the check of an uploaded file takes its steps at every refresh
+within the budget its pace sets, as on the board ([core.md](core.md), "Uploads and the
+check").
 
 **After a start.** The show plays from the first refresh, however much is installed: the
 core reads only the first 16 bytes of every animation before it plays. It reads the
@@ -239,7 +240,21 @@ python -m emulator build/clock-breaks/show --drive-folder collection/card
 
 The clocks play between the animations once `Clocks between animations` is checked in
 the Settings of the Controller view, or `clocks on` is sent; the core plays the breaks,
-and the emulator has no code of its own for them.
+and the emulator has no code of its own for them. `clocks storage sd` and `clocks storage
+internal` choose the storage whose copy of a clock or a message plays, over the serial
+port, TCP and HTTP alike, and the choice is kept in the show folder's `clocks.txt` across a
+restart, as the mode and the message are.
+
+### Folders of the show's folder
+
+The folders of the board's own storage, [core.md](core.md#internal-folders), are
+sub-folders of the show's folder named by their numbers, `1` to `255`, as on the board:
+`folder make internal shows` makes `1` and the line of `folders.txt` that names it, and a
+file of it is `1/stars.odrg`. The emulator makes and removes them when the core asks, a
+folder only while it is empty, and `space` counts two blocks of 4,096 bytes for each and
+the files in it. The current playlist is kept by a host with a drive: an emulator started
+without `--drive` or `--drive-folder` answers `play` of such a folder with `unsupported`
+and plays the root's playlist, its folders among it.
 
 ## The serial port
 
@@ -824,6 +839,42 @@ send for 15 seconds is sent the comment line `: keep-alive`.
 
 ## The command tool
 
+Board time and scheduling use the same command path as other controls:
+
+```
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] time [OPERATION]
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] schedule [OPERATION]
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] guard TARGET-ID TIMING-COMMAND
+python -m odrigctl --port NAME time
+python -m odrigctl --port NAME schedule
+python -m odrigctl --tcp localhost:8766 time
+python -m odrigctl --tcp localhost:8766 schedule
+python -m odrigctl --http http://4.3.2.1 time
+python -m odrigctl --http http://4.3.2.1 schedule
+python -m odrigctl --port NAME guard esp32-000000000000 time
+python -m odrigctl --tcp localhost:8766 guard emu-000000000000000000000000 time
+python -m odrigctl --http http://4.3.2.1 guard esp32-000000000000 schedule
+```
+
+Folders of the card and what is saved for an animation are asked the same way:
+
+```
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] saved ID
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] folder make external PATH
+python -m odrigctl --port NAME saved 1
+python -m odrigctl --port NAME folder make external night
+python -m odrigctl --tcp localhost:8766 saved 1
+python -m odrigctl --tcp localhost:8766 folder make external night
+python -m odrigctl --http http://4.3.2.1 saved 1
+python -m odrigctl --http http://4.3.2.1 folder make external night
+```
+
+Use `guard BOARD time` or `guard BOARD schedule` to bind a request to the ID from `time`; longer timing forms use the same prefix.
+Use `time zone BASE64`, `time set UTC ZONE-CRC32`, `schedule set REV ON OFF on|off`
+and `schedule resume REV` as [commands.md](commands.md#daily-schedule-and-manual-control)
+defines. A manual On/Off is persistent until resumed; an ordinary clock reset
+invalidates civil time and bypasses automatic scheduling until synchronized again.
+
 `odrigctl` sends the commands of [commands.md](commands.md) to the emulator or to the
 board, through a serial port, over TCP or over HTTP. It is a second small Python package
 at the repository root, uses only the Python standard library, and treats the two targets
@@ -840,17 +891,20 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] fault
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] space
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] list
-python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] read ID OFFSET
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] read ID OFFSET [COUNT]
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] catalog [OPERATION]
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] remove ID
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] ignore ID VALUE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] mapping OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] order OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] repeat ID N [save]
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] saved ID
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] clocks OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] debug mini on|off
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload --external FILE
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] --folder PATH upload ID FILE
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] folder make internal|external PATH
 ```
 
 Through the serial port, here the emulator's; for the board the name is its USB serial
@@ -879,8 +933,13 @@ python -m odrigctl --port build/emulator/serial order move 2805384113 9 1
 python -m odrigctl --port build/emulator/serial repeat 1 8
 python -m odrigctl --port build/emulator/serial repeat 1 8 save
 python -m odrigctl --port build/emulator/serial repeat 1 default
+python -m odrigctl --port build/emulator/serial saved 1
 python -m odrigctl --port build/emulator/serial clocks on
 python -m odrigctl --port build/emulator/serial clocks message on
+python -m odrigctl --port build/emulator/serial clocks storage internal
+python -m odrigctl --port build/emulator/serial folder make external clocks
+python -m odrigctl --port build/emulator/serial folder make internal shows
+python -m odrigctl --port build/emulator/serial --folder shows upload 10 build/hello-bench.odrg
 ```
 
 Over TCP, to the emulator's [line port](#the-line-port), which is how the emulator takes
@@ -896,6 +955,7 @@ python -m odrigctl --tcp 127.0.0.1:8601 fault
 python -m odrigctl --tcp 127.0.0.1:8601 space
 python -m odrigctl --tcp 127.0.0.1:8601 list
 python -m odrigctl --tcp 127.0.0.1:8601 read 1 0
+python -m odrigctl --tcp 127.0.0.1:8601 read 1 720 720
 python -m odrigctl --tcp 127.0.0.1:8601 catalog
 python -m odrigctl --tcp 127.0.0.1:8601 catalog cancel
 python -m odrigctl --tcp 127.0.0.1:8601 catalog page external 3 0
@@ -909,8 +969,12 @@ python -m odrigctl --tcp 127.0.0.1:8601 order move 2805384113 9 1
 python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 8
 python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 8 save
 python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 default
+python -m odrigctl --tcp 127.0.0.1:8601 saved 1
 python -m odrigctl --tcp 127.0.0.1:8601 clocks on
 python -m odrigctl --tcp 127.0.0.1:8601 clocks message off
+python -m odrigctl --tcp 127.0.0.1:8601 clocks storage sd
+python -m odrigctl --tcp 127.0.0.1:8601 folder make external clocks/message
+python -m odrigctl --tcp 127.0.0.1:8601 folder make internal shows/night
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -926,6 +990,7 @@ python -m odrigctl --http 127.0.0.1:8600 fault
 python -m odrigctl --http 127.0.0.1:8600 space
 python -m odrigctl --http 127.0.0.1:8600 list
 python -m odrigctl --http 127.0.0.1:8600 read 1 0
+python -m odrigctl --http 127.0.0.1:8600 read 1 720 720
 python -m odrigctl --http 127.0.0.1:8600 catalog
 python -m odrigctl --http 127.0.0.1:8600 catalog rebuild external
 python -m odrigctl --http 127.0.0.1:8600 catalog page external 3 512
@@ -939,8 +1004,11 @@ python -m odrigctl --http 127.0.0.1:8600 order move 2805384113 9 1
 python -m odrigctl --http 127.0.0.1:8600 repeat 1 8
 python -m odrigctl --http 127.0.0.1:8600 repeat 1 8 save
 python -m odrigctl --http 127.0.0.1:8600 repeat 1 default
+python -m odrigctl --http 127.0.0.1:8600 saved 1
 python -m odrigctl --http 127.0.0.1:8600 clocks off
 python -m odrigctl --http 127.0.0.1:8600 clocks message off
+python -m odrigctl --http 127.0.0.1:8600 clocks storage internal
+python -m odrigctl --http 127.0.0.1:8600 folder make external "night/old songs"
 ```
 
 The temporary miniature command is submitted through the same routes; status reports
@@ -978,6 +1046,9 @@ The tool prints the reply line to standard output:
   card's folder with that id, and `order get` and `order get in ID` for the saved order of
   a level; with a position after them, `list in ID FROM` and `order get in ID FROM` send
   that one line.
+- `read ID OFFSET` sends `read <ID> <OFFSET>`, and `read ID OFFSET COUNT` sends
+  `read <ID> <OFFSET> <COUNT>`: one reply with up to 600 bytes of the file, or up to COUNT,
+  1 to 720, in base64. The tool prints that one reply; the next piece is a second command.
 - `--timeout SECONDS` is how long the tool waits for a reply; 2 seconds without it.
 - `--port NAME`: the tool opens the port without resetting the board. It sets 115200 baud,
   8 data bits and no parity, lowers RTS before it lowers DTR, waits 0.2 seconds, discards
@@ -1041,7 +1112,9 @@ here; the board's is in [firmware.md](firmware.md).
   <name> <bytes> <crc32>`, where the name is the last part of the path as it is and the
   CRC-32 is the file's, then the file in pieces of the size the reply names, each as one
   `upload data` line, and then `upload end` with the CRC-32 of the file. ID and the name
-  are not checked by the tool.
+  are not checked by the tool. With `--folder PATH` the name is the path of that folder of
+  the board's own storage, `/` and the last part, each part escaped as a URI's, so that
+  the file goes into the folder.
 - A reply `{"ok":true,"unchanged":true}` to `upload begin` ends the upload: the item holds
   this file already, and nothing more is sent. A reply `bad-argument` to it is followed by
   `upload begin <ID> <name> <bytes>` once, for a target older than the CRC-32 there.
@@ -1053,8 +1126,11 @@ here; the board's is in [firmware.md](firmware.md).
   is written over again.
 - After the last piece the tool writes `upload: checking` once. While the reply to
   `upload end` is `busy`, the target is checking the file, and the tool sends
-  `upload end` again every 0.2 seconds. After 600 seconds of `busy` it sends
-  `upload cancel`, prints the last reply and exits with status 1.
+  `upload end` again every 0.2 seconds. After 10800 seconds of `busy` it sends
+  `upload cancel`, prints the last reply and exits with status 1. The core discards an
+  upload whose check does not move for 60 s by itself; the limit is for a target that
+  would answer `busy` for ever, and leaves time for the largest file of the collection
+  on a board at 20 refreshes a second.
 - After an upload that ended well, one more line on standard error says what it came to:
   `upload: committed: <bytes> bytes sent and checked by the target`, or `upload:
   unchanged: the target holds this file already; nothing was sent`. A reply that was not
@@ -1118,6 +1194,22 @@ python -m odrigctl --port build/emulator/serial mapping get
 python -m odrigctl --tcp 127.0.0.1:8601 mapping get
 python -m odrigctl --http 127.0.0.1:8600 mapping get
 ```
+
+### Output rotation
+
+The emulator runs the same square output permutation as the firmware. Query and set
+the confirmed installation orientation through any existing command route:
+
+```
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] rotation [OPERATION]
+python -m odrigctl --port NAME rotation
+python -m odrigctl --tcp localhost:8766 rotation
+python -m odrigctl --http http://4.3.2.1 rotation
+python -m odrigctl --http http://4.3.2.1 rotation set REVISION 90
+```
+
+Use the revision from `rotation`; degrees are exactly0,90,180 or270 clockwise.
+Read actual orientation after a lost reply; do not replay an uncertain write.
 
 ## Previewing one animation
 
@@ -1550,9 +1642,12 @@ tool sends the words as they are typed. The emulator keeps the saved repeats in
 has no code of its own for them.
 
 `clocks on`, `clocks off`, and `clocks only` select Between animations, Off and Clocks
-only. `clocks message on|off` remains independent. The emulator and every command-tool
-transport use the shared core for mode boundaries and separate clock/message bags.
-The host keeps version-2 settings in `clocks.txt`; valid version-1 settings still load.
+only. `clocks message on|off` and `clocks storage sd|internal` remain independent of the
+mode. The emulator and every command-tool transport use the shared core for mode
+boundaries and separate clock/message bags. The host keeps version-2 settings in
+`clocks.txt` while the card's copies are preferred, and version-3 settings, whose fourth
+line is `storage internal`, while the board's own copies are; valid version-1 settings
+still load.
 Only rejects outside playback and output-taking diagnostics, retains the normal playlist
 for exit, and stays dark when no eligible faces exist. See
 [commands.md](commands.md#clocks-between-the-animations) for status and recovery.
