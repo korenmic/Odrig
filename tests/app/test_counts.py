@@ -91,7 +91,7 @@ class OnTheShowScreen(Counts):
 
 
 class WhatIsNotKnown(Counts):
-    def test_disconnect_drops_stale_absence_or_capacity_and_recovers_unknown_mounted_storage(self):
+    def test_disconnect_keeps_the_last_absence_or_capacity_dimmed_and_recovers_unknown_mounted_storage(self):
         listed = (200, json.dumps({"ok": True, "items": [
             {"id": 1, "file": "one.odrg", "bytes": 1138, "ignored": False, "external": False},
             {"id": 60001, "file": "card.odrg", "bytes": 52340, "ignored": False, "external": True},
@@ -116,28 +116,29 @@ class WhatIsNotKnown(Counts):
                     mode.update(offline=False, recovered=True)
 
                 initial = r"free 77\.0 MB of 99\.0 MB" if mounted else r"External storage: absent \(read-only\)\.$"
+                # While the target does not answer, the lines keep their last words, dimmed.
                 with support.StandIn({name: reply for name in ("status", "list", "space")}) as target:
-                    seen = self.lines(target.address, 2, [initial, r"External storage: information unavailable\.$",
-                                      r"External storage: 1 animation, capacity unavailable \(read-only\)\.$"],
+                    seen = self.lines(target.address, 2, [{"lines": initial, "dimmed": False}, {"lines": initial, "dimmed": True},
+                                      {"lines": r"External storage: 1 animation, capacity unavailable \(read-only\)\.$", "dimmed": False}],
                                       steps=[offline, recover], ms=12000)
                     self.assertEqual(target.together, 1)
-                self.assertEqual(seen[1]["external"], "External storage: information unavailable.")
+                self.assertEqual((seen[1]["internal"], seen[1]["external"]), (seen[0]["internal"], seen[0]["external"]))
                 self.assertEqual(seen[2]["external"], "External storage: 1 animation, capacity unavailable (read-only).")
 
     def test_while_the_list_is_busy_the_drive_s_number_is_not_known_yet_and_the_board_s_is(self):
         replies = {"status": support.PLAYING, "list": BUSY, "space": space(2, True, 3100000000, 31900000000)}
         with support.StandIn(replies) as target:
             seen = self.lines(target.address, 0, [r"animations not known yet"])
-        self.assertEqual(seen[0], {"internal": "Internal storage: 2 animations, free 8.4 MB of 10.4 MB",
-                                   "external": "External storage: animations not known yet, free 3.1 GB of 31.9 GB (read-only)."})
+        self.assertEqual((seen[0]["internal"], seen[0]["external"]), ("Internal storage: 2 animations, free 8.4 MB of 10.4 MB",
+                                                                      "External storage: animations not known yet, free 3.1 GB of 31.9 GB (read-only)."))
 
     def test_an_invalid_show_s_number_is_not_known(self):
         invalid = (200, '{"ok":true,"on":true,"brightness":128,"playing":null,"animation":null,"fps":0,"error":"file-missing"}\n')
         refused = (200, '{"ok":false,"error":"show-invalid"}\n')
         with support.StandIn({"status": invalid, "list": refused, "space": space(0, False)}) as target:
             seen = self.lines(target.address, 0, [r"animations not known"])
-        self.assertEqual(seen[0], {"internal": "Internal storage: animations not known, free 8.4 MB of 10.4 MB",
-                                   "external": "External storage: absent (read-only)."})
+        self.assertEqual((seen[0]["internal"], seen[0]["external"]), ("Internal storage: animations not known, free 8.4 MB of 10.4 MB",
+                                                                      "External storage: absent (read-only)."))
 
     def test_a_present_drive_whose_capacity_is_unknown_still_says_its_number(self):
         listed = (200, '{"ok":true,"items":[{"id":1,"file":"one.odrg","bytes":1138,"ignored":false},{"id":60001,"file":"card.odrg","bytes":52340}],"next":null}\n')

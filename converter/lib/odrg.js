@@ -108,25 +108,58 @@ export function header(data) {
 //   It refuses nothing: it stops at the first start it cannot read or whose record does not
 //   fit, a place where `next` refuses the file.
 export function reader(data) {
-  const {width, height, paletteSize, frameCount, compressed, n} = header(data);
-  const bpp = paletteSize > 0 ? 1 : 3;
-  const body = compressed ? inflated(data.subarray(HEADER_SIZE)) : data.subarray(HEADER_SIZE);
+  const head = header(data);
+  const body = head.compressed ? inflated(data.subarray(HEADER_SIZE)) : data.subarray(HEADER_SIZE);
   let position = 0;
-  const take = (count, what) => {
-    const end = position + count;
-    if (end > body.length) {
-      throw new Rejection(TRUNCATED, `the file ends inside ${what}`);
-    }
-    const taken = body.subarray(position, end);
-    position = end;
-    return taken;
+  const source = {
+    take(count, what) {
+      const end = position + count;
+      if (end > body.length) {
+        throw new Rejection(TRUNCATED, `the file ends inside ${what}`);
+      }
+      const taken = body.subarray(position, end);
+      position = end;
+      return taken;
+    },
+    rest() {
+      return body.length - position;
+    },
   };
+  const read = records(head, source);
+  const firstRecord = position;
+  const {frameCount} = head;
+
+  const loopMs = () => {
+    let at = firstRecord;
+    let total = 0;
+    for (let counted = 0; counted < frameCount; counted += 1) {
+      if (at + RECORD_START_SIZE > body.length) {
+        break;
+      }
+      const length = u16(body, at + 2);
+      if (length < 2 || at + RECORD_START_SIZE + length - 1 > body.length) {
+        break;
+      }
+      total += u16(body, at);
+      at += RECORD_START_SIZE + length - 1;
+    }
+    return total;
+  };
+
+  return {...read, loopMs};
+}
+
+// The palette and the frame records of a file whose header was read, from a source of its
+// body: `take(count, what)` gives the next bytes or refuses as `reader` does, and `rest()`
+// the number of bytes left. The palette is read at once; `next()` is the reader's.
+export function records({width, height, paletteSize, frameCount, compressed, n}, source) {
+  const bpp = paletteSize > 0 ? 1 : 3;
+  const take = (count, what) => source.take(count, what);
 
   const palette = new Uint8Array(3 * paletteSize);
   for (let entry = 0; entry < paletteSize; entry += 1) {
     palette.set(take(3, "the palette"), 3 * entry);
   }
-  const firstRecord = position;
 
   let buffer = new Uint8Array(n);
   let number = 0;
@@ -135,8 +168,9 @@ export function reader(data) {
     if (number === frameCount) {
       if (!ended) {
         ended = true;
-        if (position < body.length) {
-          throw new Rejection(TRAILING_BYTES, `${body.length - position} bytes follow the last frame record`);
+        const left = source.rest();
+        if (left > 0) {
+          throw new Rejection(TRAILING_BYTES, `${left} bytes follow the last frame record`);
         }
       }
       return null;
@@ -180,24 +214,7 @@ export function reader(data) {
     return {ms: duration, picture, mode, buffer};
   };
 
-  const loopMs = () => {
-    let at = firstRecord;
-    let total = 0;
-    for (let counted = 0; counted < frameCount; counted += 1) {
-      if (at + RECORD_START_SIZE > body.length) {
-        break;
-      }
-      const length = u16(body, at + 2);
-      if (length < 2 || at + RECORD_START_SIZE + length - 1 > body.length) {
-        break;
-      }
-      total += u16(body, at);
-      at += RECORD_START_SIZE + length - 1;
-    }
-    return total;
-  };
-
-  return {width, height, paletteSize, frameCount, compressed, palette, next, loopMs};
+  return {width, height, paletteSize, frameCount, compressed, palette, next};
 }
 
 // Reads an ODRG file given as bytes.

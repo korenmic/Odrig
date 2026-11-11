@@ -12791,3 +12791,98 @@ as it is, when it has one. The page needs no change: the legs come from the core
 file from that route.
 
 **Resolution.** `emulator/httpd.py`, `docs/emulator.md`.
+
+## Seed 80: what the batch decides beyond its seed
+
+**Question.** What does a pick of one file do to a list, when are names made, how is a lost
+link taken back, and how is the run tested?
+
+**Answer.** A pick of one file closes a list that was not sent and opens the form; during a
+run the list stays and the form opens under it. Names are made when rows are added and when
+the storage changes, never when another row's name is edited, so that an edit cannot rename
+the others; the same file is known by its name and size. After a lost reply before the last
+byte's reply, the run sends `upload cancel` once the installation answers, so that an
+upload it may still hold open does not answer the next begin `busy` until it is dropped a
+minute later. A reply of a job that comes after the job ended changes no row. The run's
+cases are tested in Chrome against the emulator and against a stand-in that hands each line
+to the emulator and answers some itself: `busy`, `stale`, nothing, or a card gone from
+`space` once the first file is in. "In the background" is the app open on any of its
+screens; with another app in front or the phone locked the run waits, and no service,
+wake lock or permission is added.
+
+**Resolution.** `app/www/batch.js`, `app/www/screens/batch-list.js`,
+`tests/app/test_batch.py`.
+
+## Seed 73: where the panel stands, and what an archive's upload decides
+
+**Question.** Where is the panel `Archive`, does it show the room for items, and how do a
+folder of the card and a replaced file go?
+
+**Answer.** On Upload, beside the upload, where the batch of seed 80 runs; the seed's
+words "the Animations screen, beside the upload" named the upload as the place. The room
+for items is not shown: seed 80, the later of the two, found that no reply gives it, and a
+`no-space` of the board's storage says so in words. A file of the card goes to its path from
+the archive's root; a folder the card does not have is refused by the board, as for a single
+upload, and the run goes on. A file ticked `Replace` is sent to the board's storage by the
+id of the root's item of its name, with no creation guard, and to the card without `upload
+expect`; the batch's run takes both from the item. The archive's rows start ticked when
+they can be sent, and a name the destination's list has needs `Replace` or another name.
+
+**Resolution.** `app/www/screens/archive.js`, `app/www/zip.js`, `app/www/batch.js`,
+`tests/app/test_archive.py`.
+
+## Seed 79: the stream's units, where the batch's preview starts, and the measurement
+
+**Question.** How does a DEFLATE reader fed in parts keep `inflateRaw`'s verdicts, where do
+the previews of a batch and an archive start, and what was measured?
+
+**Answer.** `inflateStream` decodes the same blocks in units: a block's header and codes, a
+literal, a length with its distance, an end of block, a part of a stored block. A unit that
+runs out of input is undone and read again when more comes, so it reads the same bits in the
+same order as `inflateRaw` and reaches every verdict at the same bit; once the end is told,
+running out is `truncated`. Its output goes through a ring of 131,072 bytes whose last 32,768
+are the window. The maker's first pass also takes the bytes after the stream and a palette
+cut short, in `odrg.reader`'s order, and sums only the records whose bytes all came, as
+`loopMs` does. A batch's or an archive's file starts its preview when its bytes are sent, and
+the run still waits for the preview of the file before, so that at most two files are held.
+The converter's test makes the preview of a compressed file whose body inflates to 17.3 MB
+with at most 32,768 bytes of output held, the same bytes as its uncompressed twin's. The
+measurement of the seed's Definition of Done in Chrome against the emulator, with the two
+files of `space-scan-10x.odrg` on the Drive under `odrig archive/seed-79/`, was not made in
+this run; it stays open with the owner's check.
+
+**Resolution.** `converter/lib/inflate.js`, `converter/lib/odrg.js`,
+`converter/lib/thumbnail.js`, `app/www/previews.js`, `app/www/client.js`,
+`converter/tests/inflatestream.test.js`, `tests/app/test_phone_previews.py`.
+
+## Seed 79: the measurement in Chrome against the emulator
+
+**Question.** How long does it take, in Chrome against the emulator, from the press of
+`Upload to the installation` to the preview in the row, for a converted GIF and for the two
+compressed ready-made files of `odrig archive/seed-79/` on the Drive?
+
+**Answer.** Measured on 2026-11-08 on Windows 11 (Intel Core i7-14700, 32 GB) in headless
+Chrome 156 at 360 x 740, three runs of each against a fresh emulator, with the app suite's
+driver and a scenario that works the app as an operator does: pick the file, or make the
+animation from the GIF, and press `Upload to the installation` as soon as it is enabled.
+The emulator played a 60 x 60 show of `mapping/legs-20.json` with no items; its internal
+storage held 5,111,808 bytes, the spare's, and its catalog was `none`; the card's catalog
+was `ok`. The two ready-made files were made by the converter's library from
+`collection/card/space/space-scan-10x.odrg`: the large one of every frame record but the
+last, the small one of its first records.
+
+| File | Bytes | Key | Storage | To the success message, ms | To the preview in the row, ms |
+|---|---:|---|---|---|---|
+| `space-scan-10x.odrg`, made by the app from `space-scan-10x.gif` (31,035 bytes) | 29,052 | `eba96049-29052` | internal | 1,129; 884; 907 | 1,139; 896; 919 |
+| `space-scan-small.odrg`, 2,357 records | 3,950,719 | `7d2fe68d-3950719` | internal | 47,621; 45,872; 46,275 | 47,634; 45,901; 46,300 |
+| `space-scan-large.odrg`, 18,003 records, 720,120 ms | 34,408,936 | `53c6b7ce-34408936` | the card | 391,392; 375,561; 372,403 | 391,404; 375,572; 372,414 |
+
+Every preview was in its row 10 to 29 ms after the success message. The phone had made it
+before the upload ended: 0.04 s, about 1 s and 7 to 10 s after the press. The time to
+success is the sending over the computer's own network and then the installation's check
+after the last byte, paced as the board paces it: about 41 s for the small file and 5 min
+46 s for the large one. Some of the runs shared the computer with the test suites. A board
+over Wi-Fi sends more slowly; the preview's delay after success does not depend on that.
+
+**Resolution.** The Definition of Done's measurement is made; the owner's check on a phone
+stays open. No file of the repository changed for it.

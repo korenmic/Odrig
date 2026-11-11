@@ -4,10 +4,11 @@
 // from the JSON source a form gives, which the same library writes as a container and
 // draws as the player does.
 
-import {Rejection, jsonframes, odrg, odrgx, thumbnail, timeline} from "./converter/index.js";
+import {Rejection, inflate, jsonframes, odrg, odrgx, thumbnail, timeline} from "./converter/index.js";
 
-// Inspect existing encoded files without converting or expanding compressed frames.
-export async function prepareReady(file, canvas) {
+// The checks of a ready-made file that read only its start: its ending, its size, its
+// header, its canvas against the target's, and a container's payload size and frames.
+export async function inspectReady(file, canvas) {
   if (!/\.(odrg|odrgx)$/i.test(file.name)) throw new Error("Choose an .odrg or .odrgx animation file.");
   if (!Number.isInteger(file.size) || file.size < 16 || file.size > 0xffffffff) throw new Error("The animation file size is unsupported.");
   if (canvas?.width == null || canvas?.height == null) throw new Error("The target has not reported its canvas yet.");
@@ -19,10 +20,34 @@ export async function prepareReady(file, canvas) {
   const frames = !container || header.type === odrgx.TYPES.frames;
   const frameHeader = frames ? (container ? odrg.header(prefix.subarray(20)) : header) : null;
   if (frameHeader && (frameHeader.width !== header.width || frameHeader.height !== header.height)) throw new Error("The animation container and its frames have different canvases.");
+  return {container, header, frames, frameHeader};
+}
+
+// The output of a raw DEFLATE stream, as an entry of a zip holds it; a damaged stream throws
+// its reason.
+export function inflated(bytes) {
+  return inflate.inflateRaw(bytes).data;
+}
+
+// The kind and the length of the bytes of a ready-made file that the checks took: `frames`,
+// `text` or `widget`, and its loop in milliseconds.
+export function kindAndLength(bytes) {
+  if (odrgx.isContainer(bytes)) {
+    const header = odrgx.readHeader(bytes);
+    const kind = header.type === odrgx.TYPES.text ? "text" : header.type === odrgx.TYPES.widget ? "widget" : "frames";
+    return {kind, ms: header.loopMs};
+  }
+  return {kind: "frames", ms: odrg.reader(bytes).loopMs()};
+}
+
+// Inspect existing encoded files without converting or expanding compressed frames.
+export async function prepareReady(file, canvas) {
+  const {container, header, frames, frameHeader} = await inspectReady(file, canvas);
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (bytes.length !== file.size) throw new Error("The selected animation changed while it was read.");
   if (!frames) odrgx.decode(bytes);
-  const previewSafe = !frames || (!frameHeader.compressed && bytes.length <= 65536 && frameHeader.frameCount <= 256 && frameHeader.n * frameHeader.frameCount <= 262144);
+  // Every file the checks take gets a preview: the maker reads a compressed body as a stream.
+  const previewSafe = true;
   return {bytes, header, ready: true, previewSafe, ending: container ? ".odrgx" : ".odrg", file};
 }
 

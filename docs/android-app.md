@@ -86,8 +86,9 @@ a top bar with the app's name and whether the installation answers.
   on the square plays as a tap on the name does. The previews are those of the default
   preview catalog that comes with the app, `thumbnails/`, found by each animation's key
   (see "The keys of the animations" below), then the phone's own; while a row's key is not
-  known yet, the preview its file's name and size find in the default catalog, so that a
-  file of other bytes with the same name and size shows that preview until its own key is
+  known yet, the key this phone kept for the place it uploaded the file to, when its size is
+  the row's; else the preview its file's name and size find in the default catalog, so that
+  a file of other bytes with the same name and size shows that preview until its own key is
   read. Each square shows its preview as soon as its own row has one, without waiting for
   the others. Folder rows and the Tests group have none. The row then
   names its file, its id and its size, or `size not read yet` while the installation has
@@ -591,12 +592,15 @@ colours do. A video is drawn at most 1,280 pixels wide or high before it is fitt
 
 ### Ready-made files and upload destinations
 
-`Choose a ready-made animation` accepts `.odrg` and `.odrgx`. Actual headers identify
+`Choose ready-made animations` accepts `.odrg` and `.odrgx`, one file or several; one
+file opens the form below, several the batch list of the next section. Actual headers identify
 the format. Wrong/unsupported headers, damaged bounded containers and another canvas
 are refused in words. The exact encoded bytes are uploaded, without conversion,
-resizing or timing changes. Compressed frame bodies never inflate on the phone for
-a preview. The app reuses its content-key preview catalog/cache; otherwise it says
-that no preview is available and the target will check the complete animation.
+resizing or timing changes. Every file the checks take gets a preview made on the
+phone, a compressed body read through a DEFLATE stream in two passes so that it is never
+held inflated: the note under it says `Preview from the animation catalog. The original
+animation bytes are kept.` for one of the default catalog, and `Preview made on this
+phone. The original animation bytes are kept.` for one this phone made.
 
 Every new ready-made or converted-media selection starts with `External storage`
 when detected, even if Internal was chosen for the previous form. Choose `Internal
@@ -628,6 +632,92 @@ manual attempt can use the visibly updated fallback. Cancellation, failed checks
 and uncertain completion are distinct from an acknowledged installed file. After
 success the destination catalog/list/preview refresh normally. Authored texts and
 clocks remain in Internal; ready-made containers can use either selected storage.
+
+### An archive of animations
+
+The panel `Archive` on Upload opens one zip from the phone's chooser with `Choose an
+archive`. The zip is read in the page, where it stays until the page reloads or another
+is chosen: its directory, and each entry stored or deflated, the deflated ones through the
+converter's inflate, each checked against its size and CRC-32. An entry encrypted, packed
+another way, in zip64 or damaged is listed `unreadable:` with its reason; at most 512
+entries and 64 MB unpacked are read, and the app says so of more. The `.odrg` and `.odrgx`
+entries, in any folder, are the animations, each checked as a ready-made file is and listed
+with its size, its kind and its length, or `refused:` with the reason; the other entries
+are `passed over: not an animation`. The animations start ticked; `Tick all` and `Tick
+none` change every row.
+
+A file goes to the board's storage under the last part of its path, and to the card under
+its path from the archive's root, into a folder the card has; each name can be changed in
+its row before the upload. A name the destination cannot take, or one ticked twice, is
+said under it; a name the destination's list has says `A file of this name is there.`, and
+the file replaces it only when `Replace` beside it is ticked. Under the list the sum of the
+ticked files stands with the destination's capacity, and `Upload ticked` is disabled with
+its reason while nothing is ticked, a name must be mended or allowed to replace, or the
+sum does not fit. The press sends the ticked files one after another as the run of a batch
+of ready-made files does, with its row states, its line on every screen and `Stop`; each
+file is extracted and checked again at its turn. The room for items is not shown, since no
+reply gives it.
+
+### A batch of ready-made files
+
+Two or more files picked at once, where the phone's file app lets several be ticked,
+open a list in place of the form; `Add more` picks more into it, and `Remove` takes a row
+out. A list left with one row stays a list; one left with none closes, and a pick of one
+file closes a list that has not been sent and opens the form. A file picked twice, by
+name and size, is listed once, and at most 512 are listed: of more, the app says `At most
+512 animations are listed; <k> were left out.` At the pick each file is checked by its
+start, its ending, its header, its canvas and a container's payload size; a file that
+fails is listed `refused: <reason>` in the words of a single file and is never sent.
+
+Each row is named as a converted file is, its name in lower case with every other
+character a `-`, and `-2`, `-3` and so on when the destination's list or a row above has
+the name; the destination's list is the root's of the board's storage, the browsed
+folder's on the card. Unedited names are made again when the storage changes. A name
+stays editable until the press; one that breaks the rule, makes a path of more than 100
+bytes, or repeats another row's says why under it, and `Upload <n> animations` is
+disabled with `Mend the names marked in the list.` The list shows `<n> animations, <a>
+KB.` and the destination's capacity; while the sum does not fit the known free space the
+button says `These animations need <a> KB and the installation has <b> KB free.`, or the
+card. The batch takes the storage and folder the form would take, with the same choice,
+and holds them for every file; a fallback the press's preflight finds moves the list and
+needs another press.
+
+One press sends the files one after another through the app's upload, each with its own
+preflight, its lowest free id and today's refusals; the first file sent after the press
+is guarded by the catalog generation of the pick, the others by their own preflight.
+Each file is read whole only at its turn and checked again; one damaged in its body fails
+there. A row says `waiting`, `checking`, `sending 45%`, `waiting: the installation is busy
+(try <k> of 30)`, `uploaded as animation <id>` or `uploaded to the card`, `failed:
+<reason>` or `not sent`. A file that fails is marked and the run goes on: `busy` is tried
+again every 2 seconds on the screen, 30 times; a `stale` begin of the board's storage, a
+drop while the app was away, and a lost link before the last byte's reply start the file
+again once; an `upload end` without a reply fails it. A card gone, read-only or without a
+ready catalog, a folder changed, or a change of target ends the run, the rest `not sent`.
+`Stop` lets the file in progress end and sends no more; `Try the failed again` sends the
+failed and the unsent once more with their names and destination.
+
+While the run lasts the content is locked as during one upload: deleting and moving on
+Animations wait, and the form's `Upload to the installation` and the text or clock form's
+upload are disabled, saying `A batch upload is under way.`; play, brightness, browsing and
+Settings work. A line under the top of every screen, staying there while the screen
+scrolls, says `Uploading 3 of 12: sunrise.odrg, 45%`, `Waiting for the installation to
+answer.` or `Paused while the app was not on the screen.`; a tap opens Upload. At the end
+it says `<a> of <n> uploaded`, with the failed and the unsent where there are any, until it
+is tapped or another upload starts. The run goes on while the app is open on any screen,
+with the phone's screen kept on as always; another app, the phone locked, or the app
+closed pauses or ends it, since no service runs it outside the app.
+
+While `Upload to the installation` is disabled, a line under it says why, one reason at a
+time: `The installation has not answered yet.` or `The installation does not answer.`
+with the failure's sentence and its kind, as the target screen words it; `Checking the
+destination with the installation.` while the press is being checked; `An upload is under
+way.` while this screen, a text or a clock sends; `A deletion is under way on Animations.`
+while the selection deletes. The sentence about the card, `External storage is
+disconnected or not detected. Using Internal /.`, waits for a reply of `space` that names
+no card: until the first reply the destination line says `Storage not known yet: the
+installation has not answered.` and the form keeps its storage, Internal chosen and
+External offered only after a reply said a card is present. A request that fails keeps the
+last capacity, dimmed, and moves the form nowhere; the next reply refreshes both.
 
 To make a text, press `Make a text` on Upload. A form opens under it: the text, written
 with English letters, digits, signs and Hebrew letters, and line feeds; its font,
@@ -772,12 +862,21 @@ it, its read under way first; else by its file's name and size in the default ca
 one key of that size the catalog gives the name, or, for a card file whose path it does
 not name, its own name; else none, and the square stays empty and dark.
 
-**The phone's own previews.** After an upload from Upload, or from the form of a text or a
-clock, a new one or an edited one, has ended with success and its message is shown, the app
-makes the preview of the bytes it sent with the converter's library, a step at a time so
-that the screen keeps answering, and keeps it in the phone's own catalog of previews, in the
-web view's IndexedDB, under the key of those bytes; the row keeps its empty square until the
-preview is made, and shows it once the catalog's pages give the row that key. The app looks
+**The phone's own previews.** As an upload starts, from Upload, from the form of a text or a
+clock, a new one or an edited one, or as a file of a batch or an archive, the app starts
+making the preview of the bytes it sends with the converter's library, one preview at a
+time in the order the uploads started, a step at a time so that the screen keeps answering;
+a ready-made file starts it when it is picked. A preview made is this run's at once. It is
+written to the phone's own catalog of previews, in the web view's IndexedDB, under the key
+of those bytes, only when an upload of them has ended with success; a refused, failed or
+cancelled upload writes nothing. With the success the app keeps the upload's place, the
+target's address, the storage and the file's name as the list names it, with the key, in
+the store `uploads` of the database's version 3, and the row shows the preview at once by
+that place: on a storage without a catalog too, and before the catalog's pages are read. The
+name's key of an earlier read is set aside until a page read after the upload names it; a
+key the board gives decides over the kept place. A place goes when a complete list of its
+folder, asked after the upload, no longer names the file, when this app deletes it, or when
+a later upload to the name replaces it; two boards at one address share their places. The app looks
 a key up in the default catalog first and in the phone's own after, and at its start drops
 each preview of its own whose key the default catalog has; the phone's catalog has no other
 limit. It never leaves the phone, and each phone has its own; the Controller view and
@@ -1125,7 +1224,30 @@ installed; the phone with mobile data on.
     Include. Check dark recovery when all faces are excluded, mode restoration, reconnect
     and another controller's changes. Repeat upright and sideways. These physical and
     phone observations remain open until actually performed.
-24. **Note** the phone's model, its Android version, the web view's version from the
+24. **The reason under Upload.** With the spare board and no card: on Upload choose a
+    ready-made animation, with `Internal storage` selected. *Seen:* `Upload to the
+    installation` enabled, the line `External storage is disconnected or not detected.
+    Using Internal /.` under the form, and after the press `Uploaded as animation <id>
+    <file>. It plays in the playlist.`; then switch the installation off: within five
+    seconds the button is gray and the line under it says `The installation does not
+    answer.` with the failure's kind in brackets.
+25. **A batch of ready-made files.** On Upload, `Choose ready-made animations` and tick ten
+    files in the phone's file app. *Seen:* the list of ten, `Upload 10 animations`; after
+    the press, Animations opened shows the line `Uploading <k> of 10: ...` and all ten play
+    after `10 of 10 uploaded.`; the same into a folder of the card; another app opened for
+    two minutes during a run, and the app brought back: the line said `Paused while the app
+    was not on the screen.`, and the run went on to its end.
+26. **An archive.** On Upload, `Choose an archive` and pick `clocks_rotated_right.zip`.
+    *Seen:* its 113 animations listed and ticked; `Tick none`, then a dozen ticked, and
+    `Upload ticked` to the board's storage: the line on every screen shows the run, and the
+    clocks play.
+27. **Previews made on this phone.** With the spare board, whose storage has no catalog,
+    upload a converted GIF, a compressed ready-made file whose preview the default catalog
+    does not hold, and a text. *Seen:* each row shows its moving preview within seconds after
+    the upload's message, and the panel of what plays too; after the app is closed and
+    opened again they are still there; after one is deleted, a new file of another size at
+    its name has no preview of the old.
+28. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1229,6 +1351,15 @@ By programs, on a Mac:
 - Uploading in Chrome: a GIF and an mp4 uploaded to the emulator, listed and played;
   `Cancel`; nothing sent while the app is away, and the upload finished when it is back;
   a file that does not fit; `upload end` answered `busy`; every refusal.
+- The reason under `Upload to the installation`, in Chrome against stand-in targets at
+  320, 360 and 740 pixels: a status that fails named under the disabled button with its
+  kind, the destination line, the form and the capacity kept and the capacity dimmed,
+  the line in the colour and the size of the capacity line inside the screen; a `space`
+  that never answers, with `Storage not known yet` and the form where it is until a
+  reply without a card enables the button with the card's sentence; a slow deletion on
+  Animations and a slow check of the destination each named; the destination invariants
+  of no reply, an absent card and an older target; and, against the emulator without a
+  drive, the Internal fallback upload unchanged.
 - That a long press or a right click marks text and opens a menu only in a field one
   types into, in Chrome: every element of the screens, of a message and of the
   question, fields and other elements made later, and the page for an old web view. A
@@ -1277,6 +1408,14 @@ By programs, on a Mac:
   and the rule that allows plain HTTP.
 
 ## What is open
+
+- **Previews made on this phone, on a phone.** No person has seen a preview this phone made
+  in a row of a storage without a catalog: the step `Previews made on this phone` above.
+- **An archive on a phone.** No person has opened a zip on a phone and uploaded its
+  animations from it: step 26 above.
+
+- **A batch of ready-made files on a phone.** No person has ticked several files in a
+  phone's file app, nor watched a run on the installation and the card: step 25 above.
 
 - **Message clock modes and external inclusion on a phone and on the board.** The
   shared browser/emulator proofs do not replace physical acceptance of all seven
@@ -1328,6 +1467,9 @@ By programs, on a Mac:
 - **Seed 47 on a phone.** Nobody has typed a brightness into the field on a phone: the
   owner's check is to type 8, press Done, and see the installation at 8 and the slider at 8,
   and to see the field show the slider's number while it moves.
+- **Seed 75 on a phone.** Nobody has seen the line under `Upload to the installation` on
+  a phone: step 24 above, with the spare board and no card, and with the installation
+  off.
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.

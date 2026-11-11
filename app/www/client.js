@@ -28,7 +28,9 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 // its path and the number of its own files, in the order they play. `rootNames` holds what
 // the root's newest list named, `{ids, files}`, the ids and the file names of the show's
 // items and of the root's files, which an upload chooses its id and its name against, or
-// null while none is known. `space` holds internal and external capacity from the newest reply, or null.
+// null while none is known. `space` holds internal and external capacity from the newest reply, or
+// null while none came from this address or the newest said the capacity is unknown; a request
+// that fails leaves it.
 // `listBusy` says whether the newest `list` request was answered `busy`. `order` is the
 // saved playlist order that goes with the newest list, `{ids, revision}`, or null while
 // there is none; `orderKnown` is false when the target has no saved order, an older one.
@@ -92,12 +94,15 @@ let pageWait = null;
 // Where the keys of the catalogs are kept between two starts of the app, the address they are
 // kept under, and whether those of earlier starts have been taken: no page of a catalog is
 // asked before.
-let keeper = {kept: () => null, keep: () => {}, forget: () => {}};
+let keeper = {kept: () => null, keep: () => {}, forget: () => {}, placed: () => null, place: () => {}, unplace: () => {}, unlisted: () => {}};
 let keptUnder = null;
 let keptTaken = false;
 // Counts the targets: a reply that belongs to an earlier address is dropped.
 let target = 0;
-let contentLocked = false;
+// Who holds the content lock, which keeps an upload, a check of its destination and a
+// deletion apart: "preflight" while the Upload screen checks a destination, "deletion"
+// while the selection removes animations, or null.
+let holder = null;
 
 // Calls a function now and whenever the state changes.
 export function watch(watcher) {
@@ -138,13 +143,14 @@ function heard() {
   state.answered = true;
 }
 
+// A request got no reply, or none of the installation. What the last replies said stays,
+// the capacity among it, shown stale while the link is down.
 function failed(error) {
   if (!(error instanceof Failure)) {
     throw error;
   }
   state.link = "no-answer";
   state.failure = error;
-  state.space = null;
   state.statusFresh = false;
 }
 
@@ -315,7 +321,7 @@ async function recoverLevel(asked, level) {
 async function askListPart() {
   const asked = target;
   const level = state.level;
-  const part = listing === null ? {items: [], from: 0} : listing;
+  const part = listing === null ? {items: [], from: 0, began: performance.now()} : listing;
   listing = null;
   try {
     const reply = await commands.list(part.from, level.id);
@@ -325,8 +331,13 @@ async function askListPart() {
     heard();
     const items = part.items.concat(reply.items);
     if (reply.next !== null) {
-      listing = {items, from: reply.next};
+      listing = {items, from: reply.next, began: part.began};
     } else {
+      // The places this phone uploaded to that the complete list of their folder does not
+      // name are dropped.
+      const files = items.filter((item) => typeof item.file === "string");
+      if (level.id === null) keeper.unlisted(keptUnder, "internal", "", new Set(files.filter((item) => item.external !== true).map((item) => item.file)), part.began);
+      keeper.unlisted(keptUnder, "external", level.path, new Set(files.filter((item) => item.external === true).map((item) => item.file)), part.began);
       state.listVersion += 1;
       state.listBusy = false;
       state.animations = items.filter((item) => typeof item.file === "string");
@@ -621,7 +632,25 @@ export function keyOf(animation) {
   const read = reads.find((one) => one.storage === storage);
   const kept = state.keys[storage];
   const key = (read === undefined ? undefined : read.byName.get(animation.file)) ?? (kept === null ? undefined : kept.byName.get(animation.file));
-  return key !== undefined && key.endsWith(`-${animation.bytes}`) ? key : null;
+  if (key !== undefined && key.endsWith(`-${animation.bytes}`)) {
+    return key;
+  }
+  // Else the key this phone kept for the place it uploaded the file to.
+  const placed = keeper.placed(keptUnder, storage, animation.file);
+  return placed !== null && placed.endsWith(`-${animation.bytes}`) ? placed : null;
+}
+
+// An upload of this phone ended with success: the place keeps the key of its bytes, and the
+// keys an earlier read of the storage gave the name are not taken until a page read after
+// it names it again.
+export function uploadedTo(storage, name, key) {
+  for (const read of reads) {
+    if (read.storage === storage) read.byName.delete(name);
+  }
+  state.keys[storage]?.byName.delete(name);
+  keeper.place(keptUnder, storage, name, key);
+  state.keysVersion += 1;
+  changed();
 }
 
 // Sends what the operator asked for, once. A status is due at once after its reply, and
@@ -784,7 +813,7 @@ async function next() {
 export function begin() {
   target += 1;
   keptUnder = address();
-  contentLocked = false;
+  holder = null;
   state.listVersion = 0;
   if (job !== null) {
     job.failed(new Error("the address changed"));
@@ -941,7 +970,10 @@ export function wake() {
 
 // Removes an animation from the show. `done` is called when the target has removed it.
 export function remove(animation, done) {
-  want("remove", () => commands.remove(animation.id), () => done(animation));
+  want("remove", () => commands.remove(animation.id), () => {
+    keeper.unplace(keptUnder, animation.external === true ? "external" : "internal", animation.file);
+    done(animation);
+  });
 }
 
 export function inClockFolder(item) {
@@ -1120,6 +1152,11 @@ function cancelWaiting() {
   wanted.length = 0;
 }
 
+// Takes back an upload the installation holds open, in the stream of requests.
+export function uploadCancel() {
+  return requestOperation("upload-cancel", () => commands.uploadCancel());
+}
+
 export function mappingGet() {
   return requestOperation("mapping", () => commands.mappingGet());
 }
@@ -1151,12 +1188,20 @@ export function lastFault() {
   });
 }
 
-export function contentBusy() {
-  return contentLocked || job !== null;
+// Who keeps the content from changing now: "upload" while an upload job of any screen is
+// under way, else the holder of the lock, else null.
+export function contentHolder() {
+  return job !== null ? "upload" : holder;
 }
 
+export function contentBusy() {
+  return contentHolder() !== null;
+}
+
+// Takes the content lock for its holder, "preflight" or "deletion", or lets it go with
+// false.
 export function setContentBusy(value) {
-  contentLocked = value;
+  holder = value ? value : null;
   changed();
 }
 
