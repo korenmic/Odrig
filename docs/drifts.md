@@ -15490,6 +15490,41 @@ taken for the next line's.
 
 **Resolution.** `emulator/mirror/middle.py`, `emulator/engine.py`, `docs/emulator.md`.
 
+## Seed 87: the mirror's clock and a turn joined late
+
+**Question.** The core shows a mirror's turn from `zero_ms`, the moment of the turn's time 0
+on the clock of its polls, an unsigned number: a time before the emulator's start cannot be
+written. A turn the board began before the mirror started has its time 0 before it. And how
+is the board's time kept steady when the round trips vary?
+
+**Answer.** A mirror's engine begins its clock at 2^32 milliseconds, 49 days, in place of 0,
+so the time 0 of any turn the board began within those days lies on it; the page and the
+event stream carry that clock's numbers as they carry another's. The offset is the reply's
+`now` less the middle of the request's round trip, taken from a round trip no longer than
+the shortest so far, which grows by 1 ms at every reply, give or take 2 ms, or from an answer
+further off than half the round trip and 20 ms, so that a slow reply does not move the turn
+and a real change does. A `#plan` line, which answers no request, sets the offset only while
+none is known.
+
+**Resolution.** `emulator/engine.py`, `emulator/mirror/keeper.py`, `docs/emulator.md`.
+
+## Seed 87: joining a board
+
+**Question.** The mirror sends `plan off` at its end only when it found planning off, and
+`status` does not say whether planning is on. How does it know, and where do the looks and
+the fetches of files run?
+
+**Answer.** It asks for the plan once before `plan on`: the reply's `planning` says. The
+keeper joins anew when the link comes back after a loss, when a reply's `now` went back by
+more than a second, when a reply says planning is off, and on a line of the chip's loader
+(`ESP-ROM:`, `rst:`, `ets `, `Build:`). The look for a key's file among the collections and
+its fetch run in a thread of their own: a refresh asks only what is known already, and the
+CRC-32 of a file of a collection is taken once. The vocabulary names the connection
+`serial way`, as `way` is already a plain word of its entries.
+
+**Resolution.** `emulator/mirror/keeper.py`, `emulator/mirror/files.py`,
+`emulator/mirror/driver.py`, `agent/vocabulary.md`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

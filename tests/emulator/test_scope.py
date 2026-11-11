@@ -72,12 +72,13 @@ class Scope(unittest.TestCase):
         for path, tree in modules(EMULATOR):
             self.assertNotIn("zlib", imported(tree), path.name)
             # The binding names the members of the host record and of the mirror's record,
-            # and four of them are spelled as commands are.
-            members = {"space", "remove", "on", "brightness"} if path.name == "binding.py" else set()
+            # and four of them are spelled as commands are; the mirror reads two such members
+            # of the board's plan.
+            members = {"space", "remove", "on", "brightness"} if path.name == "binding.py" else {"on", "brightness"} if MIRROR in path.parents else set()
             for text in set(texts(tree)) - members:
                 self.assertNotIn(text, ("ODRG", "show.json", "play", "brightness", "on", "off", "list", "upload", "upload.part", "show.part", "pending.txt", "space", "remove"), f"{path.name} writes out {text!r}")
-        users = sorted(path.name for path, tree in modules(EMULATOR) if "json" in imported(tree))
-        self.assertEqual(users, ["hub.py"])
+        users = sorted(str(path.relative_to(EMULATOR)).replace("\\", "/") for path, tree in modules(EMULATOR) if "json" in imported(tree))
+        self.assertEqual(users, ["hub.py", "mirror/keeper.py"])
 
     def test_the_addresses_a_source_names_are_this_computer_every_address_and_one_for_documents(self):
         # 127.0.0.1 is where everything listens; 0.0.0.0 is where the page listens when

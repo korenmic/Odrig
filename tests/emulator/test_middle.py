@@ -254,7 +254,7 @@ class TheLinesOfAStream(unittest.TestCase):
 
 class TheWaysOfAMirror(unittest.TestCase):
     def test_the_boards_other_lines_wait_for_each_way_that_asked_since(self):
-        mirror = Mirror("tcp", "127.0.0.1:1")
+        mirror = Mirror("tcp", "127.0.0.1:1", support.ROOT, {})
         self.assertIsNone(mirror.heard_for(2))
         mirror.middle._heard(b"#log one")
         self.assertIsNone(mirror.heard_for(1))

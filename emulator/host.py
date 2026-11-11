@@ -217,6 +217,8 @@ class FolderHost:
         # Told of every open of an animation file, with the name the core used and the
         # file's path, when set: the engine learns the start of a loop from it.
         self.on_open = None
+        # A mirror's names, `<key>.odrg`, and the local files they stand for.
+        self.mirrored = {}
 
     def open(self, name):
         """1 when the file is open, 0 when the folder has no file of that name, -1 otherwise."""
@@ -343,6 +345,8 @@ class FolderHost:
         alone, alone or after the number of a folder of the storage and `/`, which is a
         folder of the folder. A name `drive/<name>` is the file of that name of the drive,
         when it can be written."""
+        if name in self.mirrored:
+            return self.mirrored[name]
         if self._of_the_drive(name):
             return self.drive.path(name, changing=True)
         folder, slash, base = name.rpartition("/")

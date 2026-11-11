@@ -14,9 +14,15 @@ GRID_MS = 20
 # A seek moves the clock in strides of this much, so that the core comes to the picture
 # of each stride's time within one refresh.
 SEEK_STRIDE_MS = 400
-# The two members of the status reply the engine reads, as the core writes them.
+# The two members of the status reply the engine reads, as the core writes them, and the
+# canvas a mirror compares with its board's.
 ANIMATION = re.compile(rb'"animation":([0-9]+|null)')
 PLAYING = re.compile(rb'"playing":("all"|[0-9]+|null)')
+WIDTH = re.compile(rb'"width":([0-9]+)')
+HEIGHT = re.compile(rb'"height":([0-9]+)')
+# A mirror's clock begins this far from 0, so that a turn the board began before the mirror
+# started has its time 0 on that clock too: 49 days.
+MIRROR_EPOCH_MS = 1 << 32
 # A cycle among the items of a list reply, and the position of the reply's next page.
 CYCLE_ITEM = re.compile(rb'\{"id":([0-9]+),"cycle":')
 NEXT_PAGE = re.compile(rb'"next":([0-9]+|null)')
@@ -104,7 +110,7 @@ class Engine:
         self.core = core
         self.hub = hub
         self.clock = clock
-        self.start_ns = clock()
+        self.start_ns = clock() - (MIRROR_EPOCH_MS * 1_000_000 if mirror is not None else 0)
         self.t0 = None
         self._lock = threading.Lock()
         self.playback = Playback()
@@ -119,9 +125,11 @@ class Engine:
         self._seen = {}
         # The page is told of the position once something is known of it.
         self._told = self.playback.event()
-        if host is not None:
+        if host is not None and mirror is None:
             host.on_open = self._note_open
         self.mirror = mirror
+        self._mini_told = None
+        self._told_status = None
         # The bytes of a line not ended yet, by transport and way, in a mirror.
         self._partial = {}
         self._partial_lock = threading.Lock()
@@ -145,6 +153,8 @@ class Engine:
             if self.t0 is None:
                 self.t0 = now
             self._opened = None
+            if self.mirror is not None:
+                self._drive(now)
             if self.core.poll(now):
                 self.hub.refresh(*self._output(now))
             if self._opened is not None:
@@ -161,6 +171,22 @@ class Engine:
             if picture is not None:
                 output += (picture,)
         return output
+
+    def _drive(self, now):
+        """A mirror's turn for the refresh at `now`, and the board's miniature output, which
+        the emulator's core is asked to show as the board's says."""
+        mini = self.mirror.drive(self.record, now)
+        if mini is not None and mini != self._mini_told:
+            self._mini_told = mini
+            self.core.command(now, b"debug mini on" if mini else b"debug mini off")
+
+    def canvas(self):
+        """The canvas of the show folder's mapping, `(width, height)`, as the core's status
+        gives it, or `None`."""
+        with self._lock:
+            reply = self.core.command(self.now_ms(), b"status")
+        width, height = WIDTH.search(reply), HEIGHT.search(reply)
+        return (int(width.group(1)), int(height.group(1))) if width and height else None
 
     def routing(self):
         """What the page must read the mapping again for: the legs and their pins."""
@@ -230,7 +256,10 @@ class Engine:
             reply = None
         else:
             reply = self.mirror.middle.send(kept)
+        self.mirror.client_line(kept, reply)
         self.hub.log(now, transport, kept[:binding.LINE_MAX], len(kept) > binding.LINE_MAX, b"" if reply is None else reply)
+        if kept == b"status" and reply is not None:
+            self.hub.status(reply)
         return reply
 
     def _fed_through(self, data, transport, way):
@@ -251,7 +280,13 @@ class Engine:
 
     def refresh_status(self):
         """Asks the core for its status, for the page. The request is not a command that
-        arrived, so it is not entered in the log."""
+        arrived, so it is not entered in the log. A mirror's status is its board's latest."""
+        if self.mirror is not None:
+            status = self.mirror.keeper.status
+            if status is not None and status != self._told_status:
+                self._told_status = status
+                self.hub.status(status)
+            return
         with self._lock:
             self._status_now(self.now_ms())
             self._publish()

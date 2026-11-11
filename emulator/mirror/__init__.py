@@ -2,12 +2,12 @@
 back, and shows what the board's plan says the board shows.
 
 It is the emulator's client of a board, as the command tool is: it opens the board's serial
-port with the command tool's client.
+port with the command tool's client, and reads the board's replies.
 """
 
 import threading
 
-from . import link, middle
+from . import driver, files, keeper, link, middle
 
 # The lines of the board one way keeps for its client, the newest; a client that does not
 # read loses the oldest, as a port nobody reads loses what waits in it.
@@ -15,14 +15,19 @@ HEARD_KEPT = 64
 
 
 class Mirror:
-    """The link, the man in the middle, and the board's lines that wait for the clients of
-    the emulator's serial ways."""
+    """The link, the man in the middle, the plan, the files and the turn on the LEDs, and the
+    board's lines that wait for the clients of the emulator's serial ways. `names` is the
+    host's table of the mirror's names; `root` holds the collections and `build/mirror/`."""
 
-    def __init__(self, kind, name):
+    def __init__(self, kind, name, root, names):
         self.kind = kind
         self.name = name
         self.link = link.made(kind, name)
         self.middle = middle.Middle(self.link)
+        self.keeper = keeper.Keeper(self.middle)
+        self.files = files.Files(root)
+        self.fetcher = files.Fetcher(self.middle, self.files)
+        self.driver = driver.Driver(self.keeper, self.files, self.fetcher, names)
         self._lock = threading.Lock()
         self._heard = {}
         self.middle.listeners.append(self._take_heard)
@@ -32,11 +37,24 @@ class Mirror:
         """The link as the emulator prints it: its kind and its name."""
         return f"{self.kind} {self.name}"
 
-    def start(self):
+    def start(self, clock_ms, canvas):
+        """Opens the link and keeps the board's plan. `clock_ms` gives the emulator's time,
+        and `canvas` is the show folder's, `(width, height)`, or `None`."""
+        self.driver.canvas = canvas
         self.middle.start()
+        self.keeper.start(clock_ms)
+        self.fetcher.start()
 
     def stop(self):
+        self.fetcher.stop()
+        self.keeper.stop()
         self.middle.stop()
+
+    def drive(self, record, local_ms):
+        return self.driver.drive(record, local_ms)
+
+    def client_line(self, line, reply):
+        self.keeper.client_line(line, reply)
 
     def heard_for(self, way):
         """The board's lines that wait for the client of a serial way, each with its line

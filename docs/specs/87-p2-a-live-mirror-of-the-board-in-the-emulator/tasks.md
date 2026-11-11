@@ -83,7 +83,7 @@ into the commit message. Code carries no history.
   - Suites: emulator, onboarding.
   - Requirements: 11.1–11.6, 12.1–12.6, 17.1.
 
-- [ ] 8. The plan kept and shown, and the files
+- [x] 8. The plan kept and shown, and the files
   - `emulator/mirror/keeper.py`, `files.py`, `driver.py`, new; `emulator/host.py` (the
     mirror's names), `emulator/engine.py` (the driver at each tick, the board's status).
   - `tests/emulator/test_mirror.py`, new, seen failing first: two emulators over the line

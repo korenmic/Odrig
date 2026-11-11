@@ -99,6 +99,10 @@ the entry links to it.
   whenever that file plays. Zero is present, not missing. It stays on internal storage,
   even for a read-only card's animation. See
   [commands.md](../docs/commands.md#saved-animation-brightness).
+- **plan**: The turns the board will play: the turn on the LEDs and, while planning is on,
+  those it has decided to play after it, at most 8 within 10 minutes. The command `plan`
+  reports it, with a version that grows at every change. See
+  [commands.md](../docs/commands.md#the-plan).
 
 ## The programs
 
@@ -146,6 +150,14 @@ the entry links to it.
   `collection/`. Git tracks the small ones; the heavy ones, the groups of a long video and
   the files over 50 MB, are kept on the share, and only their previews and readmes are
   tracked. Nothing of the installation reads it.
+- **serial way**: A connection on which lines go both ways: the board's two USB sockets,
+  the emulator's serial port and each connection of its line port. After `plan push on` on
+  a serial way, the `#plan` lines of the plan are written on it between the replies. HTTP
+  is no serial way.
+- **mirror**: The emulator started with `--mirror-port`, `--mirror-tcp` or `--mirror-http`.
+  It carries every line of its clients to a board and the board's reply back, and its LEDs
+  show what the board's plan says the board shows, its files found by their keys. See
+  [emulator.md](../docs/emulator.md#a-mirror-of-a-board).
 
 ## How the work is organised
 

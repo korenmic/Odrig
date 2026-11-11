@@ -138,7 +138,7 @@ def serve(arguments, out):
         drive = None if arguments.drive is None else host.Drive(arguments.drive, writable=not arguments.drive_read_only)
     files = host.FolderHost(arguments.show_dir, verbose=arguments.verbose, storage=arguments.storage, drive=drive)
     mirrored = mirror_of(arguments)
-    the_mirror = None if mirrored is None else mirror.Mirror(*mirrored)
+    the_mirror = None if mirrored is None else mirror.Mirror(*mirrored, ROOT, files.mirrored)
     port = None
     line_port = None
     server = None
@@ -188,7 +188,7 @@ def serve(arguments, out):
         out.flush()
 
         if the_mirror is not None:
-            the_mirror.start()
+            the_mirror.start(running.now_ms, running.canvas())
         if port is not None:
             port.start()
         if line_port is not None:

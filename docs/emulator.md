@@ -450,6 +450,43 @@ they are the emulator's; the app is the same.
 - **A lost link** ends every wait. A client of HTTP has its request closed without a reply,
   as a board that did not answer leaves it, and a client of a port gets nothing.
 
+**The plan.** On joining, the mirror reads the board's `status` and its plan, switches
+planning on with `plan on` and, over a serial port or TCP, the push with `plan push on`,
+and asks for the plan again. It then takes every `#plan` line, and asks `plan since
+<version>` every 10 seconds all the same; over HTTP it asks every 2 seconds, and at once
+after a client's line that may change what plays, every line but those that only read. A
+reply whose `now` went back, or that says planning is off, is a restart or another
+client's `plan off`, and the mirror joins again; over a serial port the lines of the
+chip's loader tell a restart too, and so does a link that was lost and comes back. On
+Ctrl-C the mirror sends `plan push off`, and `plan off` when it had found planning off.
+The header's status is the board's: the latest reply to a `status` the link carried, a
+client's or the mirror's own, which it asks for every 2 seconds.
+
+**The board's clock.** The mirror keeps the board's time less its own from each reply's
+`now` and the middle of the request's round trip: from a round trip no longer than the
+shortest so far, give or take 2 ms, or from one whose answer is further off than half of
+it and 20 ms. The mirror's clock begins at 2^32 milliseconds, 49 days, so that a turn the
+board began before the mirror started has its time 0 on that clock too.
+
+**What it shows.** At every refresh, the item of the latest plan whose part holds the
+board's time: its file at the point of its turn then, with its seed and its brightness,
+and the board's on or off, rotation, display test and miniature output. A new version that
+leaves the item's id and the start of its turn as they were does not restart it. The LEDs
+are dark where the plan says nothing, after the last item's end, for an item whose key is
+`null`, as no catalog of its storage names the file (`catalog rebuild` makes one), while its
+file is fetched, while no plan is known, and for a board whose canvas is not the one of the
+show folder's mapping. While the link is lost the mirror goes on with the plan it has. The
+mapping of the show folder draws the LEDs: the board's pins, WLED's current limiter and the
+budgets of the snakes are not mirrored.
+
+**The files.** An item's file is the local file of its key, `crc-size` as
+[catalog.md](catalog.md) writes it: one the mirror fetched before, kept in `build/mirror/`,
+else a file of `collection/` or of the share's collection, which `ODRIG_ANIMATIONS` in `env`
+names, whose size and CRC-32 are the key's. A key found nowhere is fetched from the board
+with `read <id> <offset> 720`, between the clients' lines, checked against the key once
+whole, and kept as `build/mirror/<key>.odrg`; the turn plays from the board's point once the
+file is there. The look and the fetch run beside the refreshes, which never wait for them.
+
 ## The page
 
 The address the emulator prints is a web page: open it in Safari or Chrome. It is made of
