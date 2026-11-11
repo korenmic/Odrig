@@ -921,6 +921,7 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] --folder PATH upload ID FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] folder OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] move external|internal ID PATH
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] plan [OPERATION]
 ```
 
 Through the serial port, here the emulator's; for the board the name is its USB serial
@@ -1217,6 +1218,22 @@ sent.
 **`move internal ID PATH`** sends `move internal <ID> <PATH>`, the new full path of a folder of
 the board's own storage, which has no `/` of its own; each name of a path is escaped as a
 URI's, and the ID is sent as it was typed. Another form is status 2, and nothing is sent.
+
+**`plan`** prints the reply of `plan`, what the target will play, as
+[commands.md](commands.md#the-plan) describes it, and **`plan since N`** the short reply while
+the target's version is N, the whole plan otherwise; N is sent as it was typed. **`plan on`**
+and **`plan off`** switch the target's planning on and off. **`plan push on`** and **`plan push
+off`** switch the push of the serial way the line arrives by: through a serial port or the
+line port they print `{"ok":true}`, and over HTTP `unsupported`, status 1. The tool takes the
+reply alone and passes over a `#plan` line; a push it switched on through the line port ends
+when its connection closes, at once, and through a serial port it goes on until `plan push
+off`. Another operation is status 2, and nothing is sent.
+
+```
+python -m odrigctl --port build/emulator/serial plan on
+python -m odrigctl --tcp 127.0.0.1:8601 plan
+python -m odrigctl --http 127.0.0.1:8600 plan since 41
+```
 
 The mapping operation is `get`, `set REV PINS`, or `test on` / `test off`.
 The pin list is twenty comma-separated GPIO numbers, in snake order.

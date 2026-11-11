@@ -65,7 +65,7 @@ into the commit message. Code carries no history.
   - Suites: emulator, core, onboarding.
   - Requirements: 9.1–9.2.
 
-- [ ] 6. `plan` in the command tool
+- [x] 6. `plan` in the command tool
   - `odrigctl/cli.py`: the six forms. `tests/emulator/test_tool.py`, seen failing first.
   - `docs/emulator.md` ("The command tool").
   - Suites: emulator, onboarding.

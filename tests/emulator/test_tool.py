@@ -94,6 +94,30 @@ class AgainstTheEmulator(unittest.TestCase):
             self.assertTrue(result.out.endswith("}\n"))
             self.assertEqual(result.out.count("\n"), 1)
 
+    def test_plan_is_sent_in_its_six_forms_by_each_transport(self):
+        unsupported = '{"ok":false,"error":"unsupported"}\n'
+        for transport, target in self.targets.items():
+            with self.subTest(transport=transport):
+                self.assertEqual(support.run_tool(*target, "plan", "on")[:3], (0, OK, ""))
+                result = support.run_tool(*target, "plan")
+                self.assertEqual((result.status, result.err), (0, ""))
+                planned = json.loads(result.out)
+                self.assertTrue(planned["ok"])
+                self.assertTrue(planned["planning"])
+                self.assertTrue(planned["items"])
+                result = support.run_tool(*target, "plan", "since", str(planned["version"]))
+                self.assertEqual((result.status, result.err), (0, ""))
+                again = json.loads(result.out)
+                self.assertTrue(again.get("unchanged") or again["version"] > planned["version"], again)
+                for operation in ("on", "off"):
+                    result = support.run_tool(*target, "plan", "push", operation)
+                    wanted = (0, OK) if transport == support.LINES else (1, unsupported)
+                    self.assertEqual((result.status, result.out, result.err), (*wanted, ""))
+                self.assertEqual(support.run_tool(*target, "plan", "off")[:3], (0, OK, ""))
+                result = support.run_tool(*target, "plan")
+                self.assertEqual(result.status, 0)
+                self.assertFalse(json.loads(result.out)["planning"])
+
     def test_repeat_is_sent_in_its_three_forms(self):
         # The example show plays its cycle, so that a turn's count is stale; a saved repeat is
         # about the animation, and is kept.
@@ -246,8 +270,8 @@ class Session(unittest.TestCase):
         self.assertEqual(replies[support.LINES], replies["http"])
         codes = [json.loads(reply).get("error") for reply in replies["http"]]
         self.assertEqual(codes[-10:-1], ["unknown-id", "bad-argument", "bad-argument", "line-too-long", None, None, "unknown-id", "unknown-id", "unknown-id"])
-        # Uploads, miniature output, timing, rotation and moves have their own transport scenarios.
-        self.assertEqual({words[0] for words in SESSION}, set(cli.COMMANDS) - {"upload", "debug", "time", "schedule", "guard", "folder", "move", "saved", "rotation"})
+        # Uploads, miniature output, timing, rotation, moves and the plan have their own transport scenarios.
+        self.assertEqual({words[0] for words in SESSION}, set(cli.COMMANDS) - {"upload", "debug", "time", "schedule", "guard", "folder", "move", "saved", "rotation", "plan"})
 
 
 class Unreachable(unittest.TestCase):
@@ -370,6 +394,16 @@ class Usage(unittest.TestCase):
             ["--port", "a", "debug", "mini", "yes"],
             ["--port", "a", "debug", "mini", "on\n"],
             ["--port", "a", "debug", "mini", "on", "extra"],
+            ["--port", "a", "plan", "now"],
+            ["--port", "a", "plan", "On"],
+            ["--port", "a", "plan", "push"],
+            ["--port", "a", "plan", "push", "yes"],
+            ["--port", "a", "plan", "push", "on", "now"],
+            ["--port", "a", "plan", "on", "off"],
+            ["--port", "a", "plan", "since"],
+            ["--port", "a", "plan", "since", "1", "2"],
+            ["--port", "a", "plan", "since", "1\n"],
+            ["--port", "a", "plan", "since", "1\r"],
         ):
             result = support.run_tool(*argv)
             self.assertEqual(result.status, 2, argv)
@@ -385,14 +419,16 @@ class Usage(unittest.TestCase):
                                       "plan", "plan since <version>", "plan on", "plan off", "plan push on", "plan push off"])
         # `play all` is `play` with the word in the place of the id.
         one_line = [command for command in documented if not command.startswith(("rotation", "time", "schedule", "guard", "upload ", "mapping ", "order ", "catalog", "repeat ", "clocks ", "debug ", "folder ", "move ", "brightness <id> ", "read ", "plan")) and command not in ("play all", "remove many <ids>", "list in <folder-id>")]
-        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("rotation", "time", "schedule", "guard", "upload", "mapping", "order", "catalog", "repeat", "clocks", "debug", "folder", "move", "read")],
+        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("rotation", "time", "schedule", "guard", "upload", "mapping", "order", "catalog", "repeat", "clocks", "debug", "folder", "move", "read", "plan")],
                          [command.replace("<id>", "<x>").replace("<n>", "<x>").replace("<value>", "<x>").replace("<offset>", "<x>") for command in one_line])
         self.assertIn("| `read <id> <offset>`, `read <id> <offset> <count>` |", table)
         self.assertEqual(list(cli.COMMANDS)[-1], "upload")
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
                          {"play": ("ID",), "brightness": ("N",), "schedule": ("[OPERATION]",), "time": ("[OPERATION]",), "guard": ("TARGET-ID", "TIMING-COMMAND"), "rotation": ("[OPERATION]",), "read": ("ID", "OFFSET", "[COUNT]"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "repeat": ("ID", "N", "[save]"), "saved": ("ID",),
-                          "clocks": ("OPERATION",), "debug": ("mini", "on|off"), "folder": ("OPERATION",), "move": ("external|internal", "ID", "PATH"), "upload": ("ID", "FILE")})
+                          "clocks": ("OPERATION",), "debug": ("mini", "on|off"), "folder": ("OPERATION",), "move": ("external|internal", "ID", "PATH"), "plan": ("[OPERATION]",), "upload": ("ID", "FILE")})
+        planned = [command for command in documented if command.startswith("plan")]
+        self.assertEqual(planned, ["plan", "plan since <version>", "plan on", "plan off", "plan push on", "plan push off"])
 
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),
@@ -412,7 +448,10 @@ class Usage(unittest.TestCase):
                            (["upload", "--external", "9", "a.odrg"], "upload --external takes one argument: FILE"),
                            (["folder", "remove"], "folder takes make internal PATH, make external PATH, or remove ID"),
                            (["folder", "make", "internal"], "folder takes make internal PATH, make external PATH, or remove ID"),
-                           (["move", "internal", "6", "/"], "move takes external ID PATH, PATH / for the card's root, or internal ID PATH")):
+                           (["move", "internal", "6", "/"], "move takes external ID PATH, PATH / for the card's root, or internal ID PATH"),
+                           (["plan", "push"], "plan takes no argument, since N, on, off, push on, or push off"),
+                           (["plan", "since"], "plan takes no argument, since N, on, off, push on, or push off"),
+                           (["plan", "since", "4\n"], "a command is one line")):
             result = support.run_tool("--port", "a", *argv)
             self.assertEqual(result.status, 2)
             self.assertIn(said, result.err)
@@ -460,6 +499,14 @@ class Usage(unittest.TestCase):
             (["clocks", "storage", "internal"], b"clocks storage internal\n"),
             (["read", "1", "0"], b"read 1 0\n"),
             (["read", "60001", "720", "720"], b"read 60001 720 720\n"),
+            (["plan"], b"plan\n"),
+            (["plan", "since", "41"], b"plan since 41\n"),
+            (["plan", "since", "4294967295"], b"plan since 4294967295\n"),
+            (["plan", "since", "abc"], b"plan since abc\n"),
+            (["plan", "on"], b"plan on\n"),
+            (["plan", "off"], b"plan off\n"),
+            (["plan", "push", "on"], b"plan push on\n"),
+            (["plan", "push", "off"], b"plan push off\n"),
         ):
             self.assertEqual(cli.command_line(made, made.parse_args(["--port", "x", *argv])), line)
 
@@ -481,6 +528,11 @@ class Usage(unittest.TestCase):
         said = " ".join(cli.parser().format_help().split())
         self.assertIn("clocks on|off|only, clocks message on|off, clocks storage sd|internal,", said)
         self.assertIn("on, off, only, message on, message off, storage sd or storage internal of clocks", said)
+
+    def test_help_names_each_plan_form(self):
+        said = " ".join(cli.parser().format_help().split())
+        self.assertIn("plan, plan since N, plan on|off, plan push on|off.", said)
+        self.assertIn("since N, on, off, push on or push off of plan", said)
 
     def test_no_option_tells_the_emulator_from_the_board(self):
         options = {option for action in cli.parser()._actions for option in action.option_strings}
