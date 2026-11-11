@@ -104,7 +104,7 @@ into the commit message. Code carries no history.
   - Suites: emulator, onboarding.
   - Requirements: 16.1–16.5.
 
-- [ ] 10. Deliver seed 87
+- [x] 10. Deliver seed 87
   - Push the branch and open its pull request against `all-unmerged-seeds`, the branch of
     pull request #63. Run an emulator as the board and another as its mirror, through
     commands sent to both, and record what was seen. From the pushed head with a clean tree:
