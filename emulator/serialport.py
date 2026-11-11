@@ -15,18 +15,24 @@ POLL_SECONDS = 0.1
 RETRY_SECONDS = 0.05
 WRITE_SECONDS = 1.0
 
+# The serial way of the port, as the board's UART is its way 1; the line port's connections
+# take the ways after it.
+WAY = 1
+
 
 class Port:
     """A pseudo-terminal whose far end programs open through a symbolic link.
 
     Both ends stay open for as long as the port lives, so the port stays in place while
     programs open and close it. Every byte a program writes goes to `feed`, and what
-    `feed` returns is written back.
+    `feed` returns is written back; between replies the port is given what `pushed()` has
+    for it, the `#plan` lines of its way.
     """
 
-    def __init__(self, link, feed):
+    def __init__(self, link, feed, pushed=None):
         self.link = os.path.abspath(os.fspath(link))
         self._feed = feed
+        self._pushed = pushed
         self._stopping = threading.Event()
         self._thread = threading.Thread(target=self._read, name="serial", daemon=True)
         try:
@@ -60,11 +66,9 @@ class Port:
         while not self._stopping.is_set():
             try:
                 readable, _, _ = select.select([self._near], [], [], POLL_SECONDS)
-                if not readable:
-                    continue
-                data = os.read(self._near, READ_SIZE)
+                data = os.read(self._near, READ_SIZE) if readable else b""
             except BlockingIOError:
-                continue
+                data = b""
             except (OSError, ValueError):
                 if self._stopping.is_set():
                     return
@@ -72,6 +76,8 @@ class Port:
                 continue
             if data:
                 self._write(self._feed(data))
+            if self._pushed is not None:
+                self._write(self._pushed() or b"")
 
     def _write(self, data):
         """Writes replies to the port. When no program has read for a while and the port is

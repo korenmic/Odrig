@@ -56,7 +56,7 @@ into the commit message. Code carries no history.
   - Suites: firmware's host-only tests, core.
   - Requirements: 4.5, 8.1–8.2.
 
-- [ ] 5. The emulator's ports as a board's
+- [x] 5. The emulator's ports as a board's
   - `emulator/binding.py` (the entries), `emulator/engine.py` (`way`, `plan_line`),
     `emulator/lineport.py` (a way for each connection, the push between replies, `plan push
     off` when it closes), `emulator/serialport.py` (way 1).

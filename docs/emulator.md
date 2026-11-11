@@ -280,6 +280,10 @@ python -m odrigctl --port build/emulator/serial status
   that room is full and stays full for a second, what waits is dropped to make room for the
   newer replies, as the output of a board is lost when nobody listens. A program should
   discard what is waiting when it opens the port, as the command tool does.
+- The port is the serial way 1 of the plan's push, [commands.md](commands.md#the-plan):
+  after `plan push on` written to it, the emulator writes the `#plan` lines the core has due
+  between the replies, as the board does on its sockets, until `plan push off` or the
+  emulator's end. A program that takes only replies passes over them.
 
 A link left at the path by an earlier run is replaced. If the path holds anything that is
 not a symbolic link, the emulator refuses to start and leaves it untouched. Two emulators
@@ -315,6 +319,11 @@ python -m odrigctl --tcp 127.0.0.1:8601 status
   one connection and not ended is ended by the next bytes that arrive, on whichever
   connection. A program sends whole lines.
 - A command that arrived this way has `tcp` as its transport in the log.
+- Each connection is a serial way of the plan's push, the lowest free one of 2 to 8; one that
+  finds none free has no way, and `plan push on` sent by it is `unsupported`. After `plan
+  push on` a connection is written the `#plan` lines of its way between the replies to its
+  lines, and when it closes its push ends, as `plan push off` would end it; that line is the
+  emulator's own and is not in the log.
 - Stopping the emulator closes every connection.
 
 Two emulators at once need two line ports and two page ports.
@@ -346,6 +355,8 @@ curl --data-binary 'play 2' http://127.0.0.1:8600/odrig
 - The content type of the request is not looked at.
 - The path is `/odrig` exactly. What follows a `?` is ignored.
 - The response that carries a reply has the header `Access-Control-Allow-Origin: *`.
+- HTTP is no serial way: `plan push on` and `plan push off` are answered `unsupported`, and
+  a client of HTTP asks `plan since <version>` for what changed.
 - An answer without a body closes its connection.
 - Before a 404 or a 405, the body that the request declares with a `Content-Length` is
   read to its end and dropped, so that the closed connection is not reset and the client

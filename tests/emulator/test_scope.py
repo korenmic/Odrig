@@ -62,12 +62,11 @@ class Scope(unittest.TestCase):
     def test_the_emulator_holds_no_decoder_no_show_reader_and_no_command_names(self):
         for path, tree in modules(EMULATOR):
             self.assertNotIn("zlib", imported(tree), path.name)
-            for text in texts(tree):
-                self.assertNotIn(text, ("ODRG", "show.json", "play", "brightness", "on", "off", "list", "upload", "upload.part", "show.part", "pending.txt"), f"{path.name} writes out {text!r}")
-                # The binding names the members of the host record, and two of them are
-                # spelled as commands are.
-                if path.name != "binding.py":
-                    self.assertNotIn(text, ("space", "remove"), f"{path.name} writes out {text!r}")
+            # The binding names the members of the host record and of the mirror's record,
+            # and four of them are spelled as commands are.
+            members = {"space", "remove", "on", "brightness"} if path.name == "binding.py" else set()
+            for text in set(texts(tree)) - members:
+                self.assertNotIn(text, ("ODRG", "show.json", "play", "brightness", "on", "off", "list", "upload", "upload.part", "show.part", "pending.txt", "space", "remove"), f"{path.name} writes out {text!r}")
         users = sorted(path.name for path, tree in modules(EMULATOR) if "json" in imported(tree))
         self.assertEqual(users, ["hub.py"])
 

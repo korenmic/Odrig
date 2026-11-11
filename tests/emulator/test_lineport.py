@@ -6,6 +6,7 @@ import pathlib
 import socket
 import tempfile
 import threading
+import time
 import unittest
 
 from emulator import app, binding, failure, httpd, lineport
@@ -17,17 +18,19 @@ OK = b'{"ok":true}\n'
 
 
 class Feed:
-    """Stands in for the engine: keeps what arrives, and answers every line that the bytes
-    finish with the line between two marks."""
+    """Stands in for the engine: keeps what arrives and the way it came by, and answers
+    every line that the bytes finish with the line between two marks."""
 
     def __init__(self):
         self.received = []
+        self.ways = []
         self._waiting = b""
         self._lock = threading.Lock()
 
-    def __call__(self, data):
+    def __call__(self, data, way):
         with self._lock:
             self.received.append(data)
+            self.ways.append(way)
             *lines, self._waiting = (self._waiting + data).split(b"\n")
         return b"".join(b"<" + line + b">\n" for line in lines)
 
@@ -123,12 +126,12 @@ class ThePort(unittest.TestCase):
         self.port.close()
 
     def test_a_connection_that_comes_while_the_port_closes_is_not_taken(self):
-        self.assertIs(self.port.opened(first := socket.socket()), True)
+        self.assertEqual(self.port.opened(first := socket.socket()), (True, lineport.FIRST_WAY))
         self.addCleanup(first.close)
         self.port.close()
         late = socket.socket()
         self.addCleanup(late.close)
-        self.assertIs(self.port.opened(late), False)
+        self.assertEqual(self.port.opened(late), (False, 0))
         self.assertEqual(self.feed.received, [])
 
     def test_bytes_that_arrive_once_the_port_closes_are_not_handed_on(self):
@@ -154,6 +157,46 @@ class ThePort(unittest.TestCase):
             with self.assertRaises(failure.Failure) as caught:
                 lineport.Port(other.getsockname()[1], self.feed)
         self.assertEqual(caught.exception.reason, failure.ADDRESS_IN_USE)
+
+
+class TheWays(unittest.TestCase):
+    """Each connection is a serial way of its own: the lowest free one of 2 to 8."""
+
+    def setUp(self):
+        self.feed = Feed()
+        self.ended = []
+        self.port = lineport.Port(0, self.feed, ended=self.ended.append)
+        self.addCleanup(self.port.close)
+        self.port.start()
+
+    def program(self):
+        return support.entered(self, support.Lines(self.port.address))
+
+    def test_each_connection_feeds_with_the_lowest_free_way_and_one_past_the_seventh_with_none(self):
+        programs = [self.program() for _ in range(8)]
+        for number, program in enumerate(programs):
+            self.assertEqual(program.ask(f"program {number}"), f"<program {number}>\n".encode("ascii"))
+        self.assertEqual(self.feed.ways, [2, 3, 4, 5, 6, 7, 8, 0])
+
+    def test_a_way_is_told_ended_when_its_connection_closes_and_is_taken_again_after(self):
+        first, second = self.program(), self.program()
+        self.assertEqual(first.ask("one"), b"<one>\n")
+        self.assertEqual(second.ask("two"), b"<two>\n")
+        first.close()
+        deadline = time.monotonic() + 5
+        while not self.ended and time.monotonic() < deadline:
+            time.sleep(0.02)
+        self.assertEqual(self.ended, [2])
+        self.assertEqual(self.program().ask("three"), b"<three>\n")
+        self.assertEqual(self.feed.ways, [2, 3, 2])
+
+    def test_a_connection_without_a_way_is_told_no_end(self):
+        programs = [self.program() for _ in range(8)]
+        for program in programs:
+            program.ask("here")
+        programs[-1].close()
+        time.sleep(0.3)
+        self.assertEqual(self.ended, [])
 
 
 def arguments(*argv):

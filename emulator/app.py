@@ -121,9 +121,9 @@ def serve(arguments, out):
         running.tick()
         running.refresh_status()
         if link is not None:
-            port = serialport.Port(link, lambda data: running.feed(data, "serial"))
+            port = serialport.Port(link, lambda data: running.feed(data, "serial", serialport.WAY), lambda: running.plan_line(serialport.WAY))
         if tcp_port is not None:
-            line_port = lineport.Port(tcp_port, lambda data: running.feed(data, "tcp"))
+            line_port = lineport.Port(tcp_port, lambda data, way: running.feed(data, "tcp", way), running.plan_line, running.way_ended)
         described = {
             "show": os.path.abspath(arguments.show_dir),
             "drive": None if drive is None else os.path.abspath(drive.top),

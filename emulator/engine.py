@@ -150,12 +150,13 @@ class Engine:
         """What the page must read the mapping again for: the legs and their pins."""
         return getattr(self.core, "legs", ())
 
-    def line(self, data, transport):
-        """One command line, as HTTP delivers it. Returns the reply."""
+    def line(self, data, transport, way=0):
+        """One command line, as HTTP delivers it, of a serial way when `way` is 1 to 8.
+        Returns the reply."""
         with self._lock:
             now = self.now_ms()
             before = self.routing()
-            reply = self.core.command(now, data)
+            reply = self.core.command(now, data, way)
             self._answered += 1
             if before != self.routing():
                 self.hub.mapping(self.core.legs)
@@ -165,13 +166,13 @@ class Engine:
         self.refresh_status()
         return reply
 
-    def feed(self, data, transport):
-        """Bytes of a transport, as a serial port delivers them. Returns the replies to the
-        lines they finish, joined."""
+    def feed(self, data, transport, way=0):
+        """Bytes of a transport, as a serial port delivers them, of a serial way when `way`
+        is 1 to 8. Returns the replies to the lines they finish, joined."""
         with self._lock:
             now = self.now_ms()
             before = self.routing()
-            answered = self.core.feed(now, data)
+            answered = self.core.feed(now, data, way)
             self._answered += len(answered)
             if before != self.routing():
                 self.hub.mapping(self.core.legs)
@@ -180,6 +181,17 @@ class Engine:
         if answered:
             self.refresh_status()
         return b"".join(reply for _, reply, _ in answered)
+
+    def plan_line(self, way):
+        """The `#plan` line the core has due on a serial way, or `None`."""
+        with self._lock:
+            return self.core.plan_line(self.now_ms(), way)
+
+    def way_ended(self, way):
+        """A serial way that ends has its push switched off, as `plan push off` on it would.
+        The line is the engine's own, and is not in the log."""
+        with self._lock:
+            self.core.command(self.now_ms(), b"plan push off", way)
 
     def refresh_status(self):
         """Asks the core for its status, for the page. The request is not a command that

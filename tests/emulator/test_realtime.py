@@ -110,7 +110,7 @@ class Core:
     def frame(self):
         return b""
 
-    def command(self, now, line):
+    def command(self, now, line, way=0):
         self.commands.append((now, line))
         return b'{"ok":true}\n'
 

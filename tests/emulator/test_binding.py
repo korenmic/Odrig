@@ -37,6 +37,10 @@ int main(void) {
     printf("odrig_mini %zu\\n", sizeof(odrig_mini));
     MEMBER(odrig_mini, revision); MEMBER(odrig_mini, active); MEMBER(odrig_mini, requested);
     MEMBER(odrig_mini, pending); MEMBER(odrig_mini, failed); MEMBER(odrig_mini, rgb);
+    printf("odrig_mirror %zu\\n", sizeof(odrig_mirror));
+    MEMBER(odrig_mirror, name); MEMBER(odrig_mirror, type); MEMBER(odrig_mirror, on); MEMBER(odrig_mirror, brightness);
+    MEMBER(odrig_mirror, rotation); MEMBER(odrig_mirror, test); MEMBER(odrig_mirror, snake); MEMBER(odrig_mirror, serial);
+    MEMBER(odrig_mirror, loop_ms); MEMBER(odrig_mirror, seed); MEMBER(odrig_mirror, zero_ms);
     return 0;
 }
 """
@@ -50,7 +54,7 @@ class Declarations(unittest.TestCase):
     def test_it_declares_exactly_the_functions_of_the_header(self):
         declared = re.findall(r"\b(odrig_core_[a-z_]+)\(", header_code())
         self.assertEqual(len(declared), len(set(declared)))
-        self.assertEqual(len(declared), 11)
+        self.assertEqual(len(declared), 15)
         self.assertEqual(sorted(binding.FUNCTIONS), sorted(declared))
 
     def test_every_function_has_as_many_arguments_as_the_header_gives_it(self):
@@ -84,7 +88,7 @@ class Declarations(unittest.TestCase):
             )
             printed = subprocess.run([str(program)], capture_output=True, text=True, check=True).stdout.split("\n")
         expected = []
-        for name, record in (("odrig_host", binding.HostRecord), ("odrig_leg", binding.LegRecord), ("odrig_mini", binding.MiniRecord)):
+        for name, record in (("odrig_host", binding.HostRecord), ("odrig_leg", binding.LegRecord), ("odrig_mini", binding.MiniRecord), ("odrig_mirror", binding.MirrorRecord)):
             expected.append(f"{name} {ctypes.sizeof(record)}")
             for member, kind in record._fields_:
                 expected.append(f"{name} {member} {getattr(record, member).offset} {ctypes.sizeof(kind)}")

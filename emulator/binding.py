@@ -76,6 +76,14 @@ class MiniRecord(Structure):
                 ("rgb", POINTER(c_uint8))]
 
 
+class MirrorRecord(Structure):
+    """`odrig_mirror`: the turn a mirror shows, which the core reads at every poll."""
+
+    _fields_ = [("name", ctypes.c_char * 33), ("type", c_uint8), ("on", c_uint8), ("brightness", c_uint8), ("rotation", c_uint8),
+                ("test", c_uint8), ("snake", c_uint8), ("serial", c_uint32), ("loop_ms", c_uint32), ("seed", c_uint32),
+                ("zero_ms", c_uint64)]
+
+
 FUNCTIONS = {
     "odrig_core_begin": (c_void_p, [POINTER(HostRecord)]),
     "odrig_core_poll": (c_int, [c_void_p, c_uint64]),
@@ -85,10 +93,17 @@ FUNCTIONS = {
     "odrig_core_mini_support": (None, [c_void_p]),
     "odrig_core_mini": (c_int, [c_void_p, POINTER(MiniRecord)]),
     "odrig_core_mini_complete": (c_int, [c_void_p, c_uint32, c_int]),
+    "odrig_core_mirror": (c_int, [c_void_p, POINTER(MirrorRecord)]),
     "odrig_core_command": (c_size_t, [c_void_p, c_uint64, c_char_p, c_size_t, c_char_p, c_size_t]),
     "odrig_core_feed": (None, [c_void_p, c_uint64, c_char_p, c_size_t, REPLY, c_void_p]),
+    "odrig_core_command_on": (c_size_t, [c_void_p, c_uint64, c_uint32, c_char_p, c_size_t, c_char_p, c_size_t]),
+    "odrig_core_feed_on": (None, [c_void_p, c_uint64, c_uint32, c_char_p, c_size_t, REPLY, c_void_p]),
+    "odrig_core_plan_line": (c_size_t, [c_void_p, c_uint64, c_uint32, c_char_p, c_size_t]),
     "odrig_core_error": (c_char_p, [c_void_p]),
 }
+
+# The room of a `#plan` line: `#plan `, a reply and its newline.
+PLAN_LINE_ROOM = REPLY_MAX + 8
 
 Leg = collections.namedtuple("Leg", "leg pin led_count")
 
@@ -157,6 +172,8 @@ class Core:
         self._on_reply = REPLY(self._collect)
         self._record = HostRecord(None, *self._functions)
         self._reply = ctypes.create_string_buffer(REPLY_MAX)
+        self._plan = ctypes.create_string_buffer(PLAN_LINE_ROOM)
+        self._mirrored = None
         self._core = self._library.odrig_core_begin(ctypes.byref(self._record))
         if not self._core:
             raise failure.Failure(failure.CORE_NOT_BUILT, "the core could not start")
@@ -298,21 +315,39 @@ class Core:
         if self._library.odrig_core_mini(self._core, ctypes.byref(record)) and record.pending:
             self._library.odrig_core_mini_complete(self._core, record.revision, 1)
 
-    def command(self, now_ms, line):
-        """One command line in, its reply out, with the reply's newline."""
-        length = self._library.odrig_core_command(self._core, now_ms, line, len(line), self._reply, REPLY_MAX)
+    def command(self, now_ms, line, way=0):
+        """One command line in, its reply out, with the reply's newline. `way` is the
+        serial way the line came by, 1 to 8, or 0 for none, as HTTP is."""
+        if way:
+            length = self._library.odrig_core_command_on(self._core, now_ms, way, line, len(line), self._reply, REPLY_MAX)
+        else:
+            length = self._library.odrig_core_command(self._core, now_ms, line, len(line), self._reply, REPLY_MAX)
         reply = self._reply.raw[:length]
         self._acknowledge_mini()
         if line.startswith(b"mapping set ") and reply.startswith(b'{"ok":true'):
             self._refresh_legs()
         return reply
 
-    def feed(self, now_ms, data):
+    def plan_line(self, now_ms, way):
+        """The `#plan` line due on a serial way, with its newline, or `None`."""
+        length = self._library.odrig_core_plan_line(self._core, now_ms, way, self._plan, PLAN_LINE_ROOM)
+        return self._plan.raw[:length] if length else None
+
+    def mirror(self, record):
+        """Shows the turn of a `MirrorRecord` at every poll in place of the show, which the
+        caller keeps alive and may change between polls; `None` ends it."""
+        self._mirrored = record
+        self._library.odrig_core_mirror(self._core, None if record is None else ctypes.byref(record))
+
+    def feed(self, now_ms, data, way=0):
         """Bytes of a transport. Returns `(line, reply, cut)` for every line they finish:
         the line as the core read it, its reply, and whether the line was longer than the
-        core's limit and was cut to it."""
+        core's limit and was cut to it. `way` is as for `command`."""
         self._answered = []
-        self._library.odrig_core_feed(self._core, now_ms, data, len(data), self._on_reply, None)
+        if way:
+            self._library.odrig_core_feed_on(self._core, now_ms, way, data, len(data), self._on_reply, None)
+        else:
+            self._library.odrig_core_feed(self._core, now_ms, data, len(data), self._on_reply, None)
         answered, self._answered = self._answered, []
         self._acknowledge_mini()
         if any(line.startswith(b"mapping set ") and reply.startswith(b'{"ok":true') for line, reply, _ in answered):
