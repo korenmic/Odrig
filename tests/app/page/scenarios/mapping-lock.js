@@ -20,7 +20,107 @@ async function givePhoto(app, pins) {
   await app.until(() => !app.byId('photo-result').hidden && app.doc.querySelectorAll('#photo-words li').length > 0, 'locked photo analysis', 15000);
 }
 
+const LOCK_KEY = 'odrig.mappingLock';
+
+// Settings opened, and the mapping editor's module of the page as it is loaded now.
+async function settings(app) {
+  await app.until(() => app.shown() !== '', 'a screen');
+  app.press('Settings');
+  await app.until(() => app.shown() === 'settings', 'Settings');
+  return app.frame.contentWindow.eval('import("/screens/mapping.js")');
+}
+
+// Moves snake 1's pin one place down with the arrow key, and waits until the target has
+// the new assignment.
+async function edit(app, mapping, after) {
+  await app.until(() => mapping.canEdit() && mapping.mapping() !== null, `edits after ${after}`);
+  const before = mapping.mapping().pins[0];
+  app.doc.querySelector('#mapping-pins .handle').dispatchEvent(new app.frame.contentWindow.KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true}));
+  await app.until(() => !mapping.saving() && mapping.mapping().pins[0] !== before && mapping.canEdit(), `a save after ${after}`);
+  return true;
+}
+
+async function kept(app) {
+  await shown(app, 2);
+  let mapping = await settings(app);
+  await app.until(() => app.doc.querySelectorAll('#mapping-pins > .map-pin').length === 20, 'mapping ready');
+  const client = await app.frame.contentWindow.eval('import("/client.js")');
+  const seen = {};
+  await unlockMapping(app);
+  Object.defineProperty(app.doc, 'hidden', {configurable: true, value: true});
+  app.doc.dispatchEvent(new app.frame.contentWindow.Event('visibilitychange'));
+  Object.defineProperty(app.doc, 'hidden', {configurable: true, value: false});
+  app.doc.dispatchEvent(new app.frame.contentWindow.Event('visibilitychange'));
+  seen.afterHide = !locked(app) && await edit(app, mapping, 'the page was hidden');
+  app.press('Animations');
+  await app.until(() => app.shown() === 'animations', 'leave Settings');
+  app.press('Settings');
+  await app.until(() => app.shown() === 'settings', 'back in Settings');
+  seen.afterLeave = !locked(app) && await edit(app, mapping, 'Settings was left');
+  client.begin();
+  seen.afterBegin = !locked(app) && await edit(app, mapping, 'a new start of the link');
+  await app.reload();
+  mapping = await settings(app);
+  seen.afterReload = !locked(app) && await edit(app, mapping, 'a reload');
+  await ask(app);
+  app.byId('mapping-lock-yes').click();
+  seen.locked = locked(app) && !mapping.canEdit();
+  await app.reload();
+  mapping = await settings(app);
+  await app.until(() => mapping.mapping() !== null, 'the mapping read after the reload');
+  seen.lockKept = locked(app) && !mapping.canEdit();
+  return seen;
+}
+
+async function noBoard(app) {
+  await settings(app);
+  const seen = {};
+  seen.enabled = await app.until(() => !app.byId('mapping-lock').disabled, 'the lock without a board', 4000).then(() => true, () => false);
+  if (!seen.enabled) return seen;
+  await ask(app);
+  app.byId('mapping-lock-no').click();
+  seen.cancelKeepsLocked = locked(app);
+  await ask(app);
+  app.byId('mapping-lock-yes').click();
+  seen.unlocked = !locked(app);
+  seen.waits = app.raw('mapping-lock-state') === 'Mapping edits are unlocked. Edits wait until the installation answers.';
+  seen.stored = app.frame.contentWindow.localStorage.getItem(LOCK_KEY) === 'unlocked';
+  return seen;
+}
+
+async function refused(app) {
+  await shown(app, 2);
+  await settings(app);
+  const view = app.frame.contentWindow;
+  const original = view.Storage.prototype.setItem;
+  view.Storage.prototype.setItem = function (key, value) {
+    if (key === LOCK_KEY) throw new view.DOMException('the store is full', 'QuotaExceededError');
+    return original.call(this, key, value);
+  };
+  await unlockMapping(app);
+  const seen = {unlocked: !locked(app)};
+  seen.said = app.raw('mapping-lock-state').endsWith('This choice could not be kept on this phone; it holds until the app is closed.');
+  await app.reload();
+  const mapping = await settings(app);
+  await app.until(() => mapping.mapping() !== null, 'the mapping read after the reload');
+  seen.lockedAfterReload = locked(app);
+  return seen;
+}
+
+async function unknown(app) {
+  await shown(app, 2);
+  app.frame.contentWindow.localStorage.setItem(LOCK_KEY, 'maybe');
+  await app.reload();
+  const mapping = await settings(app);
+  await app.until(() => mapping.mapping() !== null && !app.byId('mapping-lock').disabled, 'the mapping read after the reload');
+  return {locked: locked(app), canEdit: mapping.canEdit()};
+}
+
 export default async function(app) {
+  if (app.settings.mode === 'kept') return kept(app);
+  if (app.settings.mode === 'noboard') return noBoard(app);
+  if (app.settings.mode === 'refused') return refused(app);
+  if (app.settings.mode === 'unknown') return unknown(app);
   await shown(app, 2);
   app.press('Settings');
   await app.until(() => app.doc.querySelectorAll('#mapping-pins > .map-pin').length === 20 && !app.byId('mapping-lock').disabled, 'mapping ready');
@@ -102,12 +202,12 @@ export default async function(app) {
   app.press('Animations');
   await app.until(() => app.shown() === 'animations', 'leave Settings');
   app.press('Settings');
-  await app.until(() => app.shown() === 'settings', 'return to locked Settings');
-  seen.exitRelocked = locked(app);
+  await app.until(() => app.shown() === 'settings', 'return to Settings');
+  seen.exitKept = !locked(app);
   await unlockMapping(app);
   Object.defineProperty(app.doc, 'hidden', {configurable: true, value: true});
   app.doc.dispatchEvent(new app.frame.contentWindow.Event('visibilitychange'));
-  seen.hiddenRelocked = locked(app);
+  seen.hiddenKept = !locked(app);
   Object.defineProperty(app.doc, 'hidden', {configurable: true, value: false});
   app.doc.dispatchEvent(new app.frame.contentWindow.Event('visibilitychange'));
   return seen;

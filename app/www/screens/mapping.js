@@ -16,6 +16,8 @@ const LIFT_MS = 450;
 const SLOP = 8;
 const EDGE = 56;
 const STEP = 12;
+// The lock's value, kept on the phone for every link, target and board.
+const LOCK_KEY = "odrig.mappingLock";
 
 let visible = false;
 let ready = false;
@@ -39,8 +41,11 @@ let press = null;
 let focused = null;
 // A click right after a drag is no press on a handle.
 let swallowClick = false;
-let editLocked = true;
-let lockEpoch = 0;
+// The phone's store refused the lock's value: it holds while the app runs.
+let unkept = false;
+let editLocked = keptLock();
+// Counts the times unsent edits were dropped, so that a save queued before is not sent.
+let editEpoch = 0;
 let lockRequest = null;
 const watchers = new Set();
 
@@ -68,16 +73,35 @@ function setDisabled(element, disabled) {
   if (element.disabled !== disabled) element.disabled = disabled;
 }
 
+// Only a stored "unlocked" unlocks; nothing stored, a value of no meaning or a store that
+// cannot be read is locked.
+function keptLock() {
+  try {
+    return localStorage.getItem(LOCK_KEY) !== "unlocked";
+  } catch {
+    return true;
+  }
+}
+
+function keepLock(locked) {
+  try {
+    localStorage.setItem(LOCK_KEY, locked ? "locked" : "unlocked");
+    unkept = false;
+  } catch {
+    unkept = true;
+  }
+}
+
 function closePrompt() {
   lockRequest = null;
   const dialog = byId("mapping-lock-dialog");
   if (dialog.open) dialog.close();
 }
 
-function relock() {
-  editLocked = true;
-  lockEpoch += 1;
-  closePrompt();
+// Drops what is not sent yet: a held move, the assignment wanted next and, while no call is
+// out, the saving. The lock's value stays.
+function dropEdits() {
+  editEpoch += 1;
   if (live !== null) {
     live.wanted = null;
     if (!live.sending) live = null;
@@ -86,8 +110,8 @@ function relock() {
 }
 
 function requestLock() {
-  if (!visible || document.hidden || pending || live !== null || press !== null || !fresh || !editable() || client.state.link !== "answers") return;
-  lockRequest = {version, epoch: lockEpoch, locked: !editLocked};
+  if (!visible || live !== null || press !== null) return;
+  lockRequest = {locked: !editLocked};
   byId("mapping-lock-question").textContent = lockRequest.locked ?
     "Are you sure you want to lock mapping edits?" :
     "Are you sure you want to unlock mapping edits? Pin moves and photo fixes will save immediately.";
@@ -99,19 +123,16 @@ function requestLock() {
 function confirmLock() {
   const request = lockRequest;
   closePrompt();
-  if (request !== null && request.version === version && request.epoch === lockEpoch && visible &&
-      !document.hidden && fresh && editable() && client.state.link === "answers") {
-    if (request.locked) relock();
-    else {
-      editLocked = false;
-      lockEpoch += 1;
-    }
+  if (request !== null) {
+    editLocked = request.locked;
+    keepLock(editLocked);
+    if (editLocked) dropEdits();
   }
   draw();
 }
 
 function reset() {
-  relock();
+  dropEdits();
   version = client.targetVersion();
   latest = null;
   pending = false;
@@ -178,6 +199,18 @@ function rows() {
   for (const handle of column.querySelectorAll(".handle")) setDisabled(handle, off);
 }
 
+// What the lock's line says: its value, why edits wait while it is unlocked, and when the
+// phone could not keep it.
+function lockState() {
+  let said = "Mapping edits are locked.";
+  if (!editLocked) {
+    said = client.state.link !== "answers" ? "Mapping edits are unlocked. Edits wait until the installation answers." :
+      pending || !fresh ? "Mapping edits are unlocked. Edits wait for the mapping to be read." :
+      editable() ? "Mapping edits are unlocked. Changes are saved immediately." : "Mapping edits are unlocked.";
+  }
+  return unkept ? `${said} This choice could not be kept on this phone; it holds until the app is closed.` : said;
+}
+
 function draw() {
   if (!ready) return;
   rows();
@@ -193,8 +226,8 @@ function draw() {
   setDisabled(byId("mapping-defaults"), locked() || live !== null || !defaultsAvailable() || same(latest.pins, DEFAULTS));
   setDisabled(byId("mapping-reload"), pending || live !== null);
   byId("mapping-lock").setAttribute("aria-pressed", String(editLocked));
-  setDisabled(byId("mapping-lock"), pending || live !== null || press !== null || !fresh || !editable() || client.state.link !== "answers");
-  setText(byId("mapping-lock-state"), editLocked ? "Mapping edits are locked." : "Mapping edits are unlocked. Changes are saved immediately.");
+  setDisabled(byId("mapping-lock"), live !== null || press !== null);
+  setText(byId("mapping-lock-state"), lockState());
   for (const watcher of watchers) watcher();
 }
 
@@ -284,8 +317,8 @@ async function pump() {
     live.sending = true;
     draw();
     try {
-      const permitted = lockEpoch;
-      const saved = await client.mappingSet(live.revision, pins, () => asked === version && permitted === lockEpoch && !locked());
+      const permitted = editEpoch;
+      const saved = await client.mappingSet(live.revision, pins, () => asked === version && permitted === editEpoch && !locked());
       if (asked !== version || live === null) return;
       if (saved === false) {
         live = null;
@@ -493,7 +526,8 @@ export function saveFromPhoto(pins) {
 export function showing(shown) {
   visible = shown;
   if (!shown) {
-    relock();
+    dropEdits();
+    closePrompt();
     draw();
   }
   if (shown) {
@@ -608,7 +642,8 @@ export function start() {
   });
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
-      relock();
+      dropEdits();
+      closePrompt();
       draw();
     }
   });
@@ -617,7 +652,7 @@ export function start() {
       reset();
       if (visible) read();
     }
-    if (client.state.link !== "answers" && (!editLocked || lockRequest !== null)) relock();
+    if (client.state.link !== "answers" && (live !== null || press !== null)) dropEdits();
     draw();
   });
   setInterval(() => {
