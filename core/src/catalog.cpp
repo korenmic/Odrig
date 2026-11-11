@@ -807,6 +807,22 @@ struct FolderEdit {
     uint32_t child_files;
     uint32_t move_from;
     uint32_t move_to;
+    // The line `<insert_id> d 0 <insert_path>` put before line `insert_row`, or none for an
+    // id of 0.
+    uint32_t insert_row;
+    uint32_t insert_id;
+    const char *insert_path;
+};
+
+// An empty folder added to the table at the ordinal `ordinal`, kNothing for none: its id,
+// depth, first position of the walk and path, and the ordinal of its parent.
+struct FolderInsert {
+    uint32_t ordinal;
+    uint32_t id;
+    uint32_t depth;
+    uint32_t first;
+    uint32_t parent;
+    const char *path;
 };
 
 // A change of the table: the lines from `gone_from` that go, `gone_count` of them, with
@@ -842,6 +858,10 @@ struct MapEdit {
     uint32_t move_ordinal;
     uint32_t move_from;
     uint32_t move_to;
+    // The kind of the line put before `insert_at`, and the first ordinal that moves on by one
+    // for a folder added there, kNothing for none.
+    uint8_t add_kind;
+    uint32_t shift_from;
 };
 
 // The change of a drive's index that goes with a change of its catalog: the files of the
@@ -852,6 +872,7 @@ struct IndexChange {
     FolderEdit folders[2];
     uint32_t folder_count;
     TableEdit table;
+    FolderInsert insert;
     MapEdit map;
     bool map_changes;
     uint32_t gone_ids[kCatalogDeepest];
@@ -865,14 +886,15 @@ struct IndexChange {
 void clear_change(IndexChange &change) {
     change.folder_count = 0;
     change.table = {0, 0, kNothing, 0, kNothing, 0, kNothing};
-    change.map = {kNothing, 0, 0, 0, 0, 0, kNothing, 0, kNothing, 0, 0};
+    change.insert = {kNothing, 0, 0, 0, 0, nullptr};
+    change.map = {kNothing, 0, 0, 0, 0, 0, kNothing, 0, kNothing, 0, 0, 'f', kNothing};
     change.map_changes = false;
     change.gone_count = 0;
 }
 
 // A folder's file left as it is but for what the edit says.
 FolderEdit edit_of(const IndexFolder &folder) {
-    FolderEdit edit = {folder.id, folder.ordinal, folder.files, folder.files + folder.folders, kNothing, kNothing, 0, 0, 0, kNothing, 0};
+    FolderEdit edit = {folder.id, folder.ordinal, folder.files, folder.files + folder.folders, kNothing, kNothing, 0, 0, 0, kNothing, 0, kNothing, 0, nullptr};
     return edit;
 }
 
@@ -925,6 +947,15 @@ ODRIG_NOINLINE bool write_folder(Core &core, const FolderEdit &edit, const Catal
         if (line_at == edit.files && edit.add_id != 0) {
             const uint32_t start = writer.length;
             put_row(core, &writer.length, edit.add_id, change);
+            if (!writer_line(core, writer, start, kIndexRow)) {
+                return false;
+            }
+        }
+        if (edit.insert_id != 0 && line_at == edit.insert_row) {
+            const uint32_t start = writer.length;
+            put_number(core, &writer.length, edit.insert_id);
+            put(core, &writer.length, " d 0 ");
+            put(core, &writer.length, edit.insert_path);
             if (!writer_line(core, writer, start, kIndexRow)) {
                 return false;
             }
@@ -983,11 +1014,32 @@ uint32_t moved(uint32_t value, int32_t delta) {
 
 // Writes the new table from the old one, as the change says, with the CRC-32s of the
 // folders' files it wrote. Gives its lines and CRC-32.
+// Puts the line of the empty folder a change adds into the table's writer.
+bool put_inserted(Core &core, Writer &writer, const FolderInsert &insert) {
+    const uint32_t start = writer.length;
+    put_number(core, &writer.length, insert.ordinal);
+    put(core, &writer.length, " ");
+    put_number(core, &writer.length, insert.id);
+    put(core, &writer.length, " ");
+    put_number(core, &writer.length, insert.depth);
+    put(core, &writer.length, " ");
+    put_number(core, &writer.length, insert.ordinal + 1);
+    put(core, &writer.length, " ");
+    put_number(core, &writer.length, insert.first);
+    put(core, &writer.length, " 0 0 00000000 ");
+    put(core, &writer.length, insert.path);
+    return writer_line(core, writer, start, kIndexRow);
+}
+
 ODRIG_NOINLINE bool write_table(Core &core, const IndexChange &change, uint32_t *lines, uint32_t *crc) {
     const TableEdit &edit = change.table;
+    const FolderInsert &insert = change.insert;
     const uint32_t past = edit.gone_from + edit.gone_count;
     Writer writer = writer_for(kIndexTableNew);
     for (uint32_t ordinal = 0; ordinal < core.index->folders; ++ordinal) {
+        if (ordinal == insert.ordinal && !put_inserted(core, writer, insert)) {
+            return false;
+        }
         if (ordinal >= edit.gone_from && ordinal < past) {
             continue;
         }
@@ -1005,20 +1057,25 @@ ODRIG_NOINLINE bool write_table(Core &core, const IndexChange &change, uint32_t 
                 folder_crc = change.has_lines[at] ? change.crcs[at] : 0;
             }
         }
+        // An added folder moves every line after it on by one, and the end of every folder
+        // whose subtree takes it in: the folders it comes before, and its ancestors.
+        const bool adds = insert.ordinal != kNothing;
+        const uint32_t after = adds && ordinal >= insert.ordinal ? 1 : 0;
+        const uint32_t takes_in = adds && (ordinal >= insert.ordinal || folder.end > insert.ordinal || (folder.end == insert.ordinal && folder.depth < insert.depth)) ? 1 : 0;
         const uint32_t start = writer.length;
-        put_number(core, &writer.length, ordinal >= past ? ordinal - edit.gone_count : ordinal);
+        put_number(core, &writer.length, (ordinal >= past ? ordinal - edit.gone_count : ordinal) + after);
         put(core, &writer.length, " ");
         put_number(core, &writer.length, folder.id);
         put(core, &writer.length, " ");
         put_number(core, &writer.length, folder.depth);
         put(core, &writer.length, " ");
-        put_number(core, &writer.length, folder.end >= past ? folder.end - edit.gone_count : folder.end);
+        put_number(core, &writer.length, (folder.end >= past ? folder.end - edit.gone_count : folder.end) + takes_in);
         put(core, &writer.length, " ");
         put_number(core, &writer.length, edit.firsts_after != kNothing && ordinal > edit.firsts_after ? moved(folder.first, edit.first_delta) : folder.first);
         put(core, &writer.length, " ");
         put_number(core, &writer.length, ordinal == edit.files_of ? moved(folder.files, edit.files_delta) : folder.files);
         put(core, &writer.length, " ");
-        put_number(core, &writer.length, ordinal == edit.folders_of ? folder.folders - 1 : folder.folders);
+        put_number(core, &writer.length, ordinal == edit.folders_of ? folder.folders - 1 : adds && ordinal == insert.parent ? folder.folders + 1 : folder.folders);
         put(core, &writer.length, " ");
         put_hex(core, &writer.length, folder_crc, 8);
         if (path_length != 0) {
@@ -1028,6 +1085,9 @@ ODRIG_NOINLINE bool write_table(Core &core, const IndexChange &change, uint32_t 
         if (!writer_line(core, writer, start, kIndexRow)) {
             return false;
         }
+    }
+    if (insert.ordinal == core.index->folders && !put_inserted(core, writer, insert)) {
+        return false;
     }
     if (!writer_close(core, writer)) {
         return false;
@@ -1055,7 +1115,7 @@ ODRIG_NOINLINE bool write_map(Core &core, const IndexChange &change, uint32_t *l
     for (uint32_t line_at = 0; line_at <= count; ++line_at) {
         if (line_at == edit.insert_at) {
             const uint32_t start = writer.length;
-            put_id_line(core, &writer.length, edit.add_id, 'f', edit.ordinal == kNothing ? 0 : edit.ordinal, edit.add_row);
+            put_id_line(core, &writer.length, edit.add_id, edit.add_kind, edit.ordinal == kNothing ? 0 : edit.ordinal, edit.add_row);
             if (!writer_line(core, writer, start, kIndexIdRow)) {
                 return false;
             }
@@ -1081,8 +1141,9 @@ ODRIG_NOINLINE bool write_map(Core &core, const IndexChange &change, uint32_t *l
         if (kind == 'f' && ordinal == edit.move_ordinal) {
             row = row_after_move(row, edit.move_from, edit.move_to);
         }
+        const uint32_t shift = edit.shift_from != kNothing && ordinal >= edit.shift_from ? 1 : 0;
         const uint32_t start = writer.length;
-        put_id_line(core, &writer.length, id, kind, ordinal >= past ? ordinal - edit.gone_count : ordinal, row);
+        put_id_line(core, &writer.length, id, kind, (ordinal >= past ? ordinal - edit.gone_count : ordinal) + shift, row);
         if (!writer_line(core, writer, start, kIndexIdRow)) {
             return false;
         }
@@ -1932,6 +1993,153 @@ bool catalog_remove_external(Core &core, uint32_t position) {
     brightness_start(core);
     ignored_start(core);
     return true;
+}
+
+namespace {
+
+// The last part of a path.
+const char *last_part(const char *path) {
+    const char *base = path;
+    for (const char *at = path; *at != '\0'; ++at) {
+        if (*at == '/') base = at + 1;
+    }
+    return base;
+}
+
+// Whether two names are the same in any case, as FAT finds them.
+bool same_any_case(const char *a, const char *b) {
+    for (;; ++a, ++b) {
+        const char x = *a >= 'A' && *a <= 'Z' ? static_cast<char>(*a - 'A' + 'a') : *a;
+        const char y = *b >= 'A' && *b <= 'Z' ? static_cast<char>(*b - 'A' + 'a') : *b;
+        if (x != y) return false;
+        if (x == '\0') return true;
+    }
+}
+
+// Whether a name comes before another by its bytes.
+bool bytes_before(const char *a, const char *b) {
+    for (; *a != '\0' && *a == *b; ++a, ++b) {
+    }
+    return static_cast<uint8_t>(*a) < static_cast<uint8_t>(*b);
+}
+
+}  // namespace
+
+namespace {
+
+// The ordinal of the parent of a folder's path, kNoFolder when the tree has none.
+ODRIG_NOINLINE uint32_t parent_ordinal_of(const Core &core, const char *path) {
+    const char *base = last_part(path);
+    char parent_path[kDrivePathRoom];
+    const uint32_t parent_length = base == path ? 0 : static_cast<uint32_t>(base - path - 1);
+    memcpy(parent_path, path, parent_length);
+    parent_path[parent_length] = '\0';
+    return drive_folder_with_path(core, parent_path);
+}
+
+// Where a new folder stands among the sub-folders of its parent: its place there and its
+// ordinal in the table, before the first sub-folder whose name comes after its own. 'u' when
+// a file or a folder of the parent has its name in any case, 's' when the index cannot be
+// read, 0 otherwise.
+ODRIG_NOINLINE char place_of(const Core &core, const IndexFolder &parent, const char *base, uint32_t *place, uint32_t *ordinal) {
+    for (uint32_t row = 0; row < parent.files; ++row) {
+        const DriveRow *file = drive_row(core, parent.first + row);
+        if (file == nullptr) return 's';
+        if (same_any_case(last_part(file->name), base)) return 'u';
+    }
+    *place = parent.folders;
+    *ordinal = parent.end;
+    for (uint32_t at = 0; at < parent.folders; ++at) {
+        const DriveRow *child = drive_subfolder(core, parent, at);
+        if (child == nullptr) return 's';
+        if (same_any_case(last_part(child->name), base)) return 'u';
+        if (*place == parent.folders && bytes_before(base, last_part(child->name))) {
+            *place = at;
+            if (drive_find(core, child->id, ordinal) != 'd') return 's';
+        }
+    }
+    return 0;
+}
+
+// Makes the folder on the drive and commits its line in the index: the parent's file with
+// its row, the table and the map.
+ODRIG_NOINLINE bool insert_folder(Core &core, const char *path, const IndexFolder &parent, uint32_t place, uint32_t ordinal, uint32_t first,
+                                  uint32_t id, uint32_t line_at) {
+    char name[kDriveOpenRoom] = "drive/";
+    copy_text(name + 6, path);
+    if (!catalog_settle(core, kExternal) || core.host.make_folder(core.host.ctx, name) != 1) {
+        return false;
+    }
+    IndexChange index;
+    clear_change(index);
+    index.folder_count = 1;
+    index.folders[0] = edit_of(parent);
+    index.folders[0].insert_row = parent.files + place;
+    index.folders[0].insert_id = id;
+    index.folders[0].insert_path = path;
+    index.insert = {ordinal, id, static_cast<uint32_t>(parent.depth) + 1, first, parent.ordinal, path};
+    index.map_changes = true;
+    index.map.insert_at = line_at;
+    index.map.add_id = id;
+    index.map.add_row = 0;
+    index.map.ordinal = ordinal;
+    index.map.add_kind = 'd';
+    index.map.shift_from = ordinal;
+    const CatalogChange change;
+    return commit_change(core, kExternal, change, &index);
+}
+
+// The reply of a folder that is there: its id, and whether it was made now.
+uint32_t folder_reply(Reply &reply, uint32_t id, bool made) {
+    reply.text("{\"ok\":true,\"id\":");
+    reply.number(id);
+    reply.text(made ? ",\"made\":true}\n" : ",\"made\":false}\n");
+    return reply.length;
+}
+
+}  // namespace
+
+uint32_t catalog_folder_make(Core &core, const char *path, Reply &reply) {
+    if (core.upload.state != kUploadNone || catalog_drive_loading(core) || catalog_rebuilding(core) || core.mapping_test) {
+        return refuse(reply, "busy");
+    }
+    if (!catalog_drive_writable(core) || !core.indexed) {
+        return refuse(reply, "read-only");
+    }
+    IndexFolder folder;
+    const uint32_t existing = drive_folder_with_path(core, path);
+    if (existing != kNoFolder && drive_folder(core, existing, folder)) {
+        return folder_reply(reply, folder.id, false);
+    }
+    IndexFolder parent;
+    const uint32_t parent_ordinal = parent_ordinal_of(core, path);
+    if (parent_ordinal == kNoFolder || !drive_folder(core, parent_ordinal, parent)) {
+        return refuse(reply, "unknown-id");
+    }
+    uint32_t place = 0;
+    uint32_t ordinal = 0;
+    const char found = place_of(core, parent, last_part(path), &place, &ordinal);
+    if (found != 0) {
+        return refuse(reply, found == 'u' ? "in-use" : "storage-error");
+    }
+    uint32_t first = core.index->files;
+    if (ordinal < core.index->folders) {
+        if (!drive_folder(core, ordinal, folder)) return refuse(reply, "storage-error");
+        first = folder.first;
+    }
+    uint32_t line_at = 0;
+    const uint32_t id = lowest_free_id(core, &line_at);
+    if (id == 0) {
+        return refuse(reply, "no-space");
+    }
+    if (!insert_folder(core, path, parent, place, ordinal, first, id, line_at)) {
+        return refuse(reply, "storage-error");
+    }
+    current_again(core);
+    repeats_reload(core);
+    brightness_start(core);
+    ignored_start(core);
+    return folder_reply(reply, id, true);
 }
 
 namespace {
