@@ -1,7 +1,9 @@
 /* The page: the event stream, the header, the reason band, the log, the three views, the
    seek bar, the readout and the count of refreshes drawn. The page sends no command; its
    one control, the seek bar, asks the emulator to move playback, which is no command. In
-   the controller view the operators' app runs in a frame, and the lines are the app's. */
+   the controller view the operators' app runs in a frame, and the lines are the app's. A
+   mirror's page names its link and its state, says in a band what keeps its LEDs dark,
+   marks the board's replies and lines in the log, and has no seek bar. */
 
 (function () {
   "use strict";
@@ -80,7 +82,7 @@
 
   /* The seek bar from the last position event and the newest frame's timestamp. */
   function seekDraw() {
-    if (!position || position.animation === null || latestMs === null) {
+    if (!position || position.animation === null || latestMs === null || (hello && hello.mirror)) {
       seek.hidden = true;
       return;
     }
@@ -214,6 +216,8 @@
     port("drive", hello.drive, shortPath);
     port("serial", hello.serial, shortPath);
     port("tcp", hello.tcp, String);
+    port("mirror", hello.mirror, String);
+    byId("mirror-band").hidden = true;
     document.title = "odrig emulator \u2013 " + hello.show.split(/[\\/]/).pop();
     showReason();
     if (!hello.legs.length) {
@@ -297,7 +301,16 @@
       mark.textContent = "\u2026 " + (entry.cut ? "more than " : "") + entry.length + " characters";
       line.appendChild(mark);
     }
-    cell(row, "reply", entry.reply);
+    var reply = cell(row, "reply", entry.reply);
+    if (entry.board) {
+      row.dataset.board = "true";
+      var from = document.createElement("span");
+      from.className = "chip";
+      from.dataset.via = "board";
+      from.textContent = "board";
+      from.title = "The reply came from the board this emulator mirrors.";
+      reply.insertBefore(from, reply.firstChild);
+    }
     entries.appendChild(row);
     while (entries.children.length > LOG_ROWS) {
       entries.removeChild(entries.firstChild);
@@ -306,6 +319,41 @@
     if (follow) {
       logBox.scrollTop = logBox.scrollHeight;
     }
+  }
+
+  /* What keeps a mirror's LEDs dark, or its link from the board, in words. */
+  function mirrorWords(mirror) {
+    if (mirror.state === "waiting") {
+      return "Waiting for the board: " + (mirror.reason || mirror.link);
+    }
+    if (mirror.state === "lost") {
+      return "The link to the board is lost since " + mirror.since + ": " + (mirror.reason || mirror.link) + ". The mirror goes on with the plan it has.";
+    }
+    if (mirror.dark === "fetching" && mirror.fetch) {
+      return "Fetching the file of animation " + mirror.fetch.id + " from the board: " + mirror.fetch.bytes + " of " + mirror.fetch.size + " bytes.";
+    }
+    if (mirror.dark === "fetching" && mirror.item) {
+      return "Looking for the file of animation " + mirror.item.id + ", key " + mirror.item.key + ".";
+    }
+    if (mirror.dark === "canvas" && mirror.canvas) {
+      return "The board's canvas is " + mirror.canvas.board.join(" x ") + " and the show folder's mapping " + mirror.canvas.show.join(" x ") + ": the LEDs stay dark, and lines go through.";
+    }
+    if (mirror.dark === "no-key" && mirror.item) {
+      return "Animation " + mirror.item.id + " plays dark: no catalog of its storage names its file. catalog rebuild makes one.";
+    }
+    return "";
+  }
+
+  function onMirror(event) {
+    var mirror = JSON.parse(event.data);
+    var state = byId("mirror-state");
+    state.dataset.state = mirror.state;
+    state.textContent = mirror.state;
+    byId("mirror-version").textContent = mirror.version === null ? "-" : String(mirror.version);
+    var words = mirrorWords(mirror);
+    var band = byId("mirror-band");
+    band.hidden = !words;
+    band.textContent = words;
   }
 
   function onFrame(event) {
@@ -429,6 +477,7 @@
   source.addEventListener("frame", onFrame);
   source.addEventListener("mini", onMini);
   source.addEventListener("position", onPosition);
+  source.addEventListener("mirror", onMirror);
   seekBar.addEventListener("pointerdown", onSeekDown);
   seekBar.addEventListener("pointermove", onSeekMove);
   seekBar.addEventListener("pointerup", onSeekUp);

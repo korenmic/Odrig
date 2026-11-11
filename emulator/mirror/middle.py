@@ -53,6 +53,8 @@ class Middle:
         self.state = WAITING
         self.reason = None
         self.since = clock()
+        # The time of day the state began, as the page says it.
+        self.since_text = time.strftime("%H:%M:%S")
         self.watchers = []
         self.listeners = []
         self._changed = threading.Condition()
@@ -136,6 +138,7 @@ class Middle:
                 return
             if state != self.state:
                 self.since = self.clock()
+                self.since_text = time.strftime("%H:%M:%S")
             self.state, self.reason = state, reason
             self._changed.notify_all()
             watchers = list(self.watchers)

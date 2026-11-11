@@ -53,6 +53,28 @@ class Mirror:
     def drive(self, record, local_ms):
         return self.driver.drive(record, local_ms)
 
+    def state(self):
+        """What the page is told: the link, its state and since when, the plan's version,
+        the offset of the board's clock, why the LEDs are dark, the item on them, a fetch
+        under way, and both canvases when they differ."""
+        plan, offset = self.keeper.snapshot()
+        dark, item = self.driver.shown()
+        fetching = self.fetcher.fetching
+        board = self.keeper.board_canvas()
+        parsed = None if fetching is None else files.parsed_key(fetching[1])
+        return {
+            "link": self.described,
+            "state": self.middle.state,
+            "reason": self.middle.reason,
+            "since": self.middle.since_text,
+            "version": None if plan is None else plan.get("version"),
+            "offset": offset,
+            "dark": dark,
+            "item": None if item is None else {"id": item.get("id"), "key": item.get("key")},
+            "fetch": None if fetching is None else {"id": fetching[0], "key": fetching[1], "bytes": fetching[2], "size": None if parsed is None else parsed[1]},
+            "canvas": {"board": list(board), "show": list(self.driver.canvas)} if dark == "canvas" and board and self.driver.canvas else None,
+        }
+
     def client_line(self, line, reply):
         self.keeper.client_line(line, reply)
 

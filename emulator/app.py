@@ -163,7 +163,8 @@ def serve(arguments, out):
             print(LAN_WARNING if the_mirror is None else LAN_MIRROR_WARNING, file=sys.stderr, flush=True)
         server = httpd.Server(
             PORT if arguments.port is None else arguments.port, running, arguments.show_dir,
-            lambda: {"show": described["show"], "drive": described["drive"], "page": server.url, "serial": described["serial"], "tcp": described["tcp"], "legs": [list(leg) for leg in core.legs], "t0": described["t0"], "error": running.error()},
+            lambda: {"show": described["show"], "drive": described["drive"], "page": server.url, "serial": described["serial"], "tcp": described["tcp"], "legs": [list(leg) for leg in core.legs], "t0": described["t0"], "error": running.error(),
+                     "mirror": None if the_mirror is None else the_mirror.described},
             lan=arguments.lan,
         )
 

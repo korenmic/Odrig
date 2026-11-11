@@ -130,6 +130,7 @@ class Engine:
         self.mirror = mirror
         self._mini_told = None
         self._told_status = None
+        self._told_mirror = None
         # The bytes of a line not ended yet, by transport and way, in a mirror.
         self._partial = {}
         self._partial_lock = threading.Lock()
@@ -179,6 +180,10 @@ class Engine:
         if mini is not None and mini != self._mini_told:
             self._mini_told = mini
             self.core.command(now, b"debug mini on" if mini else b"debug mini off")
+        told = self.mirror.state()
+        if told != self._told_mirror:
+            self._told_mirror = told
+            self.hub.mirror(told)
 
     def canvas(self):
         """The canvas of the show folder's mapping, `(width, height)`, as the core's status
@@ -257,7 +262,7 @@ class Engine:
         else:
             reply = self.mirror.middle.send(kept)
         self.mirror.client_line(kept, reply)
-        self.hub.log(now, transport, kept[:binding.LINE_MAX], len(kept) > binding.LINE_MAX, b"" if reply is None else reply)
+        self.hub.log(now, transport, kept[:binding.LINE_MAX], len(kept) > binding.LINE_MAX, b"" if reply is None else reply, board=True)
         if kept == b"status" and reply is not None:
             self.hub.status(reply)
         return reply
@@ -296,7 +301,9 @@ class Engine:
         milliseconds from its start: forward by a move of the clock, back by a restart of
         the animation, the engine's own `play`, and then a move. Returns the reply of the
         route: the position moved to, the starts, the length and the clock's move, or the
-        refusal."""
+        refusal. A mirror refuses it: the page does not move the board's playback."""
+        if self.mirror is not None:
+            return {"ok": False, "error": "mirror"}
         with self._lock:
             playback = self.playback
             if isinstance(target, bool) or not isinstance(target, int):

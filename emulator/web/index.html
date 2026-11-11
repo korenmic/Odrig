@@ -16,6 +16,7 @@
     <span class="fact" hidden><span class="key">drive</span> <code id="drive">-</code></span>
     <span class="fact"><span class="key">serial</span> <code id="serial">-</code></span>
     <span class="fact" hidden><span class="key">tcp</span> <code id="tcp">-</code></span>
+    <span class="fact" hidden><span class="key">mirror</span> <code id="mirror">-</code> <span class="mirror-state" id="mirror-state" data-state="waiting">waiting</span> <span class="key">plan</span> <span class="value" id="mirror-version">-</span></span>
     <span class="link" id="link" data-state="waiting">connecting</span>
   </div>
   <div class="state">
@@ -28,6 +29,7 @@
   </div>
 </header>
 <div class="band" id="band" hidden>The core reports that the show is invalid: <code id="reason"></code></div>
+<div class="band mirror-band" id="mirror-band" hidden></div>
 <nav class="tabs">
   <button type="button" class="tab" id="tab-leds" aria-pressed="true">LEDs</button>
   <button type="button" class="tab" id="tab-mapping" aria-pressed="false">Mapping</button>

@@ -95,7 +95,7 @@ into the commit message. Code carries no history.
   - Suites: emulator, core, onboarding.
   - Requirements: 13.1–13.4, 14.1–14.8, 15.1–15.4.
 
-- [ ] 9. The page of a mirror
+- [x] 9. The page of a mirror
   - `emulator/httpd.py` (`hello`, `mirror` events, `/seek`), `emulator/hub.py`,
     `emulator/web/` (the header, the bands, the log's marks, no seek bar).
   - Tests of `tests/emulator` for the events, `/seek` and the page's script, seen failing

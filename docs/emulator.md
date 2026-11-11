@@ -504,7 +504,14 @@ From top to bottom the page has:
   is playing, which reads `playlist` for the playlist and is the id of a cycle otherwise,
   and the id of the animation on the LEDs. `core` is the `fps` the core
   reports: its refreshes in the last full second. `page` is the page's own count: the
-  refreshes it drew in the last full second.
+  refreshes it drew in the last full second. In a [mirror](#a-mirror-of-a-board) the
+  header names the link, its state, `waiting`, `linked` or `lost`, and the version of the
+  board's plan, and the status is the board's.
+- **The mirror's band.** In a mirror a band says what keeps its LEDs dark or its link from
+  the board: that it waits for the board, that the link is lost and since when, while the
+  mirror goes on with the plan it has, the file of an animation being fetched from the
+  board and how far, a board whose canvas is not the show folder's, with both sizes, or an
+  animation whose file no catalog names.
 - **The reason band.** When the core reports that the show is invalid, a red band shows the
   reason text exactly as the core gives it, for example `show-malformed`. With a
   valid mapping the LEDs are still drawn, all dark. With an invalid mapping there are no
@@ -520,7 +527,8 @@ From top to bottom the page has:
   the length is not known, and shows nothing while nothing plays or a cycle plays.
   Dragging the bar, or pressing on it, moves playback to that point, see
   [Seeking](#seeking); for three seconds after it the row says by how much the
-  emulator's clock moved, `clock +12 s`.
+  emulator's clock moved, `clock +12 s`. A mirror has no seek bar: the page does not move
+  the board's playback.
 - **The command log.** One line for each command that arrived, by the serial port or over
   HTTP: the time it arrived, how it came, the line, and the reply. A line of more than
   200 characters is shown with its first 200, the mark `…` and the number of characters it
@@ -906,7 +914,7 @@ playback and miniature-preview events are:
 
 ```
 event: hello
-data: {"show":"/abs/path/of/show","drive":null,"page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","tcp":null,"legs":[[1,1,180],[2,2,180]],"t0":3,"error":null}
+data: {"show":"/abs/path/of/show","drive":null,"page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","tcp":null,"legs":[[1,1,180],[2,2,180]],"t0":3,"error":null,"mirror":null}
 
 event: log
 data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","length":6,"cut":false,"reply":"{\"ok\":true}"}
@@ -922,19 +930,25 @@ data: 123460 <base64 of the refresh>
 
 event: mini
 data: {"active":false}
+
+event: mirror
+data: {"link":"tcp 127.0.0.1:8601","state":"linked","reason":null,"since":"14:03:20","version":41,"offset":-4294962176,"dark":null,"item":{"id":1,"key":"ddb3ab90-1138"},"fetch":null,"canvas":null}
 ```
 
 | Event | What it carries |
 |---|---|
-| `hello` | First on every connection. `drive` is the folder of `--drive` or of `--drive-folder`, or `null` without either. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
+| `hello` | First on every connection. `mirror` is a mirror's link, `tcp 127.0.0.1:8601`, or `null` for an emulator that mirrors no board. `drive` is the folder of `--drive` or of `--drive-folder`, or `null` without either. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
 | `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial`, `tcp`, `http` or, for a restart the emulator made for a seek, `seek`, `line` the first 200 characters of the line as the core read it, `length` the number of characters of that line, and `reply` the reply without its newline. A line of more than 2,048 characters, which the core cuts to its first 2,048, has `"length":2048` and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
 | `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
 | `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |
 | `position` | Where the animation on the LEDs stands, for the [seek bar](#seeking): its id, the start of the loop that shows and the start of its turn, both on the clock of the frames' timestamps, and the loop's length in milliseconds; each `null` while unknown, and all four `null` while nothing plays or a cycle plays. It is sent to a new connection after the latest status, and at every change: a turn's start, a loop's start, a seek, a length learned. |
+| `mirror` | Only in a [mirror](#a-mirror-of-a-board): `link`; `state`, `waiting` until the link is open, `linked` or `lost`, with `reason` and `since`, the time of day the state began; `version`, the latest plan's, and `offset`, the board's time less the emulator's in milliseconds, each `null` while unknown; `dark`, why the LEDs are dark, `no-plan`, `canvas`, `nothing`, `no-key` or `fetching`, else `null`; `item`, the id and the key of the plan's item on the LEDs; `fetch`, a fetch from the board under way with its `bytes` read and its `size`, else `null`; and `canvas`, the board's and the show folder's sizes while they differ. It is sent to a new connection after the latest position, and at every change. |
 | `mini` | Only for a supporting60x60 target. `active` is the acknowledged virtual-output mode. When true, `rgb` is180bytes encoded in base64, in physical index `x*6+y` of the10x6 miniature; when false, `rgb` is omitted. The page flips y for its top-down canvas. Projection is the core's, not a second renderer. |
 
 A new connection gets `hello`, the log entries kept so far, the latest status, the latest
-position, and then everything that happens. The emulator keeps the last 500 log entries.
+position, a mirror's latest state, and then everything that happens. In a mirror a log
+entry of a client's line has the board's reply and `"board":true`, and the board's other
+lines come with the transport `board`; the mirror's own lines are not in the log. The emulator keeps the last 500 log entries.
 
 Log, status and position events are never dropped. Refreshes do not queue: each connection has one
 place for the newest refresh, and a newer one replaces it, so a page that cannot keep up
@@ -1656,6 +1670,24 @@ in a narrower window the mapping view of every other step has the arrangement of
     `python -m emulator build/example-broken`. *Seen:* a band under the header shows
     `show-malformed`, in the LEDs view and in the mapping view, and every LED is
     dark.
+
+### A mirror, by eye
+
+The owner's checks of the mirror, open until the owner reports them, as
+[the seed's requirements](specs/87-p2-a-live-mirror-of-the-board-in-the-emulator/requirements.md)
+18.4 name them:
+
+- **Beside the wall over USB.** `python -m emulator build/demo-20/show --mirror-port COM5`
+  beside the wall: the page shows what the wall shows, turn by turn, a clock and a message
+  with the wall's time and words, the LEDs dark while the wall's are off, and the diagonal
+  or a snake's test while one shows.
+- **Over Wi-Fi.** The same with `--mirror-http` and the board's address.
+- **The phone.** The Controller view, and a phone through `--lan`, steer the board through
+  the emulator, and so does a phone straight at the board's address while the mirror runs;
+  the page follows both.
+- **The link.** The header names the link, `linked` and the plan's version; a cable pulled
+  shows the band that the link is lost and since when while the LEDs go on, and put back
+  the mirror joins again.
 
 ### What has been checked
 
