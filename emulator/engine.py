@@ -147,9 +147,8 @@ class Engine:
         return output
 
     def routing(self):
-        """What the page must read the mapping again for: the legs and their pins, and the
-        saves of a leg's wiring."""
-        return getattr(self.core, "legs", ()), getattr(self.core, "wiring_saves", 0)
+        """What the page must read the mapping again for: the legs and their pins."""
+        return getattr(self.core, "legs", ())
 
     def line(self, data, transport):
         """One command line, as HTTP delivers it. Returns the reply."""

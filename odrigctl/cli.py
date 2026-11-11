@@ -115,10 +115,10 @@ def checked(made, arguments):
         return [arguments.command, *arguments.arguments]
     if arguments.command == "mapping":
         words = arguments.arguments
-        valid = words == ["get"] or (len(words) == 2 and words[0] in ("test", "cross") and words[1] in ("on", "off")) or (len(words) == 3 and words[0] == "set") or (
+        valid = words == ["get"] or (len(words) == 2 and words[0] == "test" and words[1] in ("on", "off")) or (len(words) == 3 and words[0] == "set") or (
             len(words) == 3 and words[:2] == ["test", "snake"])
         if not valid:
-            made.error("mapping takes get, set REV PINS, cross on|off, test on|off, or test snake N")
+            made.error("mapping takes get, set REV PINS, test on|off, or test snake N")
         if any("\n" in word or "\r" in word for word in words):
             made.error("a command is one line")
         return [arguments.command, *words]

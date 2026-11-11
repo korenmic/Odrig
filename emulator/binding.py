@@ -151,9 +151,6 @@ class Core:
         if not self._core:
             raise failure.Failure(failure.CORE_NOT_BUILT, "the core could not start")
         self._library.odrig_core_mini_support(self._core)
-        # Successful `mapping cross` commands: each may have changed where the LEDs of a leg
-        # are, which the mapping file says and the legs do not.
-        self.wiring_saves = 0
         self._refresh_legs()
 
     def _refresh_legs(self):
@@ -286,8 +283,6 @@ class Core:
         self._acknowledge_mini()
         if line.startswith(b"mapping set ") and reply.startswith(b'{"ok":true'):
             self._refresh_legs()
-        if line.startswith(b"mapping cross ") and reply.startswith(b'{"ok":true'):
-            self.wiring_saves += 1
         return reply
 
     def feed(self, now_ms, data):
@@ -300,7 +295,6 @@ class Core:
         self._acknowledge_mini()
         if any(line.startswith(b"mapping set ") and reply.startswith(b'{"ok":true') for line, reply, _ in answered):
             self._refresh_legs()
-        self.wiring_saves += sum(line.startswith(b"mapping cross ") and reply.startswith(b'{"ok":true') for line, reply, _ in answered)
         return answered
 
     def error(self):
