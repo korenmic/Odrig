@@ -5,7 +5,9 @@ the folder that [show.md](show.md) describes. It is the Python package `emulator
 repository root and uses only the Python standard library and the repository's own
 `odrig` package, pure Python, which reads the catalogs. It loads the core as a shared
 library, built from the same `core/src/*.cpp` the firmware compiles, and leaves every
-decision about files, time and commands to it. So it plays texts and clocks as the board
+decision about files, time and commands to it. Its [mirror of a board](#a-mirror-of-a-board),
+`emulator/mirror/`, is a client of the board as the command tool is, and opens the board's
+port with the command tool's client. So it plays texts and clocks as the board
 does, drawn by the core at every refresh, a clock with the seed `status` reports; its
 suite finds every reference picture of `tests/vectors/procedural/` on its LEDs.
 
@@ -101,6 +103,7 @@ of the Python library of [python-library.md](python-library.md).
 
 ```
 python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR [--drive-read-only] | --drive-folder DIR] [--parent PID]
+python -m emulator SHOW_DIR (--mirror-port NAME | --mirror-tcp ADDRESS | --mirror-http ADDRESS) [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--parent PID]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
@@ -131,10 +134,14 @@ Ctrl-C or Ctrl-Break, and then removes the link to its port and exits with statu
 | `--drive-read-only` | With `--drive`: the core may not change the drive's files, as on a USB stick. | The core may change them, as on the card |
 | `--drive-folder DIR` | The folder `DIR` stands for the card's folder `odrig` itself, and the drive is read-only. Not with `--drive`. See [A folder as the card](#a-folder-as-the-card). | No drive |
 | `--parent PID` | The emulator ends, as on an interrupt, within a second or two after the process with this id ends, even when that process was killed without ending it. The preview and the tests give their own id, so that no emulator outlives them. | It runs until it is stopped |
+| `--mirror-port NAME` | The emulator is the mirror of the board on this serial port, `COM5` or `/dev/cu.usbmodem101`. See [A mirror of a board](#a-mirror-of-a-board). | No mirror |
+| `--mirror-tcp ADDRESS` | The emulator is the mirror of the emulator whose line port is at `host:port`. | No mirror |
+| `--mirror-http ADDRESS` | The emulator is the mirror of the board or the emulator at this address over HTTP: `host`, `host:port` or `http://host`. | No mirror |
 
-There is no option for the size of the canvas and none that names an address: the canvas
-is the one of `mapping.json` in the folder, and the emulator listens on 127.0.0.1, or
-with `--lan` on every address this computer has.
+There is no option for the size of the canvas and none that names an address of the
+emulator's own: the canvas is the one of `mapping.json` in the folder, and the emulator
+listens on 127.0.0.1, or with `--lan` on every address this computer has. The address of
+`--mirror-tcp` and `--mirror-http` is the board's, which the emulator reaches.
 
 **Storage.** The emulator gives the core the storage functions of [core.md](core.md) on
 the folder it was started on, and on nothing else: a name with a path separator, or one
@@ -357,6 +364,8 @@ curl --data-binary 'play 2' http://127.0.0.1:8600/odrig
 - The response that carries a reply has the header `Access-Control-Allow-Origin: *`.
 - HTTP is no serial way: `plan push on` and `plan push off` are answered `unsupported`, and
   a client of HTTP asks `plan since <version>` for what changed.
+- In a [mirror](#a-mirror-of-a-board), a line no reply came for from the board has its
+  request closed without an answer.
 - An answer without a body closes its connection.
 - Before a 404 or a 405, the body that the request declares with a `Content-Length` is
   read to its end and dropped, so that the closed connection is not reset and the client
@@ -392,6 +401,54 @@ warning: --lan: anyone on the local network can send commands to this emulator a
 - macOS may ask whether Python may accept incoming connections. A phone reaches the
   emulator only when that is allowed.
 - `--lan` does not go with `--record`: record mode opens no address.
+
+## A mirror of a board
+
+```
+python -m emulator build/demo-20/show --mirror-port COM5
+python -m emulator build/demo-20/show --mirror-tcp 127.0.0.1:8601 --tcp-port 8611 --port 8610
+python -m emulator build/demo-20/show --mirror-http http://192.168.1.40
+```
+
+With one of the three options the emulator is the mirror of a board: it carries every line
+of its clients to the board and the board's reply back, and it shows what the board's plan,
+[commands.md](commands.md#the-plan), says the board shows. The board is reached through its
+USB serial port, with `--mirror-port`; through the [line port](#the-line-port) of another
+emulator, with `--mirror-tcp`, which is how the suites test the mirror without a board; or
+over HTTP, a board at its address or an emulator at its page's, with `--mirror-http`. The
+app in the Controller view, a phone through `--lan` and the command tool are its clients as
+they are the emulator's; the app is the same.
+
+- **Start.** The emulator prints `mirror: serial COM5`, `mirror: tcp 127.0.0.1:8601` or
+  `mirror: http http://192.168.1.40` after its other lines, and opens the link. A link that
+  cannot be opened is tried again every 2 seconds while the emulator runs. `--drive`,
+  `--drive-folder` and `--record` do not go with a mirror: status 2. With `--lan` the
+  warning says that the devices of the network reach the board through the emulator.
+- **The show folder** gives the mapping the LEDs are drawn on. Nothing of its show plays,
+  and nothing is written into it while the mirror runs.
+- **A serial port** is opened as the command tool opens one: 115,200 bits a second, eight
+  data bits, no parity, one stop bit, RTS lowered before DTR, never resetting the chip. It
+  is kept open, and one that goes away is opened again when it comes back. While the
+  emulator holds it, the command tool and its `--log` reach the board through the
+  emulator's line port or serial port; the firmware tool needs the emulator stopped first.
+- **The man in the middle.** Every line a client sends, over HTTP, on the line port or on
+  the serial port, goes to the board, and the board's reply goes back to that client as it
+  came; the emulator's own core answers none of them. Each is in the page's log with the
+  board's reply. Over a serial port or TCP the lines go one at a time in the order they
+  came, a client's line before the mirror's own, each once the reply of the one before has
+  come: a reply goes only to the client of its own line. A line is waited for as long as
+  its client waits, up to 30 seconds, and once its client stopped waiting for 30 seconds
+  more, so that a reply that comes late is dropped and never given to the next line. Over
+  HTTP every line is a request of its own, as a phone sends it. A line that came over HTTP
+  with a line end inside it gets no reply over a serial port or TCP, where it would be two
+  lines.
+- **The board's other lines.** A `#plan` line is the mirror's and reaches no client. Every
+  other line of the board that is no reply, a `#log` line or one of the chip's loader, is
+  written to each client of the line port and of the serial port, between its replies, as
+  the board's own port would give it, and is in the page's log with the transport `board`.
+  A client of HTTP gets replies only.
+- **A lost link** ends every wait. A client of HTTP has its request closed without a reply,
+  as a board that did not answer leaves it, and a client of a port gets nothing.
 
 ## The page
 

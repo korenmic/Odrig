@@ -15455,6 +15455,41 @@ closes its file and its test, and the show goes on from where it was.
 **Resolution.** `core/include/odrig_core.h`, `core/src/player.cpp`,
 `core/src/mapping_control.cpp`, `core/src/brightness.cpp`, `docs/core.md`.
 
+## Seed 87: the mirror inside the emulator's package
+
+**Question.** The emulator's package may import nothing but the standard library and itself,
+and its scope tests keep it so; the preview, which needed the command tool, became a package
+of its own for that reason. The mirror opens a board's serial port as the command tool does
+and reads the board's replies. Where does it live?
+
+**Answer.** In `emulator/mirror/`, as the design says. The owner's command line is `python -m
+emulator SHOW_DIR --mirror-port NAME`, so the emulator itself starts the mirror, and a package
+beside it would have to be imported by it all the same. The mirror is the emulator's client
+of a board, as the command tool is, and its link opens the port with the command tool's
+client rather than with a second copy of the opening that lowers RTS before DTR and of the
+serial port of Windows. The scope tests let the modules of `emulator/mirror/` import
+`odrigctl`, and `emulator/mirror/link.py` alone does; every other module of the emulator is
+held to the rules as before.
+
+**Resolution.** `emulator/mirror/link.py`, `tests/emulator/test_scope.py`,
+`docs/emulator.md`.
+
+## Seed 87: how long the man in the middle waits
+
+**Question.** A line is waited for as long as its client waits, and a reply that comes after
+its client stopped waiting is dropped. The emulator does not learn when a client of HTTP or
+of a port stops waiting. How long does a line wait, and when does the next one go?
+
+**Answer.** A client's line waits for its reply up to 30 seconds, longer than any client of
+the board waits, and the worker waits for that reply 30 seconds more once the line's client
+stopped waiting before it sends the next line: the board answers the lines of a way in their
+order, and a reply that comes in that time is the dropped one, never the next line's. A lost
+link and a restart end the waits at once. A line of HTTP with a line end inside it gets no
+reply over a stream: there it would be two lines and two replies, and the second would be
+taken for the next line's.
+
+**Resolution.** `emulator/mirror/middle.py`, `emulator/engine.py`, `docs/emulator.md`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

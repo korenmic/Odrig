@@ -208,7 +208,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         kept = self.body()
         if kept is None:
             return
-        self.json(self.server.engine.line(kept, "http"))
+        reply = self.server.engine.line(kept, "http")
+        if reply is None:
+            # No reply came from the board a mirror carries the line to: the request is
+            # closed without an answer, as a board that did not answer leaves it.
+            self.close_connection = True
+            return
+        self.json(reply)
 
     def seek(self):
         """The page's seek: the body names the point in milliseconds, the engine moves

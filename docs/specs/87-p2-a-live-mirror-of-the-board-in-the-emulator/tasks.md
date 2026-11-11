@@ -71,7 +71,7 @@ into the commit message. Code carries no history.
   - Suites: emulator, onboarding.
   - Requirements: 10.1.
 
-- [ ] 7. The mirror's link and the man in the middle
+- [x] 7. The mirror's link and the man in the middle
   - `emulator/mirror/__init__.py`, `link.py`, `middle.py`, new. `emulator/app.py`
     (`--mirror-port`, `--mirror-tcp`, `--mirror-http`, their refusals, `mirror:`, the `--lan`
     warning), `emulator/engine.py` (lines to the middle, logged with the board's reply),
