@@ -66,7 +66,7 @@ export default async function(app) {
   if (app.settings.other) {
     app.press("Target");
     app.fill("address", app.settings.other);
-    app.press("Use");
+    app.press("Connect over Wi-Fi");
     await app.until(() => app.shown() === "animations", "new target answers");
     app.press("Settings");
     await app.until(() => pins(app)[0] === app.settings.first, "new target assignment");
