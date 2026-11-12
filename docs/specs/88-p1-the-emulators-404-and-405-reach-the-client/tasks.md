@@ -48,7 +48,10 @@ Rules for every task:
   - Suites: emulator, converter, onboarding.
   - Requirements: 5.1, 5.2, 5.3, 5.4
 
-- [ ] 3. Deliver seed 88
+- [x] 3. Deliver seed 88
+  - The owner chose on 2026-11-12 to merge once the tests that the seed mends were seen
+    broken on `master` and passing on the branch. The other suites and the whole runs of
+    the emulator's suite are run after the merge, and their results are told to the owner.
   - Fetch `origin`. When `master` has moved past 51e1e3e4, merge it into the branch, never
     a rebase, and make what follows on the merge.
   - Push the branch and open the pull request against `master`.
