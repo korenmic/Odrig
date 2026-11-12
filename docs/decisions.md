@@ -864,6 +864,24 @@ are in [format.md](format.md), "Measured sizes".
   The owner cancelled the standalone fallback firmware seed; its unfinished work
   is retained as history and is not scheduled for completion.
 
+- 2026-10-31: Seed64's owner authorized autonomous protocol choices and delivery.
+  Add shared `time`, `time zone DATA` and `time set UTC REVISION` operations with
+  verified phone-zone rules, boot-local epoch validity and no per-sync flash writes;
+  the exact format and refusals are in commands.md.
+
+- 2026-10-31: The owner chose manual override always for real-time scheduling.
+  Existing manual On/Off now persist mode across reset when saved, never expire at
+  a scheduled boundary, and remain immediate even if saving fails. Add schedule
+  read/set/resume with atomic daily hours (default18:00/06:00), invalid-time bypass
+  and no per-tick writes. These protocol choices use the autonomous authorization.
+
+### Seed 64: physical identity and timing metadata integration
+
+Timing cooldowns/queued writes bind to a stable board ID, not a shared Wi-Fi address.
+The bounded identity callback and atomic guard prefix retain existing line/arena
+bounds. Ordinary show installs preserve schedule/zone files, never clock validity.
+Runtime WLED power mirroring does not create an override; external manual control does.
+
 ### Seed69: retire dedicated cross-wiring controls
 
 The owner requested removal of the Snake10 cross-wire feature from master. This
@@ -903,3 +921,135 @@ the app is not changed.
   stays as it is. `status` names in its host text the external memory the board found
   and the internal memory free when the core started, which the app shows unchanged. No
   new command; no APK; nothing of the wiring, the power or the LEDs is touched.
+- 2026-11-06: Seed 81, under the owner's approval of that day. The owner, whose phone
+  stayed at `Sending: 100%` while the spare board checked the rotated clock of 14,399
+  frames, wrote: "It is incredibly unreasonable that it takes more than half a minute to
+  validate 400K of animation." Offered to skip the check, which would let a broken file
+  onto the board, or to check at full speed with a Checking line in the app, the owner
+  approved the second: "So you saw a problem with validation and you say you can optimize
+  it with a fixed seed. If you believe truly you can do this, then I approve. Create that
+  fixed seed right now, autonomously S2S it, and queue, implement, and push to a branch
+  from a temp work tree, then make a PR". The check of an upload no longer takes one
+  record at a refresh in step: it takes its steps at every refresh, in step or late, each
+  charged by its work, within a budget of 256 to 2,048 bytes of charge a refresh paced by
+  the refresh rate, a larger record leaving a debt that the refreshes after it pay. The
+  board still takes the file only after it has decoded all of it, with every verdict and
+  reason as before. A board at 22 refreshes a second or more before the check stays at 20
+  or more during it; a board already at 20 or 21 shows about 19 while it checks an upload,
+  where before its check never ended. The app says `Checking the animation on the
+  installation: m:ss` until `upload end` answers, and the command tool waits up to
+  10,800 s. This follows the entry of seed 07 of 2026-10-12 ("its check takes as long as
+  the animation lasts"), which stands as the record of that day.
+
+### Seed 83: the display tests start whenever play does
+
+The owner ruled on 2026-11-07, after the board answered `busy` to the diagonal and the
+snake tests while it read its animations after a start over USB serial, and played
+ordinary animations at the same time: "If there is no slowdown in deciding to play
+non-test animations, there is no reason why there should be a slowdown in selecting test
+animations." The tests are therefore taken whenever play is: while the check after a start
+goes on, and while an upload is open, which goes on under the test to its end. `mapping
+set` no longer waits for the check after a start and still waits for an open upload. A
+test still refuses `upload begin`, `ignore`, `remove`, `remove many` and `catalog
+rebuild`. No command, reply or error code changes.
+
+### Seed 84: the mapping lock keeps the operator's choice
+
+The owner ruled on 2026-11-07, after the APK over USB serial locked mapping edits again by
+itself: "Locking versus unlocking should be persistent forever and never fall back into
+some defaults. It can only change when I manually change it." The lock is "an APK
+individual setting and should be unaffected by the medium used forever". This replaces seed
+69's rule that an unlock holds for one Settings session: the app keeps one value on the
+phone for every link, target and board, changed only by a confirmed press, and locked only
+on a phone that never stored one. Unsent edits are still dropped when Settings is left, the
+app hidden, the link lost or the target changed. No command is added.
+
+### Seed 74: folders of the card, and moves from the app
+
+On 2026-11-06 the owner approved in advance the new board commands seed 74 needs, folder
+creation and listing, moves and readback among them, choosing "Approve fully now": the
+specification designs them and implementation follows without a second review. Under that
+answer the core gets `folder make external <path>`, which makes a real folder of the card
+and keeps it in the card's index while it is empty, and the host interface gets the optional
+`make_folder`. The decision of the catalog that a folder without a file is in no line of the
+index narrows: a folder made by `folder make` is listed empty until a rebuild.
+
+### 2026-11-01: Clocks-only app browsing and destinations
+
+The owner replaces unrestricted app browsing in Only with a visible boundary at the
+resolved Clocks folder and its descendants. Settings, Target and leaving the mode remain
+available. Uploads in Only require a writable external Clocks destination; the app does
+not fall back to internal root, and its flat-root authoring save is disabled. Raw command
+browsing and the firmware command list remain unchanged.
+
+### Seed 74: reads of 720 bytes, backups, and folders of the board's own storage
+
+On 2026-11-08, under the answer of 2026-11-06, `read` gets a count: `read <id> <offset> <count>` gives
+1 to 720 bytes of a file from an offset, through the chunk buffer, at no memory of the core,
+and `read <id> <offset>` keeps its 600. A reply holds 1,024 bytes, which with a size of ten
+digits leave room for 737; 720 make a reply of 1,001. The app downloads a file under its name
+and backs up a selection of one storage as one zip with the manifest `odrig-backup.json` of
+version 1, and the APK gets another plugin of its own, `Save`, which keeps a download or a
+backup where the operator chooses in the system's dialog.
+
+On 2026-11-08, under the same answer, the board's own storage gets folders: `folder make
+internal <path>` makes one, a playlist as a folder of the card is, `upload begin` takes a
+folder's path before a file's name, `list` and `list in` give the folders and their files,
+and `ignore` of a folder's id holds its subtree. A file of a folder keeps the name
+`<n>/<name>`, in the storage's folder `n`, in `show.json` and the other files that name it;
+the folders' paths are in `folders.txt`. The host interface's names, `remove` and
+`make_folder` take the number of such a folder, and `make_folder` may answer 0 for a storage
+that makes no folders. The core's memory is as it was.
+
+- 2026-11-09: Seed 61, under the owner's answers of that day, asked one at a time. The owner
+  approved the command `clocks storage sd` and `clocks storage internal`, kept on the board
+  with the other clock settings in `clocks.txt`, and the status member
+  `"clock_storage":"sd"` or `"clock_storage":"internal"`, the SD card the default; the
+  dropdown `Preferred storage for matching clock/message files` of the app's clock settings
+  sends it. By the seed, the owner's request of 2026-10-31, the board's own folders `clocks`
+  and `clocks/message` give clocks and messages beside the card's `clocks` and
+  `clocks/message` of seed 54, in Between animations and in Clocks only. The command chooses
+  which of two copies plays as a clock or a message: a file of the card and a file of the
+  board's own storage with the same path under `clocks/` or `clocks/message/` and the same
+  type. The owner also changed the decision of 2026-11-01,
+  "Clocks-only app browsing and destinations": in Clocks only the app also shows the board's
+  own `clocks/` and `clocks/message/` folders and accepts uploads into them, like the card's,
+  so an upload in Clocks only no longer needs the card; the board's root still takes none
+  there. The core's memory is as it was.
+
+### Seed 74: moves of files and folders, under the answer of 2026-11-06
+
+On 2026-11-09, under the same answer, `move external <id> <path>` moves a file of the card
+into another of its folders, `/` for its root: the board renames it through `upload.part` in
+one commit of the card's catalog, which keeps its id and puts it last among the folder's
+files, and gives its saved brightness, repeat and Ignore to its new path through a journal
+on the card, `moving.txt`, that a mount finishes after a cut. A folder of the card is moved
+by the app, as the owner allowed on 2026-11-09 should the board's own folder move prove too
+large to build safely: its folders made with `folder make external` and its files moved one
+at a time with `move external`, each keeping its id and its saved settings, the new folder
+with an id of its own. Folders move between the board's own storage and the card as jobs of
+the app over their files, their folders made first. The core's memory is as it was.
+
+### Seed 85: removing an empty folder
+
+On 2026-11-09 the owner approved a new seed in which `folder remove <id>` removes an empty
+folder of the board's own storage or of the card, with a `Remove folder` action in the app;
+the approval covers the addition to the command list. The folder's entry goes first, its
+line of `folders.txt` or its line of the card's index in one commit of the card's catalog,
+and its folder of the storage after it, a folder the host cannot remove then staying,
+listed nowhere. Only the folder named goes, and a folder that holds a file or a folder is
+`in-use`. The card's catalog format, its commit record and the Python library are as they
+were; the host interface's `remove` also removes an empty folder of the drive. The core's
+memory is as it was.
+
+### Seed 86: moving or renaming a folder of the board's own storage
+
+On 2026-11-09 the owner approved a new seed in which `move internal <folder id> <path>` moves
+or renames a folder of the board's own storage, its sub-folders with it, by one rewrite of
+`folders.txt`, with `Rename…` and `Move to…` in the app; the approval covers the addition to
+the command list. The folder's numbers, ids, Ignore, stored names and files stay, so its
+files, their saved settings, the internal catalog and the previews on the phone stay too,
+and the current playlist's path follows the move. A moved folder takes its place among its
+new siblings by the bytes of their names, as the owner ruled the same day for the card's
+moved folders. The host interface, the format of `folders.txt`, the card's catalog and the
+Python library are as they were. The core's memory is as it was.

@@ -12791,6 +12791,2569 @@ as it is, when it has one. The page needs no change: the legs come from the core
 file from that route.
 
 **Resolution.** `emulator/httpd.py`, `docs/emulator.md`.
+## Seed 64: civil-time wire forms and offline phone zones
+
+**Question.** How can the board follow phone time-zone rules offline without a
+platform time API, a new host callback or a second unbounded memory buffer?
+
+**Answer.** Use a boot-local UTC anchor and a validated compact phone-zone snapshot
+in the existing chunk. The supported civil range is2000..2099; the snapshot holds
+up to8 offsets and276 exact transitions, each five bytes. The phone supplies rules
+from its own Intl data. `time`, `time zone DATA` and `time set UTC REVISION` use
+shared dispatch. The owner's autonomous implementation instruction authorizes
+these protocol choices without another permission question.
+
+**Resolution.** The spec design, commands.md and core.md define the format, strict
+validation, revision guard, atomic publication, reset invalidation and memory bound.
+
+## Seed64: persistent manual precedence and scheduling publication
+
+**Question.** What happens to a manual On/Off if internal settings cannot be saved
+while the owner requires manual control always to win?
+
+**Answer.** Apply visibility and manual mode immediately. Preserve that volatile
+control on a failed save, report storage-error/busy, and expose saved:false plus
+manual-not-saved. Read-only hosts retain their ordinary successful manual control.
+A successful save retains manual mode across reset; only explicit resume releases
+it. Ordinary clock/zone/times edits never release it. The daily pair/enabled flag
+are one atomic publication, never partial field writes or writes at boundaries.
+
+**Resolution.** civil_time.cpp and commands.md define schedule set/resume, file
+grammar, validation/readback, startup and failed-persistence behavior.
+
+## Seed 64: physical timing identity and host feedback
+
+**Question.** Can an address or host build text identify a board for cooldowns and
+stale-write guards, and can show installs discard the timing metadata?
+
+**Answer.** Different boards share4.3.2.1. A bounded optional identity callback and
+atomic `guard BOARD ...` prefix are required plumbing for existing requirement5.4;
+address-only preflight is insufficient. Timing files are retained/replaced/read back
+like other operator metadata; an epoch is never persisted. Firmware mirrors effective
+visibility into volatile WLED power state without a command/callback, and forwards
+external explicit power requests or power transitions to ordinary core On/Off.
+Initialization and the mirror itself never establish a manual override.
+
+**Resolution.** `design.md`, `odrig_core.h`, `civil_time.cpp`, `commands.cpp`, the
+native binding/host, firmware adapter and `fwtool/storage.py` carry this contract.
+The earlier no-new-callback design assumption is replaced; seed scope is unchanged.
+
+## Seed 64: connection generations and confirmation boundaries
+
+**Question.** What counts as a reconnect, and can a timing failure trigger another
+automatic sync merely by making the next status reply look like a recovery?
+
+**Answer.** A fresh successful status after begin, foreground or a failed status
+creates a connection generation. Ordinary polls and a timing-operation failure do
+not create one. This prevents self-induced retries. Target/connection/preference
+guards are checked when queued operations are sent and after every await; physical
+identity is also checked by firmware. Backgrounding cancels unfinished preparation.
+Clock confirmation and physical-ID cooldown are independent of schedule readback:
+if UTC was confirmed but a later settings read fails, that confirmed UTC remains a
+successful sync, while the later error is reported. New connections clear old-board
+metadata immediately; current attempts never display a previous attempt as success.
+
+**Resolution.** `app/www/client.js`, `timing.js`, `time-zone.js`, `commands.js`, the
+browser tests and the automatic-phone-time section of `android-app.md` carry it.
+
+A phone zone change while the app remains connected is checked on ordinary client
+observations. It can publish changed zone rules, but cannot set UTC or move the
+last-confirmed UTC time. The observation is remembered even when its initial read
+fails, so later status polls do not silently retry it. A zone that changes during
+preparation invalidates that preparation before any write.
+
+## Seed64: Settings drafts and confirmation
+
+**Question.** Can background reads or a lost save reply discard typed hours or
+present an unconfirmed pair as saved?
+
+**Answer.** Keep a dirty draft with its original physical board and revision through
+polls, sync and reconnect to that same board. A successful explicit Refresh reloads
+the saved pair; a failed Refresh retains the draft. Another board/target clears it.
+Save and Resume use the shared serialized guard and readback path. Saving hours
+never releases manual mode. A lost reply remains an error even while disconnected,
+and no reconnect replays the mutation. Corrupt metadata disables edits rather than
+repairing it with defaults; unsaved manual mode is explained as temporary.
+
+**Resolution.** `screens/time.js`, `timing.js`, the guarded command validators and
+native/stand-in browser scenarios implement and verify these choices.
+
+## Seed64: initial inventory before authoring
+
+**Question.** Can the added connection-time reads expose authoring before the
+initial root-name inventory has arrived, causing an existing id to be chosen?
+
+**Answer.** Integration testing observed a new text uploaded as id1 instead of the
+free id3. Unknown names must keep new-authoring Upload disabled with a readable
+waiting explanation. A new text/clock also uses the existing internal creation-only
+begin guard, so a later id claim is refused atomically. Existing-file editing keeps
+its read CRC. This restores the intended free-id/no-replacement behavior under
+the shared queue's delayed initial inventory.
+
+**Resolution.** `screens/author.js` and native preview/authoring regression cases
+verify both missing inventory and an id claimed since the inventory. Both failed
+before the fix; no new command or file format is introduced.
+
+## Seed 81: the files of the tests of the pace and of a debt
+
+**Question.** The design of seed 81 has the tests of the pace (requirement 13.4) upload
+`support.dense_clip(60, 6, 10)`, and the test of a host that rests to pay a debt (13.5)
+`support.dense_clip(60, 60, 1)`, "whose records of about 10,800 bytes leave a debt of 15
+at pace 0". Do these files do what the tests need?
+
+**Answer.** No. The dense clip is coded, not stored: `dense_clip(60, 6, 10)` charges
+167,792 in all, so a host at 50 a second has checked it within the third second, before
+the host of the test slows down; and `dense_clip(60, 60, 1)` charges about 2,860 a
+record, which leaves a debt of 9 at pace 0, ten refreshes or 39 s from one step to the
+next at a refresh every 3,900 ms, not more than 60 s. The tests take files that do what
+the design says: `dense_clip(60, 6, 30)` for the pace, 473,957 of charge, whose check
+outlasts both schedules; and ten pictures of noise of 60 x 60, three bytes a pixel,
+uncompressed, made in the test, whose stored records of 10,805 bytes leave a debt of 15 at
+pace 0, sixteen refreshes or 62.4 s from one step to the next.
+
+**Resolution.** `tests/core/test_upload_check.py`, `ThePace` and `TheBounds`.
+
+## Seed 81: the upload check at full speed
+
+**Question.** How fast does the board check a file it was sent, and what does the app say
+while it does? The check took one frame record at a refresh, and only at a refresh in
+step: the owner's rotated clock of 14,399 frames, 498,211 bytes, took 288 s at a perfect
+50 refreshes a second, and the phone showed `Sending: 100%` meanwhile.
+
+**Answer.** The check takes its steps at every refresh, in step or late, each charged by
+its work, within a budget of 256 to 2,048 bytes of charge a refresh paced by the refresh
+rate, a larger record leaving a debt that the refreshes after it pay ([core.md](core.md),
+"Uploads and the check"); the app says `Checking the animation on the installation:
+m:ss` by its own clock until `upload end` answers. The seed's point 5 measured the core
+on this computer, an Intel Core i7-14700 with GCC 16.1.0 at `-O2`: the whole check of the
+rotated clock is 22.6 ms of processor time, and the board, 135 to 167 times slower at the
+check and 1.4 times slower again beside its sends to twenty outputs, 189 to 234 in all,
+does it in 4.3 to 5.3 s of its work; its estimate is about 8 s on a board at 50 with room,
+within 30 s at 30 or more while a show that is not dense plays, 20 or more kept from 22
+before, about 19 from 20 or 21. Measured on the implementation, on 2026-11-06:
+
+- The test host, `upload end` after every poll, a board without show files, from the last
+  byte to `{"ok":true}`, before and after: the rotated clock at a refresh every 20 ms
+  14,402 refreshes (288.0 s) and 374 (7.5 s); every 30 ms 28,802 (864.0 s) and 353
+  (10.6 s); every 45 ms discarded after 60 s and 1,201 (54.0 s); every 50 ms discarded
+  after 60 s and 2,289 (114.4 s); the tracked clock, 471,095 bytes, after: 380 (7.6 s),
+  359 (10.7 s), 1,221 (54.9 s), 2,322 (116.1 s), as the rule's model gives.
+- The emulator, the tracked clock over HTTP to an empty folder: checked in 7.5 s, `status`
+  reporting 47 to 50 refreshes a second meanwhile.
+- The processor time of the implemented check here, three runs at a refresh every 20 ms:
+  the rotated clock's whole check 23.6 to 23.8 ms; a refresh at pace 1, 2 and 3 a median of
+  20, 39 and 76 µs and at most 41, 49 and 97 µs. By the factors above the board's work is
+  3.8 to 4.8 ms a refresh at pace 1 and 14 to 18 ms at pace 3, as the seed estimated. The
+  board's figures stay an estimate until the owner's check of seed 81.
+
+**Resolution.** `core/src/upload.cpp`, `app/www/upload.js`, `docs/core.md`.
+
+## Seed 81: the name of the branch
+
+**Question.** The seed names the branch `seed-81-the-upload-check-at-full-speed`; the
+owner's workflow made `seed-81-upload-check-at-full-speed`. Which?
+
+**Answer.** The workflow's, which holds the spec and the work and is the pull request's.
+
+**Resolution.** `docs/specs/81-p1-the-upload-check-at-full-speed/requirements.md`, 14.1.
+
+## Seed 81: a refresh that rests is progress
+
+**Question.** The seed has each step set the upload's progress, and a refresh that pays a
+debt take none, at most 15 in a row: a host refreshing less often than once in 3.75 s
+could then lose an upload whose check runs. Is a resting refresh progress?
+
+**Answer.** Yes: every refresh of the check sets the progress, a rest included, so the
+quiet timer discards a checked upload only when the host asks for no refresh for 60 s, as
+the seed says. A test refreshes every 3,900 ms and keeps the upload through rests of
+62.4 s.
+
+**Resolution.** `core/src/upload.cpp`, `upload_refresh`; `tests/core/test_upload_check.py`,
+`TheBounds`.
+
+## Seed 81: both pace rules at one refresh
+
+**Question.** The first refresh of a second can also be 500 ms or more into it, after a
+gap. Which rule of the pace comes first?
+
+**Answer.** The rule of the whole second, then the rule of the middle of the second.
+
+**Resolution.** `core/src/upload.cpp`, `upload_refresh`; `tests/core/support.py`,
+`CheckPace`.
+
+## Seed 81: the first refresh of a check in a new second
+
+**Question.** The seed's model began a check inside a second. When the first refresh after
+the last byte is also the first of a new second, does it change the pace?
+
+**Answer.** Yes, by the second before, as any refresh of the check does.
+
+**Resolution.** `core/src/upload.cpp`, `upload_refresh`.
+
+## Seed 81: the mode byte of the decoder
+
+**Question.** The charge of a record that walks the picture needs the mode of the record
+just decoded. When is the decoder's byte set?
+
+**Answer.** Only when `next` decodes a whole record; it is 0 at the start of every call of
+`next` and `finish` and after `open`. So one function, `OdrgDecoder::charge_since`, charges
+every call, a slice of settling and the end alike, and the test host's `decode --taken`
+calls the same function.
+
+**Resolution.** `core/src/odrg_decoder.h`, `core/src/odrg_decoder.cpp`.
+
+## Seed 81: the pace and the debt compared refresh for refresh
+
+**Question.** How are the core's pace and debt compared with the reference player's, and
+how are files counted that the reference player cannot decode in a short time?
+
+**Answer.** The test host's option `--trace-check` prints `check <pace> <debt> <fell>`
+after each refresh of a check, and the reference player prints the same lines; the rule
+also has a model of its own in `tests/core/support.py`, `check_end`, which the tests of the
+owner's clock of 14,399 frames count from.
+
+**Resolution.** `tests/core/host/host.cpp`, `tests/core/support.py`, `docs/core.md`.
+
+## Seed 81: where the tests of the rule live
+
+**Question.** Where do the tests of the new rule go, and where do their files come from?
+
+**Answer.** In a new file, `tests/core/test_upload_check.py`, so that a run of the core as
+it was shows their failure without the rewritten `TheCheck`; the fade of three bytes a
+pixel and the files of the bounds are made in the tests, the fade by `support.fade()`.
+
+**Resolution.** `tests/core/test_upload_check.py`, `tests/core/support.py`.
+
+## Seed 81: the sampled texts of the gif's upload
+
+**Question.** Requirement 13.11 has the test of a gif uploaded to the emulator expect
+Sending texts, then Checking texts. The emulator checks that small clip at the first
+refresh after its last byte, and the whole upload can end between two samples of the
+line. Must a text be seen?
+
+**Answer.** No: the test asserts that every text it sampled is a Sending text or a
+Checking text and that no Sending text follows a Checking text. The counting of the line
+is asserted against stand-ins that answer `busy` for 3.5 s, on Upload and in the forms.
+
+**Resolution.** `tests/app/test_upload.py`, `checking_texts`.
+
+## Seed 81: the bytes of a compressed stream that inflate to nothing
+
+**Question.** The seed charges a step the bytes of the body it took, inflated bytes of a
+compressed body, and says that the check's work at a refresh is so about its budget,
+whatever the file holds. A valid compressed file can hold, before each record, empty
+stored blocks of DEFLATE that inflate to nothing: such a step is charged the few bytes of
+its record, and 64 of them at one refresh read far more of the file than the budget. The
+review of pull request #54 made one of 1,503,578 bytes, 1,000 empty blocks before each of
+300 records, of which one refresh read 270,770 bytes of `upload.part`. Which of the two
+statements holds?
+
+**Answer.** The work. A step is charged the bytes of the body it took or the bytes of the
+file it took, whichever are more, and n / 32 more for a record that walks the picture. The
+bytes of the file are more only in a compressed stream: at a block's header, at empty
+blocks, and at the end of the stream, which is charged its last bytes. Requirements 2.2
+and 2.4 of the spec, a charge from `body_read` alone and an end charged 0, are replaced on
+this point. The tracked clock's charges change at the 26 records with which a block of its
+stream begins, by 2,318 of 657,686: it is checked in 381 refreshes every 20 ms where it
+took 380, the rotated clock in 375 where it took 374, and the times of the seed's point 5
+stand. A step's own input is still not bounded: one record behind a long run of empty
+blocks is read whole at its refresh, as playback reads it.
+
+**Resolution.** `core/src/odrg_decoder.cpp`, `OdrgDecoder::charge_since`, and
+`core/src/file_source.h`, `FileSource::given`; `docs/core.md`, "The charge";
+`tests/core/test_decoder.py`, `TheChargeOfACall`; `tests/core/test_upload_check.py`,
+`TheBounds`.
+
+## Seed 81: the board suite's upload of a dense minute
+
+**Question.** Requirement 13.6 names the core's, the emulator's and the app's suites as
+those whose tests counted the old pacing. The board suite's `DenseUpload`, in
+`tests/board/test_upload.py`, asserts that the check of the dense clip of 60 s on the
+two-leg canvas takes as long as the animation lasts, and that `status` is read 20 times
+during it. By the rule's model that clip, 865,351 bytes and 3,000 frames, is checked in
+9.8 s at 50 refreshes a second, 12.0 s at 40, 14.2 s at 33 and 59.9 s at 25, so
+`fw.py test-board` would fail on a board with this core. Is the board's test changed in
+this seed?
+
+**Answer.** Yes: no test may pin the old pacing, and this one was missed. It now asserts
+`{"ok":true}`, at least five rates read during the check, each 20 or more, and, when
+every one of them is 30 or more, a check shorter than half the 60 s the animation lasts.
+The board suite needs the board and is not run here; it runs at the owner's next board
+session.
+
+**Resolution.** `tests/board/test_upload.py`, `DenseUpload`.
+
+## Seed 81: the average work of the check for records larger than the budget
+
+**Question.** The seed says that a record larger than the allowance is taken about once in
+every (its charge / the budget) refreshes, so that the check's work at a refresh is, on
+average, its budget; the pages said at most about 2,048 bytes of body a refresh on average,
+and `AGENTS.md` a larger record spread over the refreshes after it. But the debt is at most
+15 x 256 = 3,840 (requirement 3.4), so the rests after a record pay only that much of its
+charge: the dense 60 x 60 records of 10,805 bytes are taken every 2 refreshes at the pace
+3 and every 16 at the pace 0, about 2.6 times the budget on average. The review of pull
+request #54 read it from the core's own `--trace-check` lines: 5,388 of charge a refresh
+at the pace 3. Which holds, the rule or the average?
+
+**Answer.** The rule of the requirements, with its cap, and the pages are corrected. A
+debt without the cap would make a file of dense records about 2.6 times as slow to check,
+which the seed does not want, and the pace keeps the refresh rate whatever the average.
+The times the seed and the pages give come from the rule's model, which has the cap, and
+stand. What holds of every refresh is that it does at most its allowance and one step
+more.
+
+**Resolution.** `docs/core.md`, the budget of the check in "The budgets" and "The budget
+and the debt"; `docs/commands.md`, `busy` of `upload end`; `docs/android-app.md`, the
+upload's Checking line; `AGENTS.md`, the line of seed 81.
+
+## Seed 82: how the app reaches the board's USB serial port
+
+**Question.** Where are the lines framed, how is the port opened without a reset, and how
+is the link tested without a phone?
+
+**Answer.** The APK's sender only moves bytes: `connect`, `write` and `read`, so that it
+still looks into no line, and `target.js`, the only file that knows how a line travels,
+drops what the port held before a line and finds the reply, the first whole line that is a
+JSON object with a boolean `ok`, passing over the board's log. The port is set to 115,200
+8N1 and both modem lines are lowered by one `SET_CONTROL_LINE_STATE` of 0, so that the pair
+that resets the chip, DTR low while RTS is high, is never made, as the command tool lowers
+RTS before DTR. The bytes are read as ISO-8859-1, one character for each byte, since the
+board's replies are ASCII. A browser has no such port, so the app suite tests the web side
+through a stand-in of the sender that relays to the emulator over HTTP, with log lines and
+replies in pieces; the Android side is checked by its text and by the APK's build, and on
+the phone by the owner. The switch stands below the link's block, so that the address keeps
+its place when the keyboard opens.
+
+**Resolution.** `app/www/target.js`, `TargetPlugin.java`, `tests/app/test_serial.py`,
+`docs/android-app.md`.
+
+## Seed 83: an upload's end under a test, and where the emulator sees the check
+
+**Question.** What does an upload that ends under a test do to what plays, and how is a
+test seen taken while the emulator's check after the start goes on?
+
+**Answer.** A test halts the player, and an upload's end that adds an item or replaces a
+file called `player_item_added`, which plays the playlist when nothing plays: it would
+have started an animation under the test, over the diagonal's picture. It now does nothing
+while a test shows; the test's end plays the saved selection, else the playlist's first
+animation, the new one among them. Under a test a line `upload` whose second word is not
+`begin` reaches the upload's own checks, so a malformed one is `bad-argument` where it was
+`busy`. The emulator has read the demo show and a clip of 3,000 records before its TCP
+line answers, about 4.7 seconds after it is started on Windows, so its suite sees the test
+taken during the check in record mode, whose time is the script's, and the upload ended
+under a test over TCP.
+
+**Resolution.** `core/src/player.cpp`, `core/src/commands.cpp`,
+`core/src/mapping_control.cpp`, `tests/core/test_snakes.py`,
+`tests/emulator/test_display_tests.py`.
+
+## Seed 84: what still closes the lock's confirmation, and the counter of dropped edits
+
+**Question.** Which events close a pending "Are you sure?" now that none changes the value,
+and what guards a save queued before unsent edits are dropped?
+
+**Answer.** Leaving Settings and hiding the app close it unanswered, as seed 72 asks for
+its checkbox; a poll, a lost reply, a reconnection and a change of target leave it open, and
+its answer applies, since the value is the same for every target. The counter that relocked
+became `editEpoch`: `dropEdits()` counts it, and a save queued before is not sent when it
+moved, as before. A store that refuses the value leaves the choice for the run and says so.
+
+**Resolution.** `app/www/screens/mapping.js`, `tests/mapping/test_lock.py`,
+`docs/android-app.md`.
+
+## Seed 72: what a change of target does to the lock's confirmation, and typed numbers
+
+**Question.** Seed 72 asks that a change of target close a pending confirmation, and seed
+84, built first, that the dialog's answer apply across a reconnection; and which text is a
+pin's number?
+
+**Answer.** Seed 84's ruling stands, being the owner's later word on the same value: a new
+start of the link, which a change of target is, leaves the dialog open, and its answer
+applies, since the value is one for every target. Leaving Settings and hiding the app close
+it, as both seeds say. A pin's number is one to three digits, its value one of the twenty
+pins of the confirmed assignment; a sign, a point, letters and an empty field are refused
+as `Type the number of a GPIO.` The checkbox keeps the toggle's id, `mapping-lock`, so that
+the page helpers find it.
+
+**Resolution.** `app/www/screens/mapping.js`, `app/www/index.html`,
+`tests/mapping/test_lock.py`.
+
+## Seed 71: the audit of the cross-wire feature's last paths
+
+**Question.** Which paths of the retired Snake10 cross-wire feature were left after seed
+69, and which layers were already clean?
+
+**Answer.** Two were left, and both are gone: the emulator's core binding counted
+successful `mapping cross` replies as `wiring_saves`, which its engine compared to send
+the page the mapping again, and the command tool still took `mapping cross on|off` and
+sent it to a target that answers `bad-argument`. A search for `cross` without regard to
+case over `app/www`, `emulator/web`, `core/src`, `firmware/usermod`, `firmware/*.py` and
+`odrigctl` found nothing else of the feature: the photo reading's and the drawing's
+`across`, the clock and text drawing's `across`, the core's strip count `across`, the
+firmware's `microsSince`, and the cross compiler of `verify_build.py`. The pages that face
+the user name only the retirement sentence of `docs/commands.md`; `docs/emulator.md`'s
+lines that cross are the drawing's wires. The photo reading of a strip wired another way,
+its test `crossedTen`, the core's refusal test `tests/mapping/test_retired_cross.py`, the
+generic mapping format with `crossed-columns`, and the records of seeds 43 and 69 stay.
+The APK takes its assets from `app/www`, so it holds no path of the feature either.
+
+**Resolution.** `emulator/binding.py`, `emulator/engine.py`, `odrigctl/cli.py`,
+`tests/emulator/test_retired_cross.py`, `tests/mapping/test_hosts.py`.
+
+## Seed 80: what the batch decides beyond its seed
+
+**Question.** What does a pick of one file do to a list, when are names made, how is a lost
+link taken back, and how is the run tested?
+
+**Answer.** A pick of one file closes a list that was not sent and opens the form; during a
+run the list stays and the form opens under it. Names are made when rows are added and when
+the storage changes, never when another row's name is edited, so that an edit cannot rename
+the others; the same file is known by its name and size. After a lost reply before the last
+byte's reply, the run sends `upload cancel` once the installation answers, so that an
+upload it may still hold open does not answer the next begin `busy` until it is dropped a
+minute later. A reply of a job that comes after the job ended changes no row. The run's
+cases are tested in Chrome against the emulator and against a stand-in that hands each line
+to the emulator and answers some itself: `busy`, `stale`, nothing, or a card gone from
+`space` once the first file is in. "In the background" is the app open on any of its
+screens; with another app in front or the phone locked the run waits, and no service,
+wake lock or permission is added.
+
+**Resolution.** `app/www/batch.js`, `app/www/screens/batch-list.js`,
+`tests/app/test_batch.py`.
+
+## Seed 73: where the panel stands, and what an archive's upload decides
+
+**Question.** Where is the panel `Archive`, does it show the room for items, and how do a
+folder of the card and a replaced file go?
+
+**Answer.** On Upload, beside the upload, where the batch of seed 80 runs; the seed's
+words "the Animations screen, beside the upload" named the upload as the place. The room
+for items is not shown: seed 80, the later of the two, found that no reply gives it, and a
+`no-space` of the board's storage says so in words. A file of the card goes to its path from
+the archive's root; a folder the card does not have is refused by the board, as for a single
+upload, and the run goes on. A file ticked `Replace` is sent to the board's storage by the
+id of the root's item of its name, with no creation guard, and to the card without `upload
+expect`; the batch's run takes both from the item. The archive's rows start ticked when
+they can be sent, and a name the destination's list has needs `Replace` or another name.
+
+**Resolution.** `app/www/screens/archive.js`, `app/www/zip.js`, `app/www/batch.js`,
+`tests/app/test_archive.py`.
+
+## Seed 74: how a folder of the card is made
+
+**Question.** Does `folder make` make the folders of a path that are missing, how long may
+a folder's path be, and where does the new folder stand?
+
+**Answer.** One level at a time: the parent is the root or a folder of the index, as an
+upload's folder is, and a client makes `clocks` before `clocks/message`. The path leaves room
+for a file, `<path>/a.odrg` being a name the catalog takes, and its last name does not end in
+`.odrg` or `.odrgx`, which the card would list as a file. The folder takes its place among its
+parent's sub-folders by the bytes of their names, the order a rebuild gives, and the lowest
+free id. A name the parent has in another case is `in-use`, since FAT tells no case apart. A
+folder the index has already answers `made:false`, so that a resent line after a lost reply
+changes nothing.
+
+**Resolution.** `core/src/catalog.cpp`, `core/src/commands.cpp`, `docs/commands.md`.
+
+## Seed 74: an empty folder removed from the card
+
+**Question.** What happens when an operator removes an empty folder of the index from the
+card on a computer, and then uploads into it?
+
+**Answer.** Before an upload into a folder the core asks the host to make each folder of its
+path, which is nothing for one that is there; a missing one is made again, so that the
+commit's `move upload.part` finds its folder and no commit record is left behind. A rebuild
+lists files only, so it keeps no empty folder; that is said where the rebuild is described.
+
+**Resolution.** `core/src/upload.cpp`, `docs/core.md`, `docs/commands.md`.
+
+## Seed 74: how the app reads the settings it carries in a move
+
+**Question.** The app gives a moved file the saved brightness and repeat of the old one, but
+`list` does not report them; how does it read them, and how does it know the show's start?
+
+**Answer.** With `saved <id>`, which reports both and whether the animation is the show's
+`start` item, under the owner's approval of 2026-11-06. It is refused `busy` as `repeat <id>
+default` is, since the saved repeats are read from the board's file then. A move of the start
+item is refused before anything is sent, as the seed asks.
+
+**Resolution.** `core/src/repeats.cpp`, `core/src/commands.cpp`, `docs/commands.md`.
+
+## Seed 74: moves made by the app
+
+**Question.** Does the board move a file between the storages by itself, or does the app?
+
+**Answer.** The app, with the commands the board has: `read`, the guarded upload, `ignore`,
+`brightness`, `repeat`, `saved` and `remove`, one file at a time, as a job the phone keeps
+until it is done. The seed asks to reuse the commands where they suffice, and they do for a
+file: nothing is removed before the new file is installed and its settings given, and an
+interrupted job is finished or ended from what the target lists. The new file gets a new id
+in its storage. Moves of folders and renaming moves inside the card are the board's, in
+part B. Replacing a file of the destination is not offered: the card's upload has no guard
+of the content it would replace, so the operator removes it first.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`.
+## Seed 79: the stream's units, where the batch's preview starts, and the measurement
+
+**Question.** How does a DEFLATE reader fed in parts keep `inflateRaw`'s verdicts, where do
+the previews of a batch and an archive start, and what was measured?
+
+**Answer.** `inflateStream` decodes the same blocks in units: a block's header and codes, a
+literal, a length with its distance, an end of block, a part of a stored block. A unit that
+runs out of input is undone and read again when more comes, so it reads the same bits in the
+same order as `inflateRaw` and reaches every verdict at the same bit; once the end is told,
+running out is `truncated`. Its output goes through a ring of 131,072 bytes whose last 32,768
+are the window. The maker's first pass also takes the bytes after the stream and a palette
+cut short, in `odrg.reader`'s order, and sums only the records whose bytes all came, as
+`loopMs` does. A batch's or an archive's file starts its preview when its bytes are sent, and
+the run still waits for the preview of the file before, so that at most two files are held.
+The converter's test makes the preview of a compressed file whose body inflates to 17.3 MB
+with at most 32,768 bytes of output held, the same bytes as its uncompressed twin's. The
+measurement of the seed's Definition of Done in Chrome against the emulator, with the two
+files of `space-scan-10x.odrg` on the Drive under `odrig archive/seed-79/`, was not made in
+this run; it stays open with the owner's check.
+
+**Resolution.** `converter/lib/inflate.js`, `converter/lib/odrg.js`,
+`converter/lib/thumbnail.js`, `app/www/previews.js`, `app/www/client.js`,
+`converter/tests/inflatestream.test.js`, `tests/app/test_phone_previews.py`.
+## Seed 65: permanently square output and rotation direction
+
+**Question.** Does legacy rectangular test geometry require a fit decision before
+the owner's installation can rotate, and which sample direction is clockwise?
+
+**Answer.** The owner fixes the installation at1:1 permanently; rectangular fitting
+is outside scope and never a delivery blocker. For bottom-left coordinates growing
+upward,90 clockwise samples source(N-1-y,x). Rotate the complete composition once
+before physical mapping and mini averaging. Diagnostics remain physical. Approving
+autonomous implementation authorizes the proposed rotation read/set command forms.
+
+**Resolution.** AGENTS.md, the hardened seed65, its spec, rotation.h/rotation.cpp and
+commands.md record this. Legacy rectangular playback stays unchanged/unsupported
+for this setting. The previous fit-question deferral is superseded.
+
+## Seed 65: fresh storage and content-independent orientation
+
+**Question.** Why can a fresh board report rotation unsupported, and may missing
+content prevent changing an installation setting?
+
+**Answer.** The shipped application image did not install mapping/show files.
+The core stopped with mapping-missing and rotation incorrectly treated that content
+fault as missing capability. The owner explicitly fixes the installation at60x60
+whether or not any content exists, and requires its setting to remain editable.
+Read, restore and atomically save orientation independently of content validity or
+inventory validation. Keep the playback failure and real storage errors visible;
+only valid legacy rectangular fixtures retain their technical unsupported result.
+
+For a genuinely absent/empty Odrig store, initialize the existing canonical mapping
+and a valid empty show before the core starts. An empty transaction directory and
+verified temporary writes permit restart recovery without replacing operator data.
+The bootstrap accepts independent rotation files only while its own marker exists,
+preserves those files, and never formats storage or changes WLED configuration.
+An application-only flash therefore retains saved hotspot credentials; existing
+install-firmware/set-wifi provisioning or WLED's settings page changes them.
+
+**Resolution.** `core/src/rotation.cpp`, `firmware/usermod/odrig_bootstrap.h`,
+`firmware/usermod/odrig_files.cpp`, the seed65 spec, `docs/commands.md`,
+`docs/firmware.md` and `docs/wifi.md`. Fresh-storage, interruption, operator-file,
+unusable-content and persistent rotation regressions cover the resolved behavior.
+
+## Seed 66: standalone Android boundary on master
+
+**Question.** How can the browsing boundary stand alone without the separate clocks
+recovery or stable-inventory implementation?
+
+**Answer.** Retain only the last confirmed Only policy for the active target, gate shared
+enter/back and visible list publication, and guard destination capture/final preflight
+and shared upload steps. Unresolved Clocks stays visible without stale-ID spin. Keep
+master inventory refresh behavior and all firmware sources unchanged. Reuse the exact
+healthy master firmware for physical comparison, with separately built APK provenance.
+
+**Resolution.** docs/specs/66-p1-clocks-only-browsing-boundary/design.md and tasks.md
+record the independent scope; docs/android-app.md describes the operator behavior.
+## Seed67: uncertain saved clock policy
+
+**Question.** The independent read callback combines missing and IO errors. How can
+startup distinguish a new installation from a saved policy that could not be read,
+without a new command or borrowing the player's open file during playback?
+
+**Answer.** Before playback, probe with sequential open's existing missing/error
+contract and close immediately. Only authoritative missing selects default Off.
+Other failures or malformed bytes select effective Only with dark output and an
+explicit unconfirmed-policy diagnostic. Independent bounded reads retry once a
+second; they do not write defaults. A valid read restores saved policy. An explicit
+mode save replaces corrupt state atomically, even if it selects effective Only;
+a message-only change cannot choose an unknown mode. Additive clock_error leaves
+old clients' mode/state enums compatible while new clients explain uncertainty.
+
+**Resolution.** breaks.cpp/h, player.cpp, commands.cpp, shared command parsing and
+the Settings clock panel implement this behavior; commands.md and actual-core IO
+fault regressions distinguish missing, read failure, malformed and operator recovery.
+
+## Seed67: automatic recovery independent of inventory caching
+
+**Question.** Does the standalone automatic Clocks recovery require the original
+seed's retained inventory snapshots or fingerprint protocol?
+
+**Answer.** No. Keep only the current confirmed Only context and desired Clocks
+path. Resolve missing/remapped IDs without publishing Root, and use an explicit
+unavailable Clocks location while storage cannot establish an ID. Restart stays
+disabled there; confirmed Off/Between and target changes release the context.
+Master's existing inventory/key refresh behavior and explicit navigation remain.
+The original global inventory redesign stays deferred in the aggregate PR.
+
+**Resolution.** `app/www/client.js`, `screens/show.js`, `android-app.md` and the
+standalone recovery specification carry the isolated behavior and its tests.
+**Resolution.** inventory.cpp, catalog publication, shared client/catalog parsing and
+browser/native regressions implement these choices. No wire command was added.
+
+## Seed67: missing Clocks during automatic recovery
+
+**Question.** What should replace an Only folder when a missing-ID lookup finds no
+Clocks entry, or when status has no resolved Clocks ID?
+
+**Answer.** Keep a virtual Clocks location with no usable folder ID. Retain last-good
+rows visibly stale, perform bounded invisible ancestry lookups, and never interpret
+that null ID as a request to display Root. Preserve valid descendants and the preferred
+Clocks path through media absence; resolve changed IDs before enabling actions. Repeated
+Only status updates identity without collapsing a valid descendant. Unknown metadata
+does not clear the last confirmed Only context; confirmed Off/Between and a different
+target do. Explicit navigation restrictions are a separate scope.
+
+**Resolution.** The shared client replaces the one-shot entry flag with reconciled
+recovery context and validates delayed replies against target and level. Shared-browser
+regressions observe the former Clocks-to-Root trace before repair and cover unavailable
+media, remapped descendants, mode uncertainty and operator recovery. No physical cause
+is inferred from those controlled tests.
+
+## Seed66: Only navigation and upload scope
+
+**Question.** Can an unavailable SD destination fall back to internal root in Only,
+and can authoring continue saving there because it has no external folder picker?
+
+**Answer.** No. The owner's Clocks browsing boundary also constrains destinations.
+Keep External selected but unavailable, disable Internal and submission, and explain
+how to leave Only. Preserve the prepared path rather than silently moving a Root draft
+into Clocks. Authoring preview remains local and usable; its flat internal-root save
+waits for confirmed Off/Between. Existing ordinary defaults/fallback remain unchanged.
+Fresh policy and path preflight precede transfer; every shared job checks its scope.
+If an outside transfer was opened before Only became confirmed, cancel its staging
+transaction before publishing a file. Background Root-name reads remain invisible.
+
+**Resolution.** Shared navigation rejects paths/IDs before publication, including
+out-of-level replies after ID reuse. Upload destination helpers and both forms enforce
+the current boundary. Status acceptance is shared with upload preflight. Upload jobs
+carry storage identity and can report a policy rejection while cancelling an opened
+transaction. Controlled races first observed outside commits; regressions now stop them.
+Native-emulator upload retains original bytes within Clocks. Physical checks stay open.
+## Seed69: generic mapping data during feature retirement
+
+**Question.** Should removing Snake10's control rewrite existing saved strip geometry?
+
+**Answer.** No. Remove the dedicated control/command and all numbered-snake special
+cases. Generic valid mapping data still describes the installed geometry; pin edits
+preserve it. This avoids silently changing an installation's physical layout.
+
+**Resolution.** `core/src/mapping_control.cpp`, `docs/commands.md`, `docs/mapping.md`.
+
+## Seed69: lock lifetime and queued mapping edits
+
+**Question.** How long does an unlock last, and what happens to a move waiting behind
+another command when the operator leaves Settings?
+
+**Answer.** Unlock belongs to the current app Settings session and target. Exit,
+visibility loss, a lost connection or target change relocks and invalidates unsent
+work. Check permission immediately before transport without fabricating a target
+reply. A command already sent cannot be recalled and uses normal reconciliation.
+Both directions of the toggle require confirmation. Reading and photo analysis are
+available while locked; applying either photo reading is an edit.
+
+**Resolution.** `app/www/screens/mapping.js`, `app/www/screens/photomap.js`,
+`app/www/client.js` and `docs/android-app.md`.
+
+## Seed 65: permanently square output and rotation direction
+
+**Question.** Does legacy rectangular test geometry require a fit decision before
+the owner's installation can rotate, and which sample direction is clockwise?
+
+**Answer.** The owner fixes the installation at1:1 permanently; rectangular fitting
+is outside scope and never a delivery blocker. For bottom-left coordinates growing
+upward,90 clockwise samples source(N-1-y,x). Rotate the complete composition once
+before physical mapping and mini averaging. Diagnostics remain physical. Approving
+autonomous implementation authorizes the proposed rotation read/set command forms.
+
+**Resolution.** AGENTS.md, the hardened seed65, its spec, rotation.h/rotation.cpp and
+commands.md record this. Legacy rectangular playback stays unchanged/unsupported
+for this setting. The previous fit-question deferral is superseded.
+
+## WLED power-state callbacks and storage pacing
+
+**Question.** May WLED's synchronous state hooks wait for player storage pacing
+or perform the manual command's persistence while processing an initial/preset,
+unrelated or manual state event?
+
+**Answer.** No. Record explicit/observed power intent under an independent,
+memory-only guard and return. Apply the latest request in the usermod loop once
+pacing permits, through the existing core manual command. Initialization and
+scheduled feedback still create no manual override. This changes execution context,
+not the owner's power policy, command list, hardware settings or watchdog.
+
+**Resolution.** The production-body callback harness reproduced the previous wait
+with permanently busy storage before repair. The firmware adapter and its queued
+power helper now defer persistence. This confirmed code defect is separate from
+the still unconfirmed physical reset reason reported by the operator.
+
+## One holder of the board's USB port: the link or a capture
+
+**Question.** The `USB serial` link and the USB diagnostics capture both open the
+board's native USB port, `303a:1001`, and each claims its data interface with force,
+which takes it from the other. Which of them holds the port when both want it?
+
+**Answer.** One at a time, and never silently. While the link is `USB serial` the page
+starts no capture on that port and says that the link uses it (choose `Wi-Fi`, or capture
+from the COM/UART port); `devices` marks that port with `link`. With `Wi-Fi` chosen, the
+link's port is idle: a capture closes it first, and the link opens it again before its
+next line. Choosing `USB serial` during a capture of that port stops the capture before
+the link opens it, keeps the text and says that the link took the port. Each waits at most
+two seconds for the other to close. Captures of other ports are untouched. No command,
+reply, failure code or plugin method is added.
+
+**Resolution.** `TargetPlugin.release` and `UsbDiagnosticsPlugin.yieldPort` hand the port
+over; `screens/usb-diagnostics.js` refuses the capture while the link is `USB serial`;
+`setLink` connects the port again before the next line. The capture's state line is
+`usb-capture-state`, since `usb-state` is the link's. The physical check stays open.
+
+## Clocks only: one app state for the browsing boundary and its recovery
+
+**Question.** The browsing boundary and the fail-closed recovery were written apart.
+Together, may the app resolve the `clocks` path through a list of the root while the
+target's status names no Clocks folder, does a status without `clock_mode` release Only,
+and must a reconnect in Only keep the same list without asking for it again?
+
+**Answer.** The status is the authority on the Clocks folder. While it names none, the
+unavailable Clocks view lists nothing and asks for nothing; the status that names a
+folder resolves the remembered location by its path at once, and while a named folder
+cannot be resolved the list timer retries it. Only a status with mode metadata that
+confirms Off or Between releases the bound; one without it, mapped to the legacy
+booleans, keeps the confirmed Only context. A reconnect keeps the rows and the row on
+the screen and takes the keys kept on the phone, but the list is asked for again as
+everywhere else: retaining the inventory without that request is the separate caching
+feature, not part of this boundary or its recovery.
+
+**Resolution.** `app/www/client.js` (`reconcileOnly`, `recoverLevel`, `toLevel`, `due`),
+the Only line of `app/www/screens/show.js`, and `docs/android-app.md`. The recovery
+model evaluates `takeStatus`, where status handling now lives; the native reconnect test
+checks the files and the keys by content and the row on the screen by identity, not the
+list's identity or its version.
+
+## Seed 79: the measurement in Chrome against the emulator
+
+**Question.** How long does it take, in Chrome against the emulator, from the press of
+`Upload to the installation` to the preview in the row, for a converted GIF and for the two
+compressed ready-made files of `odrig archive/seed-79/` on the Drive?
+
+**Answer.** Measured on 2026-11-08 on Windows 11 (Intel Core i7-14700, 32 GB) in headless
+Chrome 156 at 360 x 740, three runs of each against a fresh emulator, with the app suite's
+driver and a scenario that works the app as an operator does: pick the file, or make the
+animation from the GIF, and press `Upload to the installation` as soon as it is enabled.
+The emulator played a 60 x 60 show of `mapping/legs-20.json` with no items; its internal
+storage held 5,111,808 bytes, the spare's, and its catalog was `none`; the card's catalog
+was `ok`. The two ready-made files were made by the converter's library from
+`collection/card/space/space-scan-10x.odrg`: the large one of every frame record but the
+last, the small one of its first records.
+
+| File | Bytes | Key | Storage | To the success message, ms | To the preview in the row, ms |
+|---|---:|---|---|---|---|
+| `space-scan-10x.odrg`, made by the app from `space-scan-10x.gif` (31,035 bytes) | 29,052 | `eba96049-29052` | internal | 1,129; 884; 907 | 1,139; 896; 919 |
+| `space-scan-small.odrg`, 2,357 records | 3,950,719 | `7d2fe68d-3950719` | internal | 47,621; 45,872; 46,275 | 47,634; 45,901; 46,300 |
+| `space-scan-large.odrg`, 18,003 records, 720,120 ms | 34,408,936 | `53c6b7ce-34408936` | the card | 391,392; 375,561; 372,403 | 391,404; 375,572; 372,414 |
+
+Every preview was in its row 10 to 29 ms after the success message. The phone had made it
+before the upload ended: 0.04 s, about 1 s and 7 to 10 s after the press. The time to
+success is the sending over the computer's own network and then the installation's check
+after the last byte, paced as the board paces it: about 41 s for the small file and 5 min
+46 s for the large one. Some of the runs shared the computer with the test suites. A board
+over Wi-Fi sends more slowly; the preview's delay after success does not depend on that.
+
+**Resolution.** The Definition of Done's measurement is made; the owner's check on a phone
+stays open. No file of the repository changed for it.
+
+## Seed 65: the fresh board's files, beside seeds 76 and 78
+
+**Question.** Seed 65 installs on a board whose `/odrig` folder is absent or empty, at
+the start and before the core, the installation's mapping and an empty show of
+brightness 32, through a `fresh-init` folder that it makes and removes again
+(`firmware/usermod/odrig_bootstrap.h`, called from `OdrigFiles::host()`). Seed 76 has the
+core play such a board on the mapping it holds and an empty show of brightness 128 and
+write nothing at the start; seed 78 has the firmware write nothing at the start, make no
+folder in `setup()`, call `ODRIG_FS.mkdir` once, in `write_open`, and never `rmdir`. With
+all three, which one makes a fresh board usable?
+
+**Answer.** Seeds 76 and 78, and seed 65's start-time installation goes. What seed 65
+requires of a fresh store, its requirement 1.5, holds without it: the canvas is 60 x 60,
+nothing plays and every LED is dark, `rotation` is supported, read and saved whatever
+content there is (seed 65's own core change), `write_open` makes the folder for
+`rotation.part` as for any file, the first upload is accepted, and no operator file is
+replaced because nothing is written at the start. Keeping the installation would break
+seed 78's requirements 2.1, 2.4 and 4.1, which its tests pin (the host fixture of
+`test_usermod_files_host.py` sees no folder, no `mkdir` and no write at the start, and
+the text rule forbids `rmdir`), and seed 76's rule that nothing is written at the start;
+and a board and the emulator would start the same empty folder with two different
+shows. The first show file of a fresh board therefore has brightness 128, seed 76's
+value, not 32. Seed 65's specification keeps its record of task 4 as it was built.
+
+**Resolution.** `firmware/usermod/odrig_files.cpp` (no `BootstrapStore`, no call before
+`askSpace()`), `firmware/usermod/odrig_bootstrap.h` and
+`tests/firmware/test_fresh_board.py` removed, `tests/firmware/test_usermod_files.py` with
+seed 78's rules again,
+`tests/core/test_rotation.py`, whose upload and four rotations now start from an empty
+folder, `docs/firmware.md`, "What the firmware does", and `docs/wifi.md`. This entry
+supersedes the bootstrap part of the entry "Seed 65: fresh storage and content-independent
+orientation"; its content-independent orientation stands.
+
+## Seed 74: part B at no core memory
+
+**Question.** The owner asked that part B cost the core no memory. The spec's first sketch
+of part B gave the board's storage names that hold folder paths, items of `show.json` that
+name such paths, and reads of 1,536 bytes. A path kept for each file between refreshes needs
+101 bytes the arena does not have, and 1,536 bytes do not fit a reply. How is part B built
+at no memory, and what changes with it?
+
+**Answer.** Each file of the board's storage keeps a stored name of 36 characters at most,
+its base name or `<n>/<base>` in the numbered LittleFS directory `/odrig/<n>/`, in the 48
+bytes of `FileInfo`: `total_ms` saturates at 32 bits, as the card's lengths do, and
+`checked` and `type` take 2 bits each. The folders' paths are in one file, `folders.txt`,
+read on demand into the stack. `Core` gains one byte inside its end padding, which is 6
+bytes on the test host on this branch and on the branch that fuses the seeds not yet
+merged, so every figure of the memory table stays as it is. With it these were decided and
+told to the owner. `read <id> <offset> <count>` reads 720 bytes at most: a reply holds 1,024
+bytes, and around the data it has 41 bytes with a size of 10 digits, which leaves 983
+base64url characters, 737 bytes; 744 would fit only with a size of one digit, and 720 leaves
+23 bytes of the reply to spare. Requirement 6.1's 1,536 becomes 720. `show.json` stores the
+stored name `<n>/<base>`, not the path the operator sees, which refines requirement 4.1's
+item that "may name a path". An internal folder's Ignore goes through the existing form
+`ignore <id> 0|1` with the folder's id, and is kept in `folders.txt`. `fwtool` refuses an
+install that would remove the files of folders, with `folders-present`, unless it is given
+`--replace-folders`. An APK older than part B refuses a `list` with an internal folder, so
+the new APK ships with or before the firmware that makes internal folders. The tasks are
+done in the order 5, 7, 6, 8, since task 6 moves folders between the storages and needs task
+7's folders. The first sketch of part B in the design is replaced. Two points of task 6 need
+the owner and are not decided here: whether moved folders go last, against the catalog's
+order of sub-folders by their names, and a job of the app in place of the folder job if that
+proves too large.
+
+**Resolution.** `docs/specs/74-p2-phone-storage-explorer-and-backups/requirements.md`,
+`design.md` and `tasks.md`.
+
+## Seed 74: where Download and Download selected are, and what can be selected
+
+**Question.** The seed asks for `Download` of a selected animation and `Download selected`
+of a batch or a subtree, and the design lets folders and a read-only card be selected for a
+download, but neither says where the actions stand, nor what `Select all`, `Delete selected`
+and `Move to…` do once folders and read-only files can be selected.
+
+**Answer.** `Download` is in the menu of every animation's row, of either storage, and not
+on the bar of the animation playing now, whose three lines stay as they were. `Download
+selected` is in the selection bar. A file of a read-only card gets a checkbox and `Select` in
+its menu; a folder of the card gets a checkbox and `Select` in its menu. `Select all` takes
+the files the filters show of the board's storage and of a card the board may write, as
+before, and neither a file of a read-only card, which is selected by hand, nor a folder.
+`Delete selected` is disabled while a file of the card or a folder is selected, and `Move to…`
+while a folder or a file of a read-only card is: folders move in task 6. A selected folder
+belongs to the storage its row names, so that a folder of the board's own storage is backed
+up with that storage's files and counted under it in the line under the bar.
+
+**Resolution.** `app/www/screens/show.js`, `app/www/screens/selection.js`,
+`app/www/screens/downloads.js`, `docs/android-app.md`.
+
+## Seed 74: the zip writer, its name and its limits
+
+**Question.** The design names the writer `zip-writer.js` and limits it to "above 4 GiB or
+65,535 entries"; the task that ordered this run named `app/www/zip.js`. Which file, and where
+do the limits fall exactly?
+
+**Answer.** `app/www/zip-writer.js`, as the design says: seed 73's reader of a zip is
+`app/www/zip.js` on its branch, and two files of one name would meet when the branches are
+merged. A count of 65,535 entries and a size or an offset of 4,294,967,295 are the values
+that tell a reader to look for zip64, and seed 73's reader refuses them, so the writer takes
+65,534 entries and 4,294,967,294 bytes at most and refuses more before anything is written.
+A folder is an entry of its own only when nothing in the selection lies in it, since the
+paths of its files make it otherwise. The entries' times are the local time the backup
+began.
+
+**Resolution.** `app/www/zip-writer.js`, `docs/android-app.md`.
+
+## Seed 74: one file in flight, and what the manifest holds
+
+**Question.** The design streams each file's CRC-32 into the zip piece by piece, checks each
+source before and after its file, and lists the manifest's members. Is a file written while
+it is read, and what does the manifest say beyond the list?
+
+**Answer.** Each file is read whole into the phone's memory, one at a time, and checked
+before its entry is written: its row, by id, path and size, before and after the read, in a
+fresh part of its level's list from the position the row was last seen at, one request, and
+in the whole level only when the row is not there, the part after a file serving before the
+next when it holds that row, so that a level of N files costs about N requests of `list` and
+not N²/9; its size in every piece; and its bytes against the key of its storage's catalog,
+when the app knows it. A file that fails leaves no entry, and the zip
+holds only checked files; the writer still counts the CRC-32 as the pieces pass. The
+manifest has, beside the design's members, `format` `odrig-backup`, the target's address,
+the moment, the generation of the storage's catalog, and for each file its entry, its id and
+a reason when it failed; `settings` holds the file's own and inherited ignore and `start`
+with `saved`'s brightness and repeat, and `savedUnknown`: null when `saved` answered, else why
+those three are null, the code of its refusal, `busy` after five tries half a second apart,
+or `not-asked` for a file that was not read, so that a restore does not take an unknown
+setting for none; `outcome` is `saved`, `failed`, `stopped` or
+`not-started`; and each folder of the selection is listed with its entry and its ignore. A
+file whose read is refused, a quarantined one among them, fails with its fault, since
+`read` answers `unavailable` for it.
+
+**Resolution.** `app/www/backups.js`, `docs/android-app.md`.
+
+## Seed 74: a selection of both storages, Stop, a change of target
+
+**Question.** A selection at the root may hold files of both storages, and a backup holds
+one. What does `Download selected` do then, and what do `Stop`, a change of target and a
+hidden app do to a backup?
+
+**Answer.** The dialog names the storage and the level the entries are named from before
+anything is read; for a selection of both storages it has a `Storage` choice and says that
+each storage is backed up in its turn, so that nothing is merged. `Stop` ends the run between
+two pieces of a file, or as the piece under way ends, whatever its reply, a lost link too:
+the zip is saved with the files read whole before, and says it is partial; a single
+`Download` saves nothing then. A sink that cannot be written ends the run with nothing
+saved. A change of target ends a run with nothing
+saved, since the files after it would be another target's. While the app is hidden nothing
+is sent, and a request withdrawn then is sent again when it is shown. The app makes no
+other change while a run goes on.
+
+**Resolution.** `app/www/screens/downloads.js`, `app/www/backups.js`, `docs/android-app.md`.
+
+## Seed 74: reads of a download among the app's other requests
+
+**Question.** The app sends one request at a time, and what the operator asks for goes before
+a status; a backup of many files is thousands of reads. How does the status go on, and where
+is the probe of the count made?
+
+**Answer.** The reads and the lists of a download or a backup are requests in the background:
+a status that is due goes before them, once a second, and they do not make a status due
+themselves, as an operator's request does. Each piece of a file is a request of its own, the
+reads of `Edit` and of a move too. The client sends `read <id> 0 1` once for each target
+before the first piece; `bad-argument` means an installation without the count, which is then
+read 600 bytes at a time. The answer is kept for the target, and the address may name another
+installation later: a read with the count refused with `bad-argument` sends `read <id> 0 1`
+again, and when that is refused too the read and the ones after it go without the count.
+
+**Resolution.** `app/www/client.js`, `docs/android-app.md`.
+
+## Seed 74: the APK's plugin that saves a file
+
+**Question.** The design gives the APK a plugin `begin`/`append(base64)`/`finish` that saves
+through the Storage Access Framework. What is its name, what does it keep, and how does the
+web code reach it while only `target.js` knows the native shell?
+
+**Answer.** `SavePlugin.java`, the plugin `Save`: `begin` opens one file in the app's cache,
+`append` adds bytes given in base64, `finish` closes it and opens the system's dialog of
+creating a document with the name and the media type; the file is copied to the place chosen
+and removed from the cache, and a dialog closed without a place resolves `saved: false`.
+`abandon` removes the file of a run that ends without saving; the next `begin` and the
+plugin's start remove what one that did not arrive left. The call of `finish` is released on
+the main thread, as the bridge keeps its calls there. It asks for no permission. `target.js` gives the shell to `save.js` through `shell()`, and stays the
+one file that names Capacitor. In a browser the file is a download of a Blob, the pieces
+folded into it every megabyte.
+
+**Resolution.** `app/android/app/src/main/java/app/odrig/operators/SavePlugin.java`,
+`app/www/save.js`, `app/www/target.js`, `docs/android-app.md`.
+
+## Seed 74: the refusals of a read's count
+
+**Question.** Is a count judged before the id, and does the form without a count change?
+
+**Answer.** The count is judged with the other words, so a count of 0 or above 720 is
+`bad-argument` whatever the id, and `read 1 0 0` stays `bad-argument` as before. The form of
+three words keeps its 600 bytes. Every other refusal is the form's without a count, and a
+folder of the card is `in-use`, as it was.
+
+**Resolution.** `core/src/commands.cpp`, `docs/commands.md`.
+
+## Seed 74: the command tool's examples of `saved` and `folder`
+
+**Question.** Part A added `saved ID` and `folder make external PATH` to the command tool, but
+the page of the emulator gave neither a synopsis nor an example, and its test of the tool's
+commands by each transport failed. Is that mended here, where `read`'s line changes?
+
+**Answer.** Yes: the page gives both, with an example by each transport, beside `read ID
+OFFSET [COUNT]`.
+
+**Resolution.** `docs/emulator.md`.
+
+## Seed 74: the bound of a read's count in the chunk buffer
+
+**Question.** The bytes of `read` pass through the chunk buffer of 1,500 bytes, but a rebuild
+of a catalog keeps its pages' counts and CRC-32s there from byte 1,400 between its steps, and
+`read` is not refused while one runs. Which bound does a count meet?
+
+**Answer.** 1,400: the offset of the kept pages, `kKeptPages`, moves from `catalog.cpp` to
+`storage.h` beside `kChunkSize`, and the `static_assert` of `content.cpp` holds both forms of
+`read` under it. 720 is far below; no rebuild's pages are touched by a read.
+
+**Resolution.** `core/src/storage.h`, `core/src/content.cpp`, `core/src/catalog.cpp`,
+`docs/core.md`.
+
+## Seed 74: the start opens `folders.txt`
+
+**Question.** Part B's design says a show without `folders.txt` pays nothing for folders, but
+the start has to learn whether the file is there, and `read_at` answers -1 alike for no file
+and for a failed read. A failure taken for no file would let the next `folder make internal`
+write a file of one line over the board's folders. How does the start tell them apart?
+
+**Answer.** It opens `folders.txt` with `open` after `pending.txt`, as it opens `pending.txt`
+and `catalog.txt`: 0 is no file, a flat show with nothing more read; -1 makes the boot's
+folders unreadable. A folder of no files is asked to open six names that are not there, and
+the tests of the start that list the names opened name `folders.txt` too. Nothing is written
+for a flat show.
+
+**Resolution.** `core/src/folders.cpp`, `tests/core/test_startup.py`, `docs/core.md`.
+
+## Seed 74: the start's repair writes, and seed 78's rule
+
+**Question.** Task 7 names the repair at the start of a folder's id that an item has, and also
+seed 78's rule that the start writes nothing and that only `write_open` makes the storage's
+folder. Does the repair break the rule?
+
+**Answer.** No. Seed 78's rule is the firmware's: its host makes no folder and writes nothing
+at its start, and `/odrig` is made by `write_open` alone; the files host's `make_folder` makes
+`/odrig/<n>` and never `/odrig`. The core's start already renames and removes what an
+interrupted change left. The repair writes `folders.txt` only when a line's id is an item's,
+which a computer's tool can bring and the core never does, and that file is in `/odrig`
+already. A board whose folders are sound is written nothing at its start.
+
+**Resolution.** `core/src/folders.cpp`, `firmware/usermod/odrig_files.cpp`, `docs/core.md`,
+`docs/firmware.md`.
+
+## Seed 74: the order in which a folder is made
+
+**Question.** The design makes the folder `<n>` before its line is written, but on a storage
+that never had a show `/odrig` is not there, and `mkdir` of `/odrig/<n>` fails while only
+`write_open` may make `/odrig`. In which order does `folder make internal` write?
+
+**Answer.** It writes `folders.part` first, which makes `/odrig` when it is missing, then makes
+`<n>` with `make_folder`, then renames the part onto `folders.txt`. The rename is the commit,
+so the folder is there before its line counts. A cut leaves the old file or the new one, the
+part removed at the next start, and at worst an empty numbered folder without a line, which a
+later folder of that number takes. A `make_folder` that answers 0, a storage that makes no
+folders, is known only then: the part is removed and the reply is `unsupported`.
+
+**Resolution.** `core/src/folders.cpp`, `docs/core.md`.
+
+## Seed 74: what a reading of `folders.txt` checks
+
+**Question.** The design reads `folders.txt` with a scan of about 270 bytes that checks each
+line's parent with hashes. Every function that holds one must stay under the frame of 512
+bytes. What does a scan check, and where?
+
+**Answer.** A scan is one buffer of 128 bytes, a line read where the last ended and the rest
+kept, and checks each line's form and that its depth is at most one more than the line's
+before. The start checks the whole file once more strictly: each line's parent is the line
+before it or a folder above that one, a sibling comes after the one before it by the bytes of
+its name, and no two lines have one number or one id. The core writes the file only in that
+order, so the later scans need no more. A scan that meets a line out of form at a command
+answers `storage-error`.
+
+**Resolution.** `core/src/folders.cpp`.
+
+## Seed 74: a new folder's id among the show's
+
+**Question.** The design finds a folder's id with a bitset of 21 bytes, for at most 132 items
+and 32 folders. A show of more items has a larger item table. Where is the lowest free id
+found?
+
+**Answer.** In the first 1,024 bytes of the chunk buffer, a bit for each id below 8,192, which
+`folder make internal` and the start use while the chunk holds nothing: the core's tables
+hold far fewer items than that, so the lowest free id is among them.
+
+**Resolution.** `core/src/folders.cpp`.
+
+## Seed 74: the rows of `list` of an internal folder's level
+
+**Question.** The design gives a file of a folder `inherited_ignored` as `held && !own`, where
+the card's rows give it whatever the file's own choice. Which, and in which order are the
+members?
+
+**Answer.** As the card's: `inherited_ignored` says that the folder or a folder above it is
+ignored, whatever the file's own `ignored`, so the app reads one form for both storages. A
+file's row is today's internal row with `file` its path, then `stored` and
+`inherited_ignored` after `type`, and `fault` last; a folder's row is a card folder's with
+`external` false. The root's rows of files gain nothing, and a file whose folder has no line
+is listed at the root under its stored name.
+
+**Resolution.** `core/src/folders.cpp`, `core/src/content.cpp`, `docs/commands.md`.
+
+## Seed 74: the refusals of `folder make internal`
+
+**Question.** The design refuses `in-use` for "a file of the show at that path", and `no-space`
+with less than 8,298 bytes free. A folder's last name cannot end in `.odrg` or `.odrgx`, and a
+host may not tell its space. What do these come to?
+
+**Answer.** No file of the show can have a folder's path, so `in-use` is a sibling equal but
+for case alone. The room is judged when the host tells its space; a host that cannot tell is
+not refused for it, as the write then says.
+
+**Resolution.** `core/src/folders.cpp`, `docs/commands.md`.
+
+## Seed 74: an upload's folder is found before the upload's own refusals
+
+**Question.** Where among `upload begin`'s refusals do a missing folder and an unreadable
+`folders.txt` stand?
+
+**Answer.** After `bad-argument` and `show-invalid`, before the rest: the path is resolved to a
+stored name first, `unknown-id` for a folder that is not there and `storage-error` while the
+folders cannot be read, and the upload then goes on as one of a file at the root. The
+reference player of the core's tests keeps no folders, so a path with a folder is
+`unknown-id` there.
+
+**Resolution.** `core/src/commands.cpp`, `tests/core/support.py`.
+
+## Seed 74: pruning, and the file left with no folder
+
+**Question.** When is a folder pruned, and what is left when the last one goes?
+
+**Answer.** After a removal, `remove many` and an upload that moves an item's file to another
+folder, each folder that lost a file is judged, then the folders above it, as the card's are.
+`folders.txt` stays with its header alone when every folder has gone, so that the next
+number keeps turning. The numbered folders are removed after the file is renamed.
+
+**Resolution.** `core/src/folders.cpp`, `core/src/storage.cpp`.
+
+## Seed 74: the current playlist of an internal folder needs the saved playlist
+
+**Question.** A folder's playlist is kept in `current`, the record of the current folder and
+`playlist_path`, but the path's room is in the block of the saved order, which only a host
+with a drive is given. What does a host without one do?
+
+**Answer.** It answers `play` of an internal folder with `unsupported`, as the design says,
+and plays the root's playlist, every folder in it; the rotation stays at the root. The board
+always has its card host, and the emulator has it with `--drive` or `--drive-folder`. A pulled
+or changed card leaves an internal playlist current, and its path, `:` and the folder's, is
+found again at the start.
+
+**Resolution.** `core/src/commands.cpp`, `core/src/order.cpp`, `docs/emulator.md`.
+
+## Seed 74: the test host's `make_folder`
+
+**Question.** The test host gave `make_folder` only with a drive. Internal folders need it on a
+host without one. What becomes of `folder make external` there?
+
+**Answer.** The test host gives `make_folder` whenever its storage can be changed, unless
+`--no-folders`; `folder make external` without a drive answers `read-only`, as an upload to
+the drive does, and the core never asks it for a drive's folder then. The emulator binds it
+the same way. A numbered folder is a sub-folder of the session's folder, or a set of names in
+memory, and a file goes into one only when it was made.
+
+**Resolution.** `tests/core/host/host.cpp`, `emulator/binding.py`, `docs/core.md`.
+
+## Seed 74: the name rule of the library and of the converter
+
+**Question.** `odrig/show.py` and `converter/lib/show.js` take a stored name now. Do their
+refusals' words change?
+
+**Answer.** No: the words stay those of the name, so that the answers the converter's tests
+keep stay as they are; the rule takes the name alone or after `<n>/`, 1 to 255 without a
+leading zero, in both.
+
+**Resolution.** `odrig/show.py`, `converter/lib/show.js`.
+
+## Seed 74: an internal upload path in the command tool
+
+**Question.** The design gives `odrigctl` "an upload to an internal path, %-escaped". How is
+the path given?
+
+**Answer.** With `--folder PATH` beside `upload ID FILE`: the name sent is the folder's path,
+`/` and the file's last part, each part escaped as a URI's. It goes neither with another
+command nor with `--external`, each a usage error. `folder make` takes `internal` or
+`external`.
+
+**Resolution.** `odrigctl/cli.py`, `docs/emulator.md`.
+
+## Seed 74: the app at the root and inside an internal folder
+
+**Question.** At the root `New folder` made a folder of the card. Which storage does it make
+one of now, and against what does the app choose a new item's id, when the root's list holds
+no item of the board's folders?
+
+**Answer.** Inside a folder, that folder's storage; at the root the dialog asks for the
+storage, `External` while the board may write the card and `Internal` otherwise. A new item's
+id is free among the root's rows, folders among them, and the rows of every folder of the
+board's storage, which the app lists before the upload: the upload's preflight, a move to the
+board and a text or a clock when the root has such folders. An upload prepared at a level of
+the board's storage goes into that folder.
+
+**Resolution.** `app/www/screens/explorer.js`, `app/www/client.js`,
+`app/www/upload-destination.js`, `app/www/screens/author.js`, `app/www/moves.js`,
+`docs/android-app.md`.
+
+## Seed 74: the firmware tool and the board's folders
+
+**Question.** The design keeps `folders.txt` with the board's settings, accepts the numbered
+folders it names and refuses an install that would remove their files. What of the board's
+`folders.txt` under `--replace-folders`, and of a numbered folder left empty?
+
+**Answer.** `--replace-folders` removes the board's folder files and the lines of its
+`folders.txt` too, unless the folder installed has its own, so that no line names a folder
+of no files the operator did not keep; the file keeps its first line, which names the number
+the next folder takes, so that the numbers go on turning and a saved `f <n>/` key of a
+folder that went attaches to no new folder's file soon. Every numbered folder the
+`folders.txt` installed names is there afterwards, empty or not, and an empty one is not
+removed with the other empty folders. A show folder's numbered sub-folders are accepted when
+its `folders.txt` names them or a file of its `show.json` is in them, with `--no-check` too:
+`read-show` writes them as sub-folders, a file whose folder has no line among them.
+
+**Resolution.** `firmware/fwtool/storage.py`, `firmware/fwtool/cli.py`, `docs/firmware.md`.
+
+## Seed 74: the vocabulary's entry for a command
+
+**Question.** Part A gave the command list `saved` and `folder`, and the onboarding suite's test
+that the vocabulary names every family of the list has failed since. Task 7 adds `folder make
+internal`. Is the entry mended here?
+
+**Answer.** Yes: the entry names `saved <id>` and `folder make`, and the test's list of
+families has both.
+
+**Resolution.** `agent/vocabulary.md`, `tests/onboarding/test_vocabulary.py`.
+
+## Seed 74: a folder's Ignore while `folders.txt` is damaged
+
+**Question.** The design answers a folder's Ignore with `storage-error` while the board could
+not read `folders.txt` in this boot. With the file unread, an id is not known to be a
+folder's. What does `ignore <id>` answer then?
+
+**Answer.** As for any id that nothing has: `unknown-id`. `folder make internal` and an
+upload into a folder, which name a folder by its path, answer `storage-error`.
+
+**Resolution.** `core/src/content.cpp`, `docs/commands.md`.
+
+## Seed 74: the longest reply to `status` with the board's folders
+
+**Question.** The design gives `checking` and `file` in `status` as the path of a file of a
+folder. A folder's path is 93 bytes and a name 32 characters, so a file that a computer's
+tool put in a folder has a path of up to 126 bytes, where `checking` gave 32 characters
+before; the reply has room for 1,024 bytes and nothing bounds it as it is written. What do
+the two members give?
+
+**Answer.** A file is a file of its folder while its path is 100 bytes at most, as
+`upload begin` makes it; one of a longer path has rank 0 and is listed, played and named at
+the root under its stored name, as a file whose folder has no line is. `file` gives the
+path, 100 bytes at most, as a card's file's is. `checking` gives the first 32 characters of
+the path, as it gives a card's name. With every member at its longest the reply is then at
+most 978 bytes with its line feed, as a test of the suite counts it.
+
+**Resolution.** `core/src/folders.cpp`, `core/src/commands.cpp`,
+`tests/core/test_internal_folders.py`, `docs/commands.md`, `docs/core.md`.
+
+## Seed 74: an emptied folder that is not pruned
+
+**Question.** The prune of an emptied folder is passed over while a rebuild runs or an upload
+is received, and a power cut between a removal and the prune leaves the folder's line. No
+later event prunes it, and it looks like a folder made and never filled. Is the prune
+recorded and done later?
+
+**Answer.** No: the folder stays, with its line, as a folder never filled does. It takes
+files again by an upload, `folder make internal` of its path answers `made:false`, and it
+goes when a file it is given later leaves it. A record of prunes due would be a second file
+to keep in step for a folder that does no harm.
+
+**Resolution.** `docs/commands.md`, `docs/core.md`.
+
+## Seed 74: `folder make external` on a board with a USB stick
+
+**Question.** The design keeps `unsupported` for `folder make external` on a board whose
+drive is a USB stick, through a `make_folder` that answers 0. The board's `make_folder` is
+given now for its own folders, and the core refuses a drive it may not write with `busy` or
+`read-only` before it asks the host to make a folder. What does the stick's board answer?
+
+**Answer.** `read-only`, or `busy` while an upload is open, a rebuild runs, a test of the
+mapping shows or the stick's catalog is read: the board never writes a stick, which
+`read-only` says. A host that gives no `make_folder` answers `unsupported` as before, and a
+card's host whose `make_folder` answers 0 does after the checks. The app offers `New folder`
+on a drive only while the board may write it, so its words do not change.
+
+**Resolution.** `docs/commands.md`.
+
+## Seed 74: the fault of an upload into a folder
+
+**Question.** The fault of an upload's check names the file the upload was sent as. With a
+folder that is the file's name alone, `x.odrg` for `shows/x.odrg` and for `art/x.odrg`.
+Which name does `fault` give?
+
+**Answer.** The stored name, `1/x.odrg`, as a fault at the start or in playback names the
+file, cut to 32 characters as every name of `fault` is. An upload to the drive keeps its
+name.
+
+**Resolution.** `core/src/upload.cpp`, `core/src/storage.h`.
+
+## Seed 74: moves out of a folder of the board's storage in the app
+
+**Question.** The app's moves find the folder of a file's source and of a destination by its
+path, and look for a file that another item names among the root's rows. A file of a folder
+of the board's storage is not among them, and a folder of the board's storage may have the
+path of one of the card's. How does a move find them?
+
+**Answer.** A file of the board's storage is in a folder when the list gives its stored
+name, and that folder is found by its path among the board's folders alone, a card's among
+the card's alone; another item that names the file is looked for in the file's own level
+too, by its stored name. The card's folders that `Move to…` offers are the card's alone, and
+a folder row of the list takes its count and its marks by its id.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `app/www/screens/show.js`,
+`tests/app/test_internal_folders.py`.
+
+## Clocks only and the folders of the board's own storage
+
+**Question.** In Clocks only the app browses and uploads only inside the Clocks folder,
+and its recovery never falls back to the root. The board's own storage now has folders,
+and one of them may have the path `clocks`. Is a folder of the board's storage part of the
+Clocks view?
+
+**Answer.** No. The Clocks folder of Clocks only is the card's: its states include
+`no-card`, and the app's words name the external clocks folder. In Only a level of the
+board's storage is outside Clocks: it cannot be entered, its folder rows count as outside,
+the recovery never lands on it, and an upload prepared at it is refused with the words of
+Only, so that a file meant for an internal `clocks` folder never goes to the card's root.
+
+**Resolution.** `app/www/client.js` (`inClocks` takes a level, `canEnter`,
+`inClockFolder`, the recovery), `app/www/upload-destination.js` (`blocked`).
+
+## A batch or an archive at a folder of the board's own storage
+
+**Question.** A single upload prepared at a folder of the board's own storage goes into
+it, with an id free among the root's and every folder's. A batch of ready-made files takes
+the storage and folder a single form would take, but named its files against the root's
+names, showed `Internal /`, and chose each id among the root's ids alone; an archive's run
+does the same. Where do their files go, and under which id?
+
+**Answer.** A batch goes where a single form goes: into the folder of the board's storage
+it was prepared at, its names made against that folder's when the app holds its list, its
+destination line `Internal /<path>/`. Every new id of the board's storage, of a batch's
+file or an archive's, is free among the ids of the root and of every folder, as a single
+upload's is: before, an id of a file inside a folder was chosen, and the board refused
+every file of the run. An archive keeps its files at the root of the board's storage, as
+its paths are kept only on the card.
+
+**Resolution.** `app/www/screens/batch-list.js`, `app/www/batch.js`,
+`app/www/upload-destination.js` (`folderOf`), `docs/android-app.md`,
+`tests/app/test_internal_folders.py`, `tests/app/page/scenarios/batch.js`.
+
+## The checkbox of a file on a read-only card
+
+**Question.** The row of a file that is neither editable nor on a writable card had its
+checkbox disabled by the current observations, so that a row kept across a reconnection
+offers nothing the board may refuse. `Download selected` takes a file of a read-only card.
+Is its checkbox enabled?
+
+**Answer.** Yes, while the selection is not locked. Each action of the selection keeps its
+own gate on the current observations: `Move to…` is disabled while a chosen file is on a
+card that is not writable, and `Delete selected` while a file or a folder of the card is
+chosen, so nothing the board would refuse can be pressed.
+
+**Resolution.** `app/www/screens/show.js`, `app/www/screens/selection.js`.
+
+## A saved playlist of a folder of the board's own storage while `folders.txt` cannot be read
+
+**Question.** A boot that cannot read `folders.txt` has no folders. The saved playlist
+names a folder of the board's own storage, `:` and its path. The core found no folder of
+that path and made the root current with a fresh window, saved as such: the operator's
+choice was lost for every later boot, while a card's saved playlist is kept as long as the
+card's tree is not known. Which holds for a folder of the board's own storage?
+
+**Answer.** The card's rule. While `folders.txt` cannot be read, the root plays in the
+folder's place and the path stays saved; the next boot that reads the file makes the folder
+current again. Only a file that was read and has no folder of that path makes the root
+current, saved as such.
+
+**Resolution.** `core/src/order.cpp` (`tree_find_current`), `docs/core.md`,
+`tests/core/test_internal_folders.py`.
+
+## The reason under Upload while a download or a move holds the content lock
+
+**Question.** The line under `Upload to the installation` names the holder of the content
+lock: a check of the destination, an upload, a deletion. A download, a backup and a move of
+files on Animations take the same lock and named no holder, so the button was disabled
+with no line under it. What does the line say then?
+
+**Answer.** `A download is under way on Animations.` while files are read back to be saved,
+and `A move is under way on Animations.` while files are moved, after the reasons of the
+earlier holders. The lists of a batch and of an archive show the same line.
+
+**Resolution.** `app/www/client.js`, `app/www/screens/downloads.js`,
+`app/www/screens/explorer.js`, `app/www/screens/storage.js`, `docs/android-app.md`,
+`tests/app/test_upload_lock.py`.
+
+## The check of an upload's folder of the board's own storage
+
+**Question.** A single upload and a batch prepared at a folder of the board's own storage
+go into it, but the check before each file read the root: a folder gone since was not seen,
+the board refused the file with `unknown-id`, and a batch went on and failed every file the
+same way. Its names were also checked against the root's. What does the check read?
+
+**Answer.** The folder the file goes into, as for a folder of the card: a folder gone or
+changed fails that file with `The explored folder changed or disappeared.`, a batch ends
+there and leaves the rest `not sent`, and a name is checked against the folder's own files.
+A folder that goes between the check and `upload begin` is refused `unknown-id`, which the
+app words `The folder of this upload is not on the installation any more.`, and a batch
+ends there too.
+
+**Resolution.** `app/www/upload-destination.js` (`snapshotLevel`), `app/www/batch.js`
+(`gone`, `turn`), `app/www/screens/storage.js`, `app/www/messages.js`,
+`tests/app/test_internal_folders.py`, `tests/app/test_messages.py`.
+
+## The key of a file of a folder of the board's own storage after an upload of this phone
+
+**Question.** An upload of this phone that ended forgets the key the catalog gave its name,
+so that the key of its own bytes is taken until a page read names it again. The internal
+catalog names a file of a folder by its stored name, `<n>/<name>`, and the upload by its
+path, so the old key of an edited text or clock of the same size was still taken. Which
+name is forgotten?
+
+**Answer.** Both: the path, and the stored name the last list of its folder gave that path.
+The client keeps the stored names its lists gave until the target changes.
+
+**Resolution.** `app/www/client.js` (`uploadedTo`), `tests/app/test_keys.py`.
+
+## The words of a destination at the root of the board's storage
+
+**Question.** Requirement 2.3 of the spec of the reason beside Upload keeps the sentence
+`Internal storage has a flat root.`, and the archive refused a name with `/` for the board's
+storage with `The board's storage has no folders`. The board's own storage has folders now.
+What do they say?
+
+**Answer.** What happens: `This upload goes to the root of Internal storage: the explored
+folder is on the card.`, and `An archive's files go to the root of the board's storage: use
+a name without /.` The rule itself is unchanged.
+
+**Resolution.** `app/www/upload-destination.js` (`reason`), `app/www/screens/archive.js`,
+`tests/app/test_ready_upload.py`, `tests/app/test_archive.py`.
+
+## Seed 74: a saved playlist of a folder of the board's own storage while `folders.txt` cannot be read
+
+**Question.** A boot that cannot read `folders.txt` has no folders. The saved playlist
+names a folder of the board's own storage, `:` and its path. The core found no folder of
+that path and made the root current with a fresh window, saved as such: the operator's
+choice was lost for every later boot, while a card's saved playlist is kept as long as the
+card's tree is not known. Which holds for a folder of the board's own storage?
+
+**Answer.** The card's rule. While `folders.txt` cannot be read, the root plays in the
+folder's place and the path stays saved; the next boot that reads the file makes the folder
+current again. Only a file that was read and has no folder of that path makes the root
+current, saved as such.
+
+**Resolution.** `core/src/order.cpp` (`tree_find_current`), `docs/core.md`,
+`tests/core/test_internal_folders.py`.
+
+## Seed 74: the check of an upload into a folder of the board's own storage
+
+**Question.** An upload prepared at a folder of the board's own storage goes into it, but
+the check before it read the root: a folder gone since was not seen, and the board refused
+the file with `unknown-id`, which the app worded `Animation begin is not installed any
+more.` Its name was also checked against the root's files, not the folder's, so a name the
+folder has was sent and refused `in-use`. What does the check read?
+
+**Answer.** The folder the file goes into, as for a folder of the card: a folder gone or
+changed fails the upload with `The explored folder changed or disappeared. Select the
+destination again.`, and a name is checked against the folder's own files, `A file already
+exists at this destination.` A folder that goes between the check and `upload begin` is
+refused `unknown-id`, which the app words `The folder of this upload is not on the
+installation any more. Select the destination again.`
+
+**Resolution.** `app/www/upload-destination.js` (`snapshotLevel`),
+`app/www/screens/storage.js`, `app/www/messages.js`, `tests/app/test_internal_folders.py`,
+`tests/app/test_messages.py`.
+
+## Seed 74: the words of an upload to the root of the board's storage from a folder of the card
+
+**Question.** Requirement 2.2 of spec 63 has the board's own storage use "its existing flat
+root", and the destination line said `Internal storage has a flat root. This upload uses
+Internal / instead of the explored SD folder.` when Internal was chosen at a folder of the
+card, and `Using Internal /; internal storage has no matching subfolders.` when the card is
+not there. The board's own storage has folders now, and may have one of the same path. What
+do they say?
+
+**Answer.** What happens and why: `This upload goes to the root of Internal storage: the
+explored folder is on the card.`, and `External storage is disconnected or not detected.
+Using Internal /; the explored folder is on the card.` The rule itself is unchanged: an
+upload prepared at a folder of the card that goes to the board's own storage goes to its
+root, whatever folders it has.
+
+**Resolution.** `app/www/upload-destination.js` (`reason`), `tests/app/test_ready_upload.py`,
+`tests/app/page/scenarios/ready-checks.js`.
+
+## Seed 74: the texts that still gave the folders and the playlists to the card alone
+
+**Question.** The board's own storage has folders, each a playlist that the rotation goes
+through before the card's, that `play`, `list in`, `order get in` and `status` take, and
+that a selection takes for a download. Texts written before still gave all this to the
+card: `docs/show.md` had the playlists, the rotation and the saved playlist of the card's
+folders alone, `With no folder on the card the root is the only playlist`; `docs/core.md`
+had a show without a card write `playlist.txt` no more than before, though it writes it
+every 900,000 ms while the board's storage has a folder; `docs/commands.md` refused
+`list in`, `order get in`, `read`, `remove`, `upload begin`, `order move`, `saved` and
+`repeat` for a folder of the card alone, and its table made the id of a folder of the
+board's own storage `unknown-id` for `play`; comments of the app and
+`docs/android-app.md` said the same; and `Delete selected`, disabled while a folder of the
+board's own storage is selected, said `clear the card's files and folders from the
+selection.` What do they say?
+
+**Answer.** What the core and the app do, as the section of `docs/commands.md` on the
+folders of the board's own storage already says: the rotation goes from the root to the
+folders of the board's own storage in the tree's order, then to the card's, which it
+passes over while the card's tree is not known, then to the root; `playlist.txt` is
+written every 900,000 ms while either storage has a folder; each refusal names a folder of
+either storage; and `Delete selected` says `clear the folders and the card's files from
+the selection.` A start whose `folders.txt` is sound and has no folder of the saved path
+makes the root current, saved as such, which a test now holds.
+
+**Resolution.** `docs/show.md`, `docs/core.md`, `docs/commands.md`,
+`docs/android-app.md`, `app/www/screens/selection.js`, the comments of
+`app/www/client.js`, `app/www/commands.js` and `app/www/screens/show.js`,
+`tests/app/test_internal_folders.py`, `tests/app/page/scenarios/downloads.js`,
+`tests/core/test_internal_folders.py`.
+
+## Seed 61: where the marks of copies of clocks and messages are kept
+
+**Question.** The design of seed 74 part B kept a spare bit of each file of the show for
+seed 61's mark of a copy: set when a file of the card with the same class, name and type is
+eligible. A mark kept from one draw to the next must be set again after every change of the
+card, the catalog, an Ignore, an install or a quarantine, and one change missed gives a
+duplicate turn. Where is it kept?
+
+**Answer.** In that spare bit, `FileInfo.copy`, written in the draw that reads it: at
+most once in a draw, and only when the draw lands on a file of the board's own storage
+while the SD card is preferred, the bits of the class are cleared and set again from the
+card's rows, and a flag on the draw's stack lets the draw read them only after that. No
+mark of an earlier draw is ever read. A bitset on the stack was weighed and left: the item
+table has room for 32 items more than `show.json` lists, 128 at least, so no bitset of a
+fixed size holds every show.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The bags").
+
+## Seed 61: what makes two clocks or messages copies
+
+**Question.** Seed 61 makes copies of files with "the same normalized full relative path,
+including extension, and the same validated file/animation type". The card's FAT does not
+keep the case of names, the board's names are lowercase, and a type may not be known yet.
+What is compared?
+
+**Answer.** The class, face or message, by the exact path of the folder, `clocks` or
+`clocks/message`; the file name with its extension, without the case of ASCII letters; and
+the type the catalog or the check gives, known on both sides. A type not known yet makes no
+copy. The files of the other folders below `clocks` are inside Clocks only's boundary but in
+no bag, so they have no copies.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (4.1), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The bags").
+
+## Seed 61: which version of `clocks.txt` keeps the preferred storage
+
+**Question.** The preferred storage is kept "atomically with the existing internal clock
+settings", in `clocks.txt`. A new version of the file is out of form to an older firmware,
+which fails closed into a dark Clocks only. Which version is written?
+
+**Answer.** Version 2, byte for byte as before, while the SD card is preferred, and version
+3, with a fourth line `storage internal`, only while internal storage is. Versions 1 and 2
+and a missing file mean the SD card. A firmware going back meets version 3 only after the
+owner chose internal storage, and `clocks storage sd` writes version 2 again.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (5.4), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The preferred storage",
+"Older clients, older firmware").
+
+## Seed 61: Clocks only in the app when both storages have a Clocks folder
+
+**Question.** By the owner's answer of 2026-11-09, Clocks only shows the board's own
+`clocks/` and `clocks/message/` as it shows the card's. The boundary of seed 66 begins at
+the one Clocks folder that `clock_only.folder` names, and Back stops there; with both
+storages there are two, and `status` names one. Which does the app open, and where does
+Back stop?
+
+**Answer.** `clock_only.folder` names the card's Clocks folder when the card has one, else
+the board's, and `Restart clocks` sends it as before. When one storage has a Clocks folder
+the app opens it, as before. When both have one, the app opens the Clocks level, the root
+showing only the two Clocks folders, each with its storage, and Back from either stops
+there. The app finds the other storage's folder in the root's list, which it reads in the
+background. A target without `clock_storage` keeps the card's boundary alone, since it does
+not play the board's clocks.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (6.5), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The app").
+
+## Seed 61: the state of Clocks only without a face
+
+**Question.** `clock_only.state` was `no-card` first whenever no card was in. With the
+board's own Clocks folder, Clocks only plays without a card. In what order are the states
+given?
+
+**Answer.** Without an internal Clocks folder, today's states in today's order, so such a
+show answers byte for byte as before: `no-card` without a card, else `missing-folder`
+without the card's Clocks folder, else `no-clocks` while nothing plays, else `playing`.
+With an internal Clocks folder, `playing` while something plays, else `no-clocks`. The
+app's words name the storages it looked in.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (3.2), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("Clocks only").
+
+## Seed 61: the storage of the clock playing now in the app
+
+**Question.** Seed 61 asks the app to make "the effective source/path understandable". A
+file `clocks/message/<name>` may be on either storage, and `status` gives the same path for
+both.
+
+**Answer.** The bar of the animation playing now and the brightness screen write a file of a
+Clocks folder with its storage, `Internal /clocks/...` or `External /clocks/...`, told by its
+id, 60,000 or less for the board's. Other files read as before.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (6.6), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The app").
+
+## Seed 61: the deployment of the seven messages without a board
+
+**Question.** Seed 61 asks that the seven approved messages be put into the board's own
+`clocks/message/` with the project's tools, read back and seen chosen in both modes. No board
+is connected to the computer the seed is built on. What is done?
+
+**Answer.** A test of the emulator suite rehearses the commands with the tracked files and is
+reported as a rehearsal only. The board session is prepared in the design with its exact
+commands, the room it needs, 163,840 bytes free, and what it records; it reads the files back
+with `fw.py read-show` and compares them by SHA-256 with the tracked files. It stays open for
+the owner, with the LED and phone checks.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The seven messages"), `docs/specs/61-p2-internal-storage-clocks-and-messages/tasks.md` (tasks 4 and 5).
+
+## Seed 61: room for `clock_storage` in a reply of `status`
+
+**Question.** A reply holds 1,024 bytes. The longest reply of `status` on the branch of
+pull request #63 is the one of `test_the_longest_reply_to_status_fits_1024_bytes` in
+`tests/core/test_internal_folders.py`, 991 bytes and the newline. Does
+`,"clock_storage":"internal"` fit, and where does it go?
+
+**Answer.** After `clock_mode`. It adds 27 bytes, 21 for `sd`: the longest reply, in Between
+with a file of a 100-byte path in a 93-byte internal playlist, becomes 1,019 bytes with its
+newline. In Only `playlist` is `clocks` or null, at most 966; `clock_error` comes only with
+a dark Only that names no file and with the SD card in force, at most 883. That test gains
+the member and a shape of Only with `clock_error`.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (5.3), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("Clocks only").
+
+## Seed 61: an Ignore or a fault of the board's own files in Clocks only
+
+**Question.** In Clocks only the card's Ignore and changes go through `only_dirty` and the
+refresh of Only, which ends an automatic turn that no longer plays and keeps a manual one.
+The board's own go another way: an Ignore of a file plays on through `player_play_all`,
+which restarts Clocks and cuts a manual turn, and an Ignore of a folder returns at once,
+which was right while no file of the board's own storage was inside the boundary. With the
+board's Clocks folders inside it, taking such a folder in again would leave Only dark.
+What is done?
+
+**Answer.** In Clocks only an Ignore of a file or a folder of the board's own storage, and a
+fault of one of its files, set `only_dirty` and refresh Only, as the card's do: an automatic
+turn that no longer plays ends at once, a manual turn goes on, and a dark Only starts a
+clock as soon as a face plays again.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (3.3), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("Clocks only").
+
+## Seed 61: the archive and the batch in Clocks only
+
+**Question.** The owner's answer of 2026-11-09 lets uploads in Clocks only go into the
+board's own Clocks folders. The Upload screen takes its rule from `upload-destination.js`,
+but the archive of seed 73 and the batch of seed 80 have storage selectors of their own,
+which disable External by the card alone and never Internal. Do they follow?
+
+**Answer.** Yes: every way of uploading offers in Clocks only the storage of the folder
+explored, and refuses the board's root, through the same rule of `upload-destination.js`.
+A target without `clock_storage` keeps today's card-only rule and words.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (6.5), `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The app").
+
+## Seed 61: the first draw of Clocks only, before the card is taken up
+
+**Question.** At a start in Clocks only the core draws its first clock in `player_start`,
+before the first refresh takes the card up and before a card's file is listed or its index
+read. With a copy on both storages and the card's preferred, the board's copy is then the
+only one the draw can see. Does the start wait for the card?
+
+**Answer.** No. The first draw takes what the core holds then: the board's copy may play
+that first turn, and it plays to its end, as the turn in progress does when a card is put
+in; the card's copy is taken from the next draw on. A show without the board's clocks is as
+before: dark until the card is taken up.
+
+**Resolution.** `core/src/breaks.cpp` (`pick`), `docs/show.md` ("Copies"),
+`tests/core/test_internal_clocks.py` (`Copies`, which looks from the second turn on).
+
+## Seed 61: a face of the board's own storage whose length is not known yet
+
+**Question.** A card's file is in the playlist only once its length is known, and the
+scheduler of Clocks only took a turn without a length for the fault `loop-mismatch`. A
+frames file of the board's own storage learns its length from the check after the start or
+from playing its first loop, so a sound face drawn at the start, before the check came to
+it, would be quarantined. What is done?
+
+**Answer.** In Clocks only a turn of a file of the board's own storage whose length is not
+known yet decodes its first loop to the moment, as the playlist does, and its turn is
+reckoned once that loop's end gives the length. A card's file still has its length before
+it plays, and a turn of one without it is still a fault.
+
+**Resolution.** `core/src/player.cpp` (`clock_only_turn`), `tests/core/test_internal_clocks.py`
+(`test_a_face_whose_length_is_not_known_yet_plays_and_a_fault_gives_way_to_the_next`).
+
+## Seed 61: an Ignore of the board's clock or message during a break
+
+**Question.** An Ignore of a card's clock or message whose break turn plays leaves the
+break, and the playlist goes on where the break was to give way to it. An Ignore of an
+animation of the show whose turn plays went on with the animation after it in the walk,
+which for the board's clock is after the folder `clocks`, not where the break began. Which
+holds for the board's clock?
+
+**Answer.** The card's: an Ignore of the board's clock or message whose break turn plays
+ends the break, and the playlist goes on with the animation the break was to give way to.
+
+**Resolution.** `core/src/player.cpp` (`player_inclusion_changed`),
+`tests/core/test_internal_clocks.py` (`test_ignoring_the_boards_clock_of_a_break_goes_back_to_the_playlist`).
+
+## Seed 61: a removal of the board's file that Clocks only plays
+
+**Question.** When the file whose turn plays is removed, the playlist goes on with the next
+animation of the walk; in Clocks only that restarts the clocks while the removed item is
+still in the item table, so the draw could take it again, or leaves Only dark when the
+walk has nothing. What is done?
+
+**Answer.** As a card's removal: the clocks restart at once. The item that goes is marked
+ignored before it leaves, as a removal of several already does, so the draw cannot take it,
+and the next clock plays from the reply of `remove` on, or Only is dark with `no-clocks`
+when none is left; a `status` in the same poll says so. The removal of another file marks
+Only to be looked at again at the next refresh, as an install does.
+
+**Resolution.** `core/src/storage.cpp` (`storage_remove`), `core/src/player.cpp`
+(`player_item_leaves`), `tests/core/test_internal_clocks.py`
+(`test_a_removal_plays_the_next_face_and_the_last_one_darkens`).
+
+## Seed 61: the fault of the last face of the board's own storage
+
+**Question.** A card's file that fails in Clocks only and leaves no face makes that refresh
+show nothing. A file of the show that fails keeps the picture before for that refresh. Which
+holds for the board's last face?
+
+**Answer.** The card's: in Clocks only, a fault of a file of the board's own storage after
+which nothing plays shows nothing at that refresh, and the LEDs are dark.
+
+**Resolution.** `core/src/player.cpp` (`advance`), `tests/core/test_internal_clocks.py`
+(`test_the_last_face_at_fault_stays_dark`).
+
+## Seed 61: the replies of a show without the board's clocks, byte for byte
+
+**Question.** Requirement 1.4 wants the replies of a show without an internal folder
+`clocks` byte for byte as they are without this seed. How is that held by a test?
+
+**Answer.** Two sessions with the card's clocks, a flat show and a show whose only folder
+is `art`, go through Between, Clocks only, `play` inside and outside, Ignore, `list`, the
+card pulled out and Off. The SHA-256 of all their replies was taken on the core before this
+seed and is kept in the test, the member `clock_storage` taken out, which the next task adds.
+
+**Resolution.** `tests/core/test_internal_clocks.py` (`AShowWithoutClocks`).
+
+## Seed 61: the board's clock taken back in while nothing plays
+
+**Question.** In Between animations, when nothing plays because every ordinary animation is
+ignored, an Ignore taken off an animation of the show plays it at once as a turn of the
+playlist. Is a face or a message of the board's own Clocks subtree taken back in so played?
+
+**Answer.** No. While the clocks are on, it is passed over as every playlist passes over the
+Clocks subtree: an Ignore taken off it starts the playlist's first animation, as one taken
+off a card's file does, and Between stays dark while there is none; the clock plays in the
+breaks. While the clocks are off it plays at once, as any animation does.
+
+**Resolution.** `core/src/player.cpp` (`player_inclusion_changed`),
+`tests/core/test_internal_clocks.py`
+(`test_the_boards_clock_taken_back_in_while_nothing_plays_is_passed_over`).
+
+## Seed 61: the storage of the animation playing in Clocks only is not told by its id
+
+**Question.** Requirement 3.4 and the entry above on the storage of the clock playing now
+say that `status` names a file of the board's own storage with an id of 60,000 or less, so
+that a client tells the storage by the id. The ids of the show's items go from 1 to 65,535:
+a face of the board's own storage may have the id 60,500. Is the rule sound?
+
+**Answer.** Only for folders: a folder of the board's own storage has an id of 60,000 or
+less, and a card's folder one of 60,001 or more, and an animation with an id of 60,000 or
+less is the board's own. The storage of an animation is told by its row of `list`,
+`external`, in the lists of the Clocks folders of both storages. Requirements 3.4 and 6.6
+and the design's bar of the animation playing now say so; the app's `Internal` and
+`External` of task 3 are built on the row, not on the id alone.
+
+**Resolution.** `docs/commands.md` (`clock_only`),
+`docs/specs/61-p2-internal-storage-clocks-and-messages/requirements.md` (3.4, 6.6),
+`docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("The app").
+
+## Seed 61: an APK before this seed in Clocks only with the board's Clocks folder
+
+**Question.** The design says an APK before this seed, on a target whose card has no Clocks
+folder, lists the board's own `clocks` as the Clocks level and plays inside it. Its
+`inClockFolder` takes no row of the board's own storage, `"external":false`, as inside
+Clocks, and its `canEnter` opens only a card's folder. What does it do?
+
+**Answer.** It lists the board's own `clocks` as the level, from `clock_only.folder`, but
+Play is disabled on each of its files, with the words of the boundary, and its sub-folder
+`message` cannot be opened; `Restart clocks`, `play <clock_only.folder>`, is all it can
+do there, and its uploads in Only still need a writable card. The verification of the seed
+and the owner's phone check describe that, and the APK of this seed is delivered with the
+firmware.
+
+**Resolution.** `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md` ("Older
+clients, older firmware"), `app/www/client.js` (`inClockFolder`, `canEnter`) as it is.
+
+## Seed 61: `clocks storage` while the saved clock settings are unreadable
+
+**Question.** Requirement 5.2 refuses the line with `storage-error` while the saved clock
+settings are unreadable. The card's copies are then in force: is `clocks storage sd` a
+choice already in force, answered `{"ok":true}` without a write, or a refusal?
+
+**Answer.** A refusal, as `clocks message on|off` is: the checks come in the order of the
+message line, and the one of unreadable settings comes before the comparison with the
+settings in force. A storage-only line cannot know the mode the file lost, so it writes
+nothing; a mode line writes version 2, the card's copies, and establishes the settings, and
+`clocks storage internal` may follow it. While the settings are unreadable `status` reports
+`"clock_storage":"sd"`, which is what plays.
+
+**Resolution.** `core/src/breaks.cpp` (`breaks_command`), `docs/commands.md` (the clocks
+section), `tests/core/test_internal_clocks.py`
+(`test_each_refusal_comes_in_the_order_of_the_message_lines`).
+
+## Seed 61: a new preferred storage and the orders of the bags
+
+**Question.** The design draws both bags anew at their next draw after `clocks storage`
+changes the choice. Does the retry that reads a version 3 after an unreadable start, which
+also sets the choice, draw them anew?
+
+**Answer.** It need not: while the settings are unreadable no clock or message is drawn,
+and the orders were cleared at the start, so the first draw after the retry draws a new
+order anyway. Only `clocks storage` with a new value sets both orders' sizes to 0; a mode
+or a message line keeps the choice and the orders. A new order matters because two copies
+hold two places of one order: without it, a copy whose place the old choice took could
+come again within the same order under the new choice.
+
+**Resolution.** `core/src/breaks.cpp` (`breaks_command`, `breaks_poll`),
+`tests/core/test_internal_clocks.py`
+(`test_a_change_during_a_messages_turn_lets_it_play_its_whole_loop`).
+
+## Seed 61: the card's copy passed over while the board's copies are preferred
+
+**Question.** Requirement 8.2 lets a draw read the card's index rows of its folder at most
+once, and only while the card's copies are preferred. With `Internal storage` preferred,
+how does a draw tell that a card's file it came to has a copy on the board that plays?
+
+**Answer.** From the card's row it read to judge that file, which `drive_automatic` has
+just read and the drive's two-row cache still holds: its name after `clocks/` or
+`clocks/message/` and its type are compared with the show's animations of the class, in
+the item table in memory, and the file is passed over when one of them plays. No other row
+is read and no mark is written; the marks of the `copy` bits stay the draw's of the card's
+preference alone.
+
+**Resolution.** `core/src/breaks.cpp` (`copyable_row`, `copy_of`, `board_copy_plays`,
+`pick`), `docs/core.md` ("Clocks").
+
+## Seed 61: a test of the retry that reads `clocks.txt` again
+
+**Question.** The task tests a version 3 read by `breaks_poll` after an unreadable start in
+the core's suite. The test host's options fail a file's reads for good (`--read-fails`) or
+only inside a command (`--command-read-fails`); none lets a start fail and a later read of
+the same file succeed. How is it tested?
+
+**Answer.** The test host gains `--read-at-fails-first FILE N`: the first N calls of
+`read_at` for that file return -1, wherever they are made, and the calls after them read
+it. With N of 3 the start and two retries fail and a later retry reads the version 3. It
+is an option of the test host alone; the core is unchanged by it.
+
+**Resolution.** `tests/core/host/host.cpp`, `docs/core.md` (the options of a session),
+`tests/core/test_internal_clocks.py`
+(`test_a_version_3_found_by_the_retry_after_an_unreadable_start_gives_its_choice`).
+
+## Seed 61: the firmware tool and a `clocks.txt` of version 3
+
+**Question.** The task has a firmware test that the firmware tool keeps a `clocks.txt` of
+version 3 through a show install. Does the tool need a change for it?
+
+**Answer.** No. The tool keeps `clocks.txt` by its name and copies its bytes, whatever
+their version, as it keeps one of version 1 or 2; the new test passes on the tool as it
+is and guards that. `docs/firmware.md` names the three settings and says any version is
+kept.
+
+**Resolution.** `tests/firmware/test_storage.py`
+(`test_clocks_with_the_preferred_storage_are_preserved_and_read_back_byte_for_byte`),
+`docs/firmware.md`.
+
+## Seed 61: the Clocks level in the app
+
+**Question.** The design gives Clocks only, while both storages have a Clocks folder, a
+Clocks level of the root that shows only the two Clocks folders, each with its storage. What
+is that level to the rest of the app: its title, the names of its rows, its list, its order
+and its uploads?
+
+**Answer.** It is the root's list, of which only the two rows whose path is `clocks` are
+shown, under the title `Clocks`; each row is named by its storage, `Internal /clocks` and
+`External /clocks`, as an upload's destination is, and its button and its menu say so too.
+The level has no files, so it reads no saved order, and it drops no upload place: its list is
+the root's whole list. In Only the status names the card's Clocks folder as the playlist
+whichever storage's file plays, and both rows have one path: the row of the storage of the
+file playing is marked, as `clockStorageOf` tells it, or while that is not known the row whose
+id the status names; the head of either Clocks folder is marked by the same storage. An upload
+of any kind is refused there, as at the board's root.
+
+**Resolution.** `app/www/client.js` (`CLOCKS_LEVEL`, `askListPart`), `app/www/screens/show.js`
+(`levelOf`, `folderRow`, `rowsState`), `docs/android-app.md` ("Clocks"),
+`tests/app/test_only_both.py`.
+
+## Seed 61: when the app reads the root's list in Clocks only
+
+**Question.** The design reads the root's list in the background to learn the other
+storage's Clocks folder, and takes the trail back when a root's list no longer has one of
+the two. When is it read, and what of a level below the remaining folder?
+
+**Answer.** On a target that reports `clock_storage`, when Only is entered, when the status
+names another folder, and at every refresh of the list while a Clocks folder, not the Clocks
+level, is shown: every ten seconds, as the list itself. The Clocks level's own list is the
+root's. A root's list that has only one of the two drops the Clocks level from the trail; a
+level shown below the folder that remains stays, else the trail goes to that folder. The
+folder that remains is the one the status names while the list names it too, else the one
+the list names: a list read one status before the status names the other folder does not take
+the trail to a folder that is gone. A status that names another folder opens the Clocks level
+while the newest root's list names the other storage's Clocks folder, also when that list
+does not name the folder the status names yet, as when a card with a Clocks folder is put in;
+the Clocks level's own list then tells whether both are there. A folder shown whose storage's
+Clocks folder is gone, while the status names the other storage's, goes where Only opens, not
+through the unavailable Clocks view, which stays for a status that names no folder. On a
+target without `clock_storage` the root's list is not read for it, so a show whose Clocks
+folder is the card's alone asks for nothing more than an older firmware's.
+
+**Resolution.** `app/www/client.js` (`reconcileOnly`, `fitClocks`, `listAgainLater`,
+`askRootPart`), `docs/android-app.md` ("Clocks").
+
+## Seed 61: the storage of a Clocks file that no list the app read named
+
+**Question.** The bar of the animation playing now names the storage of a Clocks file by its
+row of `list`. In Between the root is shown, and in Only a message often plays while its
+folder is not shown: no list the app holds has the row. What does the line say then?
+
+**Answer.** An id of 60,000 or less is the board's own, as `docs/commands.md` says, and needs
+no row. For another, the app reads once for that id and file, in the background after the
+list, the space and the catalog, the root's list and the lists of the file's folder in the
+card and then in the board's own storage, until one names the id; every file of a Clocks
+subtree a list names is kept with its storage until the target changes. A read that gets no
+answer, or is answered `busy`, is made again at a later status; another refusal is not. Until
+it knows, and when no list names it, the line names the file without a storage. The storage
+also keeps a turn of a file of the other storage's Clocks subtree, which has the path of a
+file of the level shown, from reading the level's list again as for a file it lacks.
+
+**Resolution.** `app/www/client.js` (`clockStorageOf`, `askClockRows`, `noteClockRows`,
+`takeStatus`), `app/www/messages.js` (`playingFile`), `app/www/screens/show.js`,
+`app/www/screens/brightness.js`, `tests/app/test_only_both.py`
+(`test_the_storage_of_a_clocks_file_playing_between_the_animations_is_asked_for_once`,
+`test_a_busy_answer_to_the_read_of_a_clocks_files_storage_is_asked_again`,
+`test_turns_of_the_boards_faces_read_the_cards_clocks_folder_no_more_often`).
+
+## Seed 61: the archive and the batch in Clocks only
+
+**Question.** In Only every way of uploading offers only the storage of the folder explored.
+An archive goes to the root of the board's storage, or to its paths on the card, which in
+Only were refused file by file; and the batch's button was enabled where every file would be
+refused. What do they do in Only?
+
+**Answer.** An archive opened in Only goes into the folder explored, of either storage, each
+file under the last part of its path; a name with `/` is refused in words that do not name
+the mode, as the archive keeps that folder after Only is left, as a prepared destination
+stays fixed. An archive opened outside Only goes to the root of the board's storage, or to
+its paths on the card. A file replaced in a folder of the board's own storage is found among
+that folder's rows. The archive's and the batch's buttons are disabled where the Upload
+screen's is, with the same words: at the Clocks level, at the board's root and in a folder
+outside.
+
+**Resolution.** `app/www/screens/archive.js`, `app/www/screens/batch-list.js`,
+`app/www/batch.js`, `app/www/upload-destination.js` (`storageInOnly`, `blocked`),
+`tests/app/test_only_both.py`.
+
+## Seed 61: the words of the panel and of the refusals on either target
+
+**Question.** The design gives new words to the panel and to the Only refusals of `play` and
+`upload`, and keeps today's on a target without `clock_storage`. It names no saved words for
+`Clocks only` on the new target, and the refusals are worded without knowing the target.
+
+**Answer.** On a target that reports `clock_storage`, `Saved: only the clocks folders
+play.`, the description `Clocks only restricts playback to the clocks folders.`, the title of
+a Play outside, and the two refusals name the clocks folders; on another, every word is
+today's. The words of a refusal take whether the target reports `clock_storage` from the
+status, as they take an invalid show's reason, at every place that words a refusal of an
+upload: the Upload screen, the batch and the archive, a text or a clock, and a move. The
+dropdown says what it saved in the panel's one line, as the mode and the message do.
+
+**Resolution.** `app/www/screens/clocks.js`, `app/www/messages.js` (`ofRefusal`),
+`app/www/main.js`, `app/www/screens/author.js`, `app/www/screens/explorer.js`,
+`docs/android-app.md` ("Clocks", "Messages").
+
+## Seed 61: the ids of the seven uploads, and how the board session checks the modes
+
+**Question.** The board session chose `ID1` to `ID7` among the ids that no row of `list`,
+and of `list in` of the folders that `list` shows, had, and then made the two folders. A
+new folder takes the lowest free id, so the first two such ids went to the folders; and a
+walk one level deep misses an animation in a folder two levels down, whose id an upload
+then takes: an upload under the id of an animation of any folder replaces that animation,
+and the folders it empties go. The session also sent `clocks storage sd` without writing
+down the preference it found or giving it back; and with `SD card` preferred, a board
+message whose name the card's `clocks/message` has is a copy that does not play, so the wait
+for it need never end. And the rehearsal was to show a board message after the card's face
+in Only alone, though the session sends `clocks on` too.
+
+**Answer.** The walk lists every folder that a reply of `list` or `list in` shows, at every
+depth, and the seven ids are chosen after both `folder make internal` replies, among the ids
+that no row has and neither reply names; a folder there already answers with its own id.
+The preference found is written down with the brightness, the mode and the message, and
+given back with the mode and the message; the brightness is not raised again, as the
+working rules ask, and the owner is told the value found. The modes are checked with `sd`
+when no row of the card's `clocks/message` has one of the seven names, and with `internal`
+when one has; each wait ends after 20 minutes with the step not done. In Between the board
+message must follow a face that follows an ordinary turn. The walk is made again at the end
+and must list the board's content found at the start. The rehearsal runs every command of
+the session that the emulator takes, in its order, `read-show` aside, whose place the show
+folder's files take, on a card with its catalog and a message of its own and a board with
+an animation two folders down, once for each storage the modes are checked with. It is a
+rehearsal, and is never reported as a deployment.
+
+**Resolution.** `tests/emulator/test_message_rehearsal.py`, the board session's notes and
+"The rehearsal" in `docs/specs/61-p2-internal-storage-clocks-and-messages/design.md`.
+
+## Seed 74: the place of a moved folder, and the app's job if the board's folder move is too large
+
+**Question.** Requirement 5.1 had the entries that `move external` moves go last in the
+destination. The card's catalog orders a folder's sub-folders by the bytes of their names
+(`docs/catalog.md`), a recorded format decision that the converter and the Python library
+keep too, so a folder put last would break it. And a folder's move was designed as a
+stepped job on the board, one commit with every id kept; should that job prove too large
+to build safely, a job of the app would keep neither the folder's id nor one commit. Both
+needed the owner, and task 6 waited for them.
+
+**Answer.** The owner's answers of 2026-11-09. A moved file goes last among the
+destination's files; a moved folder takes its place among the destination's sub-folders by
+its name, and the catalog's format, the converter and the Python library stay as they are.
+The stepped folder job on the board is built first. If it proves too large to build
+safely, a job of the app is allowed instead: it makes the destination folder and moves the
+files one at a time, each keeping its id and its saved settings; the folder gets a new id,
+and a move cut short is finished at the next connection.
+
+**Resolution.** `docs/specs/74-p2-phone-storage-explorer-and-backups/requirements.md`
+(5.1), `docs/specs/74-p2-phone-storage-explorer-and-backups/design.md` (task 6 and the
+tests).
+
+## Seed 74: a folder of the card is moved by the app, not by a stepped job on the board
+
+**Question.** Task 6 was to try the stepped folder job on the board first, one commit with
+every id kept, and to take the job of the app the owner allowed on 2026-11-09 only if the
+board's job proved too large to build safely. Which is built?
+
+**Answer.** The job of the app. The board's job proved too large to build safely within
+the core's frames and the catalog's format: (1) the commit record of a folder would need a
+rename for each file of its subtree, and a line `move <old path> <new path>` takes up to
+206 bytes where a record's line may have 161 (`kCatalogLineRoom`, the arena's
+`OrderReader.line` too), so the record would need a new kind of action that is resolved
+against the new index while it is finished, a change of the record's format that the PC
+library would have to learn; (2) every file of the subtree takes a new path and so, by the
+hash of its name, another page, so the job writes every page from a pass over every old
+page, as a rebuild does, while the player and the commands go on; (3) the job would
+repeat the rebuild's eight phases with a second plan of the table and the map, kept in the
+rebuild's fields, each phase cut at every storage call in its tests; (4) the frames of the
+catalog's changes were at up to 480 bytes of the 512 before task 6 (g++ -O2 and the
+checked build), and a file's move alone, with up to four files of folders in one change,
+needed four of them split so that each stays at 480 at most. So
+`move external <id> <path>` moves one file in one commit, with its id, its saved settings
+and its place last among the destination's files; `move external` of a folder's id is
+`in-use`; and the app moves a folder of the card as the owner allowed: it makes the
+destination's folders from the top with `folder make external`, gives each the Ignore of
+the folder it stands for, and moves the files one at a time with `move external`, each
+keeping its id and its saved settings. The new folder has its own id, the move is not one
+commit, and a job cut short is finished at the next connection from the job the phone
+keeps. The source's folders go as their last files leave them, by the prune a removal
+makes. Once the folder goes, the board plays the root's playlist, as after a removal, and
+the Clocks-only boundary is judged again at each file's move, as at a removal; the app then
+plays the folder's new place when its playlist, or that of a folder below it, was current
+(see "the playlist of a moved folder follows it" below).
+
+**Resolution.** `core/src/catalog.cpp`, `core/src/moving.cpp`, `core/src/commands.cpp`,
+`app/www/moves.js`, `app/www/screens/explorer.js`, `docs/commands.md`,
+`docs/android-app.md`, `docs/catalog.md`, `tests/core/test_move_external.py`,
+`tests/app/test_moves.py`.
+
+## Seed 74: the order of the refusals of `move external`
+
+**Question.** Which refusal does `move external` give when more than one applies, and what
+does it give for an item's id, a folder's id and a file that is in the folder already?
+
+**Answer.** The order of the error table of `docs/commands.md`: `bad-argument` for the form,
+`show-invalid`, `busy`, `unknown-id` for an id that is no file of the card (an item of the
+show among them, since an item's id means the item) and for a destination the card has not,
+`in-use` for a folder's id of either storage, `bad-argument` for a new path over 100 bytes,
+`in-use` for a name of the destination that is the file's in any case, `read-only`, then
+`storage-error`. A file in that folder already answers `moved:false` before the
+destination's names are looked at, also on a card the board may not write, since nothing is
+written; a card without a catalog answers `read-only` once the id and the folder are known.
+
+**Resolution.** `core/src/catalog.cpp`, `core/src/catalog.h`, `docs/commands.md`,
+`tests/core/test_move_external.py`.
+
+## Seed 74: the journal of a move is on the card
+
+**Question.** The design put the saved settings of a moved file behind a journal
+`moving.txt` written before the commit and named no storage for it. Where does it go?
+
+**Answer.** On the card, `drive/moving.txt` through `drive/moving.part`. Its generation is
+the card catalog's, and a card may be pulled after the commit: on the card the journal
+travels with the move and is finished when that card is mounted again, while one on the
+board would be dropped by the mount of any other card, and would be a file of the board's
+folder that the firmware tool does not know. The mount finishes it when the catalog is of
+its generation and has a file of its new path, and removes it otherwise; a stray
+`moving.part` is removed at the mount as a stray `upload.part` is. The settings are given
+to the new path only while a line of the old one is there, so a journal finished again
+changes nothing, and the lines of the new path that a removed file left are dropped then.
+
+**Resolution.** `core/src/moving.cpp`, `core/src/catalog.cpp`, `docs/catalog.md`,
+`tests/core/test_move_external.py`.
+
+## Seed 74: the commit record's `move <name> upload.part`, read by the PC library too
+
+**Question.** A file's move renames it through `upload.part` in two actions, since `move
+<old> <new>` passes the 161 bytes of a record's line. A card's name may hold spaces, and the
+PC library read `move <from> <to>` with `<from>` up to the first space, so a card with a
+move's record left by a cut would be finished wrongly on a computer. The owner answered on
+2026-11-09 that the catalog's format and the Python library stay as they are, about the
+order of moved folders. Is the record's new line read on a computer?
+
+**Answer.** Yes. `parse_do` of `odrig/catalog.py` takes a line that ends in ` upload.part`
+as the move of the name before it onto the part, as the core does, so that the board and
+the PC tool finish such a record alike. No name of a catalog ends in `upload.part`, as each
+ends in `.odrg` or `.odrgx`, so the line is never the second action, also for a name that
+begins with `upload.part`, such as `upload.part.odrg` or `upload.part x.odrg`, which the
+card's naming rule allows. Nothing the PC tool writes changes, and the order of folders is
+as it was. A firmware or a PC tool older than the action reads such a record as not whole,
+leaves the change undone and removes the stray `upload.part`, which then holds the file:
+a card a cut left in the middle of a move is finished by a board that has `move external`,
+or by this PC tool, before an older one takes it, as `docs/catalog.md` says. The owner is
+told.
+
+**Resolution.** `odrig/catalog.py`, `core/src/catalog.cpp`, `docs/catalog.md`,
+`tests/core/test_move_external.py` (`Record`).
+
+## Seed 74: what a move leaves where
+
+**Question.** The design left open what stays behind a move: the card's emptied
+directories, empty folders of a moved subtree, a folder of the board's own storage moved
+inside it, a file given another name on the card, and the files a stopped folder's job did
+not reach.
+
+**Answer.** The board renames files on the card and never a folder, and no command removes
+a folder, so a directory emptied by moves stays on the card, out of the card's index. A
+folder of a moved subtree that never held a file is made at the destination and stays at
+the source, with the folders above it, and the end of the move says the source stays. A
+folder of the board's own storage is moved to the card only: a move inside the board's
+storage, with every id kept, is the approved seed of `move internal`, and the preview says
+so. A file of the card given another name in the preview is moved by the job of part A,
+since `move external` keeps a file's name, and takes a new id. `Stop` ends a folder's job
+after the file under way and forgets it: its other files stay where they are and are not
+moved at the next connection, as a stopped run of files is not.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`,
+`docs/microsd.md`, `docs/firmware.md`, `tests/app/test_moves.py`.
+
+## Seed 74: a folder's job cut short, refused or taken up again
+
+**Question.** The app's job of a folder moved its files one at a time and, whatever a file
+met, passed to the next one and forgot the job at its end. So a lost link failed every file
+left at once and forgot the job, which the owner's allowance of 2026-11-09 says is finished
+at the next connection; a folder the board refused to make left the job on the phone for
+good, and its taking up again failed and was asked again at once, without end. Which
+failures end a job, which keep it, and when is a kept job taken up?
+
+**Answer.** A failure of the way, no answer and no Wi-Fi, a request withdrawn as the app
+was hidden, and another target chosen cut the job short: the file under way and those
+after it stay in the job, the one under way first, and the end says that they move when the
+app reaches the installation again. A reply that is not a reply, and a refusal of the
+board or of the app's own checks, end the file alone, which is said, and the next file is
+moved. A refusal of `folder make` ends the folder's job, which is forgotten and said, the
+folders made before it staying empty until a folder can be removed (the approved seed of
+`folder remove`). A job is taken up again when the target answers after it did not, or
+when the app is shown again after it was hidden, never at once after it failed, and a
+job's requests are sent only while the target it began with is chosen, so none reaches a
+spare board that has the same card. Taking up a job says what it finished, what failed
+with why, what it gave up with why, and what waits again. `Stop` still forgets the job.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `app/www/messages.js`,
+`docs/android-app.md`, `tests/app/test_moves.py` (`Jobs`, and a kept job the board
+refuses), `tests/app/page/scenarios/move-jobs.js`.
+
+## Seed 74: a lost reply of `move external` is sent once more
+
+**Question.** `move external` answers `moved:false` for a file in that folder already, so
+that a line sent again changes nothing. Does the app send it again when its reply is lost?
+
+**Answer.** Once, when the reply did not come. Both answers then mean the file is in its
+new folder. A second silence fails the file, or cuts a folder's job short as above, and the
+list shows where the file is.
+
+**Resolution.** `app/www/moves.js`, `docs/android-app.md`, `tests/app/test_moves.py`.
+
+## Seed 74: a move inside the board's own storage keeps the file's id
+
+**Question.** The design (the app, and 8.15 of the design of part B) says a move inside the
+board's storage uploads under the same id, which keeps it, and that the job gives the
+settings again. The job gave such a file a new id, as a move between the storages does.
+The board keeps a file's saved brightness and repeat by its stored name, which an upload
+into another folder changes, and it leaves the old name's lines behind. In which order are
+the settings carried?
+
+**Answer.** The job uploads the file under its own id to its new path, which moves it there
+and keeps its id and its Ignore. Before the upload it takes the saved brightness and
+repeat from the file with `brightness <id> default` and `repeat <id> default`, keeping them
+in the job on the phone, and gives them to it again after the upload, so no line of the
+old stored name stays to be given to a later file of that name. A refused upload gives
+them back at once; a job cut short that the next connection finds not moved gives them
+back then. A folder of the board's own storage is still not moved inside it.
+
+**Resolution.** `app/www/moves.js`, `docs/android-app.md`,
+`tests/app/test_internal_folders.py`.
+
+## Seed 74: the playlist of a moved folder follows it
+
+**Question.** The design had the current playlist follow a folder moved inside the card.
+With the folder moved by the app, the source folder goes with its last file and the board
+plays the root's playlist. Does the playlist follow?
+
+**Answer.** Yes, by the app. When the move begins, the status says which playlist is
+current; when it is the moved folder's or one below it, of the same storage, the job keeps
+the new path. Once every file of the job has moved, the app asks for the status and plays
+the new folder's playlist with `play <id>` when the board plays the root's or still that
+folder's; when another playlist was chosen meanwhile, it is left. A refusal, such as the
+boundary of Clocks only, leaves the root's playing.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`,
+`tests/app/test_moves.py`.
+
+## Seed 74: two selected folders of one name
+
+**Question.** Two selected folders of one name, one of each storage, planned into one
+destination took the same path, and the second's files went into the first's. What does
+the preview do?
+
+**Answer.** It skips the later one, "Another selected folder takes this name", with a field
+for another name, as for a name the destination has; names compare in any case, as the
+card's do.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`,
+`tests/app/test_moves.py`.
+
+## Seed 74: the stack of `move external` on the board
+
+**Question.** The owner asked for designs that cost the core no memory. `move external`
+holds the old and the new name and two edits of folders' files while its commit runs, so
+its chain of frames is deeper than any command's before it, while the build's check sees
+each frame alone (512 bytes). How deep is it, and what is done about it?
+
+**Answer.** The checks of the move are made in a frame of their own, gone before the
+commit, and so is what follows it; the line of the record's end is a constant, not on the
+stack. With the board's compiler at `-Os` and `-fstack-usage`, the chain from
+`command_answer` to a rename of the commit is 416 + 432 (`catalog_move`) + 416
+(`move_committed`) + 208 (`commit_change`) + 208 (`finish`) + 272 (`read_record`) + 208
+(`take_action`) + 256 (`act`) = 2,416 bytes, where `folder make external`'s is 2,064; the
+old and new names and the four edits are what the move needs and stay. The figure is in
+`docs/core.md`; the margin of the task that runs the commands on the board, the web
+server's for a request, is the board's to see, at the delivery.
+
+**Resolution.** `core/src/catalog.cpp`, `docs/core.md`.
+
+## Seeds 61 and 74: moves in Clocks only
+
+**Question.** Seed 74's `Move to…` offers every folder of both storages, and `move external`
+and `folder make` are no uploads, so the boundary of Clocks only, which seed 61 holds over
+the Clocks folders of both storages, did not reach them: a face could be moved out of
+Clocks. Where may a move go in Only, and what of a move under way or cut short when Only
+comes?
+
+**Answer.** Where an upload may go: a Clocks folder or one below it, of the card, and of the
+board's own storage on a target that reports `clock_storage`. The dialog offers only those,
+a storage without one disabled, with the words of the boundary of uploads. A file or a
+folder job that meets a confirmed Only is refused before anything is sent, `in-use` in those
+words, as an upload is; a move cut short whose destination is outside waits, kept on the
+phone, until Only is left, since finishing it would take its files out of Clocks.
+
+**Resolution.** `app/www/client.js` (`canMoveInto`), `app/www/moves.js`,
+`app/www/screens/explorer.js`, `app/www/messages.js`, `docs/android-app.md`,
+`docs/commands.md`, `tests/app/test_only_both.py`.
+
+## Seeds 61 and 74: a kept move in Clocks only that moves nothing
+
+**Question.** A move cut short whose destination is outside Clocks waits in Clocks only
+until the mode is left. All the kept moves of the target waited when one of them did, and
+a move that would move no file waited too: a file of the board's own Clocks folder moved
+under its own id, whose upload was cut before it installed the file, would only be given
+back the saved brightness and repeat the move took from it before the upload. Meanwhile it
+played in Only without them. A move between the storages cut after its settings were
+carried waited with its old file in Clocks without them as well. Which kept moves end in
+Only, and what does one that waits keep?
+
+**Answer.** Each kept move is judged alone. One whose new file was never installed ends as
+not moved in Only too, as outside it, a file moved under its own id given back its saved
+settings: nothing leaves Clocks. One whose new file is there, or a folder's, waits until
+Only is left, and the others go on. A move between the storages that waits gives its old
+file, while that file is still where the move found it, the saved brightness and repeat it
+carried from it, and takes them again when it finishes.
+
+**Resolution.** `app/www/moves.js` (`reconcile`, `closed`, `giveBack`),
+`app/www/screens/explorer.js`, `docs/android-app.md`, `tests/app/test_moves.py`,
+`tests/app/test_only_both.py`.
+
+## Seeds 61 and 74: a moved folder's playlist and the Clocks folders
+
+**Question.** When the playlist that plays is a folder's that is moved, the app plays the
+folder's new place once it is gone. Between animations the files of a Clocks folder play as
+clocks and never as a playlist: the card's Clocks folder is passed over, and the files of
+the board's own Clocks folder are clocks while the clocks are on. A folder moved into either
+was played there all the same; the board played the root's in its place while its status
+named the moved folder as the playlist, and the app said that the playlist plays there.
+Does the playlist follow a folder into a Clocks folder?
+
+**Answer.** Not while the clocks play between animations: the new place is in the card's
+Clocks folder, or in the board's own on a target that reports `clock_storage`, and the
+root's plays on, as the board chose, with nothing said of the playlist. With the clocks off
+the Clocks folders are ordinary folders and the playlist follows, and in Clocks only it
+follows a folder moved inside Clocks, as before.
+
+**Resolution.** `app/www/moves.js` (`follow`), `docs/android-app.md`,
+`tests/app/test_moves.py`.
+## Seed 74: a lost reply of a download's or a backup's read is sent again
+
+**Question.** On the emulated phone about one reply in ten was lost, and one lost reply
+ended a whole `Download`, which may need thousands of reads of 720 bytes: the job asked again
+only for a request withdrawn while the app was hidden. In `Download selected` it failed the
+file, and ended the backup while the selected folders or the catalog's generation were read.
+Is a request whose reply did not come sent again?
+
+**Answer.** Yes. Every request of a download or a backup only reads: `read`, the probe
+`read <id> 0 1`, `list` and `list in`, `saved` and `catalog`; one sent again changes nothing
+on the installation. One whose reply does not come, the client's `no-answer`, is sent again,
+up to three times in all, before the file fails or the run ends as it did, in the same words.
+Three, not the once of `move external`, because a download sends many more lines, each of
+which waits up to five seconds for its reply; the count is for each request, so lost replies
+of different requests do not add up. A refusal is the installation's answer and is never
+sent again; `no-wifi` and a reply that is not one are not lost replies and end as before;
+`Stop`, a change of target and a request withdrawn while the app was hidden keep their
+meaning, and the probe still falls back to 600 bytes after `bad-argument`. Whether replies
+are lost on the installation's own Wi-Fi is for the board to show.
+
+**Resolution.** `app/www/backups.js`, `docs/android-app.md`, `tests/app/test_downloads.py`,
+`tests/app/page/scenarios/downloads.js`.
+
+## Seed 74: a file whose read lost a reply is still checked against its catalog's key
+
+**Question.** The entry "Seed 74: a lost reply of a download's or a backup's read is sent
+again" lets a read go on after a lost reply. The client forgets every key when the target
+answers again after a silence, and asks for `catalog` again only after the download's own
+requests that wait; a file is checked against the key the app knows at the end of its read.
+After a lost reply near the end of the file no key was known then, and a file whose bytes
+are not the ones its catalog names was saved, in a backup as `saved`. Which key is a file
+checked against?
+
+**Answer.** The key the app knows once the file is read, or, when it knows none then, the
+one it knew before the first piece. The keys are forgotten after a silence because another
+storage may answer now; a file whose pieces came from two storages is then not the file of
+the key from before, and fails, which is what the check is for. The client still forgets the
+keys as before: only the job keeps the one of the file it reads.
+
+**Resolution.** `app/www/backups.js`, `docs/android-app.md`, `tests/app/test_downloads.py`,
+`tests/app/page/scenarios/downloads.js`.
+
+## Seed 74: lost replies are counted for each line
+
+**Question.** The entry "Seed 74: a lost reply of a download's or a backup's read is sent
+again" says that the count is for each request, so that lost replies of different requests
+do not add up. One request of the client's may send more than one line: the probe
+`read <id> 0 1` and then the first piece, or after `bad-argument` the piece, the probe again
+and the piece of 600 bytes. Their lost replies were counted together, so a probe whose reply
+was lost twice ended the download at the first lost reply of the piece, sent only once. What
+is counted?
+
+**Answer.** Each line: a request is sent again until the reply of one of its lines was lost
+three times. Each send again follows a lost reply, which adds to the count of its line, so a
+request is sent again at most twice for each of its lines before one ends it. A failure on the way
+names the line it was met for, as a refusal already does.
+
+**Resolution.** `app/www/backups.js`, `app/www/commands.js`, `app/www/target.js`,
+`docs/android-app.md`, `tests/app/test_downloads.py`.
+
+## Seed 74: `saved` is still asked again after `busy` in a backup
+
+**Question.** The entry "Seed 74: a lost reply of a download's or a backup's read is sent
+again" says that a refusal is the installation's answer and is never sent again, and
+`docs/android-app.md` said it is not asked again. A backup asks `saved` again after `busy`,
+up to five times half a second apart, as the same page says. Which holds?
+
+**Answer.** Both, each for its own reason. A refusal never has a request sent again as a
+lost reply does; only `saved` is asked again, after `busy`, because the board answers `busy`
+until it has read what it keeps. `docs/android-app.md` now says so; the code is as it was.
+
+**Resolution.** `docs/android-app.md`.
+
+## Seed 74 with seed 82: over USB serial a line whose reply is lost is not sent again
+
+**Question.** The entry "Seed 74: a lost reply of a download's or a backup's read is sent
+again" sends a request again when its reply did not come, up to three sends of each line.
+It was made over Wi-Fi, where every line is a request of its own and a reply that comes too
+late has nowhere to go. Over the board's USB serial port, seed 82, the app drops what the
+port holds before it writes a line and takes the first whole reply that comes after it, and
+a status that is due goes before the job's next line. A reply of a piece that came after the
+client's limit was taken by the status, and the piece sent again took the status's reply,
+which ended the download as `bad-reply` with the words of a target that is no odrig
+installation. Is a line sent again over USB serial?
+
+**Answer.** No. Over USB serial a line whose reply did not come is not sent again: its
+first silence ends a download, or fails the file of a backup, as the third does over
+Wi-Fi, in the words of no answer over USB serial. A reply that comes late over the cable
+can only be told from the next line's by its fields, which the client does not compare, and
+matching replies to lines is a change of the link, not of the job. Over Wi-Fi nothing
+changes.
+
+**Resolution.** `app/www/backups.js`, `docs/android-app.md`, `tests/app/test_downloads.py`,
+`tests/app/page/scenarios/serial-downloads.js`.
+## Seed 85: no stepped card folder move enters the refusals of `folder remove`
+
+**Question.** The seed refuses `folder remove` `busy` while the board moves a card folder in
+steps, "if seed 74's task 6 builds that stepped move". Does it?
+
+**Answer.** No. Seed 74's task 6 moved a folder of the card with a job of the app, the
+fallback the owner allowed on 2026-11-09, and the board holds no move of a folder between
+two lines. So no such condition is judged, on either storage.
+
+**Resolution.** `core/src/catalog.cpp`, `core/src/folders.cpp`, `docs/commands.md`.
+
+## Seed 85: an id above 60,000 while the card's catalog is read
+
+**Question.** The card's refusals give `busy` while its catalog is read. While it is read
+the core has not published the card's index, so it cannot tell whether an id of the card
+names a folder, an animation or nothing. What does `folder remove` of such an id answer?
+
+**Answer.** `busy`: an id above 60,000, the highest id of the board's own storage, can only
+be the card's, and the card's answer waits for its catalog. The id of a folder of the card
+is `unknown-id` while the card is out, as for every command. On the test host and in the
+emulator a card's catalog is read within the refresh that notices the card, so no line
+arrives while it is read and no test reaches this `busy`, nor that of `folder make
+external`; the test of the card that is out stands for it.
+
+**Resolution.** `core/src/content.cpp`, `docs/commands.md`,
+`tests/core/test_folder_remove.py`.
+
+## Seed 85: a test that shows makes `folder remove` of the card `busy`, not of the board
+
+**Question.** The card's refusals name a test of the mapping that shows; those of the board's
+own storage do not. Is a folder of the board's own storage removed while a test shows?
+
+**Answer.** Yes, as the seed lists the conditions: the board's storage is refused `busy`
+only while an upload is open or a rebuild runs, the two that hold the chunk buffer through
+which `folders.txt` is written, as for `folder make internal`. The card's conditions are
+those of `folder make external`.
+
+**Resolution.** `core/src/folders.cpp`, `core/src/catalog.cpp`, `docs/commands.md`.
+
+## Seed 85: the card's `rmdir`, how it is checked and where it is written down
+
+**Question.** The seed gives a folder of the card that is not empty -1 without
+`capacityWriteFailed()`, and names the firmware host suite for its test and
+`docs/firmware.md` for its words. FAT may answer a folder that is not empty with a refusal
+other than `ENOTEMPTY`, and the card host's code is built for the board only; where is it
+tested, and where described?
+
+**Answer.** Any failure to remove a folder gives -1 without `capacityWriteFailed()`: the
+core asks `remove` of a folder only after the index let it go, and a folder that stays is
+what the seed allows, whatever FAT calls the refusal. A missing folder is not a folder to
+`stat`, so it falls to `unlink` and gives 0 as before. The card host's code is checked as
+the rest of it is, in its source by the firmware suite (`tests/firmware/
+test_usermod_drive.py`), since no host build of it exists; the firmware host suite builds
+and verifies images and is run as it is. The card's changes are described in
+`docs/microsd.md`, so the removal is written there, not in `docs/firmware.md`.
+
+**Resolution.** `firmware/usermod/odrig_drive.cpp`, `tests/firmware/test_usermod_drive.py`,
+`docs/microsd.md`.
+
+## Seed 85: `Remove folder` before the app knows the card, and after a lost reply it cannot check
+
+**Question.** The seed names two states of a folder of the card: a card the board may write,
+with `Remove folder`, and one it may not, with the note that it is read-only. Until `space`
+and `catalog` have answered, the app knows neither; and after a reply that did not arrive,
+the list it reads to see whether the folder went may fail too. What does the app say then?
+
+**Answer.** Until the app knows whether the board may write the card, the action is there,
+disabled, under `Whether the card can be written is not known yet.`: calling the card
+read-only before it is known would be wrong. After a lost reply whose level cannot be read
+either, the app says that whether the folder was removed is not known yet and reads the
+list again; it never sends the line again by itself.
+
+**Resolution.** `app/www/screens/explorer.js`, `docs/android-app.md`.
+## Seed 86: how the core knows the current playlist is in the moved subtree
+
+**Question.** The current playlist's path follows the move when it is the moved folder or a
+folder below it. The core keeps the current internal playlist by its number; how does it
+know, without keeping the subtree's numbers, that the current one is in it?
+
+**Answer.** By its line's index, which the record of the current folder holds as its first
+rank before the move: the subtree is the lines from the folder's index to the last of its
+subtree, found by the plan's reading. After the rename `folders_derive` finds the current
+folder again by its number, which stays, and its new path is read by that number into
+`playlist_path`; `save_due` writes `playlist.txt` at the next refresh, as the seed says. A
+cut before that leaves the old path there, which the next start does not find and so plays
+the root, as for a playlist that is gone.
+
+**Resolution.** `core/src/folders.cpp`, `tests/core/test_folder_move.py`.
+
+## Seed 86: the command tool and `/` for `move internal`
+
+**Question.** `move external` takes `/` for the card's root, as its path names the
+destination folder. `move internal` takes the folder's new full path, which is never the
+root. What does the command tool do with `move internal ID /`?
+
+**Answer.** It refuses it with its usage, status 2, and sends nothing, as for any other
+form it does not take: the board would answer `bad-argument`. The emulator's sources are
+unchanged; its line reaches the core as every line does.
+
+**Resolution.** `odrigctl/cli.py`, `docs/emulator.md`, `tests/emulator/test_tool.py`,
+`tests/emulator/test_folder_move.py`.
+
+## Seed 86: the app's moves inside the board's storage, and the old skip
+
+**Question.** Seed 74's `Move to…` skipped a folder of the board's own storage with a
+destination there ("not moved inside Internal storage"). Seed 86 moves it by `move internal`.
+Which checks does the preview keep for it, and which go?
+
+**Answer.** It keeps those of the destination: into itself or below it, there already, the
+name the storage does not take, a name the destination has in any case, another selected
+folder of that name, and a folder of it past three levels or 93 characters; and it adds a
+file of it whose path would pass 100 characters, which keeps the whole folder in place, as
+the board would refuse it. The checks of a file moved alone, a cycle that lists it or a size
+not known yet, go: no file is sent, and its stored name stays. Such a move keeps no job on
+the phone, so a reply that does not come ends with the list showing where the folder is.
+`Move to…` from a folder's own menu offers Internal storage alone and shows a destination that
+cannot take the folder disabled with its reason, in the chooser itself.
+
+**Resolution.** `app/www/moves.js`, `app/www/screens/explorer.js`, `docs/android-app.md`.
+
+## Fused: seed 86's folder moves inside Clocks in Clocks only
+
+**Question.** On the branch of every unmerged seed, Clocks only keeps the files the app
+moves inside Clocks (seed 66's boundary, over both storages by seed 61). Seed 86's
+`move internal`, sent by `Rename…`, by `Move to…` of one folder and for selected folders
+moved inside the board's storage, went past that check: the board's `clocks` folder could be
+renamed out of Clocks. What does the app do?
+
+**Answer.** The folder's new full path must be a place Clocks only lets files into
+(`client.canMoveInto`), as a destination of a file's move must: a rename or a one-folder move
+that would leave Clocks says so in Clocks only's words and sends nothing, and a selected
+folder that would leave it is failed with the same words. `Move to…` of one folder offers the
+Clocks folders alone, as the chooser already did.
+
+**Resolution.** `app/www/screens/explorer.js`, `docs/android-app.md`,
+`tests/app/test_only_both.py`, `tests/app/page/scenarios/only-folder-moves.js`.
 
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 

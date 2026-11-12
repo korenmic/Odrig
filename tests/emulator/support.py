@@ -317,6 +317,15 @@ class Emulator:
         if kept is None:
             kept = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
             try:
+                deadline = time.monotonic() + 2
+                while True:
+                    try:
+                        kept.connect()
+                        break
+                    except OSError as error:
+                        if getattr(error, "winerror", None) != 10055 or time.monotonic() >= deadline:
+                            raise
+                        time.sleep(0.05)
                 status, reply, closing = self._exchange(kept, body)
             except BaseException:
                 kept.close()

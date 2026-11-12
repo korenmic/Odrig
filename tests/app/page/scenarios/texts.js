@@ -5,8 +5,9 @@ export const withoutTheApp = true;
 export default async function (app) {
   const messages = await import("/messages.js");
   const refusals = {};
-  for (const [code, line, reason] of app.settings.refusals) {
-    refusals[`${code} | ${line} | ${reason}`] = messages.ofRefusal({code, line}, reason);
+  // A fourth member asks for the words of a target that plays the clocks of both storages.
+  for (const [code, line, reason, both] of app.settings.refusals) {
+    refusals[`${code} | ${line} | ${reason}${both ? " | both" : ""}`] = messages.ofRefusal({code, line}, reason, both === true);
   }
   const failures = {};
   for (const [kind, detail] of app.settings.failures) {

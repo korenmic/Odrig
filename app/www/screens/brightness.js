@@ -1,6 +1,7 @@
 // One edit flow for the slider, numeric value and saved animation preference.
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
+import {playingFile} from "../messages.js";
 
 const EVERY_MS = 200;
 const RESTS_MS = 1000;
@@ -112,7 +113,7 @@ export function draw(state) {
   box.indeterminate = !fresh;
   box.disabled = !canSave || pending !== null || modeChanging;
   byId("level-label").textContent = current.override ? "This animation\u2019s brightness" : "Default brightness";
-  say("level-file", typeof status?.file === "string" ? `Animation ${status.animation}: ${status.file}` : null);
+  say("level-file", typeof status?.file === "string" ? `Animation ${status.animation}: ${playingFile(status, client.clockStorageOf(status))}` : null);
   let explanation = note;
   if (!fresh) explanation = "Brightness setting unknown. Waiting for fresh status.";
   else if (dimming == null) explanation = "This target does not support saved animation brightness. The default can still be changed.";

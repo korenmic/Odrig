@@ -65,6 +65,7 @@ def parser():
     install.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.SETTLE_SECONDS, help="how long to wait after the restart for the board's reply and for it to read its animations (default: 300)")
     install.add_argument("--dry-run", action="store_true", help="say what would change and write nothing")
     install.add_argument("--keep-copies", metavar="DIR", type=pathlib.Path, help="copy every file the install removes or replaces, as the board holds it, into a folder that is new or empty, before anything is written")
+    install.add_argument("--replace-folders", action="store_true", help="remove the files of the board's internal folders that the folder does not have, and their lines of folders.txt with them")
     recover = commands.add_parser("recover-storage", help="finish or give up a change of the board's storage that was cut")
     recover.add_argument("--port", metavar="P", help="the board's USB serial port")
     recover.add_argument("--whole", action="store_true", help="write the new image of the change whole: the last resort when storage changed since the change began")
@@ -420,9 +421,19 @@ def _install_show(arguments):
     try:
         present = storage.show_of(before)
         for name in storage.KEPT_NAMES:
+            if name == storage.FOLDERS_NAME and arguments.replace_folders:
+                # The board's folders go, and the number its next folder takes stays.
+                header = storage.folders_header(present.get(name))
+                if header is not None and name not in files:
+                    files = dict(files, **{name: header})
+                continue
             if name in present and name not in files:
                 # Operator settings are kept unless the folder explicitly replaces them.
                 files = dict(files, **{name: present[name]})
+        removed = storage.folder_files_removed(present, files)
+        if removed and not arguments.replace_folders:
+            raise Failure("folders-present", f"the install would remove the files of the board's internal folders: {', '.join(removed)}; "
+                                             "move them to the root or the card first, or give --replace-folders")
         files = storage.with_board_generation(files, present)
         for line in show_lines(present, files):
             print(line)

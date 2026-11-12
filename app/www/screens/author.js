@@ -2,6 +2,7 @@
 // drawn as the player draws it, and uploading it as a new animation; and editing one that
 // is installed, read back from the target and saved in its place.
 
+import * as batch from "../batch.js";
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
 import {NotConverted, makeContainer, pictureOf, readContainer} from "../convert.js";
@@ -9,7 +10,7 @@ import {crc32} from "../crc32.js";
 import * as messages from "../messages.js";
 import * as previews from "../previews.js";
 import {Failure} from "../target.js";
-import {fileName, fits, freeId, textName, uploading} from "../upload.js";
+import {fileName, fits, freeId, showChecking, textName, uploading} from "../upload.js";
 import {answers, extend, isEditable} from "./show.js";
 
 // The ending of a container, and how often the preview draws its next picture.
@@ -38,9 +39,10 @@ function byId(id) {
 }
 
 // Whether an upload cannot begin now: one is under way, another job holds the target, or
-// the target does not answer.
+// the target does not answer, or its installed names are still being read.
 function locked() {
-  return sending !== null || client.contentBusy() || client.state.link !== "answers";
+  return client.clocksOnly() || sending !== null || client.contentBusy() || client.state.link !== "answers" ||
+    (editing === null && client.state.rootNames === null);
 }
 
 // A colour of a colour field, `#rrggbb`, as the integer of the JSON sources.
@@ -166,7 +168,16 @@ function draw() {
     remake();
     return;
   }
-  byId("author-upload").disabled = made === null || reading || locked();
+  const button = byId("author-upload");
+  button.disabled = made === null || reading || locked();
+  byId("author-names").hidden = editing !== null || client.state.rootNames !== null;
+  byId("author-boundary").hidden = !client.clocksOnly();
+  byId("author-boundary").textContent = client.clocksOnly() ?
+    "Clocks only: this form saves to internal storage outside Clocks. Leave this mode in Settings to upload or save it." : "";
+  // While a batch runs, the line under the button says so.
+  const reason = byId("author-locked-reason");
+  reason.hidden = button.hidden || !batch.running();
+  reason.textContent = reason.hidden ? "" : "A batch upload is under way.";
 }
 
 // What the form is about: its title and the words of its button.
@@ -296,7 +307,7 @@ function close() {
 // Uploads the text or the clock that was made as a new item with the lowest free id and a
 // file name made from a text's first words, or `clock-<kind>`; or, for one that is edited,
 // in the place of its file, while that file is still the one that was read.
-function upload(message) {
+async function upload(message) {
   if (made === null || locked()) {
     return;
   }
@@ -306,9 +317,22 @@ function upload(message) {
     message(messages.ofNoSpace(bytes.length, state.space.free));
     return;
   }
-  const named = state.rootNames ?? {ids: [], files: []};
+  const named = state.rootNames;
   const saving = editing;
-  const id = saving !== null ? saving.id : freeId(new Set(named.ids));
+  // A new item's id is free among the root's and those of the folders of the board's own
+  // storage, which the root's list holds no item of. An edited one keeps its id and its file,
+  // and is saved while the root's names may still be read.
+  let taken = saving === null ? named.ids : [];
+  if (saving === null && named.internal === true) {
+    try {
+      taken = taken.concat(await client.takenIds());
+    } catch (error) {
+      message(error instanceof Failure ? messages.ofFailure(error) : error instanceof Refusal ? messages.ofRefusal(error, null) : error.message);
+      return;
+    }
+    if (made === null || locked() || sending !== null) return;
+  }
+  const id = saving !== null ? saving.id : freeId(new Set(taken));
   const base = kind === "text" ? textName(made.source.text) : `clock-${made.source.widget}`;
   const file = saving !== null ? saving.file : fileName(base, new Set(named.files), ENDING);
   const shown = byId("author-uploading");
@@ -316,13 +340,20 @@ function upload(message) {
   shown.textContent = "Sending: 0%";
   byId("author-upload").hidden = true;
   byId("author-cancel").hidden = false;
+  let stopChecking = () => {};
+  // The preview of the bytes is made as they are sent, and kept when they are installed.
+  const making = previews.makeOwn(bytes);
   sending = uploading(
-    {id, file, bytes, expect: saving === null ? null : saving.crc},
+    {id, file, bytes, create: saving === null, expect: saving === null ? null : saving.crc},
     {
       report(part) {
         shown.textContent = `Sending: ${Math.floor(part * 100)}%`;
       },
+      checking(since) {
+        stopChecking = showChecking(shown, since);
+      },
       end(how) {
+        stopChecking();
         sending = null;
         byId("author-upload").hidden = false;
         byId("author-cancel").hidden = true;
@@ -331,12 +362,17 @@ function upload(message) {
           // What is on the target now is what was saved.
           saving.crc = crc32(bytes);
           message(messages.ofSaved(id, file));
-          previews.makeOwn(bytes);
+          previews.keep(making);
+          client.uploadedTo("internal", file, making.key);
+          making.release();
         } else if (how.done) {
           shown.hidden = true;
           message(messages.ofUploaded(id, file));
-          previews.makeOwn(bytes);
+          previews.keep(making);
+          client.uploadedTo("internal", file, making.key);
+          making.release();
         } else if (how.cancelled) {
+          making.release();
           shown.textContent = "Cancelled.";
         } else {
           shown.hidden = true;
@@ -344,7 +380,7 @@ function upload(message) {
           if (error instanceof Refusal && error.code === "no-space") {
             message(messages.ofNoSpace(bytes.length, client.state.space === null ? null : client.state.space.free));
           } else if (error instanceof Refusal) {
-            message(messages.ofRefusal(error, client.state.status === null ? null : client.state.status.error));
+            message(messages.ofRefusal(error, client.state.status === null ? null : client.state.status.error, client.state.status?.hasClockStorage === true));
           } else if (error instanceof Failure) {
             message(messages.ofFailure(error));
           }
@@ -355,6 +391,7 @@ function upload(message) {
     },
   );
   client.upload(sending);
+  batch.otherUpload();
   draw(client.state);
 }
 
@@ -383,4 +420,5 @@ export function start(options) {
   extend({menu: (animation) => (isEditable(animation) && (animation.type === "text" || animation.type === "widget") && animation.fault === undefined
     ? [{label: "Edit", act: () => edit(animation, message, options.go), disabled: !answers() || sending !== null || reading}] : [])});
   client.watch(draw);
+  batch.watch(draw);
 }

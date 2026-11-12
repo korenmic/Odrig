@@ -386,7 +386,8 @@ test("the walk reads a long file in bounded steps and keeps no picture it does n
     steps += 1;
   }
   steps += 1;
-  assert.equal(steps, 1 + Math.ceil((count + 1) / thumbnail.RECORDS_A_STEP) + 1);
+  // The header, the first pass over the body and its end, the records, and the encoding.
+  assert.equal(steps, 1 + 2 + Math.ceil((count + 1) / thumbnail.RECORDS_A_STEP) + 1);
   assert.ok(making.done);
   assert.deepEqual(making.preview, thumbnail.make(data));
   checkPreview(data, making.preview, 24);

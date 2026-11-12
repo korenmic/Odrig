@@ -22,6 +22,7 @@
 #include <cstring>
 #include <iostream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -63,7 +64,7 @@ int usage() {
     std::fputs(
         "usage: odrig_host reasons\n"
         "       odrig_host inflate [--batch]\n"
-        "       odrig_host decode [--slice BYTES] FILE | --batch\n"
+        "       odrig_host decode [--slice BYTES | --taken] FILE | --batch\n"
         "       odrig_host render [--seed N] FILE MS...\n"
         "       odrig_host shuffle KEY COUNT\n"
         "       odrig_host session DIR | --batch [options]\n"
@@ -76,8 +77,8 @@ int usage() {
         "       --storage BYTES  --no-storage  --only-space  --space-unknown\n"
         "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
         "       --read-back-fails OFFSET  --read-back-differs OFFSET\n"
-        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --drive-read-only  --trace-drive  --trace-read-at  --about TEXT\n"
-        "       --command-read-fails FILE OFFSET\n",
+        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --drive-read-only  --no-folders  --trace-drive  --trace-read-at  --about TEXT\n"
+        "       --command-read-fails FILE OFFSET  --read-at-fails-first FILE N  --trace-check\n",
         stderr);
     return kUsage;
 }
@@ -165,10 +166,14 @@ struct Options {
     long drive_read_fails_offset = 0;   // fails at this offset; `read_at` reads it whole
     std::string command_read_fails_file;    // the file whose reading with `read_at` inside a
     long command_read_fails_offset = 0;     // command fails at this offset
+    std::string read_at_fails_file;         // the file whose first calls of `read_at`,
+    long read_at_fails_first = 0;           // this many, fail
     bool drive_read_only = false;   // the drive cannot be written
+    bool no_folders = false;        // the host has no `make_folder`
     bool trace_drive = false;       // print `drive list <count>` and `drive bind <place> <name>`
     bool trace_read_at = false;     // print `read_at <name> <offset> <count>` for every `read_at`
     bool trace_calls = false;       // print `call <bytes>` after every poll and command: what `read` and `read_at` gave in it
+    bool trace_check = false;       // print `check <pace> <debt> <fell>` after a refresh at which an upload was being checked
     std::string about;              // the text `about` gives; without one the host has no `about`
 };
 
@@ -189,7 +194,30 @@ public:
         host.from_ = kFromFiles;
         host.files_ = files;
         host.options_ = options;
+        // A file in a numbered folder brings its folder.
+        for (const auto &file : files) {
+            const size_t slash = file.first.find('/');
+            if (slash != std::string::npos && number_of(file.first.substr(0, slash)) != 0) {
+                host.made_.insert(file.first.substr(0, slash));
+            }
+        }
         return host;
+    }
+
+    // The number of a folder of the storage, 1 to 255 without a leading zero, or 0 for a name
+    // that is no such number.
+    static int number_of(const std::string &name) {
+        if (name.empty() || name.size() > 3 || name[0] == '0' || name.find_first_not_of("0123456789") != std::string::npos) {
+            return 0;
+        }
+        const int number = std::atoi(name.c_str());
+        return number <= 255 ? number : 0;
+    }
+
+    // The folder of a stored name, `<n>/<name>`, or an empty text for a name at the root.
+    static std::string folder_of(const std::string &name) {
+        const size_t slash = name.find('/');
+        return slash != std::string::npos && number_of(name.substr(0, slash)) != 0 ? name.substr(0, slash) : std::string();
     }
 
     static Host of_memory(const std::string &bytes) {
@@ -232,6 +260,8 @@ public:
         functions.drive_list = drive ? drive_list : nullptr;
         functions.drive_bind = drive ? drive_bind : nullptr;
         functions.drive_writable = drive ? drive_writable : nullptr;
+        functions.identity = nullptr;
+        functions.make_folder = changes && !options_.no_folders ? make_folder : nullptr;
         if (drive && !options_.drive_pulled) {
             plug();
         }
@@ -706,9 +736,47 @@ private:
         return result;
     }
 
+    // Makes a folder of the drive, or a numbered folder of the storage: a storage call, as
+    // `write_open` is.
+    static int make_folder(void *ctx, const char *name) {
+        guard::InHost lowered;
+        Host &host = *static_cast<Host *>(ctx);
+        const bool numbered = number_of(name) != 0;
+        if ((!numbered && !host.of_the_drive(name)) || (host.of_the_drive(name) && (host.options_.drive.empty() || std::strlen(name) <= 6))) {
+            stop("file misuse", kFileMisuse);
+        }
+        int result = -1;
+        if (numbered) {
+            if (host.store_call()) {
+                result = host.make_numbered(name) ? 1 : -1;
+            }
+        } else if (host.store_call() && host.may_change(name)) {
+            const std::string path = host.path_of(name);
+            struct stat status;
+#ifdef _WIN32
+            std::error_code failure;
+            const bool made = std::filesystem::create_directory(path, failure);
+#else
+            const bool made = ::mkdir(path.c_str(), 0777) == 0;
+#endif
+            result = made || (stat(path.c_str(), &status) == 0 && S_ISDIR(status.st_mode)) ? 1 : -1;
+        }
+        host.trace("make_folder", name, result);
+        return result;
+    }
+
     static int remove(void *ctx, const char *name) {
         guard::InHost lowered;
         Host &host = *static_cast<Host *>(ctx);
+        if (number_of(name) != 0) {
+            // A numbered folder of the storage, removed when it is empty.
+            int result = -1;
+            if (host.store_call()) {
+                result = host.remove_numbered(name);
+            }
+            host.trace("remove", name, result);
+            return result;
+        }
         host.check_name(name);
         if (host.is_open_ && host.open_name_ == name) {
             stop("file misuse", kFileMisuse);
@@ -759,6 +827,10 @@ private:
         const bool anywhere = std::strncmp(name, "drive/index-", 12) == 0 || std::strncmp(name, "drive/rebuild", 13) == 0;
         if (capacity == 0 || capacity > 512 || (offset != 0 && !goes_on && !host.in_command_ && !anywhere)) {
             stop("file misuse", kFileMisuse);
+        }
+        if (name == host.options_.read_at_fails_file && host.read_at_failed_ < host.options_.read_at_fails_first) {
+            ++host.read_at_failed_;
+            return -1;
         }
         // A read that goes on where the last of the same file ended, with no storage call and
         // no change of the drive since, reads the content the last one read; any other reads
@@ -818,12 +890,14 @@ private:
 
     // Stops the program when a name the core gives is not one of its names: 1 to 32
     // characters of a-z, 0-9, `-`, `_` and `.`, and either the name of an `.odrg` or `.odrgx`
-    // file or one of the fixed names: the files of the show, of changes and of the catalog.
+    // file, alone or in a numbered folder, `<n>/`, or one of the fixed names: the files of
+    // the show, of changes, of the catalog and of the folders.
     void check_name(const char *name) const {
         if (!options_.check_names) {
             return;
         }
-        const std::string given = name;
+        const std::string folder = folder_of(name);
+        const std::string given = folder.empty() ? std::string(name) : std::string(name).substr(folder.size() + 1);
         if (!options_.drive.empty() && of_the_drive(name) && given.size() > 6 &&
             (given.find_first_not_of("0123456789", 6) == std::string::npos || drive_name_sound(name + 6))) {
             return;
@@ -839,8 +913,11 @@ private:
                            given == "show.part" || given == "pending.txt" || given == "mapping.part" ||
                            given == "order.txt" || given == "order.part" || given == "repeats.txt" || given == "repeats.part" || given == "clocks.txt" || given == "clocks.part" || given == "playlist.txt" || given == "playlist.part" || given == "catalog.txt" ||
                            given == "brightness.txt" || given == "brightness.part" || given == "ignored.txt" || given == "ignored.part" ||
-                           given == "catalog.new" || given == "catalog.do" || page;
-        if (!sound || !(animation || fixed)) {
+                           given == "timezone.bin" || given == "timezone.part" ||
+                           given == "schedule.txt" || given == "schedule.part" ||
+                           given == "rotation.txt" || given == "rotation.part" ||
+                           given == "folders.txt" || given == "folders.part" || given == "catalog.new" || given == "catalog.do" || page;
+        if (!sound || !(animation || fixed) || (!folder.empty() && !animation)) {
             stop("file misuse", kFileMisuse);
         }
     }
@@ -887,6 +964,9 @@ private:
             return false;
         }
         if (from_ == kFromFiles && !writing_drive_) {
+            if (!folder_of(name).empty() && made_.count(folder_of(name)) == 0) {
+                return false;
+            }
             files_[name].clear();
             return true;
         }
@@ -918,7 +998,8 @@ private:
         }
         if (from_ == kFromFiles && !of_the_drive(from)) {
             auto file = files_.find(from);
-            if (file == files_.end()) {
+            // A file goes into a numbered folder only when the folder was made.
+            if (file == files_.end() || (!folder_of(to).empty() && made_.count(folder_of(to)) == 0)) {
                 return false;
             }
             std::string content = file->second;
@@ -941,6 +1022,16 @@ private:
         if (from_ == kFromFiles && !of_the_drive(name)) {
             return files_.erase(name) != 0 ? 1 : 0;
         }
+        struct stat status;
+        if (of_the_drive(name) && stat(path_of(name).c_str(), &status) == 0 && S_ISDIR(status.st_mode)) {
+            // A folder of the drive goes only while it is empty, as the drive's host takes it.
+#ifdef _WIN32
+            std::error_code failure;
+            return std::filesystem::remove(path_of(name), failure) ? 1 : -1;
+#else
+            return ::rmdir(path_of(name).c_str()) == 0 ? 1 : -1;
+#endif
+        }
 #ifdef _WIN32
         if (std::remove(path_of(name).c_str()) == 0) {
             return 1;
@@ -951,6 +1042,51 @@ private:
         }
 #endif
         return errno == ENOENT ? 0 : -1;
+    }
+
+    // Makes a numbered folder of the storage: true when it is there afterwards.
+    bool make_numbered(const char *name) {
+        if (from_ == kFromFiles) {
+            if (files_.count(name) != 0) {
+                return false;
+            }
+            made_.insert(name);
+            return true;
+        }
+        const std::string path = path_of(name);
+        struct stat status;
+#ifdef _WIN32
+        std::error_code failure;
+        const bool made = std::filesystem::create_directory(path, failure);
+#else
+        const bool made = ::mkdir(path.c_str(), 0777) == 0;
+#endif
+        return made || (stat(path.c_str(), &status) == 0 && S_ISDIR(status.st_mode));
+    }
+
+    // Removes an empty numbered folder of the storage: 1 when it removed one, 0 when there was
+    // none, -1 when it holds a file or could not be removed.
+    int remove_numbered(const char *name) {
+        if (from_ == kFromFiles) {
+            const std::string prefix = std::string(name) + "/";
+            for (const auto &file : files_) {
+                if (file.first.compare(0, prefix.size(), prefix) == 0) {
+                    return -1;
+                }
+            }
+            return made_.erase(name) != 0 ? 1 : 0;
+        }
+        const std::string path = path_of(name);
+        struct stat status;
+        if (stat(path.c_str(), &status) != 0) {
+            return 0;
+        }
+#ifdef _WIN32
+        std::error_code failure;
+        return std::filesystem::remove(path, failure) ? 1 : -1;
+#else
+        return ::rmdir(path.c_str()) == 0 ? 1 : -1;
+#endif
     }
 
     bool whole_file(const char *name, std::string *content) {
@@ -969,42 +1105,58 @@ private:
         return loaded;
     }
 
-    // The space the files take: the size of each, rounded up to a whole block.
+    // The space the files take: the size of each, rounded up to a whole block, and two
+    // blocks for each numbered folder, with the files in it.
     uint64_t used_bytes() const {
         uint64_t used = 0;
         if (from_ == kFromFiles) {
             for (const auto &file : files_) {
                 used += (file.second.size() + kStorageBlock - 1) / kStorageBlock * kStorageBlock;
             }
-            return used;
+            return used + 2 * kStorageBlock * made_.size();
         }
+        return used_in(folder_, true);
+    }
+
+    uint64_t used_in(const std::string &folder, bool top) const {
+        uint64_t used = 0;
 #ifdef _WIN32
         std::error_code failed;
-        for (const auto &entry : std::filesystem::directory_iterator(folder_, failed)) {
+        for (const auto &entry : std::filesystem::directory_iterator(folder, failed)) {
             if (entry.is_regular_file(failed)) {
                 used += (static_cast<uint64_t>(entry.file_size(failed)) + kStorageBlock - 1) / kStorageBlock * kStorageBlock;
+            } else if (top && entry.is_directory(failed) && number_of(entry.path().filename().string()) != 0) {
+                used += 2 * kStorageBlock + used_in(entry.path().string(), false);
             }
         }
         return used;
 #else
-        DIR *folder = opendir(folder_.c_str());
-        if (folder == nullptr) {
+        DIR *opened = opendir(folder.c_str());
+        if (opened == nullptr) {
             return 0;
         }
-        while (const dirent *entry = readdir(folder)) {
+        while (const dirent *entry = readdir(opened)) {
             struct stat status;
-            if (stat(path_of(entry->d_name).c_str(), &status) == 0 && S_ISREG(status.st_mode)) {
+            const std::string path = folder + "/" + entry->d_name;
+            if (stat(path.c_str(), &status) != 0) {
+                continue;
+            }
+            if (S_ISREG(status.st_mode)) {
                 used += (static_cast<uint64_t>(status.st_size) + kStorageBlock - 1) / kStorageBlock * kStorageBlock;
+            } else if (top && S_ISDIR(status.st_mode) && number_of(entry->d_name) != 0) {
+                used += 2 * kStorageBlock + used_in(path, false);
             }
         }
-        closedir(folder);
+        closedir(opened);
         return used;
 #endif
     }
 
-    // Loads a file of the folder: 1 when loaded, 0 when there is no such file, -1 otherwise.
+    // Loads a file of the folder, or of one of its numbered folders: 1 when loaded, 0 when
+    // there is no such file, -1 otherwise.
     int load(const char *name) {
-        if (std::strchr(name, '/') != nullptr) {
+        const char *slash = std::strchr(name, '/');
+        if (slash != nullptr && (folder_of(name).empty() || std::strchr(slash + 1, '/') != nullptr)) {
             return -1;
         }
         std::string path = folder_ + "/" + name;
@@ -1038,6 +1190,7 @@ public:
     bool checks_first() const { return options_.check_first; }
     bool has_drive() const { return !options_.drive.empty(); }
     bool traces_calls() const { return options_.trace_calls; }
+    bool traces_check() const { return options_.trace_check; }
     From from_ = kFromFolder;
     std::string folder_;
     std::map<std::string, std::string> files_;
@@ -1056,6 +1209,7 @@ public:
     size_t offset_ = 0;
     size_t reads_ = 0;
 
+    std::set<std::string> made_;    // the numbered folders of files held in memory
     bool writing_ = false;
     std::string writing_name_;
     std::FILE *written_ = nullptr;
@@ -1066,6 +1220,7 @@ public:
     long read_at_kept_calls_ = 0;       // the storage calls made when it was read
     uint32_t read_at_kept_drive_ = 0;   // and the drive then
     size_t reads_at_ = 0;
+    long read_at_failed_ = 0;       // the calls of `read_at` that `--read-at-fails-first` failed
     bool in_command_ = false;       // a command line is being carried out
 
     long alloc_calls_ = 0;
@@ -1138,8 +1293,11 @@ int inflate(bool in_batch) {
 // record with the picture as three bytes for each pixel, then `end`; or, at the point where
 // the file is refused, `rejected <reason>`. The decoder is called again while it settles a
 // defect. With a slice, settling takes at most that many bytes in one call, and
-// `pending <calls>`, the calls that gave kPendingWork, comes before the last line.
-void decode_one(Host &host, const char *name, uint32_t slice) {
+// `pending <calls>`, the calls that gave kPendingWork, comes before the last line. With
+// `taken`, no `frame` line is printed: after each call of the decoder for a record or for
+// the end, `taken <bytes> <charge>`, the bytes of the body the call took and the charge the
+// core gives it, with ` pending` after a call that gave kPendingWork.
+void decode_one(Host &host, const char *name, uint32_t slice, bool taken) {
     odrig_host functions = host.interface();
     odrig::FileSource file;
     std::memset(&file, 0, sizeof file);
@@ -1174,15 +1332,30 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
                     decoder.frames, decoder.compressed);
         std::vector<uint8_t> pixels(decoder.n, 0);
         std::string picture;
+        // One call of the decoder, with its `taken` line.
+        const auto call = [&](odrig::Reason given, uint64_t before, uint32_t given_before) {
+            if (taken) {
+                std::printf("taken %llu %u%s\n", static_cast<unsigned long long>(decoder.body_read - before),
+                            decoder.charge_since(before, given_before), given == odrig::kPendingWork ? " pending" : "");
+            }
+            return given;
+        };
         for (uint32_t record = 0; record < decoder.frames && reason == odrig::kNone; ++record) {
             uint16_t duration = 0;
-            while ((reason = decoder.next(pixels.data(), &duration)) == odrig::kPendingWork) {
+            uint64_t before = decoder.body_read;
+            uint32_t given_before = file.given();
+            while ((reason = call(decoder.next(pixels.data(), &duration), before, given_before)) == odrig::kPendingWork) {
                 ++pending;
+                before = decoder.body_read;
+                given_before = file.given();
             }
             if (reason != odrig::kNone) {
                 break;
             }
             total_ms += duration;
+            if (taken) {
+                continue;
+            }
             picture.clear();
             if (decoder.colours != 0) {
                 for (uint8_t index : pixels) {
@@ -1194,8 +1367,12 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
             std::printf("frame %u %s\n", duration, hex(picture).c_str());
         }
         if (reason == odrig::kNone) {
-            while ((reason = odrig::content_finish(&file, &decoder, content, total_ms)) == odrig::kPendingWork) {
+            uint64_t before = decoder.body_read;
+            uint32_t given_before = file.given();
+            while ((reason = call(odrig::content_finish(&file, &decoder, content, total_ms), before, given_before)) == odrig::kPendingWork) {
                 ++pending;
+                before = decoder.body_read;
+                given_before = file.given();
             }
         }
     }
@@ -1283,11 +1460,11 @@ int render(const std::string &path, const std::vector<std::string> &times, uint3
     return 0;
 }
 
-int decode(const std::string &argument, uint32_t slice) {
+int decode(const std::string &argument, uint32_t slice, bool taken) {
     if (argument == "--batch") {
         for (const std::string &content : batch(standard_input())) {
             Host host = Host::of_memory(content);
-            decode_one(host, "file.odrg", slice);
+            decode_one(host, "file.odrg", slice, taken);
         }
         return 0;
     }
@@ -1295,7 +1472,7 @@ int decode(const std::string &argument, uint32_t slice) {
     std::string folder = slash == std::string::npos ? "." : argument.substr(0, slash);
     std::string name = slash == std::string::npos ? argument : argument.substr(slash + 1);
     Host host = Host::of_folder(folder);
-    decode_one(host, name.c_str(), slice);
+    decode_one(host, name.c_str(), slice, taken);
     return 0;
 }
 
@@ -1552,7 +1729,11 @@ private:
     }
 
     // `refresh <ms>` and the LED data of every leg, or `idle <ms>` when no refresh was due.
+    // With `--trace-check`, after a refresh at which an upload was being checked when it
+    // began, `check <pace> <debt> <fell>`: the pace and the debt after it, and 1 when the
+    // pace has fallen during the check.
     void poll(uint64_t now) {
+        const bool checking = host_.traces_check() && core_->state.upload.state == odrig::kUploadChecking;
         int produced;
         {
             guard::InCore inside;
@@ -1577,6 +1758,11 @@ private:
             }
             std::string rgb(reinterpret_cast<const char *>(leg.rgb), 3 * static_cast<size_t>(leg.led_count));
             std::printf("data %u %s\n", leg.leg, hex(rgb).c_str());
+        }
+        if (checking) {
+            const odrig::Upload &upload = core_->state.upload;
+            std::printf("check %u %u %u\n", static_cast<unsigned>(upload.pace), static_cast<unsigned>(upload.debt),
+                        static_cast<unsigned>(upload.pace_fell));
         }
     }
 
@@ -1743,12 +1929,15 @@ int main(int argc, char **argv) {
         return inflate(true);
     }
     if (invocation == "decode" && arguments.size() == 2) {
-        return decode(arguments[1], 0);
+        return decode(arguments[1], 0, false);
+    }
+    if (invocation == "decode" && arguments.size() == 3 && arguments[1] == "--taken") {
+        return decode(arguments[2], 0, true);
     }
     long slice = 0;
     if (invocation == "decode" && arguments.size() == 4 && arguments[1] == "--slice" &&
         whole_number(arguments[2], &slice) && slice > 0 && slice <= 0x7FFFFFFF) {
-        return decode(arguments[3], static_cast<uint32_t>(slice));
+        return decode(arguments[3], static_cast<uint32_t>(slice), false);
     }
     if (invocation == "shuffle" && arguments.size() == 3) {
         // The permutation of 0 to COUNT - 1 that the key draws, in the order of the places.
@@ -1810,11 +1999,18 @@ int main(int argc, char **argv) {
                        whole_number(arguments[at + 2], &options.command_read_fails_offset)) {
                 options.command_read_fails_file = arguments[at + 1];
                 at += 3;
+            } else if (arguments[at] == "--read-at-fails-first" && at + 2 < arguments.size() &&
+                       whole_number(arguments[at + 2], &options.read_at_fails_first)) {
+                options.read_at_fails_file = arguments[at + 1];
+                at += 3;
             } else if (arguments[at] == "--drive" && at + 1 < arguments.size()) {
                 options.drive = arguments[at + 1];
                 at += 2;
             } else if (arguments[at] == "--drive-pulled") {
                 options.drive_pulled = true;
+                ++at;
+            } else if (arguments[at] == "--no-folders") {
+                options.no_folders = true;
                 ++at;
             } else if (arguments[at] == "--drive-read-only") {
                 options.drive_read_only = true;
@@ -1849,6 +2045,9 @@ int main(int argc, char **argv) {
                 at += 1;
             } else if (arguments[at] == "--trace-calls") {
                 options.trace_calls = true;
+                at += 1;
+            } else if (arguments[at] == "--trace-check") {
+                options.trace_check = true;
                 at += 1;
             } else if (arguments[at] == "--about" && at + 1 < arguments.size()) {
                 options.about = arguments[at + 1];

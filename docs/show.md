@@ -46,7 +46,7 @@ two kinds, with the members of its kind and no other:
 
 | Kind | Members | Meaning |
 |---|---|---|
-| Animation | `id`, `file`, and optionally `repeat`, `max_seconds` and `ignored` | `file` is the name of an `.odrg` or `.odrgx` file in the folder: 1 to 32 characters from `a`-`z`, `0`-`9`, `-`, `_` and `.`, ending in `.odrg` or `.odrgx`. The file's first bytes, not its name, say whether it is an ODRG file or an ODRGX container. `repeat` is how many times the animation is played through when its turn comes, and `max_seconds` the longest that turn lasts, each a whole number from 1 to 65,535. |
+| Animation | `id`, `file`, and optionally `repeat`, `max_seconds` and `ignored` | `file` is the name of an `.odrg` or `.odrgx` file in the folder: 1 to 32 characters from `a`-`z`, `0`-`9`, `-`, `_` and `.`, ending in `.odrg` or `.odrgx`, alone or after the number of a folder of the board's storage and `/`, `2/stars.odrg`, the number 1 to 255 without a leading zero; [core.md](core.md#internal-folders) says what such a folder is. The file's first bytes, not its name, say whether it is an ODRG file or an ODRGX container. `repeat` is how many times the animation is played through when its turn comes, and `max_seconds` the longest that turn lasts, each a whole number from 1 to 65,535. |
 | Cycle | `id`, `cycle`, `seconds` | `cycle` is a list of one or more ids of animation items. `seconds` is how long each one is shown, 1 to 65,535. |
 
 Example: two animations, and a cycle that alternates them every 15 seconds and starts at
@@ -75,14 +75,17 @@ order of `show.json` and after them the drive's. It is what a show plays by itse
 last the first again, without end. A show with one animation plays it turn after turn. A
 show without an animation plays nothing.
 
-With a card of sub-folders there is a playlist for each folder, and one of them is
-current: the root's, the folder `odrig` with the show's animations and the loose files, or
-a sub-folder's, see [animations from a USB drive](#animations-from-a-usb-drive). A
-playlist plays its own animations in the saved order, each for its turn, then each of its
-sub-folders' playlists once the same way, depth first, and then its own animations again:
-the root exhausts the show's animations and the loose files, then each folder of the card
-once, and starts over. A file that is left out, unavailable or still to be read is passed
-over, and so is an ignored animation of the show, as always. While the current playlist
+With folders on the board's own storage or a card of sub-folders there is a playlist for
+each folder, and one of them is current: the root's, the folder `odrig` with the show's
+animations and the loose files, or a folder's of the board's own storage, see
+[core.md](core.md#internal-folders), or a sub-folder's of the card, see [animations from a
+USB drive](#animations-from-a-usb-drive). A playlist plays its own animations in the saved
+order, each for its turn, then each of its sub-folders' playlists once the same way, depth
+first, and then its own animations again: the root exhausts the show's animations at the
+root of the board's storage, then each folder of the board's own storage once, then the
+loose files and each folder of the card once, and starts over. A file that is left out,
+unavailable or still to be read is passed over, and so is an ignored animation of the
+show, as always. While the current playlist
 has nothing to play, the card out or not yet read or every file of its folders
 unavailable, the root plays in its place, and the current playlist takes over at the end
 of the turn in progress, from its first animation, as soon as it has something to play.
@@ -91,21 +94,25 @@ A current playlist plays for a window of 24 hours of the board's running time fr
 moment it became current, the time the LEDs are off and the time a cycle or a jump plays
 included; calendar time is never considered. When the window has passed, the turn in
 progress ends as it would, and the next playlist in the tree's order becomes current with
-a window of its own, the root after the last: a card of the folders `a`, `b` and `b/c`
-plays the root for a day, then `a`, `b`, `b/c`, and the root again. A window that ends
-while a cycle plays changes which playlist is current and not what plays; the cycle goes
-on until a command ends it. A window that ends while a mapping test shows is taken when
-the test ends. While the tree is not known, the card out or not yet read, the window's
-end makes the root current with a fresh window. With no folder on the card the root is
-the only playlist and its window changes nothing that plays. `status` says the seconds
-left in the window as `left`.
+a window of its own, the root after the last, the folders of the board's own storage
+before the card's: a card of the folders `a`, `b` and `b/c` plays the root for a day, then
+`a`, `b`, `b/c`, and the root again. A window that ends while a cycle plays changes which
+playlist is current and not what plays; the cycle goes on until a command ends it. A
+window that ends while a mapping test shows is taken when the test ends. While the card's
+tree is not known, the card out or not yet read, the window's end makes the next folder of
+the board's own storage current, or the root after the last, with a fresh window. With no
+folder on the board's own storage and none on the card the root is the only playlist and
+its window changes nothing that plays. `status` says the seconds left in the window as
+`left`.
 
 At power-on a show plays the playlist, from its first animation, or from the animation
 `start` names. Only a `start` that names a cycle plays something else: that cycle. The
 playlist that was current is current again, with the time spent in its window, from the
-board's own file `playlist.txt`: the root plays as said, and a folder of the card plays
-from its first animation once the card is read, the root in its place until then. A
-restart loses at most the last 15 minutes of the window.
+board's own file `playlist.txt`: the root plays as said, a folder of the board's own
+storage from its first animation, the root in its place in a start that cannot read
+`folders.txt`, and a folder of the card from its first animation once the card is read,
+the root in its place until then. A restart loses at most the last 15 minutes of the
+window.
 
 A cycle has no turn in the playlist, wherever it stands among the items.
 
@@ -155,9 +162,9 @@ one turn, for the rest of that turn, and then the saved repeat of the animation 
   a cycle plays, the playlist does not.
 - `play all` plays the playlist from its first animation, whatever `start` names, and
   makes the root playlist current.
-- `play <id>` of a folder of the card makes that folder's playlist current and plays its
-  first animation; when nothing at or below the folder can play, the root plays in its
-  place.
+- `play <id>` of a folder of the board's own storage or of the card makes that folder's
+  playlist current and plays its first animation; when nothing at or below the folder can
+  play, the root plays in its place.
 
 ## Animations from a USB drive
 
@@ -343,9 +350,11 @@ which named a file of the drive in a file written before, is passed over, and th
 write leaves it out. A line in another form is no entry and takes no place. The player
 takes the first 512 entries, and of two entries for one animation the first.
 
-- The playlist plays the show's animations the file names in the order of their entries,
-  and after them the ones it does not name, in the order of `show.json`; a new item is
-  therefore last until it is moved. Then it plays the drive's files in the drive's walk:
+- The playlist plays the show's animations folder by folder, those at the root first and
+  then each folder's of the board's own storage in the tree's order, and of one folder the
+  ones the file names in the order of their entries, and after them the ones it does not
+  name, in the order of `show.json`; a new item is therefore last of its folder until it is
+  moved. Then it plays the drive's files in the drive's walk:
   the root's files, then each folder's, depth first, each folder's files in the order of
   the rows of the card's index, which `order move` changes on a card with a catalog, and of
   their names on a card without one.
@@ -395,15 +404,20 @@ never writes two.
 
 While the clocks are on, `clocks on` of [commands.md](commands.md#clocks-between-the-animations),
 the playlist has a break now and then: a turn of a clock, and, while the message is on and
-there is one, one loop of the message after it. The clocks are the animation files directly
-in the folder `clocks` of a card's folder `odrig`, at its first level, and each message is
-the next eligible direct file in an independent shuffled bag of `clocks/message`; the show's own animations
-are never clocks, nor is a file of another sub-folder of `clocks`. While both settings are
-off, the player plays as the rest of this page says.
+there is one, one loop of the message after it. The clocks, or faces, are the animation files
+directly in the folder `clocks` of a card's folder `odrig`, at its first level, and those of
+the board's own folder `clocks`, [Internal folders](core.md#internal-folders); each message
+is the next eligible direct file of the folders `clocks/message` of both, in an independent
+shuffled bag. An animation at the root of the board's storage, in a folder `folders.txt`
+does not name or in any other of its folders, and every animation of a boot that cannot
+read `folders.txt`, is never a clock, nor is a file of another sub-folder of `clocks` of
+either storage, such as `clocks/old`; a message is never a face, nor a face a message. While
+both settings are off, the player plays as the rest of this page says.
 
 - **The folders are the breaks'.** While the clocks are on, every playlist passes over the
-  folder `clocks` and every folder below it, as it passes over an ignored animation: the
-  root's walk, a folder's, the first animation of a playlist, and a folder whose files are
+  folder `clocks` and every folder below it, of the card and of the board's own storage, as
+  it passes over an ignored animation: the root's walk, a folder's, the rotation's
+  playlists, the first animation of a playlist, and a folder whose files are
   all in them, which has nothing to play, so that the root plays in its place. A `play
   <id>` of one of their files plays its turn as a jump; a `play <id>` of one of the folders
   makes it current, and the root plays in its place. While the clocks are off they are
@@ -427,10 +441,28 @@ off, the player plays as the rest of this page says.
   turns as turns: `animation`, `repeat`, `loop` and `saved` are the clock's or the
   message's, and `playing` stays the playlist's.
 - **The order of the clocks.** Each break takes the next clock of an order drawn at random
-  among all the orders of the clocks there are, each once; a clock that cannot play when
-  its place comes is passed over. When the order is used up a new one is drawn, and the
-  last clock of one may be the first of the next. A new order is drawn at the start, when a
-  card is taken up or dropped, and when its tree changes.
+  among all the orders of the clocks there are, the card's and the board's together, each
+  once; a clock that cannot play when its place comes is passed over. When the order is used
+  up a new one is drawn, and the last clock of one may be the first of the next. A new order
+  is drawn at the start, when a card is taken up or dropped, when its tree changes, and when
+  the number of the clocks of both storages changes. A card's clock followed by a message of
+  the board's storage, or the board's clock by a card's message, is a break as any other.
+  Without a clock of either storage no break comes, whatever messages there are.
+- **Copies.** A card's file and a file of the board's own storage of the same class, face
+  or message, whose names are the same but for the case of ASCII letters, so with the same
+  path `clocks/<name>` or `clocks/message/<name>`, and whose types the catalog or the check
+  gives as the same, frames, text or widget, are copies: they make one place of the order,
+  also when their bytes differ. Which one plays is the preferred storage's, `clocks storage
+  sd|internal` of [commands.md](commands.md#clocks-between-the-animations), the card by
+  default. The preferred storage's copy plays when it can; the other plays in its place only
+  when the preferred one cannot: ignored by its own or an inherited Ignore, left out for a
+  fault, removed, or on a card that is out. A file whose type is not known yet is no copy.
+  Each copy keeps its own id, saved brightness, repeat and Ignore, and `play` of either plays
+  that one. A card taken up, and a new preferred storage, are taken at the next draw, the
+  orders of both bags drawn anew for a new preferred storage: the turn in progress plays to
+  its end, a message its whole loop, and so does the board's copy that the start of Clocks
+  only drew before the card was taken up. The preference decides which copy plays, never
+  whether a storage is used, and touches nothing but the faces and the messages.
 - **The order of messages.** Messages have their own shuffled bag in both enabled modes.
   Every eligible direct message is taken before that bag reshuffles; ignored files and
   descendants of ignored folders are passed over. A message turn is one complete loop,
@@ -450,15 +482,22 @@ off, the player plays as the rest of this page says.
 
 ### Clocks only
 
-`clocks only` uses the same two bags in a separate scheduler: a clock, optionally a
-complete message, then the next clock. It does not run normal breaks or folder-window
-rotation. The normal playlist path and its window stay saved, and leaving Only resumes
-that valid playlist, else root, without restoring a paused break. A global restart
-uses `play <resolved-clocks-folder-id>`; raw `play all` is refused. An explicit inside
-file or subfolder is a manual turn before the
-exclusive program continues. Outside play and output-taking diagnostics are refused.
+`clocks only` uses the same two bags, over the card and the board's own storage, in a
+separate scheduler: a clock, optionally a complete message, then the next clock. It does
+not run normal breaks or folder-window rotation. The normal playlist path and its window
+stay saved, and leaving Only resumes that valid playlist, else root, without restoring a
+paused break. A global restart uses `play <resolved-clocks-folder-id>`, the card's folder
+`clocks` when the card has one, else the board's, and `play` of either restarts the
+clocks; raw `play all` is refused. An explicit inside file or subfolder of either
+storage's Clocks subtree is a manual turn before the exclusive program continues. Outside
+play and output-taking diagnostics are refused. With a face of the board's own storage,
+Only plays without a card.
 
-Only remains selected when media is absent, Clocks is missing or no face is eligible.
-Output stays dark and responsive with the reason in `clock_only`; a relevant media or
-inclusion change retries selection. Browsing is unrestricted, and Ignore remains an
-automatic exclusion rather than a manual-play ban inside the exclusive boundary.
+Only remains selected when no face of either storage is eligible. Output stays dark and
+responsive with the reason in `clock_only`: without a folder `clocks` of the board's own
+storage, `no-card` without a card, else `missing-folder` without the card's Clocks folder,
+else `no-clocks`; with one, `no-clocks`. No ordinary animation and no message stands in for
+a face. A relevant media, inclusion, removal or fault change retries selection. Raw command
+browsing is unrestricted; the operators' app keeps visible navigation and upload
+destinations inside Clocks in Only. Ignore remains an automatic exclusion rather than a
+manual-play ban inside the exclusive boundary.

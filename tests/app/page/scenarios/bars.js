@@ -81,12 +81,12 @@ export default async function (app) {
   const uploadTop = measure(app, room);
   scrolled(app, "end");
   await settle(app);
-  const uploadEnd = {...measure(app, room), last: box(app.byId("choose"))};
+  const uploadEnd = {...measure(app, room), last: box(app.byId("make-clock"))};
   scrolled(app, "top");
   app.press("Target");
   await app.until(() => app.shown() === "target", "the target screen");
   app.fill("address", "not an address");
-  app.press("Use");
+  app.press("Connect over Wi-Fi");
   await app.until(() => app.text("message-text") !== null, "a message");
   const message = {...measure(app, room), message: box(app.byId("message"))};
   app.press("OK");

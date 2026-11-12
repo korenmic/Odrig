@@ -12,7 +12,7 @@ import zlib
 
 from . import client
 
-BUSY_SECONDS = 600.0
+BUSY_SECONDS = 10800.0
 BUSY_PAUSE_SECONDS = 0.2
 STRAY_SECONDS = 0.5
 # The codes after which the target holds no upload any more.

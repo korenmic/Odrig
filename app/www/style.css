@@ -186,6 +186,13 @@ textarea {
   font-size: 17px;
 }
 
+#usb-log {
+  font-family: monospace;
+  font-size: 0.8rem;
+  white-space: pre;
+  overflow: auto;
+}
+
 button {
   color: var(--teal);
   text-align: center;
@@ -779,13 +786,15 @@ input[type="range"] {
   border-radius: 16px;
 }
 
-.row .pick {
+.row .pick,
+.folder-row .pick {
   display: none;
   flex: 0 0 auto;
   margin: 0;
 }
 
-.selecting .row .pick {
+.selecting .row .pick,
+.selecting .folder-row .pick {
   display: flex;
   align-items: center;
   min-height: 44px;
@@ -905,6 +914,50 @@ nav button[aria-current="true"] {
   overflow-wrap: anywhere;
 }
 
+.explorer-dialog {
+  position: fixed;
+  z-index: 6;
+  left: calc(8px + var(--bar-left));
+  right: calc(8px + var(--bar-right));
+  bottom: calc(92px + var(--bar-bottom));
+  max-width: 704px;
+  margin: 0 auto;
+  max-height: 70vh;
+  overflow: auto;
+  padding: 10px 14px;
+  border: 1px solid var(--edge-strong);
+  border-radius: 16px;
+  background: #101a3a;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  overflow-wrap: anywhere;
+}
+
+.explorer-dialog h2 {
+  margin: 4px 0 8px;
+  font-size: 1.05rem;
+}
+
+.explorer-dialog label,
+.explorer-dialog select,
+.explorer-dialog input {
+  display: block;
+  width: 100%;
+  margin: 4px 0;
+}
+
+#move-preview {
+  padding-left: 18px;
+}
+
+#move-preview li.skipped {
+  opacity: 0.75;
+}
+
+/* A file of a moved folder, under the folder's line. */
+#move-preview li.inner {
+  margin-left: 18px;
+}
+
 #mapping-lock-dialog {
   width: calc(100% - 32px - var(--bar-left) - var(--bar-right));
   max-width: 560px;
@@ -918,10 +971,6 @@ nav button[aria-current="true"] {
 
 #mapping-lock-dialog::backdrop {
   background: rgba(0, 0, 0, 0.7);
-}
-
-#mapping-lock[aria-pressed="true"] {
-  border-color: var(--teal);
 }
 
 /* Upload. */
@@ -1014,6 +1063,14 @@ label.button {
   line-height: 1;
   touch-action: none;
   cursor: grab;
+}
+
+.map-pin .pin-field {
+  width: 4.5em;
+  min-height: 40px;
+  margin: 0 0 0 4px;
+  padding: 4px 8px;
+  font-variant-numeric: tabular-nums;
 }
 
 .map-pin.lifted {
@@ -1140,7 +1197,8 @@ input[type="checkbox"] {
   margin-bottom: 8px;
 }
 
-#clocks {
+#clocks,
+#clock-storage {
   width: 100%;
   min-height: 48px;
   margin-bottom: 12px;
@@ -1217,4 +1275,53 @@ input[type="checkbox"] {
 .folder-row[aria-current="true"] {
   border-color: var(--edge-strong);
   box-shadow: 0 0 16px rgba(69, 224, 210, 0.28);
+}
+
+/* A batch of ready-made animations: its rows, and the line of its run on every screen. */
+#batch-rows {
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+#batch-rows > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--edge);
+}
+
+#batch-rows .batch-file,
+#batch-rows .batch-name {
+  flex: 1 1 12em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#batch-rows .batch-state {
+  flex: 1 1 100%;
+  overflow-wrap: anywhere;
+}
+
+#batch-rows .batch-why {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--warn, #ffb4a8);
+}
+
+#batch-rows .batch-remove {
+  flex: 0 0 auto;
+}
+
+#batch-line {
+  position: sticky;
+  top: calc(4px + var(--bar-top));
+  z-index: 4;
+  max-width: 696px;
+  margin: 8px auto 0;
+  width: fit-content;
+  color: var(--text);
+  cursor: pointer;
 }

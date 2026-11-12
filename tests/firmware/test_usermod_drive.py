@@ -61,8 +61,11 @@ class TheDrive(unittest.TestCase):
         card = builds(self.drive, sd=True)
         self.assertIn("SD.begin(ODRIG_SD_CS, cardBus, ODRIG_SD_FREQUENCY, MOUNT, 3, false)", card)
         self.assertEqual(sorted(re.findall(r'fopen\([^,]+, "([^"]*)"\)', card)), ["rb", "wb"])
-        self.assertNotRegex(card, r"(?<![\w.])(fputs|fprintf|mkdir|rmdir|f_mkfs|truncate)\(")
-        for function in ("beginDriveFile", "renameDriveFile", "removeDriveFile"):
+        self.assertNotRegex(card, r"(?<![\w.])(fputs|fprintf|f_mkfs|truncate)\(")
+        # A folder is made only by the core's name of it, in the folder odrig.
+        self.assertEqual(len(re.findall(r"(?<![\w.])mkdir\(", card)), 1)
+        self.assertIn("mkdir(path, 0777)", function_body(card, "makeDriveFolder"))
+        for function in ("beginDriveFile", "renameDriveFile", "removeDriveFile", "makeDriveFolder"):
             self.assertIn("changedPath(", function_body(card, function), function)
         self.assertIn("return cardMounted && !cardFailed && cardFolder && !namesAPlace(name) && drivePath(name, path);", function_body(card, "changedPath"))
         made = function_body(card, "drivePath")
@@ -75,6 +78,18 @@ class TheDrive(unittest.TestCase):
         self.assertIn("const uint32_t DEEPEST = 3;", self.drive)
         self.assertIn("const uint32_t MOST_FOLDERS = 32;", self.drive)
         self.assertIn("const size_t LONGEST_DRIVE_NAME = 100;", self.drive)
+
+    def test_an_empty_folder_of_the_card_is_removed_by_the_cores_name_of_it_and_a_full_one_is_no_failed_write(self):
+        card = builds(self.drive, sd=True)
+        self.assertEqual(len(re.findall(r"(?<![\w.])rmdir\(", card)), 1)
+        removed = function_body(card, "removeDriveFile")
+        steps = [removed.index(step) for step in ("changedPath(name, path)", "changing(path);", "S_ISDIR(found.st_mode)", "rmdir(path)", "unlink(path)")]
+        self.assertEqual(steps, sorted(steps))
+        folder = removed[removed.index("S_ISDIR(found.st_mode)"):removed.index("unlink(path)")]
+        self.assertIn("return rmdir(path) == 0 ? 1 : -1;", folder)
+        self.assertNotIn("capacityWriteFailed()", folder)
+        self.assertIn("if (errno == ENOENT) return 0;", removed[removed.index("unlink(path)"):])
+        self.assertIn("int removeDriveFile(const char *) { return -1; }", builds(self.drive, sd=False))
 
     def test_a_rename_on_the_card_removes_the_file_that_has_the_new_name_only_once_the_old_one_is_there(self):
         renamed = function_body(builds(self.drive, sd=True), "renameDriveFile")

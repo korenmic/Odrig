@@ -3,8 +3,11 @@
 const FAILURES = {
   "bad-address": () => "That is not an address. Write it like 4.3.2.1 or 192.168.1.23:8600.",
   "no-wifi": () => "This phone is not on a Wi-Fi network. Join the network odrig in the phone's Wi-Fi settings.",
-  "no-answer": (detail) => `No answer from ${detail}. Check that the phone is on the installation's Wi-Fi network and that the installation has power.`,
+  "no-answer": (detail) => detail === "USB serial" ? "No answer over USB serial. Check the cable to the board's USB port and that the installation has power." :
+    `No answer from ${detail}. Check that the phone is on the installation's Wi-Fi network and that the installation has power.`,
   "bad-reply": (detail) => `Something answered at ${detail}, but it is not an odrig installation.`,
+  "no-usb": () => "No board is connected by USB. Connect the phone to the board's USB port with a cable, then press Connect over USB.",
+  "usb-refused": () => "Android did not let the app use the board's USB port. Press Connect over USB and allow it.",
 };
 
 // The message of a Failure of the way to the target.
@@ -96,9 +99,72 @@ function kilobytes(bytes) {
   return String(Math.ceil(bytes / 1000));
 }
 
+// Why an upload cannot go where it was prepared in Clocks only, on a target that plays the
+// clocks of both storages.
+export const ONLY_UPLOAD_BOTH = "Clocks only: choose a folder inside Clocks, a writable one on the card, or leave this mode in Settings.";
+
+// Why an upload or a move cannot go where it was asked to in Clocks only: `both` says that the
+// target plays the clocks of both storages.
+export function onlyDestination(both) {
+  return both ? ONLY_UPLOAD_BOTH : "Clocks only: choose a writable external folder inside Clocks, or leave this mode in Settings.";
+}
+
+// The id and the folder of a line `move external <id> <path>`, and the storage and the
+// folder of a line `folder make <storage> <path>`, each folder as `/` and its path; null for
+// another line.
+function moveOf(line) {
+  const found = /^move external ([0-9]+) (.+)$/.exec(line);
+  return found === null ? null : {id: found[1], folder: found[2] === "/" ? "/" : `/${decodeURIComponent(found[2])}`};
+}
+
+function makingOf(line) {
+  const found = /^folder make (internal|external) (.+)$/.exec(line);
+  return found === null ? null : {storage: found[1], folder: `/${decodeURIComponent(found[2])}`};
+}
+
+// Whether a line is `folder remove <id>`.
+function removingOf(line) {
+  return /^folder remove [0-9]+$/.test(line);
+}
+
+// Whether a line is `move internal <id> <path>`.
+function movingInsideOf(line) {
+  return /^move internal [0-9]+ .+$/.test(line);
+}
+
+// The texts of the refusals of `move external` and of `folder make`, by their codes.
+const MOVES = {
+  "unknown-id": ({id, folder}) => `Animation ${id} or the folder ${folder} is not on the card any more. The list is read again.`,
+  "in-use": ({id, folder}) => `Animation ${id} cannot be moved into ${folder}: a file or a folder there has its name.`,
+  "read-only": ({id}) => `The card cannot be written now, so animation ${id} cannot be moved on it.`,
+  "bad-argument": ({id, folder}) => `Animation ${id} cannot be moved into ${folder}: its new path would pass 100 characters.`,
+};
+const MAKINGS = {
+  "unknown-id": ({folder}) => `The folder above ${folder} is not on the installation any more. The list is read again.`,
+  "in-use": ({folder}) => `The folder ${folder} cannot be made: a file or a folder there has its name.`,
+  "read-only": ({folder}) => `The card cannot be written now, so the folder ${folder} cannot be made.`,
+  "no-space": ({storage, folder}) => storage === "internal" ? `Internal storage has no room for the folder ${folder}: it keeps 32 folders at most, each with room for its files.` :
+    `The card has no free id for the folder ${folder}.`,
+  unsupported: () => "This installation cannot make folders in that storage.",
+};
+// The texts of the refusals of `folder remove`, by their codes.
+const REMOVINGS = {
+  "in-use": () => "Only an empty folder can be removed: it holds a file or a folder.",
+  "read-only": () => "The card cannot be written now, so the folder cannot be removed.",
+  "unknown-id": () => "The folder is not on the installation any more. The list is read again.",
+  unsupported: () => "This installation cannot remove folders in that storage.",
+};
+// The texts of the refusals of `move internal`, by their codes.
+const MOVINGS_INSIDE = {
+  "bad-argument": () => "A folder or an animation inside would pass the limits of 3 levels or 100 bytes.",
+  "in-use": () => "A folder there has that name.",
+  "unknown-id": () => "The folder or its new place is not on the installation any more. The list is read again.",
+  unsupported: () => "This installation cannot move folders in its storage.",
+};
+
 // The text for each error code a command of the app can get, from the line that was
-// refused, from the reason of an invalid show, when the target has said one, and from the
-// refusal itself.
+// refused, from the reason of an invalid show, when the target has said one, from the
+// refusal itself, and from whether the target plays the clocks of both storages.
 const REFUSALS = {
   "unsupported": () => "This target cannot use miniature display mode with its current output setup.",
   "line-too-long": NOT_UNDERSTOOD,
@@ -106,12 +172,15 @@ const REFUSALS = {
   "bad-argument": NOT_UNDERSTOOD,
   "show-invalid": (line, reason) =>
     `${reason === null ? "The installed show is invalid." : ofInvalidShow(reason)} Nothing can be played until a show is installed over USB.`,
-  "unknown-id": (line) => line.startsWith("order ") ? "That animation is not on the installation any more. The list is read again." : line.startsWith("remove many ") ? "Some selected animations are not installed any more. Refresh the selection." : (line === "play all" ? "No animation is installed." : `Animation ${line.split(" ")[1]} is not installed any more.`),
+  "unknown-id": (line) => line.startsWith("order ") ? "That animation is not on the installation any more. The list is read again." : line.startsWith("remove many ") ? "Some selected animations are not installed any more. Refresh the selection." :
+    line.startsWith("upload begin ") ? "The folder of this upload is not on the installation any more. Select the destination again." :
+    (line === "play all" ? "No animation is installed." : `Animation ${line.split(" ")[1]} is not installed any more.`),
   unavailable: (line) => line.startsWith("read ") ? `Animation ${line.split(" ")[1]} cannot be read until it is replaced: its file has a fault. The list says which.`
     : `Animation ${line.split(" ")[1]} cannot be played until it is replaced: its file has a fault. The list says which.`,
   busy: () => "The installation is busy. Try again in a moment.",
-  "in-use": (line) =>
-    line.startsWith("play ") ? "Clocks only allows playback inside the Clocks folder. Leave Clocks only in Settings to play elsewhere." :
+  "in-use": (line, reason, refusal, both) =>
+    line === "upload" || line === "move" ? onlyDestination(both) :
+    line.startsWith("play ") ? `Clocks only allows playback inside the ${both ? "clocks folders" : "Clocks folder"}. Leave Clocks only in Settings to play elsewhere.` :
     line.startsWith("mapping test ") ? "Leave Clocks only in Settings before starting a display test." :
     line.startsWith("remove many ") ? "Some selected animations cannot be removed: a cycle plays them, or they are on external storage." :
     line.startsWith("ignore ") ? "This target does not support playlist inclusion for that item." :
@@ -125,10 +194,12 @@ const REFUSALS = {
     line.startsWith("upload ") ? "The card cannot be written now. Choose Internal storage to store the animation on the board." :
     `Animation ${line.split(" ")[1]} cannot be removed: the card cannot be written now.`,
   "mapping-conflict": () => "Mapping changed on the target. Reload before saving.",
+  "rotation-conflict": () => "Another controller changed the rotation. The saved angle is read again.",
   "order-conflict": () => "The order changed on the installation since the app read it. The list is read again; move the animation again.",
   stale: (line) => line.startsWith("repeat ") ? "That animation's turn had already ended." :
     "Another controller changed this animation since it was opened. Your changes are still here; open it again to see the new one.",
   "storage-error": () => "The installation could not use its storage.",
+  "zone-unset": () => "Set the board's time from this phone first.",
   "no-space": (line) => line.startsWith("repeat ") ?
     "The installation has no room for another saved repeat: it keeps them for at most 32 files of a card or drive and 512 files in all." : ofNoSpace(Number(line.split(" ")[4]), null, line.split(" ")[2] === "external" ? "the card" : "the installation").replace(/ \(no-space\)$/, ""),
   "bad-file": (line, reason, refusal) => `The installation refused the file: ${refusal.reason === null ? "it is not a valid animation" : refusal.reason}.`,
@@ -137,6 +208,18 @@ const REFUSALS = {
   "bad-offset": NOT_WHOLE,
   "no-upload": () => "The installation dropped the upload, after the app was away for a minute or more. Upload again.",
 };
+
+// A path with its storage before it: `Internal /clocks/message` for the board's own,
+// `External /clocks` for the card.
+export function storagePath(storage, path) {
+  return `${storage === "internal" ? "Internal" : "External"} /${path}`;
+}
+
+// The file a status names, with the storage it plays from before it when that is known, as
+// for a file of a Clocks subtree: `Internal /clocks/message/v7-the-time.odrgx`.
+export function playingFile(status, storage) {
+  return storage === null ? status.file : storagePath(storage, status.file);
+}
 
 // What the app says of an animation that does not fit into the free storage, of the
 // installation or, as `where` says, of the card. The free bytes are null when the app
@@ -215,8 +298,15 @@ export function ofRemoved(animation) {
 }
 
 // The message of a command the target refused. A code without a text of its own gets
-// the general sentence.
-export function ofRefusal(refusal, reason = null) {
+// the general sentence. `both` says that the target plays the clocks of both storages, whose
+// boundary of Clocks only holds the Clocks folders of each.
+export function ofRefusal(refusal, reason = null, both = false) {
+  const moving = moveOf(refusal.line);
+  if (moving !== null && Object.prototype.hasOwnProperty.call(MOVES, refusal.code)) return `${MOVES[refusal.code](moving)} (${refusal.code})`;
+  const making = makingOf(refusal.line);
+  if (making !== null && Object.prototype.hasOwnProperty.call(MAKINGS, refusal.code)) return `${MAKINGS[refusal.code](making)} (${refusal.code})`;
+  if (removingOf(refusal.line) && Object.prototype.hasOwnProperty.call(REMOVINGS, refusal.code)) return `${REMOVINGS[refusal.code]()} (${refusal.code})`;
+  if (movingInsideOf(refusal.line) && Object.prototype.hasOwnProperty.call(MOVINGS_INSIDE, refusal.code)) return `${MOVINGS_INSIDE[refusal.code]()} (${refusal.code})`;
   const text = Object.prototype.hasOwnProperty.call(REFUSALS, refusal.code) ? REFUSALS[refusal.code] : REFUSED;
-  return `${text(refusal.line, reason, refusal)} (${refusal.code})`;
+  return `${text(refusal.line, reason, refusal, both)} (${refusal.code})`;
 }

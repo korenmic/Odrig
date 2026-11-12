@@ -44,10 +44,10 @@ class ChildEnvironment(unittest.TestCase):
         self.assertEqual(caller["PATH"], "/usr/bin")
         self.assertEqual(env.child().get("HOME"), os.environ.get("HOME"))
 
-    def test_no_variable_names_a_folder_in_the_home_folder(self):
+    def test_the_callers_home_cannot_redirect_caches_outside_the_configured_toolchains(self):
         home = pathlib.Path.home().resolve()
         made = env.child({"PATH": "/usr/bin", "HOME": str(home)})
         for name in set(FOLDER_VARIABLES) | set(SWITCHES):
             value = pathlib.Path(made[name])
             if value.is_absolute():
-                self.assertTrue(paths.inside(value, paths.ROOT), f"{name} is {value}")
+                self.assertTrue(paths.inside(value, paths.SHARED) and value != paths.SHARED, f"{name} is {value}")

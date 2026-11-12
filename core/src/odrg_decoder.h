@@ -16,6 +16,10 @@ const uint32_t kLargestPicture = 65534;
 // body, while it settles a defect: about a millisecond of work on the board.
 const uint32_t kSettleSliceBytes = 32768;
 
+// A coded record with the run bit and predictor 1 or 2 walks every position of the picture
+// whatever its bytes, and is charged n / kWalkDivisor beside them.
+const uint32_t kWalkDivisor = 32;
+
 // A reader of one ODRG file (docs/format.md), front to back. It holds no frame record: each
 // record is decoded straight into the caller's pixel buffer, which holds the picture before
 // it. The same reader checks a file at startup and decodes it for playback.
@@ -38,6 +42,14 @@ struct OdrgDecoder {
     // After the last record: nothing may follow, in the body or in the file. kPendingWork as
     // for `next`.
     Reason finish();
+
+    // The work of the call of `next` or `finish` that has just ended, in bytes: the bytes of
+    // the body it took since `before`, a value of `body_read` taken before the call, or the
+    // bytes of the file it took since `given_before`, a value of `file->given()` taken
+    // before it, whichever are more; and n / kWalkDivisor more when it decoded a whole
+    // record that walks the picture. The bytes of the file are more only in a compressed
+    // body, where input that inflates to little is work as well.
+    uint32_t charge_since(uint64_t before, uint32_t given_before) const;
 
     int body_get() {
         const int byte = compressed ? inflate->get() : file->get();
@@ -67,6 +79,9 @@ struct OdrgDecoder {
     // reason in `settle_found`; the defect that began it, the data bytes of its record not
     // yet read, and the bytes one call may take.
     uint8_t settling;
+    // The mode byte of the record the last call of `next` decoded whole; 0 after any other
+    // call and after `open`.
+    uint8_t record_mode;
     Reason settle_found;
     uint32_t settle_missing;
     uint32_t settle_slice;
