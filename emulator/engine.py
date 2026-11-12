@@ -14,9 +14,15 @@ GRID_MS = 20
 # A seek moves the clock in strides of this much, so that the core comes to the picture
 # of each stride's time within one refresh.
 SEEK_STRIDE_MS = 400
-# The two members of the status reply the engine reads, as the core writes them.
+# The two members of the status reply the engine reads, as the core writes them, and the
+# canvas a mirror compares with its board's.
 ANIMATION = re.compile(rb'"animation":([0-9]+|null)')
 PLAYING = re.compile(rb'"playing":("all"|[0-9]+|null)')
+WIDTH = re.compile(rb'"width":([0-9]+)')
+HEIGHT = re.compile(rb'"height":([0-9]+)')
+# A mirror's clock begins this far from 0, so that a turn the board began before the mirror
+# started has its time 0 on that clock too: 49 days.
+MIRROR_EPOCH_MS = 1 << 32
 # A cycle among the items of a list reply, and the position of the reply's next page.
 CYCLE_ITEM = re.compile(rb'\{"id":([0-9]+),"cycle":')
 NEXT_PAGE = re.compile(rb'"next":([0-9]+|null)')
@@ -24,6 +30,12 @@ AFTER_GRID_NS = 200_000
 LONG_WAIT_NS = 3_000_000
 KEPT_BACK_NS = 2_000_000
 SHORT_SLEEP_NS = 500_000
+
+
+def kept_line(data):
+    """A command line without its line end: one newline, and a carriage return before it."""
+    kept = data[:-1] if data.endswith(b"\n") else data
+    return kept[:-1] if kept.endswith(b"\r") else kept
 
 
 def wait_until(target_ns, clock=time.monotonic_ns, sleep=time.sleep):
@@ -89,14 +101,16 @@ class Engine:
     timestamps never go backwards.
 
     With a `host`, the engine is told of every open of an animation file and keeps the
-    playback state from it; `lengths` finds the lengths of the files.
+    playback state from it; `lengths` finds the lengths of the files. With a `mirror` the
+    emulator is the mirror of a board: the lines of its clients go to the board, and nothing
+    of the show folder's show plays.
     """
 
-    def __init__(self, core, hub, clock=time.monotonic_ns, host=None, lengths=None):
+    def __init__(self, core, hub, clock=time.monotonic_ns, host=None, lengths=None, mirror=None):
         self.core = core
         self.hub = hub
         self.clock = clock
-        self.start_ns = clock()
+        self.start_ns = clock() - (MIRROR_EPOCH_MS * 1_000_000 if mirror is not None else 0)
         self.t0 = None
         self._lock = threading.Lock()
         self.playback = Playback()
@@ -111,8 +125,19 @@ class Engine:
         self._seen = {}
         # The page is told of the position once something is known of it.
         self._told = self.playback.event()
-        if host is not None:
+        if host is not None and mirror is None:
             host.on_open = self._note_open
+        self.mirror = mirror
+        self._mini_told = None
+        self._told_status = None
+        self._told_mirror = None
+        # The bytes of a line not ended yet, by transport and way, in a mirror.
+        self._partial = {}
+        self._partial_lock = threading.Lock()
+        if mirror is not None:
+            self.record = binding.MirrorRecord()
+            core.mirror(self.record)
+            mirror.middle.listeners.append(self._heard)
 
     def now_ms(self):
         return (self.clock() - self.start_ns) // 1_000_000
@@ -129,6 +154,8 @@ class Engine:
             if self.t0 is None:
                 self.t0 = now
             self._opened = None
+            if self.mirror is not None:
+                self._drive(now)
             if self.core.poll(now):
                 self.hub.refresh(*self._output(now))
             if self._opened is not None:
@@ -146,32 +173,56 @@ class Engine:
                 output += (picture,)
         return output
 
+    def _drive(self, now):
+        """A mirror's turn for the refresh at `now`, and the board's miniature output, which
+        the emulator's core is asked to show as the board's says."""
+        mini = self.mirror.drive(self.record, now)
+        if mini is not None and mini != self._mini_told:
+            self._mini_told = mini
+            self.core.command(now, b"debug mini on" if mini else b"debug mini off")
+        told = self.mirror.state()
+        if told != self._told_mirror:
+            self._told_mirror = told
+            self.hub.mirror(told)
+
+    def canvas(self):
+        """The canvas of the show folder's mapping, `(width, height)`, as the core's status
+        gives it, or `None`."""
+        with self._lock:
+            reply = self.core.command(self.now_ms(), b"status")
+        width, height = WIDTH.search(reply), HEIGHT.search(reply)
+        return (int(width.group(1)), int(height.group(1))) if width and height else None
+
     def routing(self):
         """What the page must read the mapping again for: the legs and their pins."""
         return getattr(self.core, "legs", ())
 
-    def line(self, data, transport):
-        """One command line, as HTTP delivers it. Returns the reply."""
+    def line(self, data, transport, way=0):
+        """One command line, as HTTP delivers it, of a serial way when `way` is 1 to 8.
+        Returns the reply; in a mirror the board's, or `None` when none came."""
+        if self.mirror is not None:
+            return self._through(kept_line(data), transport)
         with self._lock:
             now = self.now_ms()
             before = self.routing()
-            reply = self.core.command(now, data)
+            reply = self.core.command(now, data, way)
             self._answered += 1
             if before != self.routing():
                 self.hub.mapping(self.core.legs)
-        kept = data[:-1] if data.endswith(b"\n") else data
-        kept = kept[:-1] if kept.endswith(b"\r") else kept
+        kept = kept_line(data)
         self.hub.log(now, transport, kept[:binding.LINE_MAX], len(kept) > binding.LINE_MAX, reply)
         self.refresh_status()
         return reply
 
-    def feed(self, data, transport):
-        """Bytes of a transport, as a serial port delivers them. Returns the replies to the
-        lines they finish, joined."""
+    def feed(self, data, transport, way=0):
+        """Bytes of a transport, as a serial port delivers them, of a serial way when `way`
+        is 1 to 8. Returns the replies to the lines they finish, joined."""
+        if self.mirror is not None:
+            return self._fed_through(data, transport, way)
         with self._lock:
             now = self.now_ms()
             before = self.routing()
-            answered = self.core.feed(now, data)
+            answered = self.core.feed(now, data, way)
             self._answered += len(answered)
             if before != self.routing():
                 self.hub.mapping(self.core.legs)
@@ -181,9 +232,66 @@ class Engine:
             self.refresh_status()
         return b"".join(reply for _, reply, _ in answered)
 
+    def plan_line(self, way):
+        """The `#plan` line the core has due on a serial way, or `None`; in a mirror the
+        board's lines that wait for the client of the way."""
+        if self.mirror is not None:
+            return self.mirror.heard_for(way)
+        with self._lock:
+            return self.core.plan_line(self.now_ms(), way)
+
+    def way_ended(self, way):
+        """A serial way that ends has its push switched off, as `plan push off` on it would.
+        The line is the engine's own, and is not in the log. In a mirror the way's lines are
+        let go."""
+        if self.mirror is not None:
+            self.mirror.way_ended(way)
+            with self._partial_lock:
+                self._partial.pop(("tcp", way), None)
+            return
+        with self._lock:
+            self.core.command(self.now_ms(), b"plan push off", way)
+
+    def _through(self, kept, transport):
+        """A client's line in a mirror: to the board through the man in the middle, and into
+        the log with the board's reply. A line that holds a line end goes nowhere over a
+        stream, where it would be two lines."""
+        now = self.now_ms()
+        if self.mirror.link.streamed and (b"\n" in kept or b"\r" in kept):
+            reply = None
+        else:
+            reply = self.mirror.middle.send(kept)
+        self.mirror.client_line(kept, reply)
+        self.hub.log(now, transport, kept[:binding.LINE_MAX], len(kept) > binding.LINE_MAX, b"" if reply is None else reply, board=True)
+        if kept == b"status" and reply is not None:
+            self.hub.status(reply)
+        return reply
+
+    def _fed_through(self, data, transport, way):
+        """Bytes of a client in a mirror: each line they finish goes to the board, and the
+        replies that came back are joined. A line longer than the longest command goes cut
+        to one byte more, which the board answers as too long all the same."""
+        key = (transport, way)
+        with self._partial_lock:
+            *lines, rest = (self._partial.pop(key, b"") + data).split(b"\n")
+            if rest:
+                self._partial[key] = rest[:binding.LINE_MAX + 1]
+        replies = [self._through(kept_line(line)[:binding.LINE_MAX + 1], transport) for line in lines]
+        return b"".join(reply for reply in replies if reply is not None)
+
+    def _heard(self, line):
+        """A line of the board that is neither a reply nor a plan, into the page's log."""
+        self.hub.log(self.now_ms(), "board", line[:binding.LINE_MAX], len(line) > binding.LINE_MAX, b"")
+
     def refresh_status(self):
         """Asks the core for its status, for the page. The request is not a command that
-        arrived, so it is not entered in the log."""
+        arrived, so it is not entered in the log. A mirror's status is its board's latest."""
+        if self.mirror is not None:
+            status = self.mirror.keeper.status
+            if status is not None and status != self._told_status:
+                self._told_status = status
+                self.hub.status(status)
+            return
         with self._lock:
             self._status_now(self.now_ms())
             self._publish()
@@ -193,7 +301,9 @@ class Engine:
         milliseconds from its start: forward by a move of the clock, back by a restart of
         the animation, the engine's own `play`, and then a move. Returns the reply of the
         route: the position moved to, the starts, the length and the clock's move, or the
-        refusal."""
+        refusal. A mirror refuses it: the page does not move the board's playback."""
+        if self.mirror is not None:
+            return {"ok": False, "error": "mirror"}
         with self._lock:
             playback = self.playback
             if isinstance(target, bool) or not isinstance(target, int):

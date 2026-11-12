@@ -179,11 +179,11 @@ class OneCallAtATime(unittest.TestCase):
         def frame(self):
             return b"abc"
 
-        def command(self, now, line):
+        def command(self, now, line, way=0):
             self.enter(now)
             return b'{"ok":true}\n'
 
-        def feed(self, now, data):
+        def feed(self, now, data, way=0):
             self.enter(now)
             return [(data.rstrip(b"\n"), b'{"ok":true}\n', False)]
 

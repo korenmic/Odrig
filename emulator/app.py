@@ -13,7 +13,7 @@ import signal
 import sys
 import threading
 
-from . import binding, engine, failure, host, httpd, hub, lineport, parent, record
+from . import binding, engine, failure, host, httpd, hub, lineport, mirror, parent, record
 
 # The virtual serial port is a pseudo-terminal. A system without one has the line port.
 HAS_SERIAL = hasattr(os, "openpty")
@@ -26,6 +26,8 @@ SERIAL_LINK = ROOT / "build" / "emulator" / "serial"
 PORT = 8600
 TCP_PORT = 8601
 WAIT_SECONDS = 0.2
+LAN_WARNING = "warning: --lan: anyone on the local network can send commands to this emulator and open its page"
+LAN_MIRROR_WARNING = "warning: --lan: anyone on the local network can send commands through this emulator to the board it mirrors, and open its page"
 
 
 def _milliseconds(text):
@@ -43,6 +45,13 @@ def _port(text):
     if not text.isascii() or not text.isdigit() or int(text) > 65535:
         raise argparse.ArgumentTypeError(f"{text!r} is not a port number from 0 to 65535")
     return int(text)
+
+
+def _mirror_tcp(text):
+    try:
+        return mirror.link.checked_tcp(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not host:port") from None
 
 
 def _storage(text):
@@ -71,6 +80,10 @@ def parser():
     drives.add_argument("--drive-folder", metavar="DIR", help="a folder that stands for the card's folder odrig itself, as collection/card; always read-only")
     made.add_argument("--drive-read-only", action="store_true", help="the drive cannot be written, as a USB stick")
     made.add_argument("--parent", metavar="PID", type=int, help="end when the process with this id ends: what the preview and the tests give, so that no emulator outlives its starter")
+    mirrors = made.add_mutually_exclusive_group()
+    mirrors.add_argument("--mirror-port", metavar="NAME", help="be the mirror of a board through its USB serial port, such as COM5: carry every line to it and show what it plays")
+    mirrors.add_argument("--mirror-tcp", metavar="ADDRESS", type=_mirror_tcp, help="be the mirror of another emulator through its line port, host:port")
+    mirrors.add_argument("--mirror-http", metavar="ADDRESS", help="be the mirror of a board or of an emulator over HTTP: host or host:port")
     made.add_argument("--record", metavar="OUT", help="record mode: the record file to write")
     made.add_argument("--seconds", metavar="S", type=_milliseconds, help="record mode: the length of the recording")
     made.add_argument("--script", metavar="FILE", help="record mode: timed command lines to give the core")
@@ -90,7 +103,19 @@ def parse(argv):
             made.error("record mode opens no page and no port: --port, --serial-link, --tcp-port, --verbose and --lan do not go with --record")
         if arguments.drive is not None or arguments.drive_folder is not None:
             made.error("record mode has no drive: --drive and --drive-folder do not go with --record")
+        if mirror_of(arguments) is not None:
+            made.error("record mode mirrors no board: --mirror-port, --mirror-tcp and --mirror-http do not go with --record")
+    if mirror_of(arguments) is not None and (arguments.drive is not None or arguments.drive_folder is not None):
+        made.error("a mirror plays the board's files: --drive and --drive-folder do not go with --mirror-port, --mirror-tcp or --mirror-http")
     return arguments
+
+
+def mirror_of(arguments):
+    """The link of a mirror the options ask for, `(kind, name)`, or `None`."""
+    for kind, name in (("serial", arguments.mirror_port), ("tcp", arguments.mirror_tcp), ("http", arguments.mirror_http)):
+        if name is not None:
+            return kind, name
+    return None
 
 
 def ports(arguments, has_serial=HAS_SERIAL):
@@ -112,18 +137,20 @@ def serve(arguments, out):
     else:
         drive = None if arguments.drive is None else host.Drive(arguments.drive, writable=not arguments.drive_read_only)
     files = host.FolderHost(arguments.show_dir, verbose=arguments.verbose, storage=arguments.storage, drive=drive)
+    mirrored = mirror_of(arguments)
+    the_mirror = None if mirrored is None else mirror.Mirror(*mirrored, ROOT, files.mirrored)
     port = None
     line_port = None
     server = None
     try:
         core = binding.Core(arguments.core, files)
-        running = engine.Engine(core, hub.Hub(), host=files)
+        running = engine.Engine(core, hub.Hub(), host=files, mirror=the_mirror)
         running.tick()
         running.refresh_status()
         if link is not None:
-            port = serialport.Port(link, lambda data: running.feed(data, "serial"))
+            port = serialport.Port(link, lambda data: running.feed(data, "serial", serialport.WAY), lambda: running.plan_line(serialport.WAY))
         if tcp_port is not None:
-            line_port = lineport.Port(tcp_port, lambda data: running.feed(data, "tcp"))
+            line_port = lineport.Port(tcp_port, lambda data, way: running.feed(data, "tcp", way), running.plan_line, running.way_ended)
         described = {
             "show": os.path.abspath(arguments.show_dir),
             "drive": None if drive is None else os.path.abspath(drive.top),
@@ -133,10 +160,11 @@ def serve(arguments, out):
             "t0": running.t0,
         }
         if arguments.lan:
-            print("warning: --lan: anyone on the local network can send commands to this emulator and open its page", file=sys.stderr, flush=True)
+            print(LAN_WARNING if the_mirror is None else LAN_MIRROR_WARNING, file=sys.stderr, flush=True)
         server = httpd.Server(
             PORT if arguments.port is None else arguments.port, running, arguments.show_dir,
-            lambda: {"show": described["show"], "drive": described["drive"], "page": server.url, "serial": described["serial"], "tcp": described["tcp"], "legs": [list(leg) for leg in core.legs], "t0": described["t0"], "error": running.error()},
+            lambda: {"show": described["show"], "drive": described["drive"], "page": server.url, "serial": described["serial"], "tcp": described["tcp"], "legs": [list(leg) for leg in core.legs], "t0": described["t0"], "error": running.error(),
+                     "mirror": None if the_mirror is None else the_mirror.described},
             lan=arguments.lan,
         )
 
@@ -156,8 +184,12 @@ def serve(arguments, out):
             # The address a phone on the same network is given.
             address = httpd.lan_address()
             print("lan: no address" if address is None else f"lan: http://{address}:{server.port}/", file=out)
+        if the_mirror is not None:
+            print(f"mirror: {the_mirror.described}", file=out)
         out.flush()
 
+        if the_mirror is not None:
+            the_mirror.start(running.now_ms, running.canvas())
         if port is not None:
             port.start()
         if line_port is not None:
@@ -174,6 +206,8 @@ def serve(arguments, out):
         loop.join()
         running.hub.close()
     finally:
+        if the_mirror is not None:
+            the_mirror.stop()
         if server is not None:
             server.server_close()
         if line_port is not None:

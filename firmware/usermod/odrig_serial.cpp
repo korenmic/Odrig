@@ -39,6 +39,28 @@ void keepSending() {
 
 OdrigSerial::Feed feedNow = nullptr;
 
+// The `#plan` line being written, and how much of it is written.
+char planLine[ODRIG_REPLY_MAX + 8];
+size_t planLength = 0;
+size_t planWritten = 0;
+
+// Writes the next piece of the `#plan` line that is being written, or asks `plan` for one
+// that is due when none is. Returns whether some of it still waits.
+bool planWaits(OdrigSerial::Plan plan) {
+  if (planWritten >= planLength) {
+    planLength = plan(planLine, sizeof(planLine));
+    planWritten = 0;
+    if (planLength == 0) return false;
+  }
+  const int room = Serial.availableForWrite();
+  if (room > 0) {
+    const size_t piece = std::min((size_t)room, planLength - planWritten);
+    OdrigSerial::write(planLine + planWritten, piece);
+    planWritten += piece;
+  }
+  return planWritten < planLength;
+}
+
 #ifdef ODRIG_PROBE
 String longLine;
 size_t longWritten = 0;
@@ -93,13 +115,15 @@ void OdrigSerial::begin() {
   usb_serial_jtag_ll_ena_intr_mask(USB_SERIAL_JTAG_INTR_SERIAL_OUT_RECV_PKT);
 }
 
-void OdrigSerial::poll(Feed feed) {
+void OdrigSerial::poll(Feed feed, Plan plan) {
   feedNow = feed;
   if (emptyBuffer == 0) emptyBuffer = Serial.availableForWrite();
   keepSending();
 #ifdef ODRIG_PROBE
   if (longLineWaits()) return;
 #endif
+  // A `#plan` line is written between replies: until it is whole, nothing is read.
+  if (planWaits(plan)) return;
   // While the pacing holds lines back, what arrives stays in the port's queue.
   if (OdrigFiles::holding()) return;
   for (int taken = 0; taken < BYTES_PER_PASS && Serial.available() > 0; taken++) {

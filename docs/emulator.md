@@ -5,7 +5,9 @@ the folder that [show.md](show.md) describes. It is the Python package `emulator
 repository root and uses only the Python standard library and the repository's own
 `odrig` package, pure Python, which reads the catalogs. It loads the core as a shared
 library, built from the same `core/src/*.cpp` the firmware compiles, and leaves every
-decision about files, time and commands to it. So it plays texts and clocks as the board
+decision about files, time and commands to it. Its [mirror of a board](#a-mirror-of-a-board),
+`emulator/mirror/`, is a client of the board as the command tool is, and opens the board's
+port with the command tool's client. So it plays texts and clocks as the board
 does, drawn by the core at every refresh, a clock with the seed `status` reports; its
 suite finds every reference picture of `tests/vectors/procedural/` on its LEDs.
 
@@ -101,6 +103,7 @@ of the Python library of [python-library.md](python-library.md).
 
 ```
 python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR [--drive-read-only] | --drive-folder DIR] [--parent PID]
+python -m emulator SHOW_DIR (--mirror-port NAME | --mirror-tcp ADDRESS | --mirror-http ADDRESS) [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--parent PID]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
@@ -131,10 +134,14 @@ Ctrl-C or Ctrl-Break, and then removes the link to its port and exits with statu
 | `--drive-read-only` | With `--drive`: the core may not change the drive's files, as on a USB stick. | The core may change them, as on the card |
 | `--drive-folder DIR` | The folder `DIR` stands for the card's folder `odrig` itself, and the drive is read-only. Not with `--drive`. See [A folder as the card](#a-folder-as-the-card). | No drive |
 | `--parent PID` | The emulator ends, as on an interrupt, within a second or two after the process with this id ends, even when that process was killed without ending it. The preview and the tests give their own id, so that no emulator outlives them. | It runs until it is stopped |
+| `--mirror-port NAME` | The emulator is the mirror of the board on this serial port, `COM5` or `/dev/cu.usbmodem101`. See [A mirror of a board](#a-mirror-of-a-board). | No mirror |
+| `--mirror-tcp ADDRESS` | The emulator is the mirror of the emulator whose line port is at `host:port`. | No mirror |
+| `--mirror-http ADDRESS` | The emulator is the mirror of the board or the emulator at this address over HTTP: `host`, `host:port` or `http://host`. | No mirror |
 
-There is no option for the size of the canvas and none that names an address: the canvas
-is the one of `mapping.json` in the folder, and the emulator listens on 127.0.0.1, or
-with `--lan` on every address this computer has.
+There is no option for the size of the canvas and none that names an address of the
+emulator's own: the canvas is the one of `mapping.json` in the folder, and the emulator
+listens on 127.0.0.1, or with `--lan` on every address this computer has. The address of
+`--mirror-tcp` and `--mirror-http` is the board's, which the emulator reaches.
 
 **Storage.** The emulator gives the core the storage functions of [core.md](core.md) on
 the folder it was started on, and on nothing else: a name with a path separator, or one
@@ -280,6 +287,10 @@ python -m odrigctl --port build/emulator/serial status
   that room is full and stays full for a second, what waits is dropped to make room for the
   newer replies, as the output of a board is lost when nobody listens. A program should
   discard what is waiting when it opens the port, as the command tool does.
+- The port is the serial way 1 of the plan's push, [commands.md](commands.md#the-plan):
+  after `plan push on` written to it, the emulator writes the `#plan` lines the core has due
+  between the replies, as the board does on its sockets, until `plan push off` or the
+  emulator's end. A program that takes only replies passes over them.
 
 A link left at the path by an earlier run is replaced. If the path holds anything that is
 not a symbolic link, the emulator refuses to start and leaves it untouched. Two emulators
@@ -315,6 +326,11 @@ python -m odrigctl --tcp 127.0.0.1:8601 status
   one connection and not ended is ended by the next bytes that arrive, on whichever
   connection. A program sends whole lines.
 - A command that arrived this way has `tcp` as its transport in the log.
+- Each connection is a serial way of the plan's push, the lowest free one of 2 to 8; one that
+  finds none free has no way, and `plan push on` sent by it is `unsupported`. After `plan
+  push on` a connection is written the `#plan` lines of its way between the replies to its
+  lines, and when it closes its push ends, as `plan push off` would end it; that line is the
+  emulator's own and is not in the log.
 - Stopping the emulator closes every connection.
 
 Two emulators at once need two line ports and two page ports.
@@ -346,6 +362,10 @@ curl --data-binary 'play 2' http://127.0.0.1:8600/odrig
 - The content type of the request is not looked at.
 - The path is `/odrig` exactly. What follows a `?` is ignored.
 - The response that carries a reply has the header `Access-Control-Allow-Origin: *`.
+- HTTP is no serial way: `plan push on` and `plan push off` are answered `unsupported`, and
+  a client of HTTP asks `plan since <version>` for what changed.
+- In a [mirror](#a-mirror-of-a-board), a line no reply came for from the board has its
+  request closed without an answer.
 - An answer without a body closes its connection.
 - Before a 404 or a 405, the body that the request declares with a `Content-Length` is
   read to its end and dropped, so that the closed connection is not reset and the client
@@ -382,6 +402,91 @@ warning: --lan: anyone on the local network can send commands to this emulator a
   emulator only when that is allowed.
 - `--lan` does not go with `--record`: record mode opens no address.
 
+## A mirror of a board
+
+```
+python -m emulator build/demo-20/show --mirror-port COM5
+python -m emulator build/demo-20/show --mirror-tcp 127.0.0.1:8601 --tcp-port 8611 --port 8610
+python -m emulator build/demo-20/show --mirror-http http://192.168.1.40
+```
+
+With one of the three options the emulator is the mirror of a board: it carries every line
+of its clients to the board and the board's reply back, and it shows what the board's plan,
+[commands.md](commands.md#the-plan), says the board shows. The board is reached through its
+USB serial port, with `--mirror-port`; through the [line port](#the-line-port) of another
+emulator, with `--mirror-tcp`, which is how the suites test the mirror without a board; or
+over HTTP, a board at its address or an emulator at its page's, with `--mirror-http`. The
+app in the Controller view, a phone through `--lan` and the command tool are its clients as
+they are the emulator's; the app is the same.
+
+- **Start.** The emulator prints `mirror: serial COM5`, `mirror: tcp 127.0.0.1:8601` or
+  `mirror: http http://192.168.1.40` after its other lines, and opens the link. A link that
+  cannot be opened is tried again every 2 seconds while the emulator runs. `--drive`,
+  `--drive-folder` and `--record` do not go with a mirror: status 2. With `--lan` the
+  warning says that the devices of the network reach the board through the emulator.
+- **The show folder** gives the mapping the LEDs are drawn on. Nothing of its show plays,
+  and nothing is written into it while the mirror runs.
+- **A serial port** is opened as the command tool opens one: 115,200 bits a second, eight
+  data bits, no parity, one stop bit, RTS lowered before DTR, never resetting the chip. It
+  is kept open, and one that goes away is opened again when it comes back. While the
+  emulator holds it, the command tool and its `--log` reach the board through the
+  emulator's line port or serial port; the firmware tool needs the emulator stopped first.
+- **The man in the middle.** Every line a client sends, over HTTP, on the line port or on
+  the serial port, goes to the board, and the board's reply goes back to that client as it
+  came; the emulator's own core answers none of them. Each is in the page's log with the
+  board's reply. Over a serial port or TCP the lines go one at a time in the order they
+  came, a client's line before the mirror's own, each once the reply of the one before has
+  come: a reply goes only to the client of its own line. A line is waited for as long as
+  its client waits, up to 30 seconds, and once its client stopped waiting for 30 seconds
+  more, so that a reply that comes late is dropped and never given to the next line. Over
+  HTTP every line is a request of its own, as a phone sends it. A line that came over HTTP
+  with a line end inside it gets no reply over a serial port or TCP, where it would be two
+  lines.
+- **The board's other lines.** A `#plan` line is the mirror's and reaches no client. Every
+  other line of the board that is no reply, a `#log` line or one of the chip's loader, is
+  written to each client of the line port and of the serial port, between its replies, as
+  the board's own port would give it, and is in the page's log with the transport `board`.
+  A client of HTTP gets replies only.
+- **A lost link** ends every wait. A client of HTTP has its request closed without a reply,
+  as a board that did not answer leaves it, and a client of a port gets nothing.
+
+**The plan.** On joining, the mirror reads the board's `status` and its plan, switches
+planning on with `plan on` and, over a serial port or TCP, the push with `plan push on`,
+and asks for the plan again. It then takes every `#plan` line, and asks `plan since
+<version>` every 10 seconds all the same; over HTTP it asks every 2 seconds, and at once
+after a client's line that may change what plays, every line but those that only read. A
+reply whose `now` went back, or that says planning is off, is a restart or another
+client's `plan off`, and the mirror joins again; over a serial port the lines of the
+chip's loader tell a restart too, and so does a link that was lost and comes back. On
+Ctrl-C the mirror sends `plan push off`, and `plan off` when it had found planning off.
+The header's status is the board's: the latest reply to a `status` the link carried, a
+client's or the mirror's own, which it asks for every 2 seconds.
+
+**The board's clock.** The mirror keeps the board's time less its own from each reply's
+`now` and the middle of the request's round trip: from a round trip no longer than the
+shortest so far, give or take 2 ms, or from one whose answer is further off than half of
+it and 20 ms. The mirror's clock begins at 2^32 milliseconds, 49 days, so that a turn the
+board began before the mirror started has its time 0 on that clock too.
+
+**What it shows.** At every refresh, the item of the latest plan whose part holds the
+board's time: its file at the point of its turn then, with its seed and its brightness,
+and the board's on or off, rotation, display test and miniature output. A new version that
+leaves the item's id and the start of its turn as they were does not restart it. The LEDs
+are dark where the plan says nothing, after the last item's end, for an item whose key is
+`null`, as no catalog of its storage names the file (`catalog rebuild` makes one), while its
+file is fetched, while no plan is known, and for a board whose canvas is not the one of the
+show folder's mapping. While the link is lost the mirror goes on with the plan it has. The
+mapping of the show folder draws the LEDs: the board's pins, WLED's current limiter and the
+budgets of the snakes are not mirrored.
+
+**The files.** An item's file is the local file of its key, `crc-size` as
+[catalog.md](catalog.md) writes it: one the mirror fetched before, kept in `build/mirror/`,
+else a file of `collection/` or of the share's collection, which `ODRIG_ANIMATIONS` in `env`
+names, whose size and CRC-32 are the key's. A key found nowhere is fetched from the board
+with `read <id> <offset> 720`, between the clients' lines, checked against the key once
+whole, and kept as `build/mirror/<key>.odrg`; the turn plays from the board's point once the
+file is there. The look and the fetch run beside the refreshes, which never wait for them.
+
 ## The page
 
 The address the emulator prints is a web page: open it in Safari or Chrome. It is made of
@@ -399,7 +504,14 @@ From top to bottom the page has:
   is playing, which reads `playlist` for the playlist and is the id of a cycle otherwise,
   and the id of the animation on the LEDs. `core` is the `fps` the core
   reports: its refreshes in the last full second. `page` is the page's own count: the
-  refreshes it drew in the last full second.
+  refreshes it drew in the last full second. In a [mirror](#a-mirror-of-a-board) the
+  header names the link, its state, `waiting`, `linked` or `lost`, and the version of the
+  board's plan, and the status is the board's.
+- **The mirror's band.** In a mirror a band says what keeps its LEDs dark or its link from
+  the board: that it waits for the board, that the link is lost and since when, while the
+  mirror goes on with the plan it has, the file of an animation being fetched from the
+  board and how far, a board whose canvas is not the show folder's, with both sizes, or an
+  animation whose file no catalog names.
 - **The reason band.** When the core reports that the show is invalid, a red band shows the
   reason text exactly as the core gives it, for example `show-malformed`. With a
   valid mapping the LEDs are still drawn, all dark. With an invalid mapping there are no
@@ -415,7 +527,8 @@ From top to bottom the page has:
   the length is not known, and shows nothing while nothing plays or a cycle plays.
   Dragging the bar, or pressing on it, moves playback to that point, see
   [Seeking](#seeking); for three seconds after it the row says by how much the
-  emulator's clock moved, `clock +12 s`.
+  emulator's clock moved, `clock +12 s`. A mirror has no seek bar: the page does not move
+  the board's playback.
 - **The command log.** One line for each command that arrived, by the serial port or over
   HTTP: the time it arrived, how it came, the line, and the reply. A line of more than
   200 characters is shown with its first 200, the mark `…` and the number of characters it
@@ -801,7 +914,7 @@ playback and miniature-preview events are:
 
 ```
 event: hello
-data: {"show":"/abs/path/of/show","drive":null,"page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","tcp":null,"legs":[[1,1,180],[2,2,180]],"t0":3,"error":null}
+data: {"show":"/abs/path/of/show","drive":null,"page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","tcp":null,"legs":[[1,1,180],[2,2,180]],"t0":3,"error":null,"mirror":null}
 
 event: log
 data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","length":6,"cut":false,"reply":"{\"ok\":true}"}
@@ -817,19 +930,25 @@ data: 123460 <base64 of the refresh>
 
 event: mini
 data: {"active":false}
+
+event: mirror
+data: {"link":"tcp 127.0.0.1:8601","state":"linked","reason":null,"since":"14:03:20","version":41,"offset":-4294962176,"dark":null,"item":{"id":1,"key":"ddb3ab90-1138"},"fetch":null,"canvas":null}
 ```
 
 | Event | What it carries |
 |---|---|
-| `hello` | First on every connection. `drive` is the folder of `--drive` or of `--drive-folder`, or `null` without either. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
+| `hello` | First on every connection. `mirror` is a mirror's link, `tcp 127.0.0.1:8601`, or `null` for an emulator that mirrors no board. `drive` is the folder of `--drive` or of `--drive-folder`, or `null` without either. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
 | `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial`, `tcp`, `http` or, for a restart the emulator made for a seek, `seek`, `line` the first 200 characters of the line as the core read it, `length` the number of characters of that line, and `reply` the reply without its newline. A line of more than 2,048 characters, which the core cuts to its first 2,048, has `"length":2048` and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
 | `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
 | `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |
 | `position` | Where the animation on the LEDs stands, for the [seek bar](#seeking): its id, the start of the loop that shows and the start of its turn, both on the clock of the frames' timestamps, and the loop's length in milliseconds; each `null` while unknown, and all four `null` while nothing plays or a cycle plays. It is sent to a new connection after the latest status, and at every change: a turn's start, a loop's start, a seek, a length learned. |
+| `mirror` | Only in a [mirror](#a-mirror-of-a-board): `link`; `state`, `waiting` until the link is open, `linked` or `lost`, with `reason` and `since`, the time of day the state began; `version`, the latest plan's, and `offset`, the board's time less the emulator's in milliseconds, each `null` while unknown; `dark`, why the LEDs are dark, `no-plan`, `canvas`, `nothing`, `no-key` or `fetching`, else `null`; `item`, the id and the key of the plan's item on the LEDs; `fetch`, a fetch from the board under way with its `bytes` read and its `size`, else `null`; and `canvas`, the board's and the show folder's sizes while they differ. It is sent to a new connection after the latest position, and at every change. |
 | `mini` | Only for a supporting60x60 target. `active` is the acknowledged virtual-output mode. When true, `rgb` is180bytes encoded in base64, in physical index `x*6+y` of the10x6 miniature; when false, `rgb` is omitted. The page flips y for its top-down canvas. Projection is the core's, not a second renderer. |
 
 A new connection gets `hello`, the log entries kept so far, the latest status, the latest
-position, and then everything that happens. The emulator keeps the last 500 log entries.
+position, a mirror's latest state, and then everything that happens. In a mirror a log
+entry of a client's line has the board's reply and `"board":true`, and the board's other
+lines come with the transport `board`; the mirror's own lines are not in the log. The emulator keeps the last 500 log entries.
 
 Log, status and position events are never dropped. Refreshes do not queue: each connection has one
 place for the newest refresh, and a newer one replaces it, so a page that cannot keep up
@@ -910,6 +1029,7 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] --folder PATH upload ID FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] folder OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] move external|internal ID PATH
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] plan [OPERATION]
 ```
 
 Through the serial port, here the emulator's; for the board the name is its USB serial
@@ -1206,6 +1326,22 @@ sent.
 **`move internal ID PATH`** sends `move internal <ID> <PATH>`, the new full path of a folder of
 the board's own storage, which has no `/` of its own; each name of a path is escaped as a
 URI's, and the ID is sent as it was typed. Another form is status 2, and nothing is sent.
+
+**`plan`** prints the reply of `plan`, what the target will play, as
+[commands.md](commands.md#the-plan) describes it, and **`plan since N`** the short reply while
+the target's version is N, the whole plan otherwise; N is sent as it was typed. **`plan on`**
+and **`plan off`** switch the target's planning on and off. **`plan push on`** and **`plan push
+off`** switch the push of the serial way the line arrives by: through a serial port or the
+line port they print `{"ok":true}`, and over HTTP `unsupported`, status 1. The tool takes the
+reply alone and passes over a `#plan` line; a push it switched on through the line port ends
+when its connection closes, at once, and through a serial port it goes on until `plan push
+off`. Another operation is status 2, and nothing is sent.
+
+```
+python -m odrigctl --port build/emulator/serial plan on
+python -m odrigctl --tcp 127.0.0.1:8601 plan
+python -m odrigctl --http 127.0.0.1:8600 plan since 41
+```
 
 The mapping operation is `get`, `set REV PINS`, or `test on` / `test off`.
 The pin list is twenty comma-separated GPIO numbers, in snake order.
@@ -1534,6 +1670,24 @@ in a narrower window the mapping view of every other step has the arrangement of
     `python -m emulator build/example-broken`. *Seen:* a band under the header shows
     `show-malformed`, in the LEDs view and in the mapping view, and every LED is
     dark.
+
+### A mirror, by eye
+
+The owner's checks of the mirror, open until the owner reports them, as
+[the seed's requirements](specs/87-p2-a-live-mirror-of-the-board-in-the-emulator/requirements.md)
+18.4 name them:
+
+- **Beside the wall over USB.** `python -m emulator build/demo-20/show --mirror-port COM5`
+  beside the wall: the page shows what the wall shows, turn by turn, a clock and a message
+  with the wall's time and words, the LEDs dark while the wall's are off, and the diagonal
+  or a snake's test while one shows.
+- **Over Wi-Fi.** The same with `--mirror-http` and the board's address.
+- **The phone.** The Controller view, and a phone through `--lan`, steer the board through
+  the emulator, and so does a phone straight at the board's address while the mirror runs;
+  the page follows both.
+- **The link.** The header names the link, `linked` and the plan's version; a cable pulled
+  shows the band that the link is lost and since when while the LEDs go on, and put back
+  the mirror joins again.
 
 ### What has been checked
 

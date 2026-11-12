@@ -181,8 +181,13 @@ void player_counts_start(Core &core, uint64_t at);
 // animation the break was to give way to, which opens anew.
 void player_break_leave(Core &core);
 
-// Produces a refresh when a grid time is due: 1 when it did, 0 when none was due.
+// Produces a refresh when a grid time is due: 1 when it did, 0 when none was due. While a
+// mirror is set, the refresh shows its turn in place of the show.
 int player_poll(Core &core, uint64_t now_ms);
+
+// A mirror ends: its file is closed and its test no longer shows; the show goes on from
+// where it was.
+void player_mirror_end(Core &core);
 
 void player_set_brightness(Core &core, uint8_t value);
 
@@ -193,6 +198,39 @@ void player_set_brightness(Core &core, uint8_t value);
 bool player_seed(const Core &core, uint32_t *seed);
 
 uint32_t player_fps(const Core &core, uint64_t now);
+
+// One turn of the plan: when its part begins on the LEDs and when it ends, while `ends`; the
+// turn's own time at its start; the position of its animation; and a widget's seed, while
+// `seeded`.
+struct PlanItem {
+    uint64_t start;
+    uint64_t end;
+    uint64_t from;
+    uint32_t position;
+    uint32_t seed;
+    uint8_t ends;
+    uint8_t seeded;
+};
+
+// The most turns a plan holds, and how long after the start of the turn on the LEDs a turn
+// it holds may begin.
+const uint32_t kPlanMost = 8;
+const uint64_t kPlanSpanMs = 600000;
+
+// Gives the turns of the plan to `take`, the one on the LEDs first, until `take` returns
+// false: with planning off that one alone, with it on the turns decided after it by the code
+// that decides them as they come, run ahead on a copy of the playback's state that is put
+// back afterwards. Nothing while the show is invalid, a test shows or nothing plays.
+void player_plan(Core &core, bool (*take)(const PlanItem &item, void *context), void *context);
+
+// The length of the loop of the animation at a position of the playlist, 0 while it is not
+// known, and the id `list` gives it.
+uint64_t player_loop_of(const Core &core, uint32_t position);
+uint32_t player_id_of(const Core &core, uint32_t position);
+
+// A sign of what a refresh found that the plan follows: what plays and from when, its
+// length, the LEDs' state, the drive, the check and the current playlist.
+uint16_t player_sign(const Core &core);
 
 }  // namespace odrig
 

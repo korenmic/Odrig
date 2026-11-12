@@ -183,6 +183,27 @@ int odrig_core_mini(const odrig_core *core, odrig_mini *out);
  * Failed setup requires the host to keep all outputs dark until a successful retry. */
 int odrig_core_mini_complete(odrig_core *core, uint32_t revision, int success);
 
+/* A turn another player plays, which a host shows in place of the show: the file, opened
+   with open by its name, at the turn's time of each poll, as the core would play it. */
+typedef struct odrig_mirror {
+    char name[33];       /* the file; an empty name shows nothing */
+    uint8_t type;        /* what it holds: 1 frames, 2 a text, 3 a widget */
+    uint8_t on;          /* 1 while the LEDs are on */
+    uint8_t brightness;  /* the brightness it plays at, 0 to 255 */
+    uint8_t rotation;    /* quarter turns clockwise of a square canvas, 0 to 3 */
+    uint8_t test;        /* 0, or the test that shows in its place: 1 the diagonal, 2 a snake's */
+    uint8_t snake;       /* the snake of a snake's test, 1 to 20 */
+    uint32_t serial;     /* a number the host changes whenever the turn changes */
+    uint32_t loop_ms;    /* the length of the file's loop, 0 while it is not known */
+    uint32_t seed;       /* a widget's seed */
+    uint64_t zero_ms;    /* when the turn's time was 0, on the clock of the polls */
+} odrig_mirror;
+
+/* From this call on every poll shows the turn *turn describes, in place of the show, until a
+   call with NULL; the host keeps the description and may change it between polls. Nothing
+   is written to storage meanwhile. Returns 1, or 0 for a null core. */
+int odrig_core_mirror(odrig_core *core, const odrig_mirror *turn);
+
 /* One command line in, one reply out. The line may end with a newline, with or without a
    carriage return before it. Writes the reply, with its newline and without a terminating
    zero, to reply and returns its length. capacity must be at least ODRIG_REPLY_MAX. */
@@ -196,6 +217,27 @@ size_t odrig_core_command(odrig_core *core, uint64_t now_ms,
 void odrig_core_feed(odrig_core *core, uint64_t now_ms,
                      const uint8_t *bytes, size_t length,
                      odrig_reply_fn on_reply, void *reply_ctx);
+
+/* A serial way: a route that carries lines the client did not ask for, numbered by its host
+   from 1 to 8, as a board's two USB sockets or an emulator's serial port and each connection
+   of its line port. odrig_core_command and odrig_core_feed are the lines of no way, which
+   `plan push on` and `plan push off` are refused on. A host whose way ends sends
+   `plan push off` on it. */
+
+/* odrig_core_command and odrig_core_feed for a line that came by a way, 1 to 8. */
+size_t odrig_core_command_on(odrig_core *core, uint64_t now_ms, uint32_t way,
+                             const char *line, size_t length,
+                             char *reply, size_t capacity);
+void odrig_core_feed_on(odrig_core *core, uint64_t now_ms, uint32_t way,
+                        const uint8_t *bytes, size_t length,
+                        odrig_reply_fn on_reply, void *reply_ctx);
+
+/* The line a way is due, while `plan push on` holds for it: `#plan `, the reply of `plan` and
+   a newline, written to line without a terminating zero; returns its length, which is no line
+   given anew until the plan's version changes, or 0 when none is due. capacity must be at
+   least ODRIG_REPLY_MAX + 6. The host writes it between replies, never inside one. */
+size_t odrig_core_plan_line(odrig_core *core, uint64_t now_ms, uint32_t way,
+                            char *line, size_t capacity);
 
 /* The reason the show is invalid, as status reports it, or NULL when it is valid. */
 const char *odrig_core_error(const odrig_core *core);

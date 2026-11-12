@@ -88,7 +88,9 @@ class EmulatorDocument(unittest.TestCase):
         self.assertIn("python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR [--drive-read-only] | --drive-folder DIR] [--parent PID]\n", self.text)
         self.assertIn("python -m emulator SHOW_DIR --record OUT --seconds S [--script FILE] [--core PATH] [--storage BYTES]\n", self.text)
         options = {option for action in app.parser()._actions for option in action.option_strings if option.startswith("--")} - {"--help"}
-        self.assertEqual(options, {"--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--lan", "--drive", "--drive-read-only", "--drive-folder", "--parent", "--record", "--seconds", "--script"})
+        self.assertEqual(options, {"--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--lan", "--drive", "--drive-read-only", "--drive-folder", "--parent", "--record", "--seconds", "--script",
+                                   "--mirror-port", "--mirror-tcp", "--mirror-http"})
+        self.assertIn("python -m emulator SHOW_DIR (--mirror-port NAME | --mirror-tcp ADDRESS | --mirror-http ADDRESS) [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--parent PID]\n", self.text)
         self.assertIn("| `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 13,500,416, the size of the board's storage on its bigger layout |", self.text)
         for option in sorted(options):
             self.assertRegex(self.text, rf"`{option}[ `]", option)
@@ -188,9 +190,10 @@ class EmulatorDocument(unittest.TestCase):
     def test_its_events_are_the_ones_the_emulator_sends(self):
         text = section(self.text, "The event stream")
         events = dict(re.findall(r"event: ([a-z]+)\ndata: (.+)", text))
-        self.assertEqual(sorted(events), ["frame", "hello", "log", "mini", "position", "status"])
+        self.assertEqual(sorted(events), ["frame", "hello", "log", "mini", "mirror", "position", "status"])
         self.assertEqual(json.loads(events["mini"]), {"active": False})
-        self.assertEqual(sorted(json.loads(events["hello"])), ["drive", "error", "legs", "page", "serial", "show", "t0", "tcp"])
+        self.assertEqual(sorted(json.loads(events["hello"])), ["drive", "error", "legs", "mirror", "page", "serial", "show", "t0", "tcp"])
+        self.assertEqual(sorted(json.loads(events["mirror"])), ["canvas", "dark", "fetch", "item", "link", "offset", "reason", "since", "state", "version"])
         entry = hub.Hub().log(5, "serial", b"play 2", False, b'{"ok":true}\n')
         self.assertEqual(sorted(json.loads(events["log"])), sorted(entry))
         self.assertEqual(sorted(json.loads(events["status"])), ["animation", "brightness", "error", "fps", "height", "left", "ok", "on", "playing", "seed", "width"])

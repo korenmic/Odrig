@@ -97,6 +97,11 @@ void keepReply(void *ctx, const char *, size_t, const char *reply, size_t reply_
   memcpy(kept->text, reply, kept->length);
 }
 
+// The serial ways of the core's push: the UART on the socket marked COM, and the chip's
+// own USB socket. HTTP is no way.
+const uint32_t UART_WAY = 1;
+const uint32_t USB_WAY = 2;
+
 // Bytes of the port for the core, up to the end of a line at most, under one hold of the
 // lock: a command so waits for one request for a refresh at most. The timestamp is read
 // after the lock is taken.
@@ -104,22 +109,45 @@ size_t feedBytes(const uint8_t *bytes, size_t length, char *reply, size_t capaci
   if (core == nullptr) return 0;
   Reply kept = {reply, capacity, 0};
   Locked held;
-  odrig_core_feed(core, OdrigFiles::nowMs(), bytes, length, keepReply, &kept);
+  odrig_core_feed_on(core, OdrigFiles::nowMs(), USB_WAY, bytes, length, keepReply, &kept);
   syncLegs();
   return kept.length;
 }
 
-// One command line of the web server, or of the UART, for the core. The web server's
-// runs on the network task; the lock is what lets it call the core. While the pacing
-// holds lines back, it waits before it takes the lock.
-size_t commandLine(const char *line, size_t length, char *reply, size_t capacity) {
+// One command line of the web server, of no way, or of the UART, for the core. The web
+// server's runs on the network task; the lock is what lets it call the core. While the
+// pacing holds lines back, it waits before it takes the lock.
+size_t commandOn(uint32_t way, const char *line, size_t length, char *reply, size_t capacity) {
   if (core == nullptr) return 0;
   while (OdrigFiles::holding()) delay(1);
   Locked held;
-  const size_t answered = odrig_core_command(core, OdrigFiles::nowMs(), line, length, reply, capacity);
+  const size_t answered = way == 0 ? odrig_core_command(core, OdrigFiles::nowMs(), line, length, reply, capacity)
+                                   : odrig_core_command_on(core, OdrigFiles::nowMs(), way, line, length, reply, capacity);
   syncLegs();
   return answered;
 }
+
+size_t commandLine(const char *line, size_t length, char *reply, size_t capacity) {
+  return commandOn(0, line, length, reply, capacity);
+}
+
+size_t uartLine(const char *line, size_t length, char *reply, size_t capacity) {
+  return commandOn(UART_WAY, line, length, reply, capacity);
+}
+
+// The `#plan` line the core has due on a way, or 0. It is asked at every pass of the loop,
+// so the lock is only tried: while a refresh holds it, the line is asked for at the next
+// pass, and the loop never waits for it. The timestamp is read after the lock is taken.
+size_t planOn(uint32_t way, char *line, size_t capacity) {
+  if (core == nullptr || xSemaphoreTake(lock, 0) != pdTRUE) return 0;
+  const size_t length = odrig_core_plan_line(core, OdrigFiles::nowMs(), way, line, capacity);
+  xSemaphoreGive(lock);
+  return length;
+}
+
+size_t uartPlan(char *line, size_t capacity) { return planOn(UART_WAY, line, capacity); }
+
+size_t usbPlan(char *line, size_t capacity) { return planOn(USB_WAY, line, capacity); }
 
 // Physical output resources remain fixed. The cached RGB pointers follow the
 // logical leg currently assigned to each pin, under the core lock.
@@ -386,8 +414,8 @@ class OdrigUsermod : public Usermod {
     OdrigLeds::keepLive();
     // WLED answers the lookups of its captive portal only outside its live mode.
     if (apActive) dnsServer.processNextRequest();
-    OdrigSerial::poll(feedBytes);
-    OdrigUart::poll(commandLine);
+    OdrigSerial::poll(feedBytes, usbPlan);
+    OdrigUart::poll(uartLine, uartPlan);
     if (serviceMini(refreshFilled)) return;
     OdrigLeds::hold();
 #ifdef ODRIG_PROBE

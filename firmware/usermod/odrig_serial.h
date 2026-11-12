@@ -11,14 +11,21 @@ namespace OdrigSerial {
 // returned; otherwise 0. `capacity` is at least ODRIG_REPLY_MAX.
 typedef size_t (*Feed)(const uint8_t *bytes, size_t length, char *reply, size_t capacity);
 
+// The `#plan` line the player has due on the port's way, put into `line` with its length
+// returned, or 0 when none is due. `capacity` is at least ODRIG_REPLY_MAX + 6.
+typedef size_t (*Plan)(char *line, size_t capacity);
+
 // Gives the port a queue of 4,096 bytes for what it receives. Called once, in setup().
 void begin();
 
 // Takes what the port has received, at most 256 bytes in one call, hands the bytes to
 // `feed` unchanged and in order, a line at a time, and writes every reply to the port.
 // It also sees to it that what was written before leaves the chip. While the pacing of
-// odrig_files.h holds lines back, it takes nothing, and after a line it asks again.
-void poll(Feed feed);
+// odrig_files.h holds lines back, it takes nothing, and after a line it asks again. The
+// `#plan` line `plan` has due is written in the pieces the port takes without waiting,
+// one piece in each call, and nothing is read from the port until all of it is written,
+// so that no reply lands inside it.
+void poll(Feed feed, Plan plan);
 
 // Writes bytes to the port.
 void write(const char *bytes, size_t length);

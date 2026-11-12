@@ -1176,6 +1176,24 @@ the show became invalid, as WLED's information shows it.
   settings. The probe builds, which start neither the card's reader nor the USB host,
   have the player's lines only.
 
+**The plan's lines.** Each USB socket is a serial way of the core's push,
+[commands.md](commands.md#the-plan): the UART of the socket marked COM is way 1 and the
+chip's own socket way 2, and a line that came by either reaches the core with its way;
+`POST /odrig` comes by no way, and `plan push on` sent there is `unsupported`. After
+`plan push on` on a socket, the firmware writes there the `#plan` lines the core has due,
+the first at once and one after every new version, the newest alone:
+
+- On the socket marked COM a line is written after the log's waiting lines, whole, when the
+  UART's queue of 2,048 bytes takes all of it, 1,032 bytes with its margin, and never
+  while a line that came waits for its reply.
+- On the chip's own socket a line is written in the pieces its buffer takes, one piece at
+  each pass of the loop, and the socket reads nothing until the line is whole, so no reply
+  lands inside it.
+- A pass of the loop asks the core for a line with the lock tried, not waited for: while a
+  refresh holds the lock, the line is asked for at the next pass.
+
+The push is not saved; a restart ends it on both sockets.
+
 **Commands over HTTP.** WLED's web server answers `POST /odrig` as
 [commands.md](commands.md) defines it and as the emulator does; the body goes to the same
 core the port reaches:

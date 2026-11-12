@@ -19,7 +19,8 @@ from emulator import binding
 from . import BUILD_SCRIPT, LIBRARY, ROOT, support
 
 MAKEFILE = ROOT / "core" / "Makefile"
-PUBLIC_API = ["odrig_core_begin", "odrig_core_poll", "odrig_core_power", "odrig_core_leg_count", "odrig_core_leg", "odrig_core_mini_support", "odrig_core_mini", "odrig_core_mini_complete", "odrig_core_command", "odrig_core_feed", "odrig_core_error"]
+PUBLIC_API = ["odrig_core_begin", "odrig_core_poll", "odrig_core_power", "odrig_core_leg_count", "odrig_core_leg", "odrig_core_mini_support", "odrig_core_mini", "odrig_core_mini_complete", "odrig_core_mirror",
+              "odrig_core_command", "odrig_core_feed", "odrig_core_command_on", "odrig_core_feed_on", "odrig_core_plan_line", "odrig_core_error"]
 
 # A library of Windows itself: its kernel, or one of the sets its C run-time is reached by.
 OF_WINDOWS = re.compile(r"\A(kernel32|ntdll|ucrtbase|msvcrt|api-ms-win-[a-z0-9-]+)\.dll\Z")
@@ -449,7 +450,7 @@ class TheLibraryOfTheSystem(unittest.TestCase):
         self.assertIn(f"`{binding.BUILD_COMMAND}`", caught.exception.detail)
 
     @unittest.skipUnless(sys.platform == "win32", "the shared library is a DLL on Windows only")
-    def test_the_dll_exports_the_seven_functions_and_needs_only_libraries_of_windows(self):
+    def test_the_dll_exports_the_functions_of_the_header_and_needs_only_libraries_of_windows(self):
         imported, exported = support.dll_tables(LIBRARY)
         self.assertEqual(sorted(exported), sorted(PUBLIC_API))
         self.assertTrue(imported)

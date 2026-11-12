@@ -725,7 +725,7 @@ class BytePort:
         else:
             from emulator import lineport
 
-            self.port = lineport.Port(0, feed)
+            self.port = lineport.Port(0, lambda data, way: feed(data))
             self.target = ("--tcp", self.port.address)
         self.port.start()
 

@@ -444,6 +444,10 @@ struct Core {
 
     Mini *mini;
 
+    // The turn a mirror shows in place of the show, as the host describes it; null while the
+    // core plays its show.
+    const odrig_mirror *mirror;
+
     LegInfo *legs;
 
     uint16_t *led_pixel;    // for each LED, the position of its pixel in pixel order
@@ -859,6 +863,17 @@ struct Core {
 
     // The id of the internal folder `clocks`, 0 while there is none.
     uint16_t clocks_internal_id;
+
+    // The plan: the count of its changes, the noise the draws take while planning is on,
+    // a sign of what the latest refresh found, and for ways 1 to 8 two bits each, the
+    // push on and a line due; whether planning is on, and whether a reply is deciding the
+    // turns ahead.
+    uint16_t plan_sign;
+    uint16_t plan_ways;
+    uint32_t plan_version;
+    uint32_t plan_noise;
+    uint8_t plan_on : 1;
+    uint8_t plan_projecting : 1;
 
 };
 

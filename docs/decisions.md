@@ -163,7 +163,9 @@ draws them at every refresh from those settings, with fonts and clocks that are 
 the core and the converter alike, generated from one source; a file names a font or a
 clock and brings no glyph, no code and no network to the player. The converter makes a
 text's layout and stores it, and the core checks its bounds and draws it. A clock's
-randomness comes from the timing of the refreshes, mixed with the turn. See
+randomness comes from the timing of the refreshes, mixed with the turn; while planning is
+on, from that of the moment planning was switched on, so the plan names a turn's seed before
+the turn begins (the owner, 2026-11-10, seed 87). See
 [format.md](format.md), "ODRGX".
 
 The widget payload was extended on purpose with seed 52: two picture clocks, a picture
@@ -256,6 +258,11 @@ are in [format.md](format.md), "Measured sizes".
   command-line tool sends them to either target by either route.
 - There is one list of commands for every route. A command is added to all routes or to
   none, and the owner approves every addition.
+- A client learns what the board will play from its plan, never from its pixels: `plan`,
+  `plan since <version>`, `plan on` and `plan off` on every route, and `plan push on` and
+  `plan push off`, which a serial way carries and HTTP answers `unsupported`. Planning is off
+  at every start. While it is on, the board decides its next turns ahead, a widget's seed
+  among what it decides (the owner, 2026-11-10, seed 87).
 
 ## Emulator
 
@@ -1053,3 +1060,16 @@ and the current playlist's path follows the move. A moved folder takes its place
 new siblings by the bytes of their names, as the owner ruled the same day for the card's
 moved folders. The host interface, the format of `folders.txt`, the card's catalog and the
 Python library are as they were. The core's memory is as it was.
+
+### Seed 87: the plan of the board
+
+On 2026-11-10 the owner approved a new seed in which the board reports what it will play, and
+the emulator shows it beside the wall as a mirror of the board: `plan`, `plan since
+<version>`, `plan on`, `plan off`, `plan push on` and `plan push off`; the approval covers the
+addition to the command list, and "plan should be toggleable" is `plan on` and `plan off`.
+The board tells identities and times, never pixels: each turn's start and end, its point,
+its animation's id and its file's key, a widget's seed and its brightness. Planning is off
+at every start; while it is on, the board decides its next turns ahead by the code that
+decides them as they come, and a widget's seed is drawn from the noise of the moment
+planning was switched on, so the plan names it before the turn begins. The core keeps no
+table of the plan: a reply decides it on the stack, and the core object grows by 16 bytes.

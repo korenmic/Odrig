@@ -78,6 +78,12 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `move internal <folder-id> <path>` | Moves or renames a folder of the board's own storage, its sub-folders with it, every id and setting kept. |
 | `debug mini on` | Requests temporary miniature output; status reports host acknowledgement. |
 | `debug mini off` | Requests restoration of normal output. |
+| `plan` | Reports the plan: the turn on the LEDs and, while planning is on, the turns decided after it. |
+| `plan since <version>` | Reports the plan only when its version is not the one given. |
+| `plan on` | Switches planning on, until `plan off` or a restart. |
+| `plan off` | Switches planning off. |
+| `plan push on` | Gives the serial way the line came by the plan as a `#plan` line, at once and after every new version. |
+| `plan push off` | Ends the push of that way. |
 
 At power-on brightness comes from `show.json` and the show plays what
 [show.md](show.md) specifies. The LEDs start on unless a saved manual override says
@@ -793,6 +799,78 @@ before a physical check. Firmware compilation and physical acceptance are open.
 The host description is at most 127 input bytes and 256 escaped bytes, ending at a
 character boundary, so expanded status remains within the fixed reply limit.
 
+## The plan
+
+`plan` reports what the board will play: the turn on the LEDs and, while planning is on, the
+turns it has decided to play after it, so that a client can show what the LEDs show without
+asking at every turn and without a pixel. The emulator's mirror of a board,
+[emulator.md](emulator.md), is such a client. The six forms of `plan` were approved by the
+owner on 2026-11-10.
+
+```
+plan
+{"ok":true,"planning":true,"version":41,"now":5120334,"on":true,"brightness":128,"rotation":0,"mini":false,"test":false,"snake":null,"items":[{"start":5101200,"end":5131200,"id":60004,"key":"9f3a10c2-52340","loop":4000},{"start":5131200,"end":5137200,"id":11,"key":"0c11d2e4-40","loop":3000,"seed":2271034987},{"start":5137200,"end":5138200,"id":13,"key":"77ab0f10-1052","loop":1000},{"start":5138200,"end":5150000,"from":30000,"id":60004,"key":"9f3a10c2-52340","loop":4000}]}
+plan since 41
+{"ok":true,"planning":true,"version":41,"now":5122410,"unchanged":true}
+```
+
+| Member | Meaning |
+|---|---|
+| `planning` | Whether planning is on. |
+| `version` | 1 at the start, one more at each change of what the reply says, `now` aside; counted with planning off too. |
+| `now` | The core's time of the reply: the milliseconds of the clock of its refreshes, since its start. Every time of the reply is on that clock. |
+| `on`, `brightness` | Whether the LEDs are on now, and the runtime default brightness, as `status` gives them. |
+| `rotation` | The saved output orientation, in degrees. |
+| `mini` | Whether the miniature output is acknowledged on. |
+| `test`, `snake` | As `mapping get` gives them: whether a test of the mapping shows, and the snake whose test it is, else `null`. |
+| `items` | The turns, the one on the LEDs first; empty while nothing plays, while the show is invalid and while a test shows. |
+
+An item: `start`, when its part begins on the LEDs; `end`, when it ends, or `null` while that
+is not known yet; `from`, the turn's own time at `start` in milliseconds, given when it is
+not 0, as for a turn that goes on after a break; `id`, its animation's id, as `play` and
+`read` take it; `key`, its file's key, `crc-size` as [catalog.md](catalog.md) writes it, or
+`null` while no catalog names the file; `loop`, the length of its loop in milliseconds when
+it is known; `seed`, a widget's seed when it is known; and `brightness`, when the file's saved
+brightness makes it differ from the default. The turn's point at a moment T of its part is
+`from + (T - start)`. The item on the LEDs of a turn that went on after a break may give the
+moment its turn's time was 0 as `start`, with no `from`: its point at any moment is the same.
+The reply holds as many items as fit into 1,024 bytes, in order.
+
+- **Planning.** `plan on` and `plan off` switch planning on and off for the whole board and
+  answer `{"ok":true}`. It is off at every start and is not saved. With planning off each
+  turn is decided as it begins, and the reply holds the item on the LEDs alone, its `seed`
+  only once the turn has drawn it. With planning on the board decides, when it is asked, the
+  turns that begin within 10 minutes of the start of the turn on the LEDs, at most 8 with
+  it, as the end of each turn decides the next; what the plan holds is what plays, unless a
+  change comes first.
+- **The draws.** While planning is on, a widget's seed and a new order of the clocks or of the
+  messages are drawn from the noise of the moment planning was switched on, in place of the
+  noise of the moment, so the plan names a seed before its turn begins.
+- **Where it stops.** The plan ends at a turn whose end is not known yet, an animation whose
+  loop's length the board has not learnt, at the turn during which the current playlist's
+  window passes, and where nothing would play.
+- **A cycle** gives its turns: each animation of its list for its `seconds`, a text's rounded
+  up to whole passes.
+- **Versions.** Every command line makes a new version but the lines that only read:
+  `status`, `space`, `fault`, `list`, `read`, `saved`, `catalog`, `catalog page`, `order get`,
+  `mapping get`, `rotation`, `time`, `schedule`, `plan` and `plan since`. So do the turn on the
+  LEDs that changes, a drive taken up or dropped, a file read whole or found faulty, a catalog
+  read again, the window that passes, the schedule switching the LEDs and the miniature output
+  acknowledged. A change may leave the reply as it was; the version never stays when it
+  changed.
+- **`plan since <version>`** answers the short reply above while the board's version is the one
+  given, and the whole plan otherwise, so a client that polls gets the plan only when it
+  changed, and one whose board restarted gets it at once. `<version>` is 0 to 4,294,967,295
+  in decimal.
+- **The push.** A serial way carries lines the client did not ask for: the board's two USB
+  sockets, the emulator's serial port and each connection of its line port. `plan push on`
+  sent by such a way makes the board write on it, between replies and never inside one,
+  `#plan ` and the reply `plan` would give, at once and after every new version, the newest
+  alone when versions come faster than the way takes them; `plan push off` ends it. Both
+  answer `{"ok":true}`. The push is not saved, and a restart ends it on every way. HTTP
+  carries no line the client did not ask for: there both are answered `unsupported`.
+- Another form of `plan` is `bad-argument`. `plan` is answered while the show is invalid too.
+
 ## Error codes
 
 | Code | When |
@@ -801,7 +879,7 @@ character boundary, so expanded status remains within the fixed reply limit.
 | `unknown-command` | The first word is not a command. |
 | `bad-argument` | An argument is missing, extra, not a number, out of range, or not in its form: a file name outside the naming rule, base64 that is not as described or stands for more bytes than `chunk`, a CRC-32 that is not eight hexadecimal digits, or a word after `upload` that is not `begin`, `data`, `end` or `cancel`; `move external` of a file whose new path would pass 100 bytes; `move internal` of a folder into itself or below it, or one whose subtree would pass the limits of a folder's or a file's path. |
 | `show-invalid` | `play`, `list`, `read`, `remove`, `repeat`, `clocks` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
-| `unsupported` | `debug mini` needs a supporting host and an installed60x60 canvas; `folder make` on a host that makes no folders, `folder make internal`, `move internal`, and `folder remove` of a folder of the board's own storage, on one whose storage cannot be changed, and `play` of a folder of the board's own storage on a host that keeps no current playlist. Judged after syntax. |
+| `unsupported` | `debug mini` needs a supporting host and an installed60x60 canvas; `folder make` on a host that makes no folders, `folder make internal`, `move internal`, and `folder remove` of a folder of the board's own storage, on one whose storage cannot be changed, and `play` of a folder of the board's own storage on a host that keeps no current playlist; `plan push on` and `plan push off` over HTTP, which is no serial way. Judged after syntax. |
 | `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
@@ -834,9 +912,10 @@ replies are the same on every transport.
 
 **Lines that are no reply.** On the board's serial ports, a line that begins with `#` is
 no reply: the firmware writes its log there between replies, as
-[firmware.md](firmware.md#the-log) describes, and the chip's loader prints lines at a
-start. A reply is a line that is a JSON object with `ok`; a client passes over every
-other line.
+[firmware.md](firmware.md#the-log) describes, the `#plan` lines of a way whose push is on,
+[The plan](#the-plan), and the chip's loader prints lines at a start. The emulator's serial
+port and line port carry `#plan` lines as well. A reply is a line that is a JSON object with
+`ok`; a client passes over every other line.
 
 **HTTP.** A command is sent as `POST /odrig` with the command line as the request body, with
 or without the final newline. The response body is the reply line, with content type

@@ -298,6 +298,9 @@ int brightness_saved(const Core &core, uint32_t position) {
 }
 
 uint8_t brightness_selected(const Core &core) {
+    if (core.mirror != nullptr) {
+        return core.mirror->brightness;
+    }
     const int saved = brightness_saved(core, core.invalid || core.playing == kNothing ? kNothing : core.shown);
     return saved < 0 ? core.brightness : static_cast<uint8_t>(saved);
 }

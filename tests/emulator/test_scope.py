@@ -9,6 +9,9 @@ from . import support
 EMULATOR = support.ROOT / "emulator"
 TOOL = support.ROOT / "odrigctl"
 PACKAGES = (EMULATOR, TOOL)
+# The mirror is the emulator's client of a board, as the command tool is: it opens the
+# board's port with the command tool's client.
+MIRROR = EMULATOR / "mirror"
 
 # The proof-of-concept scripts that speak WLED's own protocol. They stay untracked.
 PROOF_OF_CONCEPT_TOOLS = ("wled.py", "wled_send.py", "wled_deploy.py")
@@ -18,6 +21,12 @@ def modules(package):
     """`(path, syntax tree)` for every module of a package."""
     paths = sorted(package.rglob("*.py"))
     return [(path, ast.parse(path.read_text(encoding="utf-8"), filename=str(path))) for path in paths]
+
+
+def allowed(package, path):
+    """The packages a module may import beside the standard library: its own, and for the
+    mirror the command tool."""
+    return {package.name, "odrigctl"} if MIRROR in path.parents else {package.name}
 
 
 def imported(tree):
@@ -47,12 +56,12 @@ class Scope(unittest.TestCase):
         for package in PACKAGES:
             for path, tree in modules(package):
                 for name in sorted(imported(tree)):
-                    self.assertTrue(name in sys.stdlib_module_names or name == package.name, f"{package.name}/{path.name} imports {name}")
+                    self.assertTrue(name in sys.stdlib_module_names or name in allowed(package, path), f"{package.name}/{path.name} imports {name}")
 
     def test_no_module_imports_the_converter_or_the_other_package(self):
         for package in PACKAGES:
-            others = {"odrig", "emulator", "odrigctl", "tests", "tools"} - {package.name}
             for path, tree in modules(package):
+                others = {"odrig", "emulator", "odrigctl", "tests", "tools"} - allowed(package, path)
                 self.assertEqual(imported(tree) & others, set(), f"{package.name}/{path.name}")
 
     def test_only_the_binding_and_the_serial_port_of_windows_import_ctypes(self):
@@ -62,14 +71,14 @@ class Scope(unittest.TestCase):
     def test_the_emulator_holds_no_decoder_no_show_reader_and_no_command_names(self):
         for path, tree in modules(EMULATOR):
             self.assertNotIn("zlib", imported(tree), path.name)
-            for text in texts(tree):
-                self.assertNotIn(text, ("ODRG", "show.json", "play", "brightness", "on", "off", "list", "upload", "upload.part", "show.part", "pending.txt"), f"{path.name} writes out {text!r}")
-                # The binding names the members of the host record, and two of them are
-                # spelled as commands are.
-                if path.name != "binding.py":
-                    self.assertNotIn(text, ("space", "remove"), f"{path.name} writes out {text!r}")
-        users = sorted(path.name for path, tree in modules(EMULATOR) if "json" in imported(tree))
-        self.assertEqual(users, ["hub.py"])
+            # The binding names the members of the host record and of the mirror's record,
+            # and four of them are spelled as commands are; the mirror reads two such members
+            # of the board's plan.
+            members = {"space", "remove", "on", "brightness"} if path.name == "binding.py" else {"on", "brightness"} if MIRROR in path.parents else set()
+            for text in set(texts(tree)) - members:
+                self.assertNotIn(text, ("ODRG", "show.json", "play", "brightness", "on", "off", "list", "upload", "upload.part", "show.part", "pending.txt", "space", "remove"), f"{path.name} writes out {text!r}")
+        users = sorted(str(path.relative_to(EMULATOR)).replace("\\", "/") for path, tree in modules(EMULATOR) if "json" in imported(tree))
+        self.assertEqual(users, ["hub.py", "mirror/keeper.py"])
 
     def test_the_addresses_a_source_names_are_this_computer_every_address_and_one_for_documents(self):
         # 127.0.0.1 is where everything listens; 0.0.0.0 is where the page listens when
@@ -109,6 +118,10 @@ class Scope(unittest.TestCase):
             cwd=support.ROOT, capture_output=True, text=True, check=True,
         ).stdout.split()
         self.assertEqual(changed, [])
+
+    def test_only_the_mirrors_link_imports_the_command_tool(self):
+        users = sorted(str(path.relative_to(EMULATOR)).replace("\\", "/") for path, tree in modules(EMULATOR) if "odrigctl" in imported(tree))
+        self.assertEqual(users, ["mirror/link.py"])
 
     def test_the_checks_find_what_they_look_for(self):
         tree = ast.parse("import os, ctypes.util\nfrom odrig import odrg\nfrom . import failure\nfrom .host import FolderHost\nimport numpy\nADDRESS = '0.0.0.0'\n")

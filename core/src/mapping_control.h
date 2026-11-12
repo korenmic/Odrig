@@ -20,6 +20,10 @@ void mapping_test_stop(Core &core);
 // its block at the place of the time since the player started.
 void snake_test_draw(Core &core, uint64_t now);
 
+// Shows a test for a mirror, the diagonal for snake 0 or that snake's test, without the
+// show's playback stopped or saved: false when the diagonal could not be decoded.
+bool mapping_mirror_test(Core &core, uint32_t snake);
+
 }  // namespace odrig
 
 #endif

@@ -282,6 +282,16 @@ uint32_t mapping_test(Core &core, bool enabled, uint32_t snake, Reply &reply) {
     return succeed(reply);
 }
 
+bool mapping_mirror_test(Core &core, uint32_t snake) {
+    core.mapping_test = 1;
+    core.mapping_snake = static_cast<uint8_t>(snake);
+    if (snake == 0 && !decode_diagonal(core)) {
+        core.mapping_test = 0;
+        return false;
+    }
+    return true;
+}
+
 void snake_test_draw(Core &core, uint64_t now) {
     const uint32_t travel = core.height - kSnakeBlock;
     const uint64_t step = (now - core.t0) / kSnakeStepMs;

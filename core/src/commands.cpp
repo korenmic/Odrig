@@ -12,6 +12,7 @@
 #include "mapping_control.h"
 #include "odrig_core.h"
 #include "order.h"
+#include "plan.h"
 #include "player.h"
 #include "mini.h"
 #include "rotation.h"
@@ -703,7 +704,8 @@ uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
 
 }  // namespace
 
-uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t length, char *bytes) {
+// Carries out one command line that came by a way and writes its reply.
+uint32_t answer_line(Core &core, uint64_t now_ms, const char *line, uint32_t length, char *bytes, uint32_t way) {
     const uint64_t now = clock_touch(core, now_ms);
     upload_touch(core, now);
     schedule_touch(core, now);
@@ -1132,23 +1134,47 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (words.count >= 2 && words.is(1, "begin") && (core.mapping_test || catalog_rebuilding(core))) return refuse(reply, "busy");
         return upload(core, now, words, reply);
     }
+    if (words.is(0, "plan")) {
+        if (words.count == 1) return plan_answer(core, now, reply);
+        uint32_t version = 0;
+        if (words.count == 3 && words.is(1, "since") && number_word(words, 2, 0, 0xFFFFFFFFu, &version)) {
+            return plan_since(core, now, version, reply);
+        }
+        if (words.count == 2 && (words.is(1, "on") || words.is(1, "off"))) return plan_switch(core, words.is(1, "on"), reply);
+        if (words.count == 3 && words.is(1, "push") && (words.is(2, "on") || words.is(2, "off"))) {
+            // HTTP carries no line the client did not ask for.
+            if (way == 0 || way > kPlanWays) return refuse(reply, "unsupported");
+            return plan_push(core, way, words.is(2, "on"), reply);
+        }
+        return refuse(reply, "bad-argument");
+    }
     return refuse(reply, "unknown-command");
+}
+
+uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t length, char *bytes, uint32_t way) {
+    const uint32_t answered = answer_line(core, now_ms, line, length, bytes, way);
+    // A line that may change what plays or how it shows makes a new version of the plan.
+    if (!plan_reads_only(line, length)) {
+        plan_bump(core);
+    }
+    return answered;
 }
 
 }  // namespace odrig
 
-size_t odrig_core_command(odrig_core *core, uint64_t now_ms, const char *line, size_t length,
-                          char *reply, size_t capacity) {
+namespace {
+
+size_t command_on(odrig_core *core, uint64_t now_ms, uint32_t way, const char *line, size_t length, char *reply, size_t capacity) {
     if (core == nullptr || (line == nullptr && length != 0) || reply == nullptr || capacity < ODRIG_REPLY_MAX) {
         return 0;
     }
     // A line is refused for its length long before its length could not be counted.
     const uint32_t counted = length > 0xFFFFu ? 0xFFFFu : static_cast<uint32_t>(length);
-    return odrig::command_answer(core->state, now_ms, line, counted, reply);
+    return odrig::command_answer(core->state, now_ms, line, counted, reply, way);
 }
 
-void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, size_t length,
-                     odrig_reply_fn on_reply, void *reply_ctx) {
+void feed_on(odrig_core *core, uint64_t now_ms, uint32_t way, const uint8_t *bytes, size_t length, odrig_reply_fn on_reply,
+             void *reply_ctx) {
     if (core == nullptr || (bytes == nullptr && length != 0)) {
         return;
     }
@@ -1180,7 +1206,7 @@ void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, si
             refusal.length = 0;
             reply_length = odrig::refuse(refusal, "line-too-long");
         } else {
-            reply_length = odrig::command_answer(state, now_ms, state.line, kept, reply);
+            reply_length = odrig::command_answer(state, now_ms, state.line, kept, reply, way);
             if (kept != 0 && state.line[kept - 1] == '\r') {
                 --kept;
             }
@@ -1194,4 +1220,34 @@ void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, si
             on_reply(reply_ctx, state.line, kept, reply, reply_length);
         }
     }
+}
+
+}  // namespace
+
+size_t odrig_core_command(odrig_core *core, uint64_t now_ms, const char *line, size_t length,
+                          char *reply, size_t capacity) {
+    return command_on(core, now_ms, 0, line, length, reply, capacity);
+}
+
+size_t odrig_core_command_on(odrig_core *core, uint64_t now_ms, uint32_t way, const char *line, size_t length,
+                             char *reply, size_t capacity) {
+    return command_on(core, now_ms, way, line, length, reply, capacity);
+}
+
+void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, size_t length,
+                     odrig_reply_fn on_reply, void *reply_ctx) {
+    feed_on(core, now_ms, 0, bytes, length, on_reply, reply_ctx);
+}
+
+void odrig_core_feed_on(odrig_core *core, uint64_t now_ms, uint32_t way, const uint8_t *bytes, size_t length,
+                        odrig_reply_fn on_reply, void *reply_ctx) {
+    feed_on(core, now_ms, way, bytes, length, on_reply, reply_ctx);
+}
+
+size_t odrig_core_plan_line(odrig_core *core, uint64_t now_ms, uint32_t way, char *line, size_t capacity) {
+    if (core == nullptr || line == nullptr) {
+        return 0;
+    }
+    odrig::Core &state = core->state;
+    return odrig::plan_line(state, odrig::clock_touch(state, now_ms), way, line, capacity);
 }

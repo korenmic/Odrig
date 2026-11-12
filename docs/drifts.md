@@ -15355,6 +15355,176 @@ Clocks folders alone, as the chooser already did.
 **Resolution.** `app/www/screens/explorer.js`, `docs/android-app.md`,
 `tests/app/test_only_both.py`, `tests/app/page/scenarios/only-folder-moves.js`.
 
+## Seed 87: the plan without a table
+
+**Question.** The seed asks for a fixed table of the plan, counted in the memory table, with
+one turn decided at a refresh. With a drive, the core has 27 bytes left under the 131,072 the
+suite allows, and a table of 8 turns with the state to go on deciding takes hundreds. What
+keeps the plan?
+
+**Answer.** Nothing but its version, the noise of its draws, a 16-bit sign of the latest
+refresh and two bits, 16 bytes in all: a reply of `plan` decides the turns when it is asked,
+on a copy of the playback's fields on the stack that is put back afterwards. A reply decides
+up to 8 turns at once rather than one a refresh; on the board it takes some milliseconds of
+one command, which may make one refresh late, and time is not stretched by it.
+
+**Resolution.** `core/src/plan.cpp`, `core/src/player.cpp`, `docs/core.md`.
+
+## Seed 87: the span of the plan
+
+**Question.** The plan holds the turns that begin within the next 10 minutes. Counted from
+the moment of the reply, a turn would enter the reply in the middle of a turn with nothing
+that changed, and the version could not know it. From when?
+
+**Answer.** From the start of the turn on the LEDs: the reply then holds still through a turn,
+and a new turn makes a new version anyway.
+
+**Resolution.** `core/src/player.cpp` (`kPlanSpanMs`), `docs/commands.md`.
+
+## Seed 87: what an item of the plan says
+
+**Question.** The seed names an item's start, end, point, id, key, seed and brightness. The
+mirror also needs the length of the file's loop to find the picture of a late point, and a
+turn that went on after a break may be the one on the LEDs. What else does an item say?
+
+**Answer.** `loop`, the loop's length in milliseconds when it is known. The item on the LEDs
+of a turn that went on after a break gives the moment its turn's time was 0 as `start`, with
+no `from`, since the core keeps no mark of the resume: the point at any moment is the same.
+A later item that goes on after a break gives the moment it goes on and its `from`.
+
+**Resolution.** `core/src/plan.cpp`, `docs/commands.md`.
+
+## Seed 87: where the plan stops
+
+**Question.** Deciding past the end of the current playlist's window would make the next
+playlist current, write its path and mark `playlist.txt` to be written. Does the plan go
+through it?
+
+**Answer.** No: it stops at the turn during which the window passes; the turns of the next
+playlist are planned once it has passed, at the new version that the turn's change makes.
+It stops too at a turn whose loop's length is not known yet, its `end` null, and where nothing
+would play.
+
+**Resolution.** `core/src/player.cpp`.
+
+## Seed 87: the lines that only read
+
+**Question.** Every command line that may change what plays makes a new version. Which lines
+do not?
+
+**Answer.** `status`, `space`, `fault`, `list`, `read`, `saved`, `catalog` alone and `catalog
+page`, `order get`, `mapping get`, and `rotation`, `time`, `schedule` and `plan` alone, and
+`plan since`. Every other line counts, a refused one too: a version that grows for a change
+that left the reply as it was costs a client one reply, and one that stays when the reply
+changed would cost it the mirror.
+
+**Resolution.** `core/src/plan.cpp` (`plan_reads_only`), `core/src/commands.cpp`.
+
+## Seed 87: the ways of the push
+
+**Question.** `plan push on` is for the serial way it came by, and the core's entries do not
+know where a line came from. How does the core tell the ways apart, and how many may there be?
+
+**Answer.** By a number its host gives each way, 1 to 8, through `odrig_core_command_on`,
+`odrig_core_feed_on` and `odrig_core_plan_line`; the entries without a way are way 0, as HTTP
+is, where the push is `unsupported`. The board's UART is way 1 and its own USB socket way 2;
+the emulator's serial port is way 1 and its line port's connections take 2 to 8. Two bits of
+the core object for each way, the push on and a line due, fit into the padding of the plan's
+fields: the core's memory is as it was. A host sends `plan push off` on a way that ends. The
+header names no number for the ways, as its suite admits only the limits of a line and of a
+reply.
+
+**Resolution.** `core/include/odrig_core.h`, `core/src/plan.cpp`, `core/src/commands.cpp`,
+`docs/core.md`.
+
+## Seed 87: the mirror's turn in the core
+
+**Question.** The mirror's entry plays a file the host names, with a seed, a brightness and the
+board's state, in place of the show. Where does the core keep that turn, with 11 bytes left
+under 131,072 once the plan's fields are in, and where does its refresh live?
+
+**Answer.** The host keeps the turn in an `odrig_mirror` and may change it between polls; the
+core keeps a pointer to it, 8 bytes, which leaves 3. The host gives the file's type too, as
+the core must know it before the file is opened. The refresh is `mirror_poll` of
+`player.cpp`, beside `show_at`, `fill_leds` and the stream it shares, in place of the
+`mirror.cpp` the design named; the position `kMirrorPosition` lies in the drive's range, so
+the functions that take it look at it first. The entry takes any host, not only one whose
+storage can be changed, as the turn is the host's and nothing is written. Ending a mirror
+closes its file and its test, and the show goes on from where it was.
+
+**Resolution.** `core/include/odrig_core.h`, `core/src/player.cpp`,
+`core/src/mapping_control.cpp`, `core/src/brightness.cpp`, `docs/core.md`.
+
+## Seed 87: the mirror inside the emulator's package
+
+**Question.** The emulator's package may import nothing but the standard library and itself,
+and its scope tests keep it so; the preview, which needed the command tool, became a package
+of its own for that reason. The mirror opens a board's serial port as the command tool does
+and reads the board's replies. Where does it live?
+
+**Answer.** In `emulator/mirror/`, as the design says. The owner's command line is `python -m
+emulator SHOW_DIR --mirror-port NAME`, so the emulator itself starts the mirror, and a package
+beside it would have to be imported by it all the same. The mirror is the emulator's client
+of a board, as the command tool is, and its link opens the port with the command tool's
+client rather than with a second copy of the opening that lowers RTS before DTR and of the
+serial port of Windows. The scope tests let the modules of `emulator/mirror/` import
+`odrigctl`, and `emulator/mirror/link.py` alone does; every other module of the emulator is
+held to the rules as before.
+
+**Resolution.** `emulator/mirror/link.py`, `tests/emulator/test_scope.py`,
+`docs/emulator.md`.
+
+## Seed 87: how long the man in the middle waits
+
+**Question.** A line is waited for as long as its client waits, and a reply that comes after
+its client stopped waiting is dropped. The emulator does not learn when a client of HTTP or
+of a port stops waiting. How long does a line wait, and when does the next one go?
+
+**Answer.** A client's line waits for its reply up to 30 seconds, longer than any client of
+the board waits, and the worker waits for that reply 30 seconds more once the line's client
+stopped waiting before it sends the next line: the board answers the lines of a way in their
+order, and a reply that comes in that time is the dropped one, never the next line's. A lost
+link and a restart end the waits at once. A line of HTTP with a line end inside it gets no
+reply over a stream: there it would be two lines and two replies, and the second would be
+taken for the next line's.
+
+**Resolution.** `emulator/mirror/middle.py`, `emulator/engine.py`, `docs/emulator.md`.
+
+## Seed 87: the mirror's clock and a turn joined late
+
+**Question.** The core shows a mirror's turn from `zero_ms`, the moment of the turn's time 0
+on the clock of its polls, an unsigned number: a time before the emulator's start cannot be
+written. A turn the board began before the mirror started has its time 0 before it. And how
+is the board's time kept steady when the round trips vary?
+
+**Answer.** A mirror's engine begins its clock at 2^32 milliseconds, 49 days, in place of 0,
+so the time 0 of any turn the board began within those days lies on it; the page and the
+event stream carry that clock's numbers as they carry another's. The offset is the reply's
+`now` less the middle of the request's round trip, taken from a round trip no longer than
+the shortest so far, which grows by 1 ms at every reply, give or take 2 ms, or from an answer
+further off than half the round trip and 20 ms, so that a slow reply does not move the turn
+and a real change does. A `#plan` line, which answers no request, sets the offset only while
+none is known.
+
+**Resolution.** `emulator/engine.py`, `emulator/mirror/keeper.py`, `docs/emulator.md`.
+
+## Seed 87: joining a board
+
+**Question.** The mirror sends `plan off` at its end only when it found planning off, and
+`status` does not say whether planning is on. How does it know, and where do the looks and
+the fetches of files run?
+
+**Answer.** It asks for the plan once before `plan on`: the reply's `planning` says. The
+keeper joins anew when the link comes back after a loss, when a reply's `now` went back by
+more than a second, when a reply says planning is off, and on a line of the chip's loader
+(`ESP-ROM:`, `rst:`, `ets `, `Build:`). The look for a key's file among the collections and
+its fetch run in a thread of their own: a refresh asks only what is known already, and the
+CRC-32 of a file of a collection is taken once. The vocabulary names the connection
+`serial way`, as `way` is already a plain word of its entries.
+
+**Resolution.** `emulator/mirror/keeper.py`, `emulator/mirror/files.py`,
+`emulator/mirror/driver.py`, `agent/vocabulary.md`.
+
 ## Seed 88: the body of a 404 or a 405 is read before the answer
 
 **Question.** The emulator's suite failed on Windows about one run in five, where

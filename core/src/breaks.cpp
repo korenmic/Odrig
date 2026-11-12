@@ -5,6 +5,7 @@
 #include "drive.h"
 #include "ignored.h"
 #include "mapping_control.h"
+#include "plan.h"
 #include "player.h"
 #include "show.h"
 #include "storage.h"
@@ -352,7 +353,7 @@ uint32_t pick(Core &core, uint64_t at, bool message) {
     // At most two whole orders are tried: what is left of this one, and a new one.
     for (uint32_t tried = 0; count != 0 && tried < 2 * count; ++tried) {
         if (next >= size || size != count) {
-            key = clock_seed(core.noise ^ (message ? 0x9E3779B9u : 0u), count, at);
+            key = clock_seed(draw_noise(core) ^ (message ? 0x9E3779B9u : 0u), count, at);
             size = count;
             next = 0;
         }

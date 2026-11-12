@@ -89,13 +89,15 @@ class Hub:
         self._seq = 0
         self._status = None
         self._position = None
+        self._mirror = None
         self._refresh = None
         self._connections = set()
 
-    def log(self, ms, transport, line, cut, reply):
+    def log(self, ms, transport, line, cut, reply, board=False):
         """Enters one command that arrived: its timestamp, how it came, the line as the
         core read it, whether it was cut, and the reply. The entry keeps the first
-        characters of the line and its length."""
+        characters of the line and its length. In a mirror the reply is the board's, and the
+        entry says so with `board`."""
         now = datetime.datetime.now()
         with self._lock:
             self._seq += 1
@@ -109,6 +111,8 @@ class Hub:
                 "cut": bool(cut),
                 "reply": reply.decode("ascii", "replace").rstrip("\n"),
             }
+            if board:
+                entry["board"] = True
             self._entries.append(entry)
             data = compact(entry)
             for connection in self._connections:
@@ -130,6 +134,14 @@ class Hub:
             self._position = data
             for connection in self._connections:
                 connection.put("position", data)
+
+    def mirror(self, value):
+        """Takes the state of a mirror: its link, the plan and what keeps its LEDs dark."""
+        data = compact(value)
+        with self._lock:
+            self._mirror = data
+            for connection in self._connections:
+                connection.put("mirror", data)
 
     def mapping(self, legs):
         """Publish a complete committed routing assignment."""
@@ -157,6 +169,8 @@ class Hub:
                 connection.put("status", self._status)
             if self._position is not None:
                 connection.put("position", self._position)
+            if self._mirror is not None:
+                connection.put("mirror", self._mirror)
             self._connections.add(connection)
         return connection
 

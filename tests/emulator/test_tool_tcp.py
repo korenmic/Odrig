@@ -176,7 +176,7 @@ class TheSession(unittest.TestCase):
         return port, taken
 
     def test_a_session_keeps_one_connection_and_gives_each_line_its_reply(self):
-        port, taken = self.port(lambda data: b"".join(b'{"ok":true,"line":"' + line + b'"}\n' for line in data.split(b"\n")[:-1]))
+        port, taken = self.port(lambda data, way: b"".join(b'{"ok":true,"line":"' + line + b'"}\n' for line in data.split(b"\n")[:-1]))
         with client.Session(tcp=port.address, timeout=2) as session:
             self.assertEqual([session.exchange(line) for line in (b"a\n", b"b\n", b"c\n")], [b'{"ok":true,"line":"a"}', b'{"ok":true,"line":"b"}', b'{"ok":true,"line":"c"}'])
             self.assertIsNotNone(session._descriptor)
@@ -187,7 +187,7 @@ class TheSession(unittest.TestCase):
 
     def test_a_line_that_arrived_whole_before_a_line_is_sent_is_no_answer_to_it(self):
         answers = {b"a\n": b'boot\n{"ok":true,"n":1}\n{"ok":true,"stray":1}\nnoi', b"b\n": b'se\n{"ok":true,"n":2}\n{"ok":true,"stray":2}\n', b"c\n": b"", b"d\n": b'{"ok":true,"n":4}\n'}
-        port, _ = self.port(lambda data: answers[data])
+        port, _ = self.port(lambda data, way: answers[data])
         with client.Session(tcp=port.address, timeout=0.4) as session:
             self.assertEqual(session.exchange(b"a\n"), b'{"ok":true,"n":1}')
             time.sleep(0.1)
@@ -198,7 +198,7 @@ class TheSession(unittest.TestCase):
             self.assertEqual(session.exchange(b"d\n"), b'{"ok":true,"n":4}')
 
     def test_what_a_session_discards_is_no_answer_and_nothing_listening_is_unreachable(self):
-        port, _ = self.port(lambda data: b'{"ok":true,"late":1}\n' if data == b"a\n" else b'{"ok":true,"n":2}\n')
+        port, _ = self.port(lambda data, way: b'{"ok":true,"late":1}\n' if data == b"a\n" else b'{"ok":true,"n":2}\n')
         with client.Session(tcp=port.address, timeout=1) as session:
             session._descriptor.write(b"a\n", 1)
             session.discard(0.3)

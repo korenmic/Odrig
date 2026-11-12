@@ -13,6 +13,7 @@
 #include "clock.h"
 #include "mapping_control.h"
 #include "order.h"
+#include "plan.h"
 #include "playlist.h"
 #include "repeats.h"
 #include "brightness.h"
@@ -23,6 +24,10 @@ namespace odrig {
 
 namespace {
 
+// The position of the file a mirror shows, which no item and no drive's file has. It lies in
+// the drive's range, so every function that takes it looks at it before it looks for a drive.
+const uint32_t kMirrorPosition = 0xFFFFFFFDu;
+
 void close_stream(Core &core) {
     core.file.close();
     core.stream_open = 0;
@@ -32,6 +37,9 @@ void close_stream(Core &core) {
 // The length of the animation at a position of the playlist, 0 while it is not known. A
 // drive's animation is in the playlist only once its length is known.
 uint64_t length_of(const Core &core, uint32_t animation) {
+    if (animation == kMirrorPosition) {
+        return core.mirror != nullptr ? core.mirror->loop_ms : 0;
+    }
     if (is_drive(animation)) {
         const DriveRow *row = drive_row(core, animation - kDriveBase);
         return row != nullptr ? row->total_ms : 0;
@@ -51,6 +59,9 @@ uint32_t seconds_of(const Core &core, uint32_t animation) {
 
 // The id `list` and `status` give the animation at a position of the playlist.
 uint32_t id_of(const Core &core, uint32_t animation) {
+    if (animation == kMirrorPosition) {
+        return 0;
+    }
     if (is_drive(animation)) {
         const DriveRow *row = drive_row(core, animation - kDriveBase);
         return row != nullptr ? row->id : 0;
@@ -60,6 +71,9 @@ uint32_t id_of(const Core &core, uint32_t animation) {
 
 // What the animation at a position of the playlist holds, as its header says.
 uint8_t type_of(const Core &core, uint32_t animation) {
+    if (animation == kMirrorPosition) {
+        return core.mirror != nullptr ? core.mirror->type : kTypeFrames;
+    }
     if (is_drive(animation)) {
         const DriveRow *row = drive_row(core, animation - kDriveBase);
         return row != nullptr ? row->type : kTypeFrames;
@@ -118,7 +132,9 @@ Reason open_stream(Core &core, uint32_t animation, uint64_t turn, uint64_t loop)
     close_stream(core);
     char drive_name[kDriveOpenRoom];
     const char *name = drive_name;
-    if (is_drive(animation)) {
+    if (animation == kMirrorPosition) {
+        name = core.mirror->name;
+    } else if (is_drive(animation)) {
         if (!drive_open_name(core, animation - kDriveBase, drive_name)) {
             return kFileMissing;
         }
@@ -196,8 +212,9 @@ Reason first_loop_to(Core &core, uint32_t animation, uint64_t turn, uint64_t tim
         core.frame_end += duration;
         ++core.stream_records;
     }
-    if (reason == kNone && core.frame_end <= time) {
-        // A drive's animation has its length before it plays: here it is an item's file.
+    if (reason == kNone && core.frame_end <= time && animation != kMirrorPosition) {
+        // A drive's animation has its length before it plays: here it is an item's file. A
+        // mirror's length is the host's.
         core.files[core.items[animation].first].total_ms = kept_length(core.frame_end);
     }
     return reason;
@@ -222,8 +239,11 @@ Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn, 
                 return reason;
             }
             // A clock's turn gets its seed when it begins: its file is opened once in a turn.
-            if (type == kTypeWidget) {
-                core.seed = core.resume_seed != 0 ? core.resume_seed : clock_seed(core.noise, id_of(core, animation), start);
+            // While planning is on, the noise is the one the plan drew it from.
+            if (type == kTypeWidget && animation == kMirrorPosition) {
+                core.seed = core.mirror->seed;
+            } else if (type == kTypeWidget) {
+                core.seed = core.resume_seed != 0 ? core.resume_seed : clock_seed(draw_noise(core), id_of(core, animation), start);
                 core.resume_seed = 0;
             }
         }
@@ -555,6 +575,9 @@ ODRIG_NOINLINE Reason clock_only_turn(Core &core, uint64_t now, uint64_t *in_tur
         const uint64_t elapsed = now >= core.zero ? now - core.zero : 0;
         if (length_of(core, core.turn_item) == 0) {
             if (is_drive(core.turn_item)) return kLoopMismatch;
+            // A plan decided ahead opens no file: the turn stays in progress, and the plan
+            // stops at it.
+            if (core.plan_projecting) { *in_turn = elapsed; return kNone; }
             const Reason reason = first_loop_to(core, core.turn_item, core.turn_number, elapsed);
             if (reason != kNone) return reason;
             if (length_of(core, core.turn_item) == 0) { *in_turn = elapsed; return kNone; }
@@ -565,8 +588,12 @@ ODRIG_NOINLINE Reason clock_only_turn(Core &core, uint64_t now, uint64_t *in_tur
         const uint32_t message = core.break_phase == kBreakClock && (core.break_message || core.clock_message_on)
             ? breaks_message(core, core.zero) : kNothing;
         const uint32_t next = message != kNothing ? message : breaks_pick(core, core.zero);
-        close_stream(core);
-        if (next == kNothing) { player_halt(core); *in_turn = 0; return kNone; }
+        if (core.plan_projecting) {
+            if (next == kNothing) { core.playing = kNothing; *in_turn = 0; return kNone; }
+        } else {
+            close_stream(core);
+            if (next == kNothing) { player_halt(core); *in_turn = 0; return kNone; }
+        }
         core.turn_item = core.shown = next;
         core.break_phase = message != kNothing ? kBreakMessage : kBreakClock;
         core.break_message = core.clock_message_on;
@@ -604,12 +631,21 @@ ODRIG_NOINLINE Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn)
             // time.
             const uint64_t longest = 1000ull * seconds;
             const bool beyond = seconds != 0 && core.turn_repeat == 0 && repeats_of(core, core.turn_item) == 0 && elapsed >= longest;
-            const Reason reason = first_loop_to(core, core.turn_item, core.turn_number, beyond ? longest : elapsed);
-            if (reason != kNone) {
-                return reason;
-            }
-            if (length_of(core, core.turn_item) != 0) {
-                continue;
+            if (core.plan_projecting) {
+                // A plan decided ahead opens no file: a turn whose length is not known goes
+                // on until its longest time, if it has one, and the plan stops at it.
+                if (!beyond) {
+                    *in_turn = elapsed;
+                    return kNone;
+                }
+            } else {
+                const Reason reason = first_loop_to(core, core.turn_item, core.turn_number, beyond ? longest : elapsed);
+                if (reason != kNone) {
+                    return reason;
+                }
+                if (length_of(core, core.turn_item) != 0) {
+                    continue;
+                }
             }
             ended = beyond;
             turn = longest;
@@ -701,7 +737,7 @@ ODRIG_NOINLINE Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn)
             }
         }
         if (core.turn_item == kNothing) {
-            close_stream(core);
+            if (!core.plan_projecting) close_stream(core);
             core.playing = core.shown = kNothing;
             core.break_phase = kBreakNone;
             core.break_paused = 0;
@@ -1433,9 +1469,89 @@ void player_item_leaves(Core &core, uint32_t item) {
     }
 }
 
+namespace {
+
+// A refresh of a mirror: the turn the host describes, at its time, in place of the show. No
+// step of the show, its uploads, checks, drive, catalogs or schedule is taken, and nothing
+// is written.
+int mirror_poll(Core &core, uint64_t now) {
+    if (core.leg_count == 0 || core.pixels == nullptr || core.window == nullptr || now < core.next_due) {
+        return 0;
+    }
+    const uint64_t grid = core.t0 + (now - core.t0) / kGridStep * kGridStep;
+    core.next_due = grid + kGridStep;
+    core.had_refresh = 1;
+    core.last_grid = grid;
+    const uint64_t second = (now - core.t0) / 1000;
+    if (second != core.second_running) {
+        core.second_before = core.second_running;
+        core.count_before = core.count_running;
+        core.second_running = second;
+        core.count_running = 0;
+    }
+    ++core.count_running;
+    const odrig_mirror &turn = *core.mirror;
+    core.on = turn.on != 0 ? 1 : 0;
+    core.rotation = turn.rotation & 3u;
+    Shown shows = kShowsNothing;
+    const uint32_t snake = turn.test == 2 ? turn.snake : 0;
+    if (turn.test != 0 && (turn.test == 1 || (snake >= 1 && snake <= 20)) && mapping_editable(core)) {
+        if (!core.mapping_test || core.mapping_snake != snake) {
+            close_stream(core);
+            mapping_mirror_test(core, snake);
+        }
+        if (core.mapping_test) {
+            shows = kShowsPicture;
+            if (core.mapping_snake != 0) {
+                snake_test_draw(core, now);
+            }
+        }
+    } else {
+        if (core.mapping_test) {
+            // The diagonal took the decoder: the turn's file opens anew.
+            core.mapping_test = 0;
+            core.mapping_snake = 0;
+            close_stream(core);
+        }
+        if (turn.name[0] != '\0') {
+            core.catch_up_left = kCatchUpBytes;
+            core.catch_up_begun = 0;
+            const uint64_t in_turn = now > turn.zero_ms ? now - turn.zero_ms : 0;
+            const Reason reason = show_at(core, kMirrorPosition, turn.serial, in_turn, turn.zero_ms);
+            if (reason == kNone) {
+                shows = kShowsPicture;
+            } else if (reason == kPendingWork) {
+                shows = kShowsBefore;
+            } else {
+                close_stream(core);
+            }
+        } else if (core.stream_open) {
+            close_stream(core);
+        }
+    }
+    if (shows == kShowsPicture && core.on) {
+        fill_leds(core);
+    } else if (shows != kShowsBefore || !core.on) {
+        memset(core.led_data, 0, 3u * core.led_total);
+        mini_clear(core);
+    }
+    return 1;
+}
+
+}  // namespace
+
+void player_mirror_end(Core &core) {
+    close_stream(core);
+    core.mapping_test = 0;
+    core.mapping_snake = 0;
+}
+
 int player_poll(Core &core, uint64_t now_ms) {
     core.noise = clock_stir(core.noise, now_ms);
     const uint64_t now = clock_touch(core, now_ms);
+    if (core.mirror != nullptr) {
+        return mirror_poll(core, now);
+    }
     upload_touch(core, now);
     schedule_touch(core, now);
     breaks_poll(core, now);
@@ -1506,6 +1622,7 @@ int player_poll(Core &core, uint64_t now_ms) {
         memset(core.led_data, 0, 3u * core.led_total);
         mini_clear(core);
     }
+    plan_refreshed(core);
     return 1;
 }
 
@@ -1578,6 +1695,290 @@ uint32_t player_fps(const Core &core, uint64_t now) {
         return core.count_before;
     }
     return 0;
+}
+
+namespace {
+
+// Every field of the playback that the end of a turn may change: a plan decided ahead runs
+// on the core's own fields and puts these back afterwards.
+struct PlayState {
+    uint64_t zero;
+    uint64_t turn_number;
+    uint64_t break_offset;
+    uint64_t break_due;
+    uint64_t break_rest;
+    uint64_t window_started;
+    uint32_t window_spent;
+    uint32_t playing;
+    uint32_t shown;
+    uint32_t turn_item;
+    uint32_t turn_repeat;
+    uint32_t resume_item;
+    uint32_t resume_seed;
+    uint32_t break_back;
+    uint32_t break_repeat;
+    uint32_t break_seed;
+    uint32_t order_key;
+    uint32_t order_next;
+    uint32_t order_count;
+    uint32_t message_order_key;
+    uint32_t message_order_next;
+    uint32_t message_order_count;
+    uint8_t in_place;
+    uint8_t break_phase;
+    uint8_t break_paused;
+    uint8_t break_message;
+    uint8_t break_turns;
+    uint8_t break_held;
+    uint8_t save_due;
+    uint8_t turn_manual;
+    uint8_t break_manual;
+    uint8_t zero_pending;
+};
+
+void take_state(const Core &core, PlayState &state) {
+    state.zero = core.zero;
+    state.turn_number = core.turn_number;
+    state.break_offset = core.break_offset;
+    state.break_due = core.break_due;
+    state.break_rest = core.break_rest;
+    state.window_started = core.window_started;
+    state.window_spent = core.window_spent;
+    state.playing = core.playing;
+    state.shown = core.shown;
+    state.turn_item = core.turn_item;
+    state.turn_repeat = core.turn_repeat;
+    state.resume_item = core.resume_item;
+    state.resume_seed = core.resume_seed;
+    state.break_back = core.break_back;
+    state.break_repeat = core.break_repeat;
+    state.break_seed = core.break_seed;
+    state.order_key = core.order_key;
+    state.order_next = core.order_next;
+    state.order_count = core.order_count;
+    state.message_order_key = core.message_order_key;
+    state.message_order_next = core.message_order_next;
+    state.message_order_count = core.message_order_count;
+    state.in_place = core.in_place;
+    state.break_phase = core.break_phase;
+    state.break_paused = core.break_paused;
+    state.break_message = core.break_message;
+    state.break_turns = core.break_turns;
+    state.break_held = core.break_held;
+    state.save_due = core.save_due;
+    state.turn_manual = core.turn_manual;
+    state.break_manual = core.break_manual;
+    state.zero_pending = core.zero_pending;
+}
+
+void put_state(Core &core, const PlayState &state) {
+    core.zero = state.zero;
+    core.turn_number = state.turn_number;
+    core.break_offset = state.break_offset;
+    core.break_due = state.break_due;
+    core.break_rest = state.break_rest;
+    core.window_started = state.window_started;
+    core.window_spent = state.window_spent;
+    core.playing = state.playing;
+    core.shown = state.shown;
+    core.turn_item = state.turn_item;
+    core.turn_repeat = state.turn_repeat;
+    core.resume_item = state.resume_item;
+    core.resume_seed = state.resume_seed;
+    core.break_back = state.break_back;
+    core.break_repeat = state.break_repeat;
+    core.break_seed = state.break_seed;
+    core.order_key = state.order_key;
+    core.order_next = state.order_next;
+    core.order_count = state.order_count;
+    core.message_order_key = state.message_order_key;
+    core.message_order_next = state.message_order_next;
+    core.message_order_count = state.message_order_count;
+    core.in_place = state.in_place;
+    core.break_phase = state.break_phase;
+    core.break_paused = state.break_paused;
+    core.break_message = state.break_message;
+    core.break_turns = state.break_turns;
+    core.break_held = state.break_held;
+    core.save_due = state.save_due;
+    core.turn_manual = state.turn_manual;
+    core.break_manual = state.break_manual;
+    core.zero_pending = state.zero_pending;
+}
+
+// When the playlist's turn in progress ends, as its end decides the next: false while that
+// is not known. A turn that a break will pause, where 5 minutes of the playlist's time are
+// counted, ends there.
+bool turn_end(const Core &core, uint64_t *end) {
+    uint64_t at;
+    if (length_of(core, core.turn_item) != 0) {
+        at = core.zero + current_turn_ms(core);
+    } else {
+        const uint32_t seconds = seconds_of(core, core.turn_item);
+        if (seconds == 0 || core.turn_repeat != 0 || repeats_of(core, core.turn_item) != 0 || core.clocks_on == kClocksOnly) {
+            return false;
+        }
+        at = core.zero + 1000ull * seconds;
+    }
+    if (core.clocks_on && core.clocks_on != kClocksOnly && core.break_phase == kBreakNone && !core.break_held && core.break_due < at) {
+        at = core.break_due > core.zero ? core.break_due : core.zero;
+    }
+    *end = at;
+    return true;
+}
+
+// The seed a widget's turn that began at `start` takes, or was given.
+uint32_t planned_seed(const Core &core, uint32_t position, uint64_t start) {
+    return core.resume_seed != 0 ? core.resume_seed : clock_seed(draw_noise(core), id_of(core, position), start);
+}
+
+// The turns of a cycle that plays: each animation of its list for its `seconds`, a text's
+// rounded up to whole passes, from the one in progress.
+void plan_cycle(Core &core, bool (*take)(const PlanItem &, void *), void *context) {
+    const ItemInfo &cycle = core.items[core.playing];
+    if (cycle.count == 0 || cycle_animation(core, cycle, 0) == kNothing) {
+        return;
+    }
+    uint64_t round = 0;
+    for (uint32_t at = 0; at < cycle.count; ++at) {
+        round += whole_passes(core, cycle_animation(core, cycle, at), 1000ull * cycle.seconds);
+    }
+    if (round == 0) {
+        return;
+    }
+    const uint64_t zero = core.zero_pending ? core.next_due : core.zero;
+    const uint64_t now = core.latest > zero ? core.latest : zero;
+    uint64_t within = (now - zero) % round;
+    uint32_t at = 0;
+    for (;;) {
+        const uint64_t length = whole_passes(core, cycle_animation(core, cycle, at), 1000ull * cycle.seconds);
+        if (within < length) {
+            break;
+        }
+        within -= length;
+        ++at;
+    }
+    const uint64_t turn = (now - zero) / round * cycle.count + at;
+    PlanItem item = {};
+    item.start = now - within;
+    const uint64_t first = item.start;
+    for (uint32_t count = 0; count < kPlanMost && item.start < first + kPlanSpanMs; ++count) {
+        item.position = cycle_animation(core, cycle, at);
+        item.end = item.start + whole_passes(core, item.position, 1000ull * cycle.seconds);
+        item.ends = 1;
+        item.seeded = 0;
+        if (type_of(core, item.position) == kTypeWidget) {
+            if (count == 0 && !core.zero_pending && core.stream_open && core.stream_drawn && core.stream_item == item.position &&
+                core.stream_turn == turn) {
+                item.seed = core.seed;
+                item.seeded = 1;
+            } else if (core.plan_on) {
+                item.seed = clock_seed(draw_noise(core), id_of(core, item.position), item.start);
+                item.seeded = 1;
+            }
+        }
+        if (!take(item, context) || !core.plan_on) {
+            return;
+        }
+        item.start = item.end;
+        at = (at + 1) % cycle.count;
+    }
+}
+
+}  // namespace
+
+void player_plan(Core &core, bool (*take)(const PlanItem &, void *), void *context) {
+    if (core.invalid || core.mapping_test || core.playing == kNothing) {
+        return;
+    }
+    if (core.playing != kPlaylist) {
+        plan_cycle(core, take, context);
+        return;
+    }
+    if (core.turn_item == kNothing) {
+        return;
+    }
+    PlayState saved;
+    take_state(core, saved);
+    core.plan_projecting = 1;
+    if (core.zero_pending) {
+        // The turn begins at the next refresh's grid time, and a count held while the
+        // playlist did not play goes on from there, as the refresh will do it.
+        core.zero = core.next_due;
+        core.zero_pending = 0;
+        if (core.break_held) {
+            core.break_due = core.zero + core.break_rest;
+            core.break_held = 0;
+        }
+    }
+    PlanItem item = {};
+    item.position = core.turn_item;
+    item.start = core.zero;
+    if (type_of(core, item.position) == kTypeWidget) {
+        // The turn's seed once its file was opened in this turn; before that, the one it will
+        // draw, which only planning knows.
+        if (!saved.zero_pending && core.stream_open && core.stream_drawn && core.stream_item == item.position &&
+            core.stream_turn == core.turn_number) {
+            item.seed = core.seed;
+            item.seeded = 1;
+        } else if (core.plan_on) {
+            item.seed = planned_seed(core, item.position, item.start);
+            item.seeded = 1;
+        }
+    }
+    item.ends = turn_end(core, &item.end) ? 1 : 0;
+    const uint64_t last = item.start + kPlanSpanMs;
+    bool going = take(item, context) && core.plan_on && item.ends;
+    for (uint32_t count = 1; going && count < kPlanMost; ++count) {
+        const uint64_t at = item.end;
+        // The window's end makes the next playlist current: what plays after it is
+        // decided once it has passed.
+        if (at >= last || at >= window_end(core)) {
+            break;
+        }
+        uint64_t in_turn = 0;
+        playlist_turn(core, at, &in_turn);
+        if (core.playing == kNothing || core.turn_item == kNothing) {
+            break;
+        }
+        item.position = core.turn_item;
+        item.start = at;
+        item.from = at > core.zero ? at - core.zero : 0;
+        item.seeded = 0;
+        if (type_of(core, item.position) == kTypeWidget) {
+            item.seed = planned_seed(core, item.position, core.zero);
+            item.seeded = 1;
+        }
+        item.ends = turn_end(core, &item.end) ? 1 : 0;
+        going = take(item, context) && item.ends;
+    }
+    put_state(core, saved);
+    core.plan_projecting = 0;
+}
+
+uint64_t player_loop_of(const Core &core, uint32_t position) {
+    return length_of(core, position);
+}
+
+uint32_t player_id_of(const Core &core, uint32_t position) {
+    return id_of(core, position);
+}
+
+uint16_t player_sign(const Core &core) {
+    const bool turn = core.playing == kPlaylist && core.turn_item != kNothing;
+    const uint64_t parts[] = {
+        core.playing, core.turn_item, core.zero, core.zero_pending, core.break_phase, core.turn_repeat, core.stream_turn,
+        turn ? length_of(core, core.turn_item) : 0, core.on, core.brightness, core.rotation, core.mapping_test, core.mapping_snake,
+        core.mini != nullptr ? (core.mini->active | core.mini->requested << 1 | core.mini->pending << 2 | core.mini->failed << 3) : 0u,
+        core.clocks_on, core.clock_message_on, core.clocks_error, core.clock_storage_internal, core.drive_number, core.drive_count,
+        core.tree_known, core.indexed, core.catalog_marker_crc, core.check_at, core.check_done, core.drive_check_at,
+        core.remembered_next, core.current, core.in_place, core.invalid, core.item_count,
+    };
+    uint32_t sign = 0;
+    for (const uint64_t part : parts) {
+        sign = clock_stir(sign, part);
+    }
+    return static_cast<uint16_t>(sign ^ sign >> 16);
 }
 
 }  // namespace odrig

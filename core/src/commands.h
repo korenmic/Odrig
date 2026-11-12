@@ -10,8 +10,9 @@ namespace odrig {
 
 // Reads one command line, carries it out and writes its reply, which is one JSON object on
 // one line of at most ODRIG_REPLY_MAX bytes with its newline. Returns the length of the
-// reply. This is the only place where a command is interpreted.
-uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t length, char *reply);
+// reply. This is the only place where a command is interpreted. `way` is the serial way the
+// line came by, 1 to 8, or 0 for a route that carries no line the client did not ask for.
+uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t length, char *reply, uint32_t way = 0);
 
 // The character of UTF-8 that begins at this byte, which is 0x80 or above: its code, and
 // the number of its bytes as the return value, or 0 when the bytes there are not UTF-8. A
