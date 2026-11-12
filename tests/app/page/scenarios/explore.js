@@ -1,6 +1,8 @@
 // The operator makes a folder of the card at the root, selects an internal animation and
 // moves it into that folder, the destination shown before it is sent. `ends` is what the
-// message at the move's end says, `Moved 1 of 1` unless the settings name another.
+// message at the move's end says, `Moved 1 of 1` unless the settings name another. With
+// `settle`, the message and the paths of the moves the phone keeps are read again that many
+// milliseconds after the end.
 
 import {rowOf, shown, startSelection} from "../reading.js";
 
@@ -53,5 +55,10 @@ export default async function (app) {
   go.click();
   await app.until(() => app.says(settings.ends ?? "Moved 1 of 1"), "the move's end", 30000);
   seen.message = app.text("message-text");
+  if (settings.settle !== undefined) {
+    await new Promise((resolve) => setTimeout(resolve, settings.settle));
+    seen.settled = app.text("message-text");
+    seen.kept = Object.values(JSON.parse(view.localStorage.getItem("odrig.moves") || "{}")).flat().map((job) => job.source.path);
+  }
   return seen;
 }

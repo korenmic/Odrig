@@ -397,7 +397,12 @@ export async function move(entry, context) {
     newId = await upload(client, {id, file: entry.path, bytes, external: entry.storage === "external", create: !job.sameId, expect: entry.storage === "external" ? "00000000" : null},
       (part) => context.report(`Sending ${label(entry.storage, entry.path)}: ${Math.floor(part * 100)}%`));
   } catch (error) {
-    if (job.sameId && error instanceof commands.Refusal) await given(job, context);
+    // A refused upload installed nothing and left the old file as it was: the job ends with
+    // it, and a file under its own id is given back the saved settings taken from it.
+    if (error instanceof commands.Refusal) {
+      if (job.sameId) await given(job, context);
+      else forget(address, job);
+    }
     throw error;
   }
   job.newId = entry.storage === "external" ? newId : id;

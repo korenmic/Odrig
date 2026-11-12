@@ -248,8 +248,11 @@ class OnTheEmulator(unittest.TestCase):
     def test_a_move_that_clocks_only_stopped_is_said_in_the_words_of_both_storages(self):
         board = Board(self)
         board.only_at_upload()
-        seen = support.run("explore", address=board.address, settings={"rows": 2, "folder": "night", "id": 1, "ends": "Moved 0 of 1"}).seen
-        self.assertEqual(seen["message"], f"Moved 0 of 1. Failed 1: root.odrg: {ONLY_BOTH} (in-use).")
+        seen = support.run("explore", address=board.address, settings={"rows": 2, "folder": "night", "id": 1, "ends": "Moved 0 of 1", "settle": 3000}).seen
+        said = f"Moved 0 of 1. Failed 1: root.odrg: {ONLY_BOTH} (in-use)."
+        self.assertEqual(seen["message"], said)
+        # The refused move ends with its words: no job of it is kept to be found again.
+        self.assertEqual((seen["settled"], seen["kept"]), (said, []))
         self.assertTrue((board.folder / "root.odrg").exists())
 
     def test_move_to_offers_the_clocks_folders_of_both_storages_alone_and_a_face_moved_stays_inside(self):
