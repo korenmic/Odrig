@@ -431,11 +431,17 @@ def connected_at_once(port, count=AT_ONCE, seconds=2):
     return len(taken)
 
 
-def raw_request(port, data, seconds=5):
-    """Sends bytes to the page address and gives everything that comes back until the
-    server closes the connection or stays silent."""
+def raw_request(port, data, seconds=5, later=None, pause=0.0, end=False):
+    """Sends bytes to the page address, then `later` after `pause` seconds when it is given,
+    and with `end` ends its own side of the connection; gives everything that comes back
+    until the server closes the connection or stays silent."""
     with socket.create_connection(("127.0.0.1", port), timeout=seconds) as connection:
         connection.sendall(data)
+        if later is not None:
+            time.sleep(pause)
+            connection.sendall(later)
+        if end:
+            connection.shutdown(socket.SHUT_WR)
         received = b""
         try:
             while True:
