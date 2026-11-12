@@ -12791,3 +12791,40 @@ as it is, when it has one. The page needs no change: the legs come from the core
 file from that route.
 
 **Resolution.** `emulator/httpd.py`, `docs/emulator.md`.
+
+## Seed 88: the body of a 404 or a 405 is read before the answer
+
+**Question.** The emulator's suite failed on Windows about one run in five, where
+`tests/emulator/test_http.py` waited for a 404 and got `ConnectionAbortedError: [WinError
+10053]`. What lost the answer, and what mends it?
+
+**Answer.** The server answered 404 or 405 and closed the connection without reading the
+request's body. `http.client` sends a request's head and its body in two writes. A body
+that reaches the server after it has read the head is unread at the close, or arrives
+after it, and TCP answers either with a reset (RFC 1122, 4.2.2.13). On Windows the reset
+throws away what the client has received and not read yet, the answer with it. The server
+now reads the body that the request declares to its end, and drops it, before it answers
+404 or 405. RFC 9112, 9.6, also describes a slow close, in which the server closes its side
+and reads until the client closes its own; reading the declared body covers every request
+that meets the race, stays in one function and adds no wait to a connection. The body is
+read whatever its length: `POST /odrig` already reads a body of any length, and with a
+limit a longer body meets the race again, as 16 of 20 bodies of 300,000 bytes did.
+
+**Resolution.** `emulator/httpd.py`, `tests/emulator/test_http.py`,
+`tests/emulator/support.py`, `docs/emulator.md`.
+
+## Seed 88: which answers read the body, and which are given at once
+
+**Question.** Is the body read before every answer without a body, and what of a request
+whose body has no length that the server reads?
+
+**Answer.** It is read before every answer of `Handler.empty`: the 405 of another method on
+`/odrig` and on `/seek`, the 404 of another path, and the 404 of a file of the page or of a
+mapping file that cannot be read, which answer `GET`s. A request with a
+`Transfer-Encoding` header, `chunked` or any other, is answered at once, as is one without a
+`Content-Length` that is a whole number: with a transfer coding the `Content-Length` does
+not give the length of the body (RFC 9112, 6.3), and the server reads no transfer coding.
+The 411 is such an answer, and it is unchanged. A connection that ends inside the declared
+body gets no answer, as on `POST /odrig`.
+
+**Resolution.** `emulator/httpd.py`, `tests/emulator/test_http.py`.

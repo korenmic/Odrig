@@ -167,6 +167,13 @@ class EmulatorDocument(unittest.TestCase):
         for phrase in ("`POST /odrig`", "Status 200", "`application/json`", "Status 405 with `Allow: POST`", "Status 411", "Status 404", "4,096", "2,048", "`Access-Control-Allow-Origin: *`"):
             self.assertIn(phrase, text)
 
+    def test_it_says_that_the_body_of_a_404_or_a_405_is_read_before_the_answer(self):
+        text = " ".join(section(self.text, "Commands over HTTP").split())
+        for phrase in ("An answer without a body closes its connection.",
+                       "Before a 404 or a 405, the body that the request declares with a `Content-Length` is read to its end and dropped",
+                       "A request whose body has no such length is answered at once."):
+            self.assertIn(phrase, text)
+
     def test_it_describes_the_port(self):
         text = section(self.text, "The serial port")
         for phrase in ("pseudo-terminal", "symbolic link", "does not echo", "open and close the port any number of times", "Setting a speed", "DTR or RTS"):

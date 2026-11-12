@@ -331,6 +331,9 @@ curl --data-binary 'play 2' http://127.0.0.1:8600/odrig
 - The path is `/odrig` exactly. What follows a `?` is ignored.
 - The response that carries a reply has the header `Access-Control-Allow-Origin: *`.
 - An answer without a body closes its connection.
+- Before a 404 or a 405, the body that the request declares with a `Content-Length` is
+  read to its end and dropped, so that the closed connection is not reset and the client
+  gets the answer. A request whose body has no such length is answered at once.
 
 ## From a phone
 
