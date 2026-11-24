@@ -80,7 +80,7 @@ Rules for every task:
   - Suites: `test_docs` of the app suite, onboarding.
   - Requirements: 8.4
 
-- [ ] 6. Deliver seed 89
+- [x] 6. Deliver seed 89
   - Fetch `origin`. When `seed-87-live-mirror` has moved past 3ab15e17, merge it into the
     branch, never a rebase, and make what follows on the merge.
   - Every suite that works on the computer, on Windows, one at a time, by the runner
