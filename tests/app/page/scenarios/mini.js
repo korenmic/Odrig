@@ -22,7 +22,7 @@ export default async function(app) {
     if (act.target) {
       app.press("Target");
       app.fill("address", act.target);
-      app.press("Use");
+      app.press("Connect over Wi-Fi");
       seen.changed = look(app);
       await shown(app, 2);
       app.press("Settings");

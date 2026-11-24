@@ -31,6 +31,13 @@ class TheTable(unittest.TestCase):
         refusals = [[code, "play 2", "file-missing dvd.odrg"] for code in cls.codes]
         refusals += [["unknown-id", "play all", None], ["unknown-id", "play 65535", None], ["show-invalid", "play all", None], ["weird", "on", None], ["toString", "off", None]]
         refusals += [["unknown-id", "remove 7", None], ["busy", "remove 7", None], ["in-use", "remove 7", None], ["storage-error", "space", None]]
+        refusals += [["unknown-id", "upload begin 4 shows/night/a.odrg 1138 0badcafe", None]]
+        refusals += [[code, "move external 60003 old%20songs/night", None] for code in ("unknown-id", "in-use", "read-only", "bad-argument")]
+        refusals += [["unknown-id", "move external 60003 /", None]]
+        refusals += [[code, "folder make internal shows/night", None] for code in ("unknown-id", "in-use", "no-space", "unsupported")]
+        refusals += [[code, "folder make external old%20songs", None] for code in ("read-only", "no-space")]
+        refusals += [[code, "folder remove 22", None] for code in ("in-use", "read-only", "unknown-id", "unsupported", "busy")]
+        refusals += [[code, "move internal 22 old%20shows/night", None] for code in ("bad-argument", "in-use", "unknown-id", "unsupported", "storage-error")]
         failures = [["bad-address", "x y"], ["no-wifi", "4.3.2.1"], ["no-answer", "4.3.2.1"], ["bad-reply", "192.168.1.23:8600"]]
         cls.found = support.run("texts", settings={"refusals": refusals, "failures": failures}).seen
 
@@ -38,7 +45,7 @@ class TheTable(unittest.TestCase):
         return self.found["refusals"][f"{code} | {line} | {'null' if reason is None else reason}"]
 
     def test_every_error_code_of_the_command_list_has_a_text_or_is_one_the_app_cannot_get(self):
-        self.assertEqual(len(self.codes), 20)
+        self.assertEqual(len(self.codes), 22)
         cannot_get = self.found["notForTheApp"]
         self.assertLessEqual(set(cannot_get), set(self.codes))
         self.assertEqual(len(cannot_get), len(set(cannot_get)))
@@ -59,9 +66,37 @@ class TheTable(unittest.TestCase):
         self.assertEqual(self.text("unknown-id", "play 65535", None), "Animation 65535 is not installed any more. (unknown-id)")
         self.assertEqual(self.text("unknown-id", "play all", None), "No animation is installed. (unknown-id)")
         self.assertEqual(self.text("unknown-id", "remove 7", None), "Animation 7 is not installed any more. (unknown-id)")
+        self.assertEqual(self.text("unknown-id", "upload begin 4 shows/night/a.odrg 1138 0badcafe", None),
+                         "The folder of this upload is not on the installation any more. Select the destination again. (unknown-id)")
         self.assertEqual(self.text("busy", "remove 7", None), "The installation is busy. Try again in a moment. (busy)")
         self.assertEqual(self.text("in-use", "remove 7", None), "Animation 7 cannot be removed: a cycle plays it, or it is on a USB stick. (in-use)")
+        move = "move external 60003 old%20songs/night"
+        self.assertEqual(self.text("unknown-id", move, None), "Animation 60003 or the folder /old songs/night is not on the card any more. The list is read again. (unknown-id)")
+        self.assertEqual(self.text("unknown-id", "move external 60003 /", None), "Animation 60003 or the folder / is not on the card any more. The list is read again. (unknown-id)")
+        self.assertEqual(self.text("in-use", move, None), "Animation 60003 cannot be moved into /old songs/night: a file or a folder there has its name. (in-use)")
+        self.assertEqual(self.text("read-only", move, None), "The card cannot be written now, so animation 60003 cannot be moved on it. (read-only)")
+        self.assertEqual(self.text("bad-argument", move, None), "Animation 60003 cannot be moved into /old songs/night: its new path would pass 100 characters. (bad-argument)")
+        make = "folder make internal shows/night"
+        self.assertEqual(self.text("unknown-id", make, None), "The folder above /shows/night is not on the installation any more. The list is read again. (unknown-id)")
+        self.assertEqual(self.text("in-use", make, None), "The folder /shows/night cannot be made: a file or a folder there has its name. (in-use)")
+        self.assertEqual(self.text("no-space", make, None), "Internal storage has no room for the folder /shows/night: it keeps 32 folders at most, each with room for its files. (no-space)")
+        self.assertEqual(self.text("unsupported", make, None), "This installation cannot make folders in that storage. (unsupported)")
+        self.assertEqual(self.text("read-only", "folder make external old%20songs", None), "The card cannot be written now, so the folder /old songs cannot be made. (read-only)")
+        self.assertEqual(self.text("no-space", "folder make external old%20songs", None), "The card has no free id for the folder /old songs. (no-space)")
+        remove = "folder remove 22"
+        self.assertEqual(self.text("in-use", remove, None), "Only an empty folder can be removed: it holds a file or a folder. (in-use)")
+        self.assertEqual(self.text("read-only", remove, None), "The card cannot be written now, so the folder cannot be removed. (read-only)")
+        self.assertEqual(self.text("unknown-id", remove, None), "The folder is not on the installation any more. The list is read again. (unknown-id)")
+        self.assertEqual(self.text("unsupported", remove, None), "This installation cannot remove folders in that storage. (unsupported)")
+        self.assertEqual(self.text("busy", remove, None), "The installation is busy. Try again in a moment. (busy)")
+        inside = "move internal 22 old%20shows/night"
+        self.assertEqual(self.text("bad-argument", inside, None), "A folder or an animation inside would pass the limits of 3 levels or 100 bytes. (bad-argument)")
+        self.assertEqual(self.text("in-use", inside, None), "A folder there has that name. (in-use)")
+        self.assertEqual(self.text("unknown-id", inside, None), "The folder or its new place is not on the installation any more. The list is read again. (unknown-id)")
+        self.assertEqual(self.text("unsupported", inside, None), "This installation cannot move folders in its storage. (unsupported)")
+        self.assertEqual(self.text("storage-error", inside, None), "The installation could not use its storage. (storage-error)")
         self.assertEqual(self.text("mapping-conflict"), "Mapping changed on the target. Reload before saving. (mapping-conflict)")
+        self.assertEqual(self.text("rotation-conflict"), "Another controller changed the rotation. The saved angle is read again. (rotation-conflict)")
         self.assertEqual(self.text("unsupported"), "This target cannot use miniature display mode with its current output setup. (unsupported)")
         self.assertEqual(self.text("storage-error", "space", None), "The installation could not use its storage. (storage-error)")
         # A code the app does not know, also one that is a word of the language.

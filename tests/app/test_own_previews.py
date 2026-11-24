@@ -43,6 +43,18 @@ class OwnPreviews(unittest.TestCase):
         data = (self.show / name).read_bytes()
         return f"{zlib.crc32(data):08x}-{len(data)}"
 
+    def test_new_authoring_waits_for_the_installed_name_inventory(self):
+        seen = support.run('ownpreviews', address=self.address, settings={'mode': 'unknown-names'}).seen
+        self.assertTrue(seen['disabled'])
+        self.assertTrue(seen['ready'])
+
+    def test_a_new_authored_text_never_replaces_an_id_claimed_since_the_inventory(self):
+        before = {name: (self.show / name).read_bytes() for name in ('one.odrg', 'two.odrg', 'show.json')}
+        seen = support.run('ownpreviews', address=self.address, settings={'mode': 'claimed-name'}).seen
+        self.assertNotIn('Uploaded as animation', seen['message'])
+        self.assertEqual({name: (self.show / name).read_bytes() for name in before}, before)
+        self.assertFalse((self.show / 'hi.odrgx').exists())
+
     def test_a_generated_message_clock_becomes_a_decodable_browser_preview(self):
         from tests.core.test_message_clock import message_file
         data = message_file([('hello', 0), ('still', 4)])

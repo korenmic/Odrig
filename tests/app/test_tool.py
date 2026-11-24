@@ -355,10 +355,10 @@ class TheToolchain(unittest.TestCase):
         self.assertEqual(env.child(home, home=True, caller={"HOME": "/Users/somebody"})["HOME"], str(paths.SHARED / "home"))
         self.assertNotIn("JAVA_HOME", env.child(caller={"PATH": "/usr/bin"}))
 
-    def test_gradle_leaves_nothing_running_and_keeps_its_settings_in_the_work_folder(self):
+    def test_gradle_leaves_nothing_running_and_keeps_its_settings_in_the_configured_toolchains(self):
         command = build.gradle_command()
         self.assertEqual(command[0], str(support.APP / "android" / "gradlew"))
-        self.assertEqual(command[1:3], ["--no-daemon", f"-Duser.home={support.ROOT / 'build' / 'app' / 'home'}"])
+        self.assertEqual(command[1:3], ["--no-daemon", f"-Duser.home={paths.HOME}"])
         self.assertEqual(command[3:], ["-p", str(support.APP / "android"), "assembleDebug"])
 
     def test_the_android_project_is_the_templates_with_the_checksum_of_gradle(self):

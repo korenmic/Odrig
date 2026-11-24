@@ -54,7 +54,7 @@ export default async function(app) {
   const seen = {
     before: pins(app),
     snakes: [...app.doc.querySelectorAll("#mapping-rows .map-snakes li")].map((item) => item.textContent),
-    words: [...app.doc.querySelectorAll("#mapping-pins .words")].map((item) => item.textContent),
+    words: [...app.doc.querySelectorAll("#mapping-pins .words")].map((item) => `${item.textContent.trim()} ${item.querySelector(".pin-field").value}`),
     buttons: [...app.doc.querySelectorAll("#mapping button")].filter((button) => button.getClientRects().length > 0).map((button) => button.textContent.trim()).filter((text) => text !== "≡"),
   };
   if (app.settings.layoutOnly) {
@@ -66,7 +66,7 @@ export default async function(app) {
   if (app.settings.other) {
     app.press("Target");
     app.fill("address", app.settings.other);
-    app.press("Use");
+    app.press("Connect over Wi-Fi");
     await app.until(() => app.shown() === "animations", "new target answers");
     app.press("Settings");
     await app.until(() => pins(app)[0] === app.settings.first, "new target assignment");

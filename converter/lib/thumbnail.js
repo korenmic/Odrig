@@ -14,7 +14,8 @@
 // differences, a tie going to the lower index. The same file gives the same bytes wherever
 // the library runs.
 
-import {PREVIEW_TOO_LARGE, Rejection} from "./errors.js";
+import {CANVAS_MISMATCH, PREVIEW_TOO_LARGE, Rejection, TRAILING_BYTES, TRUNCATED} from "./errors.js";
+import {inflateStream} from "./inflate.js";
 import * as odrg from "./odrg.js";
 import * as odrgx from "./odrgx.js";
 
@@ -23,6 +24,8 @@ export const LARGEST = 65536;
 // How many records, or drawings of a text or a clock, one step of a maker reads.
 export const RECORDS_A_STEP = 256;
 export const DRAWINGS_A_STEP = 4;
+// How many bytes of a body one step of a maker reads at most.
+export const BYTES_A_STEP = 1048576;
 
 const MOST_COLOURS = 256;
 const MOST_CODES = 4096;
@@ -71,10 +74,79 @@ export function timesOf(loopMs) {
   return times;
 }
 
+// The body of an ODRG file read a part at a time: the output of its DEFLATE stream, or the
+// bytes of one stored as it is, read in place. `pull(limit)` gives the next part, empty at the
+// end; `check()` refuses bytes that follow a stream, as `odrg.reader` does.
+function bodyParts(file, compressed) {
+  const body = file.subarray(odrg.HEADER_SIZE);
+  if (!compressed) {
+    let at = 0;
+    return {
+      pull(limit) {
+        const part = body.subarray(at, Math.min(body.length, at + limit));
+        at += part.length;
+        return part;
+      },
+      check() {},
+      held: () => 0,
+    };
+  }
+  const stream = inflateStream();
+  stream.push(body);
+  stream.end();
+  return {
+    pull: (limit) => stream.pull(limit),
+    check() {
+      if (stream.used < body.length) {
+        throw new Rejection(TRAILING_BYTES, `${body.length - stream.used} bytes follow the DEFLATE stream`);
+      }
+    },
+    held: () => stream.held,
+  };
+}
+
+// A source of a body's bytes for `odrg.records`, which takes from the parts only what a
+// record needs, and counts what it took.
+function partSource(parts) {
+  let pending = new Uint8Array(0);
+  let offset = 0;
+  const source = {
+    taken: 0,
+    take(count, what) {
+      while (pending.length - offset < count) {
+        const more = parts.pull(count - (pending.length - offset));
+        if (more.length === 0) {
+          throw new Rejection(TRUNCATED, `the file ends inside ${what}`);
+        }
+        source.taken += more.length;
+        const joined = new Uint8Array(pending.length - offset + more.length);
+        joined.set(pending.subarray(offset));
+        joined.set(more, pending.length - offset);
+        pending = joined;
+        offset = 0;
+      }
+      const taken = pending.subarray(offset, offset + count);
+      offset += count;
+      return taken;
+    },
+    rest() {
+      let left = pending.length - offset;
+      for (let more = parts.pull(BYTES_A_STEP); more.length > 0; more = parts.pull(BYTES_A_STEP)) {
+        left += more.length;
+      }
+      return left;
+    },
+  };
+  return source;
+}
+
 // Makes the preview of an ODRG file or an ODRGX container in steps. `step()` does a bounded
 // part of the work and gives whether the preview is made; `preview` is then its bytes. A
 // file the library's readers refuse is refused by the step that reads the fault, and one
-// whose preview stays too large by the last step.
+// whose preview stays too large by the last step. The frames of a file are read in two
+// passes over its body, the second after the first has judged the whole of it, so that a
+// compressed body is never held inflated: at most 256 records and 1 MiB of body a step.
+// `held()` is the bytes of the body's output the maker holds.
 export function maker(data) {
   let stage = "start";
   let width = 0;
@@ -82,37 +154,111 @@ export function maker(data) {
   let loop = 0;
   let times = [];
   const samples = [];
+  let file = null;
+  let head = null;
+  let container = null;
+  let parts = null;
   let read = null;
+  let source = null;
   let decoded = null;
   let elapsed = 0;
+  let total = 0;
   let last = null;
   let made = null;
+  // The first pass: the palette to pass over, the start of the record being read, and the
+  // bytes of it still to come.
+  let skip = 0;
+  const start = new Uint8Array(odrg.RECORD_START_SIZE);
+  let have = 0;
+  let inRecord = false;
+  let waitingMs = 0;
+  let counted = 0;
+  let counting = true;
 
-  const start = () => {
+  const begin = () => {
     if (odrgx.isContainer(data)) {
-      const header = odrgx.readHeader(data);
-      if (header.type === odrgx.TYPES.frames) {
-        read = odrgx.framesReader(data, header);
-      } else {
+      container = odrgx.readHeader(data);
+      width = container.width;
+      height = container.height;
+      if (container.type !== odrgx.TYPES.frames) {
         decoded = odrgx.decode(data);
+        loop = container.loopMs;
+        times = timesOf(loop);
+        stage = "drawings";
+        return;
       }
-      width = header.width;
-      height = header.height;
-      loop = header.loopMs;
+      file = odrgx.payloadOf(data);
+      head = odrg.header(file);
+      if (head.width !== container.width || head.height !== container.height) {
+        throw new Rejection(CANVAS_MISMATCH, `the container's canvas is ${container.width} x ${container.height} and its frames' ${head.width} x ${head.height}`);
+      }
     } else {
-      read = odrg.reader(data);
-      width = read.width;
-      height = read.height;
-      loop = read.loopMs();
+      file = data;
+      head = odrg.header(data);
+      width = head.width;
+      height = head.height;
     }
-    times = timesOf(loop);
-    stage = read !== null ? "records" : "drawings";
+    parts = bodyParts(file, head.compressed);
+    skip = 3 * head.paletteSize;
+    stage = "first";
+  };
+
+  // Reads a part of the body for the stream's verdicts and, of a file, the loop: the
+  // durations of the records whose bytes all came, as `odrg.reader`'s `loopMs` sums them.
+  const firstPass = () => {
+    const part = parts.pull(BYTES_A_STEP);
+    if (part.length === 0) {
+      parts.check();
+      if (skip > 0 && !inRecord) {
+        throw new Rejection(TRUNCATED, "the file ends inside the palette");
+      }
+      loop = container === null ? total : container.loopMs;
+      times = timesOf(loop);
+      parts = bodyParts(file, head.compressed);
+      source = partSource(parts);
+      read = odrg.records(head, source);
+      stage = "records";
+      return;
+    }
+    for (let at = 0; at < part.length && counting;) {
+      if (skip > 0) {
+        const passed = Math.min(skip, part.length - at);
+        skip -= passed;
+        at += passed;
+        if (skip === 0 && inRecord) {
+          total += waitingMs;
+          counted += 1;
+          inRecord = false;
+          counting = counted < head.frameCount;
+        }
+        continue;
+      }
+      start[have] = part[at];
+      have += 1;
+      at += 1;
+      if (have === odrg.RECORD_START_SIZE) {
+        have = 0;
+        const length = start[2] | (start[3] << 8);
+        if (length < 2) {
+          counting = false;
+          break;
+        }
+        waitingMs = start[0] | (start[1] << 8);
+        skip = length - 1;
+        inRecord = true;
+      }
+    }
   };
 
   const records = () => {
-    for (let count = 0; count < RECORDS_A_STEP; count += 1) {
+    const before = source.taken;
+    for (let count = 0; count < RECORDS_A_STEP && source.taken - before < BYTES_A_STEP; count += 1) {
       const record = read.next();
       if (record === null) {
+        if (container !== null) {
+          odrgx.checkPayloadSize(container, data);
+          odrgx.checkLoop(container, elapsed);
+        }
         while (samples.length < PICTURES) {
           samples.push(last === null ? new Uint8Array(3 * width * height) : new Uint8Array(last));
         }
@@ -156,7 +302,9 @@ export function maker(data) {
       return true;
     }
     if (stage === "start") {
-      start();
+      begin();
+    } else if (stage === "first") {
+      firstPass();
     } else if (stage === "records") {
       records();
     } else if (stage === "drawings") {
@@ -175,6 +323,7 @@ export function maker(data) {
     get preview() {
       return made;
     },
+    held: () => (parts === null ? 0 : parts.held()),
   };
 }
 

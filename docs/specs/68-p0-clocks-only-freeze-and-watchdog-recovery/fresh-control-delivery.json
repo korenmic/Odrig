@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "publishedUtc": "2026-11-01T18:49:33.032563+00:00",
+  "purpose": "Fresh-name byte-identical PR control and application-only readback instructions; no new runtime repair",
+  "runtimeSourceCommit": "22758471c861fd6a0d10dfad49839a741e5bf0a7",
+  "appSha256": "429d2ebe8072923acbd11a40b1e764ac29e08f20cfb3830d5dfe00b8cdddf0bb",
+  "appBytes": 1890944,
+  "sameBytesAsUsualFirmware": true,
+  "physicalOutcome": "pending",
+  "existingArtifactsUnchanged": true,
+  "cloudReadback": "Mounted Drive bytes verified; independent remote API/phone readback not available",
+  "files": [
+    {
+      "file": "odrig-pr41-429d2ebe.bin",
+      "bytes": 1890944,
+      "sha256": "429d2ebe8072923acbd11a40b1e764ac29e08f20cfb3830d5dfe00b8cdddf0bb"
+    },
+    {
+      "file": "odrig-pr41-429d2ebe.bin.sha256",
+      "bytes": 90,
+      "sha256": "57801ae59476da19d72272ce17afb2192405a9a6c41cfc0524620af304e80b1e"
+    },
+    {
+      "file": "odrig-pr41-429d2ebe.bin.build.json",
+      "bytes": 16000,
+      "sha256": "4e475996e264d3b06d53292f5903d31312b5f5793860795c2b152fee4db9058b"
+    },
+    {
+      "file": "odrig-pr41-429d2ebe-README.txt",
+      "bytes": 1864,
+      "sha256": "a15e7585bdb1110cf8f4fbcd132994cafe12e06fdbefc23a7d1bb87ff7422262"
+    }
+  ]
+}

@@ -21,6 +21,16 @@ const uint32_t kMostItems = 65535;
 // `.odrg`. The text is known to be at most 32 characters long.
 bool is_file_name(const char *name);
 
+// The rule of a stored name: a file name of 32 characters at most, alone or after `<n>/`,
+// the number of a folder of the storage, 1 to 255 without a leading zero.
+bool is_stored_name(const char *name);
+
+// The number of the folder of a stored name, 0 for a name without one.
+uint32_t stored_folder(const char *name);
+
+// The file name of a stored name, after its folder's number.
+const char *stored_base(const char *name);
+
 // Reads `show.json` under the rules of docs/show.md, sets up the item, entry and file tables
 // of the core, with room to spare in the item and the file table, and checks the ids. A
 // host without a show file has the empty show: no item, brightness 128. Returns kNone,

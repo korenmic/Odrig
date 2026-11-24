@@ -90,10 +90,18 @@ int main() {
 class MappingCli(unittest.TestCase):
     def test_mapping_forms_are_sent_without_reinterpreting_pins(self):
         from odrigctl import cli
-        for words in [('mapping','get'),('mapping','test','on'),('mapping','test','off'),('mapping','set','123','1,2,3'),('mapping','cross','on'),('mapping','cross','off')]:
+        for words in [('mapping','get'),('mapping','test','on'),('mapping','test','off'),('mapping','set','123','1,2,3'),('mapping','test','snake','4')]:
             parser=cli.parser()
             parsed=parser.parse_args(['--port','unused',*words])
             self.assertEqual(cli.command_line(parser,parsed),(' '.join(words)+'\n').encode())
+
+    def test_the_retired_cross_forms_are_usage_errors_and_nothing_is_sent(self):
+        from tests.emulator.support import run_tool
+        for words in (('mapping','cross','on'),('mapping','cross','off')):
+            result=run_tool('--port','unused',*words)
+            self.assertEqual(result.status,2,result)
+            self.assertIn('mapping takes get, set REV PINS, test on|off, or test snake N',result.err)
+            self.assertEqual(result.out,'')
 
 class FallbackDriver(unittest.TestCase):
     def test_compiled_output_bytes_follow_pins_after_a_swap(self):

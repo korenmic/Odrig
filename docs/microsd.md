@@ -206,6 +206,14 @@ catalog's change renames it again when it is finished. A file the player reads t
 change replaces or removes is closed first: its reads fail, and the card stays mounted. A
 write that fails is no fault of the card, and a card whose read failed is not written
 until it is mounted again. Each change is paced as the board's own storage calls are.
+A rename takes a file only, never a folder: `move external` moves a file to another folder
+of the card by two renames through `upload.part`, after it has made the new folder, and
+a folder is moved by the app, file by file. A folder that the moves leave without a file
+stays on the card, empty, and the card's index lists it no more. The board removes a
+folder of the card only for `folder remove` of a folder the index lists empty, after the
+index has let it go: `rmdir` under the same guard, which leaves a folder that holds any
+file, one the index does not know among them, where it is. Such a folder is no failed
+write: the card stays sound, and its free space stays known.
 
 A card put back is taken up again with a new drive number, and its animations get their
 ids afresh. A card that goes while one of its files is read can hold that read until the

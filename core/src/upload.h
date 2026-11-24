@@ -9,8 +9,32 @@
 namespace odrig {
 
 // An upload on which nothing has moved for this long is discarded. Progress is
-// `upload begin`, an `upload data` that was taken, and a step of the check.
+// `upload begin`, an `upload data` that was taken, and a refresh of the check.
 const uint64_t kUploadQuietMs = 60000;
+
+// The check of an uploaded file. Each step is charged by its work: the bytes of the body it
+// took, or of the file when those are more, and more for a record that walks the picture
+// (OdrgDecoder::charge_since); the header, a drawn payload and the end of a drawn file 0.
+// A refresh takes steps while their charge is below its allowance, its budget less its debt.
+// A budget's and a debt's unit, in bytes of charge: the budget is this shifted by the pace.
+const uint32_t kUploadChargeUnit = 256;
+// The pace when the check begins, and the highest.
+const uint8_t kUploadPaceStart = 1;
+const uint8_t kUploadPaceMost = 3;
+// The most a debt can be, in kUploadChargeUnit.
+const uint32_t kUploadDebtMost = 15;
+// The most steps of one refresh.
+const uint32_t kUploadStepsMost = 64;
+// At the first refresh of each second, by the refreshes of the second before: fewer than
+// kUploadRateSlow lower the pace; kUploadRateSteady or more raise it; kUploadRateTrial or
+// more raise it while it has not fallen during the check.
+const uint32_t kUploadRateSlow = 21;
+const uint32_t kUploadRateSteady = 40;
+const uint32_t kUploadRateTrial = 27;
+// A second that has had kUploadTrialFewest refreshes or fewer by kUploadMiddleMs into it
+// lowers the pace, while it has not fallen.
+const uint64_t kUploadMiddleMs = 500;
+const uint32_t kUploadTrialFewest = 11;
 
 // The space a file needs beside its own bytes: a 256th of them, for the block pointers of
 // the file system, and this many bytes for the other files a change writes.
@@ -33,6 +57,7 @@ bool upload_external_absent(const Core &core);
 // section 5, without padding and with the unused bits of its last character zero; 0 when
 // the text is not that, or stands for no byte or for more than kChunkSize.
 uint32_t base64_size(const char *text, uint32_t length);
+uint32_t base64_read(const char *text, uint32_t length, uint8_t *bytes);
 
 // Called by every entry of the core that carries a timestamp, before it does anything
 // else: discards an open upload on which nothing has moved for kUploadQuietMs.
@@ -41,13 +66,15 @@ void upload_touch(Core &core, uint64_t now);
 // Discards the open upload, if there is one: its bytes are removed from storage.
 void upload_discard(Core &core);
 
-// One step of the check of an uploaded file: the header, one frame record, the end of the
-// file, or one slice of the settling of a defect. Called after a refresh that followed the
-// refresh before it without a gap.
-void upload_step(Core &core, uint64_t now);
+// Called at every refresh once its LED data is complete, with whether it is the first
+// refresh of a new whole second. While an uploaded file is checked, it sets the pace by the
+// refresh rate and takes the steps the budget and the debt allow: the header, frame
+// records, the end of the file, or slices of the settling of a defect.
+void upload_refresh(Core &core, uint64_t now, bool new_second);
 
 // The four commands on a valid show, with their arguments read. Each writes its reply.
-// `name` ends in a zero and is a file name; `count` is what base64_size gave for the text.
+// `name` ends in a zero and is a stored name, in a folder that `folders.txt` has when it
+// has one; `count` is what base64_size gave for the text.
 uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, uint32_t bytes, Reply &reply, bool report_creation = false);
 
 // `upload begin external <file> <bytes>`: opens an upload to the drive. `busy` while an

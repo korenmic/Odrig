@@ -21,9 +21,16 @@ function whole(value, low, high) {
   return Number.isInteger(value) && value >= low && value <= high;
 }
 
-// The reply to a line, when the target carried it out. A refusal throws a Refusal.
+// The reply to a line, when the target carried it out. A refusal throws a Refusal, and a
+// Failure on the way names the line.
 async function carriedOut(line) {
-  const reply = await send(line);
+  let reply;
+  try {
+    reply = await send(line);
+  } catch (error) {
+    if (error instanceof Failure) error.line = line;
+    throw error;
+  }
   if (reply.ok === false) {
     if (typeof reply.error !== "string") {
       throw new Failure("bad-reply", address());
@@ -41,6 +48,9 @@ function side(value) {
 
 // The readiness of a target after its start, as `status` reports it.
 const READINESS = ["checking", "ready", "degraded", "recovery"];
+
+// The storages a copy of a clock or a message may play from first.
+const CLOCK_STORAGES = ["sd", "internal"];
 
 // The most files a count of `status` names.
 const MOST_FILES = 1000000;
@@ -73,20 +83,22 @@ function progressOf(reply) {
 }
 
 // What `status` reports: whether the LEDs are on, the brightness, what plays, which is
-// "all" for the root playlist, the id of a folder of the card whose playlist is current,
+// "all" for the root playlist, the id of a folder of either storage whose playlist is current,
 // the id of a cycle or null, the id of the animation on the LEDs or null, the refreshes
 // in the last second, the reason of an invalid show or null, the width and the height of
 // the canvas, each null when the target gives none; in `progress`, how far it has read
 // its files after its start, in `host`, the text that names it, and in `left`, the whole
 // seconds left in the window of the current playlist, each null when the target gives
-// none; in `file`, the file of the animation on the LEDs, a card's by its path, and in
-// `playlist`, the path of the card's folder whose playlist is current, each null when the
+// none; in `file`, the file of the animation on the LEDs, one of a folder or of the card by its path, and in
+// `playlist`, the path of the folder whose playlist is current, each null when the
 // target names none, and undefined from a target that does not name them; and of the
 // playlist's turn in progress the loops it plays, `repeat`, the loop in progress, `loop`,
 // and its animation's saved repeat, `saved`, each null while the target reports none, with
 // `hasRepeat` and `hasSaved` saying whether the target reports them; and whether a clock plays
 // between the animations, `clocks`, and the message after each clock, `clockMessage`, each
-// null from a target that does not report them.
+// null from a target that does not report them; and the storage whose copy of a clock or a
+// message plays first, `clockStorage`, "sd" or "internal", with `hasClockStorage` saying
+// whether the target reports it: one that does plays the clocks of both storages.
 export async function status() {
   const reply = await carriedOut("status");
   const dimming = reply.dimming;
@@ -126,8 +138,11 @@ export async function status() {
     countOrNull(reply.loop, MOST_LOOPS) &&
     countOrNull(reply.saved, MOST_SAVED) &&
     (reply.clocks === undefined || typeof reply.clocks === "boolean") &&
-    (reply.clock_message === undefined || typeof reply.clock_message === "boolean");
-  if (!sound || !miniSound || !dimmingSound || !modeSound) {
+    (reply.clock_message === undefined || typeof reply.clock_message === "boolean") &&
+    (reply.clock_storage === undefined || CLOCK_STORAGES.includes(reply.clock_storage)) &&
+    (reply.timing === undefined || typeof reply.timing === "boolean");
+  if (!sound || !miniSound || !dimmingSound || !modeSound ||
+      (reply.clock_error !== undefined && reply.clock_error !== null && reply.clock_error !== "unreadable")) {
     throw new Failure("bad-reply", address());
   }
   return {
@@ -154,9 +169,83 @@ export async function status() {
     clockMessage: reply.clock_message ?? null,
     hasClockMode,
     clockMode,
+    clockError: reply.clock_error ?? null,
     clockOnly: hasClockMode && only !== null ? {...only} : null,
+    hasClockStorage: reply.clock_storage !== undefined,
+    clockStorage: reply.clock_storage ?? null,
     mini: mini === undefined ? null : {...mini},
+    ...(reply.timing === undefined ? {} : {timing: reply.timing}),
   };
+}
+
+const TIMING_FIRST = 946684800;
+const TIMING_UNTIL = 4102444800;
+const TIMING_REVISION = /^[0-9a-f]{8}$/;
+const TIMING_ID = /^[A-Za-z0-9_-]{1,31}$/;
+const TIMING_ZONE = /^[A-Za-z0-9_+/-]{1,63}$/;
+const DAILY_MINUTE = /^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/;
+
+function timingLine(line, identity, reading = false) {
+  if (identity === null && reading) return line;
+  if (typeof identity !== "string" || !TIMING_ID.test(identity)) throw new Refusal("bad-argument", "timing target");
+  return `guard ${identity} ${line}`;
+}
+
+export async function timeRead(identity = null) {
+  const reply = await carriedOut(timingLine("time", identity, true));
+  const metadata = reply.zone !== null;
+  const sound = reply.ok === true && typeof reply.valid === "boolean" &&
+    (reply.board === null || (typeof reply.board === "string" && TIMING_ID.test(reply.board))) &&
+    (identity === null || reply.board === identity) &&
+    (reply.error === null || typeof reply.error === "string") &&
+    (metadata ? typeof reply.zone === "string" && TIMING_ZONE.test(reply.zone) &&
+      !reply.zone.startsWith("/") && !reply.zone.endsWith("/") && !reply.zone.includes("//") &&
+      whole(reply.offset, -86400, 86400) && typeof reply.revision === "string" && TIMING_REVISION.test(reply.revision) &&
+      whole(reply.from, TIMING_FIRST, TIMING_UNTIL - 1) && whole(reply.until, reply.from + 1, TIMING_UNTIL) :
+      reply.offset === null && reply.revision === null && reply.from === null && reply.until === null) &&
+    (reply.valid ? metadata && reply.error === null && whole(reply.utc, reply.from, reply.until - 1) : reply.utc === null);
+  if (!sound) throw new Failure("bad-reply", address());
+  return {...reply};
+}
+
+export async function timeZone(identity, base64) {
+  if (typeof base64 !== "string" || base64.length % 4 === 1 || !/^[A-Za-z0-9_-]{160,2000}$/.test(base64)) {
+    throw new Refusal("bad-argument", "phone zone");
+  }
+  await carriedOut(timingLine(`time zone ${base64}`, identity));
+}
+
+export async function timeSet(identity, utc, revision) {
+  if (!whole(utc, TIMING_FIRST, TIMING_UNTIL - 1) || typeof revision !== "string" || !TIMING_REVISION.test(revision)) {
+    throw new Refusal("bad-argument", "phone time");
+  }
+  await carriedOut(timingLine(`time set ${utc} ${revision}`, identity));
+}
+
+export async function scheduleRead(identity = null) {
+  const reply = await carriedOut(timingLine("schedule", identity, true));
+  const sound = reply.ok === true && typeof reply.enabled === "boolean" &&
+    typeof reply.on === "string" && DAILY_MINUTE.test(reply.on) && typeof reply.off === "string" && DAILY_MINUTE.test(reply.off) &&
+    reply.on !== reply.off && (reply.override === null || ["on", "off"].includes(reply.override)) &&
+    typeof reply.revision === "string" && TIMING_REVISION.test(reply.revision) &&
+    typeof reply.power === "boolean" && typeof reply.active === "boolean" && typeof reply.saved === "boolean" &&
+    (reply.reason === null || ["manual", "disabled", "time-unset", "settings-unreadable"].includes(reply.reason)) &&
+    (reply.error === null || typeof reply.error === "string") &&
+    (!reply.active || (reply.enabled && reply.override === null && reply.reason === null && reply.error === null));
+  if (!sound) throw new Failure("bad-reply", address());
+  return {...reply};
+}
+
+export async function scheduleSet(identity, revision, on, off, enabled) {
+  if (typeof revision !== "string" || !TIMING_REVISION.test(revision) ||
+      typeof on !== "string" || !DAILY_MINUTE.test(on) || typeof off !== "string" || !DAILY_MINUTE.test(off) ||
+      on === off || typeof enabled !== "boolean") throw new Refusal("bad-argument", "schedule times");
+  await carriedOut(timingLine(`schedule set ${revision} ${on} ${off} ${enabled ? "on" : "off"}`, identity));
+}
+
+export async function scheduleResume(identity, revision) {
+  if (typeof revision !== "string" || !TIMING_REVISION.test(revision)) throw new Refusal("bad-argument", "schedule revision");
+  await carriedOut(timingLine(`schedule resume ${revision}`, identity));
 }
 
 // The works in which a target meets a fault of a file.
@@ -178,14 +267,15 @@ export async function fault() {
 }
 
 // One part of the items of a level, in its order, from a position on: of the root, the
-// show's items and the root's folders and files of the card; of the card's folder with the
-// id `folder`, its sub-folders and its own files. Each animation as `{id, file, bytes}`
-// with the booleans `ignored` and `external` and the text `type` when the target gives
-// them and `fault`, the reason it is unavailable, when it has one, and `bytes` null while
-// the installation has not read it whole; each folder of the card as `{id, playlist}`
-// with its path, and `files`, the number of its own files, when the target gives it; each
-// cycle as `{id, cycle: true}`; and `next`, the position to ask for next, or
-// null when the part holds the last item.
+// show's items, the folders of the board's own storage and the root's folders and files of
+// the card; of a folder with the id `folder`, its sub-folders and its own files. Each
+// animation as `{id, file, bytes}` with the booleans `ignored` and `external` and the text
+// `type` when the target gives them, `stored`, the name the board's storage keeps a file of
+// one of its folders under, and `fault`, the reason it is unavailable, when it has one, and
+// `bytes` null while the installation has not read it whole; each folder as
+// `{id, playlist, external}` with its path, and `files`, the number of its own files, when
+// the target gives it; each cycle as `{id, cycle: true}`; and `next`, the position to ask
+// for next, or null when the part holds the last item.
 export async function list(from = 0, folder = null) {
   const reply = folder === null ? await carriedOut(`list ${from}`) : await carriedOut(`list in ${folder} ${from}`);
   const sound =
@@ -202,9 +292,10 @@ export async function list(from = 0, folder = null) {
         (item.external === undefined || typeof item.external === "boolean") &&
         (item.type === undefined || typeof item.type === "string") &&
         (item.fault === undefined || typeof item.fault === "string") &&
+        (item.stored === undefined || (typeof item.stored === "string" && typeof item.file === "string" && item.external === false)) &&
         ((typeof item.file === "string" && item.playlist === undefined && (item.bytes === null || whole(item.bytes, 0, MOST_BYTES))) ||
-          (typeof item.playlist === "string" && item.playlist.length > 0 && item.external === true && item.file === undefined && item.cycle === undefined &&
-            item.bytes === undefined && item.type === undefined && item.fault === undefined) ||
+          (typeof item.playlist === "string" && item.playlist.length > 0 && typeof item.external === "boolean" && item.file === undefined && item.cycle === undefined &&
+            item.bytes === undefined && item.type === undefined && item.fault === undefined && item.stored === undefined) ||
           (Array.isArray(item.cycle) && item.file === undefined && item.playlist === undefined && item.ignored === undefined && item.external === undefined &&
             item.inherited_ignored === undefined && item.type === undefined && item.fault === undefined)),
     );
@@ -215,10 +306,11 @@ export async function list(from = 0, folder = null) {
     items: reply.items.map((item) => (typeof item.file === "string" ? {id: item.id, file: item.file, bytes: item.bytes, ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
       ...(item.inherited_ignored === undefined ? {} : {inheritedIgnored: item.inherited_ignored}),
       ...(item.external === undefined ? {} : {external: item.external}), ...(item.type === undefined ? {} : {type: item.type}),
-      ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist, ...(item.files === undefined ? {} : {files: item.files}),
+      ...(item.stored === undefined ? {} : {stored: item.stored}),
+      ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist, external: item.external, ...(item.files === undefined ? {} : {files: item.files}),
       ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
       ...(item.inherited_ignored === undefined ? {} : {inheritedIgnored: item.inherited_ignored})} :
-      {id: item.id, cycle: true})),
+      {id: item.id, cycle: true, members: item.cycle.filter((member) => whole(member, 1, MOST_ID))})),
     next: reply.next,
   };
 }
@@ -247,13 +339,70 @@ export async function remove(id) {
   await carriedOut(`remove ${id}`);
 }
 
-// Opens the upload of a file of some bytes as the item with this id. Gives the most bytes
-// one `upload data` may carry.
+// Makes a folder of a storage, "external", the card, or "internal", the board's own, with
+// this path, its parent there already. Gives `{id, made}`, `made` false for a folder that
+// was there.
+export async function folderMake(path, storage = "external") {
+  const encoded = path.split("/").map(encodeURIComponent).join("/");
+  const reply = storage === "internal"
+    ? await carriedOut(`folder make internal ${encoded}`)
+    : await carriedOut(`folder make external ${encoded}`);
+  if (!whole(reply.id, 1, MOST_ID) || typeof reply.made !== "boolean") {
+    throw new Failure("bad-reply", address());
+  }
+  return {id: reply.id, made: reply.made};
+}
+
+// Removes the empty folder of either storage with this id. A folder that holds a file or a
+// folder is refused `in-use`.
+export async function folderRemove(id) {
+  await carriedOut(`folder remove ${id}`);
+}
+
+// Moves the card's file with this id into the card's folder with this path, "" for the root,
+// with its id and its saved settings. Gives whether it moved: false for a file that was in
+// that folder already.
+export async function moveExternal(id, folder) {
+  const encoded = folder === "" ? "/" : folder.split("/").map(encodeURIComponent).join("/");
+  const reply = await carriedOut(`move external ${id} ${encoded}`);
+  if (reply.id !== id || typeof reply.moved !== "boolean") {
+    throw new Failure("bad-reply", address());
+  }
+  return reply.moved;
+}
+
+// Gives the folder of the board's own storage with this id the new full path, its
+// sub-folders with it, each name encoded as `folderMake` encodes it. Gives whether it moved:
+// false for a folder that has that path already.
+export async function moveInternal(id, path) {
+  const encoded = path.split("/").map(encodeURIComponent).join("/");
+  const reply = await carriedOut(`move internal ${id} ${encoded}`);
+  if (reply.id !== id || typeof reply.moved !== "boolean") {
+    throw new Failure("bad-reply", address());
+  }
+  return reply.moved;
+}
+
+// What the board keeps for an animation: its saved brightness and saved repeat, null for
+// none, and whether it is the show's start item.
+export async function saved(id) {
+  const reply = await carriedOut(`saved ${id}`);
+  const value = (given, most) => given === null || whole(given, 0, most);
+  if (!value(reply.brightness, 255) || !value(reply.repeat, 65535) || typeof reply.start !== "boolean") {
+    throw new Failure("bad-reply", address());
+  }
+  return {brightness: reply.brightness, repeat: reply.repeat, start: reply.start};
+}
+
+// Opens the upload of a file of some bytes as the item with this id: a file name, or the
+// path of a folder of the board's own storage and a file name. Gives the most bytes one
+// `upload data` may carry.
 export async function uploadBegin(id, file, bytes, createCrc = null) {
-  const line = `upload begin ${id} ${file} ${bytes}${createCrc === null ? "" : " " + createCrc}`;
+  const encoded = file.split("/").map(encodeURIComponent).join("/");
+  const line = `upload begin ${id} ${encoded} ${bytes}${createCrc === null ? "" : " " + createCrc}`;
   const reply = createCrc === null
-    ? await carriedOut(`upload begin ${id} ${file} ${bytes}`)
-    : await carriedOut(`upload begin ${id} ${file} ${bytes} ${createCrc}`);
+    ? await carriedOut(`upload begin ${id} ${encoded} ${bytes}`)
+    : await carriedOut(`upload begin ${id} ${encoded} ${bytes} ${createCrc}`);
   if (createCrc !== null && reply.replacing !== false) {
     try { await uploadCancel(); } catch (_) { /* An unchanged upload opens no transaction. */ }
     throw new Refusal(reply.replacing === true || reply.unchanged === true ? "stale" : "unsupported", line);
@@ -291,11 +440,15 @@ export async function uploadExpect(crc) {
   await carriedOut(`upload expect ${crc}`);
 }
 
-// Up to 600 bytes of the file of an animation, from an offset, as given in base64, and
-// the size of the file.
-export async function read(id, offset) {
-  const reply = await carriedOut(`read ${id} ${offset}`);
-  if (!whole(reply.bytes, 0, MOST_BYTES) || typeof reply.data !== "string" || !/^[A-Za-z0-9_-]*$/.test(reply.data) || reply.data.length % 4 === 1) {
+// The most bytes one `read` with a count asks for.
+export const READ_COUNT = 720;
+
+// Up to 600 bytes of the file of an animation, from an offset, or up to `count` bytes, 1 to
+// 720, as given in base64, and the size of the file.
+export async function read(id, offset, count = null) {
+  const reply = count === null ? await carriedOut(`read ${id} ${offset}`) : await carriedOut(`read ${id} ${offset} ${count}`);
+  if (!whole(reply.bytes, 0, MOST_BYTES) || typeof reply.data !== "string" || !/^[A-Za-z0-9_-]*$/.test(reply.data) || reply.data.length % 4 === 1 ||
+      reply.data.length > Math.ceil(((count ?? READ_COUNT) * 4) / 3)) {
     throw new Failure("bad-reply", address());
   }
   const text = atob(reply.data.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (reply.data.length % 4)) % 4));
@@ -380,9 +533,34 @@ export async function debugMini(on) {
   await carriedOut(`debug mini ${on ? "on" : "off"}`);
 }
 
+function rotationOf(reply) {
+  if (reply.ok !== true || typeof reply.supported !== "boolean" ||
+      ![0, 90, 180, 270].includes(reply.degrees) || !whole(reply.revision, 0, MOST_ID) ||
+      !(reply.error === null || reply.error === "unreadable")) throw new Failure("bad-reply", address());
+  return {supported: reply.supported, degrees: reply.degrees, revision: reply.revision, error: reply.error};
+}
+
+export async function rotation() {
+  return rotationOf(await carriedOut("rotation"));
+}
+
+export async function rotationSet(revision, degrees) {
+  if (!whole(revision, 0, MOST_ID) || ![0, 90, 180, 270].includes(degrees)) throw new RangeError("invalid rotation");
+  const reply = rotationOf(await carriedOut(`rotation set ${revision} ${degrees}`));
+  if (!reply.supported || reply.degrees !== degrees || reply.error !== null) throw new Failure("bad-reply", address());
+  return reply;
+}
+
 // Switches the message after each clock on or off.
 export async function clockMessage(on) {
   await carriedOut(`clocks message ${on ? "on" : "off"}`);
+}
+
+// Chooses the storage whose copy of a clock or a message plays when both storages hold one:
+// "sd" for the card, "internal" for the board's own storage.
+export async function clockStorage(storage) {
+  if (!CLOCK_STORAGES.includes(storage)) throw new RangeError("unknown clock storage");
+  await carriedOut(`clocks storage ${storage}`);
 }
 
 // Removes an animation's saved repeat: its turns play its own count again.

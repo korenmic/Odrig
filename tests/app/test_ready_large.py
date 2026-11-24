@@ -15,7 +15,7 @@ class LargeReadyFile(unittest.TestCase):
     def test_the_actual_space_scan_has_bounded_preflight_and_original_encoded_bytes(self):
         found = support.run('ready-large', settings={'file': SPACE_SCAN.name}, media=SPACE_SCAN.parent).seen
         self.assertEqual(found, {'bytes': 34410601, 'sha256': SPACE_SHA, 'prefixReads': [[0, 36]],
-                                'encodedReads': 1, 'previewSafe': False, 'frames': 18004, 'materializedFrames': False})
+                                'encodedReads': 1, 'previewSafe': True, 'frames': 18004, 'materializedFrames': False})
 
     def test_the_shared_app_reuses_the_large_files_known_preview(self):
         top = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))

@@ -128,6 +128,14 @@ class Includes(unittest.TestCase):
 
     def test_every_call_to_the_core_after_its_start_is_made_with_the_lock_held(self):
         text = text_of(USERMOD / "odrig_usermod.cpp")
+        start = text.index('void syncLegs() {')
+        end = text.index('\n}\n', start) + 3
+        self.assertEqual(text[start:end].count('odrig_core_power('), 1)
+        self.assertEqual(text.count('odrig_core_power('), 1)
+        for call in re.finditer(r'(?m)^\s+syncLegs\(\);', text):
+            block = text[text.rfind('\n}', 0, call.start()):call.start()]
+            self.assertIn('Locked held;', block)
+        text = text[:start] + text[end:]
         calls = [match for match in re.finditer(r"\bodrig_core_(\w+)\(", text) if match.group(1) != "begin"]
         self.assertGreaterEqual(len(calls), 3)
         for call in calls:
@@ -251,7 +259,7 @@ class TheTask(unittest.TestCase):
         self.assertRegex(setup, r"if \(core != nullptr\) \{\n\s+xTaskCreatePinnedToCore\(")
 
     def test_the_task_asks_again_only_when_the_loop_has_taken_the_last_refresh(self):
-        steps = [self.task.index(step) for step in ("if (refreshReady || updating || outputChanging) {", "ulTaskNotifyTake(", "continue;", "const bool due = refreshDue();", "vTaskDelay(1);")]
+        steps = [self.task.index(step) for step in ("if (refreshReady || updating || outputChanging) {", "ulTaskNotifyTake(", "continue;", "refreshDue();", "vTaskDelay(1);")]
         self.assertEqual(steps, sorted(steps))
         polling = self.usermod[self.usermod.index("bool refreshDue() {"):self.usermod.index("const char TASK_NAME[]")]
         steps = [polling.index(step) for step in ("Locked held;", "if (outputChanging) return false;", "odrig_core_poll(", "if (due) refreshReady = true;", "return due;")]
@@ -262,8 +270,9 @@ class TheTask(unittest.TestCase):
     def test_physical_pins_are_read_once_and_routing_is_refreshed_under_the_core_lock(self):
         legs = self.usermod[self.usermod.index("void readLegs() {"):self.usermod.index("// Asks the core for a refresh.")]
         self.assertIn("Locked held;", legs[:legs.index("uint32_t legCount()")])
-        self.assertNotIn("Locked held;", legs[legs.index("uint32_t legCount()"):])
-        self.assertNotRegex(legs[legs.index("uint32_t legCount()"):], r"odrig_core_")
+        callbacks = legs[legs.index("uint32_t legCount()"):legs.index("void syncLegs() {")]
+        self.assertNotIn("Locked held;", callbacks)
+        self.assertNotRegex(callbacks, r"odrig_core_")
         self.assertEqual(self.usermod.count("readLegs();"), 1)
         self.assertIn("OdrigRouting::onPin(core, legs[i].pin, &leg)", self.usermod)
         self.assertIn("Locked held;\n        syncLegs();", self.usermod)
@@ -383,10 +392,19 @@ class Host(unittest.TestCase):
         self.assertEqual(users, {"odrig_files.cpp"})
         for path in SOURCES:
             text = text_of(path)
-            self.assertNotRegex(text, r"ODRIG_FS\.(rmdir|format)\b", path.name)
+            self.assertNotRegex(text, r"ODRIG_FS\.format\b", path.name)
+            # The folder of the show is made by a write; a numbered folder of it by the
+            # core's `make_folder`, and removed by its `remove` while it is empty.
             self.assertEqual(re.findall(r"ODRIG_FS\.mkdir\(([^)]*)\)", text),
-                             ["FOLDER_PATH"] if path.name == "odrig_files.cpp" else [], path.name)
+                             ["FOLDER_PATH", "path"] if path.name == "odrig_files.cpp" else [], path.name)
+            self.assertEqual(re.findall(r"ODRIG_FS\.rmdir\(([^)]*)\)", text), ["path"] if path.name == "odrig_files.cpp" else [], path.name)
             self.assertNotRegex(text, r"serializeConfig|writeObjectToFile|doSerializeConfig|configNeedsWrite", path.name)
+        made = self.files[self.files.index("int makeFolder(void *"):]
+        self.assertIn("if (!folderPathOf(name, path)) return -1;", made[:made.index("\n}\n")])
+        removed = self.files[self.files.index("int removeFile(void *"):]
+        self.assertIn("if (folderPathOf(name, path)) {", removed[:removed.index("\n}\n")])
+        numbered = self.files[self.files.index("bool folderPathOf(const char *name, char *path) {"):self.files.index("bool isFolder(")]
+        self.assertIn("if (numberLength(name, 0) == 0) return false;", numbered)
 
     def test_every_path_given_to_the_file_system_is_in_the_shows_folder(self):
         calls = re.findall(r"ODRIG_FS\.(open|exists|remove|rename)\(([^)]*)\)", self.files)
@@ -399,7 +417,9 @@ class Host(unittest.TestCase):
         self.assertEqual(set(re.findall(r"strcpy\((\w+), FOLDER\);", self.files)), {"path", "given"})
         self.assertEqual(set(re.findall(r"pathOf\(\w+, (\w+)\)", self.files)), {"path", "pathFrom", "pathTo"})
         made = self.files[self.files.index("bool pathOf(const char *name, char *path) {"):self.files.index("int openNamed(")]
-        self.assertIn("if (!isName(name)) return false;", made)
+        self.assertIn("if (!isStored(name)) return false;", made)
+        stored = self.files[self.files.index("bool isStored(const char *name) {"):self.files.index("bool pathOf(")]
+        self.assertIn("return isName(number == 0 ? name : name + number + 1);", stored)
         self.assertIn("strcpy(path, FOLDER);", made)
         self.assertNotRegex(self.files, r'"/[^o"]')
 
@@ -578,12 +598,24 @@ class Pacing(unittest.TestCase):
 
     def test_the_pacing_is_asked_only_by_what_carries_lines(self):
         asking = {path.name: len(re.findall(r"OdrigFiles::holding\(\)", outside_probe_blocks(text_of(path)))) for path in SOURCES}
-        self.assertEqual({name: count for name, count in asking.items() if count}, {"odrig_files.cpp": 1, "odrig_serial.cpp": 2, "odrig_uart.cpp": 1, "odrig_usermod.cpp": 1})
+        self.assertEqual({name: count for name, count in asking.items() if count}, {"odrig_files.cpp": 1, "odrig_serial.cpp": 2, "odrig_uart.cpp": 1, "odrig_usermod.cpp": 2})
 
-    def test_no_source_holds_a_word_of_a_command(self):
+    def test_only_the_external_power_adapter_holds_manual_command_words(self):
         words = r'"(play|on|off|brightness|status|space|list|remove|upload|begin|data|end|cancel)[ "\\]'
         for path in SOURCES:
-            self.assertNotRegex(text_of(path), words, path.name)
+            text = text_of(path)
+            if path.name == 'odrig_usermod.cpp':
+                start = text.index('void applyPower() {')
+                end = text.index('\n}\n', start) + 3
+                adapter = text[start:end]
+                self.assertIn('const char *line = on ? "on" : "off";', adapter)
+                self.assertIn('odrig_core_command(core,', adapter)
+                text = text[:start] + text[end:]
+                start = text.index('  void readFromJsonState(JsonObject &root) override {')
+                end = text.index('\n  }\n', start) + 5
+                self.assertIn('powerState.explicitRequest(', text[start:end])
+                text = text[:start] + text[end:]
+            self.assertNotRegex(text, words, path.name)
 
     def test_the_port_has_a_queue_of_4096_bytes_made_before_the_core_starts(self):
         self.assertIn("const size_t RECEIVE_QUEUE = 4096;", self.serial)

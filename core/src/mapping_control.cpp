@@ -211,7 +211,7 @@ uint32_t mapping_set(Core &core, uint32_t revision, const char *text, uint32_t l
     if (!parse_pins(text, length, pins)) return refuse(reply, "bad-argument");
     if (core.invalid) return refuse(reply, "show-invalid");
     if (!mapping_editable(core)) return refuse(reply, "bad-argument");
-    if (!check_complete(core) || core.upload.state != kUploadNone) return refuse(reply, "busy");
+    if (core.upload.state != kUploadNone) return refuse(reply, "busy");
     for (uint32_t i = 0; i < kSnakes; ++i) {
         bool found = false;
         for (uint32_t j = 0; j < kSnakes; ++j) found = found || core.legs[j].pin == pins[i];
@@ -264,7 +264,6 @@ uint32_t mapping_test(Core &core, bool enabled, uint32_t snake, Reply &reply) {
     if (core.mapping_test && core.mapping_snake == snake) return succeed(reply);
     if (core.invalid) return refuse(reply, "show-invalid");
     if (!mapping_editable(core)) return refuse(reply, "bad-argument");
-    if (!check_complete(core) || core.upload.state != kUploadNone) return refuse(reply, "busy");
     // A test that follows another one resumes what played before the first.
     if (!core.mapping_test) {
         // A break gives way to the animation it was to give way to, which the test's end

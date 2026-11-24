@@ -44,6 +44,9 @@ uint32_t repeats_save(Core &core, uint32_t id, uint32_t loops, uint64_t now, Rep
 // The reply to `repeat <id> default`: the listed animation with the id has no saved repeat
 // any more, and its reported turn plays its own count again.
 uint32_t repeats_restore(Core &core, uint32_t id, uint64_t now, Reply &reply);
+// The reply to `saved <id>`: the saved brightness and the saved repeat of the listed
+// animation with the id, null for none, and whether it is the show's start item.
+uint32_t repeats_saved_reply(Core &core, uint32_t id, Reply &reply);
 
 }  // namespace odrig
 

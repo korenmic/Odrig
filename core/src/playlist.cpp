@@ -151,11 +151,12 @@ void playlist_touch(Core &core, uint64_t now) {
     if (core.playlist_path == nullptr || !storage_changes(core)) {
         return;
     }
-    const bool periodic = drive_folder_count(core) > 1 && now - core.playlist_saved >= kPlaylistSaveEveryMs;
+    const bool folders = drive_folder_count(core) > 1 || core.internal_folders != 0;
+    const bool periodic = folders && now - core.playlist_saved >= kPlaylistSaveEveryMs;
     if (!core.save_due && !periodic) {
         return;
     }
-    if (drive_folder_count(core) <= 1 && !core.file_present) {
+    if (!folders && !core.file_present) {
         // The root with a fresh window is what an absent file means: nothing to write.
         core.save_due = 0;
         return;

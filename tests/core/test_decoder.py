@@ -1,10 +1,14 @@
+import itertools
+import pathlib
 import random
+import struct
+import tempfile
 import unittest
 import zlib
 
 from odrig import errors, jsonframes, odrg
 
-from . import support
+from . import huge_tail, support
 
 BLACK = bytes(3)
 
@@ -145,6 +149,132 @@ class EncodedFiles(unittest.TestCase):
         self.assertEqual(body, plain[16:])
         self.assertLess(len(compressed), len(plain) // 2)
         self.check([compressed, plain])
+
+
+CLOCK = support.ROOT / "collection" / "card" / "clocks" / "time-original-5-every-row-another-time.odrg"
+TEXT = support.ROOT / "tests" / "vectors" / "texts" / "valid" / "english.static.odrgx"
+
+
+def records_of(data):
+    """The bytes of each frame record of the body of an ODRG file, as Python reads them, the
+    palette counted with the first; the mode byte of each; and n, the size of the decoder's
+    pixel buffer."""
+    width, height, colours = struct.unpack_from("<HHH", data, 6)
+    body = zlib.decompress(data[16:], wbits=-15) if data[5] & 1 else data[16:]
+    at = 3 * colours
+    sizes, modes = [], []
+    while at < len(body):
+        _, length, mode = struct.unpack_from("<HHB", body, at)
+        sizes.append(4 + length)
+        modes.append(mode)
+        at += 4 + length
+    sizes[0] += 3 * colours
+    return sizes, modes, width * height * (1 if colours else 3)
+
+
+def walks(mode):
+    """Whether a record of this mode walks every position of the picture: the run bit and
+    predictor 1 or 2."""
+    return bool(mode & 0x08) and (mode >> 4) & 3 in (1, 2)
+
+
+def file_bytes_of(data, sizes):
+    """The bytes of the file that each call of a reader takes, for each frame record of
+    these sizes and for the end, when it takes a byte only once it needs a bit of it. Of an
+    uncompressed body they are the record's bytes, and none for the end. Of a compressed
+    body they are what zlib has been given of the stream when the record's last byte comes
+    out, given one byte at a time; the end takes the rest of the stream."""
+    if not data[5] & 1:
+        return [*sizes, 0]
+    stream = data[16:]
+    inflater = zlib.decompressobj(wbits=-15)
+    ends = itertools.accumulate(sizes)
+    end = next(ends)
+    taken = []
+    made = 0
+    for given in range(1, len(stream) + 1):
+        made += len(inflater.decompress(stream[given - 1:given]))
+        while end is not None and made >= end:
+            taken.append(given)
+            end = next(ends, None)
+        if end is None:
+            break
+    taken.append(len(stream))
+    return [later - earlier for earlier, later in zip([0, *taken], taken)]
+
+
+class TheChargeOfACall(unittest.TestCase):
+    def assert_charged(self, data, calls, walk_charge):
+        """Each call for a record took its bytes of the body and is charged them, or the
+        bytes of the file it took when those are more, and `walk_charge` more for a record
+        that walks the picture; the end took no byte of the body and is charged the bytes of
+        the file it took. Gives the number of records that walk."""
+        sizes, modes, n = records_of(data)
+        taken = file_bytes_of(data, sizes)
+        self.assertEqual(n // 32, walk_charge)
+        self.assertEqual(len(calls), len(sizes) + 1)
+        for number, (call, size, of_file, mode) in enumerate(zip(calls, sizes, taken, modes), 1):
+            self.assertEqual(call, (size, max(size, of_file) + (walk_charge if walks(mode) else 0), False), f"record {number}, mode 0x{mode:02x}")
+        self.assertEqual(calls[-1], (0, taken[-1], False))
+        return sum(walks(mode) for mode in modes)
+
+    def test_a_fade_of_three_bytes_a_pixel_is_charged_337_more_for_each_record_that_walks(self):
+        data = support.fade()
+        self.assertEqual(len(data), 15313)
+        walking = self.assert_charged(data, support.taken_each([data])[0], 337)
+        self.assertGreater(walking, 1000)
+
+    def test_the_tracked_clock_is_charged_112_more_for_each_record_that_walks(self):
+        data = CLOCK.read_bytes()
+        lines = support.host_lines("decode", "--taken", CLOCK)
+        self.assertEqual(lines[0], "header 60 60 5 14399 1")
+        self.assertEqual(lines[-1], "end")
+        self.assertFalse([line for line in lines if line.startswith("frame ")])
+        calls = support._taken(iter(lines))
+        walking = self.assert_charged(data, calls, 112)
+        self.assertGreater(walking, 0)
+        self.assertEqual(sum(call.bytes for call in calls), len(zlib.decompress(data[16:], wbits=-15)))
+        # A record with which a block of the stream begins takes the block's header too.
+        sizes = records_of(data)[0]
+        self.assertGreater(sum(of_file > size for size, of_file in zip(sizes, file_bytes_of(data, sizes))), 10)
+
+    def test_a_record_behind_empty_blocks_of_the_stream_is_charged_the_bytes_of_the_file_it_took(self):
+        data = support.with_empty_blocks(support.clip(3, 60, 6, (20,) * 5), 400)
+        calls = support.taken_in(data)
+        self.assert_charged(data, calls, 11)
+        self.assertEqual([call.charge > 5 * 400 for call in calls], [True] * 5 + [False])
+
+    def test_a_texts_container_has_no_call_to_charge(self):
+        lines = support.host_lines("decode", "--taken", TEXT)
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(support.type_of(TEXT.read_bytes()), "text")
+        self.assertRegex(lines[0], r"^container [0-9]+ [0-9]+ [0-9]+$")
+        self.assertEqual(lines[1], "end")
+        self.assertEqual(support.taken_in(TEXT.read_bytes()), ())
+
+    def test_a_defect_settled_in_slices_gives_pending_calls_and_then_its_reason(self):
+        from .test_bounded import small
+        data = small()
+        lines = support.host_lines("decode", "--taken", "--batch", stdin=support.batch([data]))
+        self.assertEqual(lines[-1], f"rejected {huge_tail.REASON}")
+        calls = support._taken(iter(lines))
+        # The first call takes the palette, the record and a slice; each later one a slice.
+        self.assertEqual(calls[0], (6 + 5 + 16 + 32768, 6 + 5 + 16 + 32768, True))
+        self.assertEqual(calls[1:-1], tuple(support.Taken(32768, 32768, True) for _ in range(31)))
+        self.assertEqual(calls[-1], (0, 0, False))
+
+    def test_a_batch_gives_what_each_file_gives_alone(self):
+        files = [support.fade(), CLOCK.read_bytes(), TEXT.read_bytes(), support.clip(3, 60, 6, (20,) * 5)]
+        alone = []
+        for data in files:
+            with tempfile.TemporaryDirectory() as folder:
+                path = pathlib.Path(folder) / "file.odrg"
+                path.write_bytes(data)
+                alone.append(support._taken(iter(support.host_lines("decode", "--taken", path))))
+        self.assertEqual(support.taken_each(files), alone)
+        self.assertEqual([support.taken_in(data) for data in files], alone)
+        # Without `--taken` the decoder prints its frames.
+        self.assertEqual(len(support.decode_each(files[3:])[0].records), 5)
 
 
 class DamagedFiles(unittest.TestCase):

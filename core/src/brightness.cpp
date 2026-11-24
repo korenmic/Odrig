@@ -4,6 +4,7 @@
 
 #include "crc32.h"
 #include "drive.h"
+#include "folders.h"
 #include "show.h"
 #include "storage.h"
 
@@ -42,7 +43,7 @@ bool parse(char *text, uint32_t length, Line &line) {
     line.kind = text[at + 1];
     line.name = text + at + 3;
     line.length = length - at - 3;
-    if (line.kind == 'f') return is_file_name(line.name);
+    if (line.kind == 'f') return is_stored_name(line.name);
     if (line.kind != 'x' || line.length > 127) return false;
     for (uint32_t index = 0; index < line.length; ++index) {
         if (line.name[index] == '\0' || line.name[index] == '\r') return false;
@@ -161,7 +162,7 @@ uint32_t animation_with(const Core &core, uint32_t id, bool &in_use) {
         const DriveRow *row = drive_row(core, position);
         if (row != nullptr && row->listed) return kDriveBase + position;
     }
-    in_use = kind == 'd';
+    in_use = kind == 'd' || (kind == 0 && internal_folder_id(core, id));
     return kNothing;
 }
 

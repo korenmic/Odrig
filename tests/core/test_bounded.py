@@ -155,7 +155,9 @@ class TheChecksAndThePlayerGoOnWhileItSettles(unittest.TestCase):
         data = small()
         lines = support.upload_lines(9, "new.odrg", data)
         script = [support.line(T0, line) for line in lines]
-        # The check takes a step at each refresh: its header, its record and 32 slices.
+        # The check takes its header and the record with the first of 32 slices at the
+        # first refresh, and one slice at each refresh after it: a slice ends the steps of
+        # its refresh. The 33rd refresh comes to the reason.
         for step in range(1, 40):
             script += [f"poll {T0 + 20 * step}", support.line(T0 + 20 * step, support.upload_end(data))]
             if step == 3:
@@ -165,7 +167,7 @@ class TheChecksAndThePlayerGoOnWhileItSettles(unittest.TestCase):
         busy = 0
         while ends[busy] == {"ok": False, "error": "busy"}:
             busy += 1
-        self.assertGreater(busy, 32)
+        self.assertEqual(busy, 32)
         self.assertEqual(ends[busy], {"ok": False, "error": "bad-file", "reason": huge_tail.REASON})
         self.assertEqual(ends[busy + 1], {"ok": False, "error": "no-upload"})
         self.assert_no_pending(run)

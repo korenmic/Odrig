@@ -1,5 +1,8 @@
 // New animations: converted media or original ready-made bytes, with a visible destination.
 
+import * as batch from "../batch.js";
+import * as archivePanel from "./archive.js";
+import * as batchList from "./batch-list.js";
 import * as capacity from "../capacity.js";
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
@@ -10,7 +13,7 @@ import * as previews from "../previews.js";
 import {crc32} from "../crc32.js";
 import * as destinations from "../upload-destination.js";
 import {prepare} from "../ready.js";
-import {fileName, freeId, uploading} from "../upload.js";
+import {fileName, freeId, showChecking, uploading} from "../upload.js";
 import {Failure} from "../target.js";
 
 // What each way of fitting a picture to the canvas does, in words.
@@ -31,6 +34,8 @@ let made = null;
 let previewTimer = null;
 // The upload under way, or null.
 let sending = null;
+// The making of the preview of a ready-made file the form holds, or null.
+let readyMaking = null;
 // The captured destination and the serialized preflight, before a job owns the transfer.
 let form = null;
 let preparing = false;
@@ -47,14 +52,33 @@ function say(id, text) {
 
 function chooseStore(where) {
   if (form === null || sending !== null || preparing) return;
-  destinations.select(form, where, client.state.space);
+  destinations.select(form, where, client.state.space, client.clocksOnly());
   draw(client.state);
 }
 
 // Whether an upload cannot begin now: one is under way, a deletion runs, or the target
 // does not answer.
 function locked() {
-  return preparing || sending !== null || client.contentBusy() || client.state.link !== "answers";
+  const only = client.clocksOnly();
+  return preparing || sending !== null || client.contentBusy() || client.state.link !== "answers" ||
+    only && (form === null || destinations.blocked(form, client.state.space, only) !== null ||
+      !client.canUpload({external: form.storage === "external", file: `${form.level.path}/pending.odrg` }));
+}
+
+// Why the button is disabled now, the first of these reasons that holds: the installation
+// does not answer, this screen checks the destination, an upload of any screen is under
+// way, or a deletion, a download or a move runs on Animations. Null while none holds.
+function lockReason(state) {
+  if (batch.running()) return "A batch upload is under way.";
+  if (state.link === "checking") return "The installation has not answered yet.";
+  if (state.link !== "answers") return `The installation does not answer.${state.failure === null ? "" : ` ${messages.ofFailure(state.failure)}`}`;
+  const holder = client.contentHolder();
+  if (preparing || holder === "preflight") return "Checking the destination with the installation.";
+  if (sending !== null || holder === "upload") return "An upload is under way.";
+  if (holder === "deletion") return "A deletion is under way on Animations.";
+  if (holder === "download") return "A download is under way on Animations.";
+  if (holder === "move") return "A move is under way on Animations.";
+  return null;
 }
 
 function draw(state) {
@@ -62,23 +86,32 @@ function draw(state) {
   say("upload-card-space", capacity.external(state.space, undefined));
   const frozen = sending !== null || preparing;
   if (form !== null) {
-    if (!frozen) destinations.synchronize(form, state.space);
+    if (!frozen) destinations.synchronize(form, state.space, client.clocksOnly());
     for (const storage of ["internal", "external"]) {
       if (form.generations[storage] === null && state.catalog?.[storage]?.generation != null) form.generations[storage] = state.catalog[storage].generation;
     }
     const selector = byId("upload-storage");
     selector.value = form.storage;
-    selector.options[0].disabled = !destinations.present(state.space);
+    // In Clocks only the selector offers the storage of the folder explored alone.
+    const only = client.clocksOnly() ? destinations.storageInOnly(form) : null;
+    selector.options[0].disabled = !destinations.present(state.space) || only !== null && only !== "external";
+    selector.options[1].disabled = only !== null && only !== "internal";
     selector.disabled = frozen;
     byId("upload-destination").textContent = destinations.label(form, byId("upload-name").value);
-    byId("upload-destination-reason").textContent = frozen && form.storage === "external" && !destinations.present(state.space)
+    const boundary = destinations.blocked(form, state.space, client.clocksOnly());
+    byId("upload-destination-reason").textContent = boundary !== null ? boundary : frozen && form.storage === "external" && !destinations.present(state.space)
       ? "External storage disconnected. This attempt keeps its original destination and will not move to Internal."
       : destinations.reason(form, state.space);
   }
   for (const id of ["upload-name", "media", "ready-file", "make"]) byId(id).disabled = frozen;
-  byId("upload-made").disabled = locked();
+  const button = byId("upload-made");
+  button.disabled = locked();
+  // The line under the button says why it is disabled, while it is on the screen.
+  say("upload-locked-reason", button.hidden || !button.disabled ? null : lockReason(state));
   byId("upload-space").classList.toggle("stale", state.link === "no-answer");
   byId("upload-card-space").classList.toggle("stale", state.link === "no-answer");
+  batchList.draw(state, lockReason(state));
+  archivePanel.draw(state, lockReason(state));
 }
 
 // Milliseconds of a field, or null for an empty field where `empty` allows it. A text
@@ -142,7 +175,7 @@ function showMade() {
   if (made.ready) {
     const header = made.header;
     byId("made-facts").textContent = `Ready-made animation, ${header.width} \u00d7 ${header.height}, ${kilobytes(made.bytes.length)} KB. Original bytes, without conversion.`;
-    if (made.previewSafe) previews.makeOwn(made.bytes);
+    readyMaking = previews.makeOwn(made.bytes);
     readyPreview();
     draw(client.state);
     return;
@@ -163,7 +196,8 @@ function readyPreview() {
   if (source !== null) image.src = source;
   byId("ready-preview-note").textContent = source === null
     ? "No preview available yet. The original bytes are kept; the target checks the complete animation before installing."
-    : "Preview from the animation catalog. The original animation bytes are kept.";
+    : previews.inDefaults(made.key) ? "Preview from the animation catalog. The original animation bytes are kept."
+    : "Preview made on this phone. The original animation bytes are kept.";
 }
 
 function forget() {
@@ -172,6 +206,8 @@ function forget() {
   }
   stopPreview();
   made = null;
+  readyMaking?.release();
+  readyMaking = null;
   byId("upload-name").value = "";
   byId("made").hidden = true;
   byId("uploading").hidden = true;
@@ -186,69 +222,71 @@ async function upload(message) {
   const captured = form;
   const bytes = prepared.bytes;
   preparing = true;
-  client.setContentBusy(true);
+  client.setContentBusy("preflight");
   draw(client.state);
   try {
-  const fresh = await client.uploadSnapshot(captured.storage === "external" ? captured.level : {path: "", id: null});
+  const fresh = await client.uploadSnapshot(destinations.snapshotLevel(captured));
   if (form !== captured || made !== prepared) throw new Error("The selected animation changed. Prepare it again.");
-  if (destinations.synchronize(captured, fresh.space)) {
+  const moved = destinations.synchronize(captured, fresh.space, client.clocksOnly());
+  const boundary = destinations.blocked(captured, fresh.space, client.clocksOnly());
+  if (boundary !== null) throw new Error(boundary);
+  if (moved) {
     message(`The destination changed to ${destinations.label(captured, byId("upload-name").value)}. Review it and press Upload again.`);
     return;
   }
-  const checked = destinations.validate(captured, fresh, byId("upload-name").value, bytes.length, client.targetVersion());
+  const checked = destinations.validate(captured, fresh, byId("upload-name").value, bytes.length, client.targetVersion(), {only: client.clocksOnly()});
   const {external, path: file} = checked;
   if (checked.noSpace !== undefined) {
     message(messages.ofNoSpace(bytes.length, checked.noSpace, external ? "the card" : undefined));
     return;
   }
-  const id = external ? null : freeId(new Set(fresh.root.map(item => item.id)));
+  const id = external ? null : freeId(new Set(fresh.ids ?? fresh.root.map(item => item.id)));
   if (!external && id === null) throw new Error("Internal storage has no free animation id.");
   const shown = byId("uploading");
   shown.hidden = false;
   shown.textContent = "Sending: 0%";
   byId("upload-made").hidden = true;
   byId("cancel-upload").hidden = false;
+  let stopChecking = () => {};
+  // The preview of the bytes is made as they are sent, and kept when they are installed.
+  const making = previews.makeOwn(bytes);
   sending = uploading(
     {id, file, bytes, external, create: true, expect: external ? "00000000" : null},
     {
       report(part, speed) {
         shown.textContent = `Sending: ${Math.floor(part * 100)}%, ${Math.round(speed / 1000)} KB a second`;
       },
+      checking(since) {
+        stopChecking = showChecking(shown, since);
+      },
       end(how) {
+        stopChecking();
         sending = null;
         byId("upload-made").hidden = false;
         byId("cancel-upload").hidden = true;
         if (how.done) {
           shown.hidden = true;
           message(messages.ofUploaded(external ? how.id : id, file, external));
-          if (!prepared.ready || prepared.previewSafe) previews.makeOwn(bytes);
+          previews.keep(making);
+          client.uploadedTo(external ? "external" : "internal", file, making.key);
+          making.release();
         } else if (how.cancelled) {
+          making.release();
           shown.textContent = "Cancelled.";
         } else {
+          making.release();
           shown.hidden = true;
           const error = how.error;
-          if (error instanceof Refusal && error.code === "no-space" && external) {
-            const card = client.state.space === null ? null : client.state.space.external;
-            message(messages.ofNoSpace(bytes.length, card === null || card.free === null ? null : card.free, "the card"));
-          } else if (error instanceof Refusal && error.code === "no-space") {
-            message(messages.ofNoSpace(bytes.length, client.state.space === null ? null : client.state.space.free));
-          } else if (error instanceof Refusal && !external && ["unsupported", "stale"].includes(error.code)) {
-            message("The chosen id was taken, or the firmware cannot confirm a safe new upload. No file bytes were sent. Select the file again or update the firmware.");
-          } else if (error instanceof Refusal && external && ["bad-argument", "unknown-command", "no-upload", "stale"].includes(error.code)) {
-            message("The destination changed, already exists, or the firmware lacks safe folder uploads. Check the folder and filename, or update the firmware. Nothing was acknowledged as installed.");
-          } else if (error instanceof Refusal) {
-            message(messages.ofRefusal(error, client.state.status === null ? null : client.state.status.error));
-          } else if (error instanceof Failure) {
-            message(`${messages.ofFailure(error)} The upload was not acknowledged as installed; check the destination before retrying.`);
-          }
+          if (error instanceof Refusal || error instanceof Failure) message(destinations.refusalWords(error, external, bytes.length, client.state, client.clocksOnly()));
         }
       },
       wake: client.wake,
     },
   );
   client.upload(sending);
+  batch.otherUpload();
   } catch (error) {
-    if (error instanceof Refusal) message(messages.ofRefusal(error, client.state.status?.error ?? null));
+    if (error instanceof Refusal) message(messages.ofRefusal(error, client.state.status?.error ?? null, client.state.status?.hasClockStorage === true));
     else if (error instanceof Failure) message(messages.ofFailure(error));
     else message(error.message);
   } finally {
@@ -263,7 +301,7 @@ function choose(file) {
   if (running !== null) running.stop();
   picked = file;
   forget();
-  form = destinations.capture(client.state, client.targetVersion());
+  form = destinations.capture(client.state, client.targetVersion(), client.clocksOnly());
   byId("media-controls").hidden = false;
   byId("chosen").hidden = false;
   byId("media-name").textContent = file.name;
@@ -281,7 +319,7 @@ async function chooseReady(file, message) {
   if (running !== null) running.stop();
   picked = file;
   forget();
-  form = destinations.capture(client.state, client.targetVersion());
+  form = destinations.capture(client.state, client.targetVersion(), client.clocksOnly());
   const captured = form;
   byId("chosen").hidden = false;
   byId("media-controls").hidden = true;
@@ -365,13 +403,31 @@ export function start(options) {
     }
   });
   byId("ready-file").addEventListener("change", () => {
-    const files = byId("ready-file").files;
+    const files = [...byId("ready-file").files];
+    byId("ready-file").value = "";
     if (files.length === 1) {
-      const file = files[0];
-      byId("ready-file").value = "";
-      chooseReady(file, message);
+      batchList.close();
+      chooseReady(files[0], message);
+    } else if (files.length > 1) {
+      if (!batchList.open() && sending === null && !preparing) {
+        picked = null;
+        forget();
+        byId("chosen").hidden = true;
+      }
+      batchList.take(files, message);
     }
   });
+  byId("batch-more").addEventListener("change", () => {
+    const files = [...byId("batch-more").files];
+    byId("batch-more").value = "";
+    if (files.length > 0) batchList.take(files, message);
+  });
+  byId("batch-storage").addEventListener("change", () => batchList.choose(byId("batch-storage").value, client.state));
+  byId("batch-upload").addEventListener("click", () => batchList.press(message));
+  byId("batch-stop").addEventListener("click", () => batch.stop());
+  byId("batch-retry").addEventListener("click", () => batchList.retry());
+  batch.watch(() => draw(client.state));
+  archivePanel.start({message});
   for (const name of Object.keys(FITS)) {
     byId(`fit-${name}`).addEventListener("click", () => chooseFit(name));
   }

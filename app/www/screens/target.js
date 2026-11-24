@@ -3,7 +3,7 @@
 
 import * as client from "../client.js";
 import * as messages from "../messages.js";
-import {BOARD, Failure, address, route, setAddress} from "../target.js";
+import {BOARD, Failure, address, link, route, setAddress, setLink, usbPossible} from "../target.js";
 
 const LINKS = {checking: "Checking", answers: "Answers", "no-answer": "No answer"};
 
@@ -27,6 +27,9 @@ function say(id, text) {
 function routeLine(found) {
   if (!found.sender) {
     return "Sent from this browser.";
+  }
+  if (found.usb) {
+    return "Sent over USB serial.";
   }
   if (!found.wifi) {
     return "This phone is not on a Wi-Fi network.";
@@ -80,7 +83,7 @@ export function start({message, shown}) {
 
   function take(text) {
     try {
-      field.value = setAddress(text);
+      field.value = setAddress(text.trim() === "" ? BOARD : text);
     } catch (error) {
       if (!(error instanceof Failure)) {
         throw error;
@@ -91,8 +94,30 @@ export function start({message, shown}) {
     client.begin();
   }
 
-  byId("use").addEventListener("click", () => take(field.value));
-  byId("board").addEventListener("click", () => take(BOARD));
+  // The switch shows the block of the link in use; a choice of the other is a change of
+  // target.
+  const choices = [...document.querySelectorAll('#link-choice input[name="link"]')];
+  function showLink() {
+    const kind = link();
+    for (const choice of choices) {
+      choice.checked = choice.value === kind;
+      choice.disabled = choice.value === "usb" && !usbPossible();
+    }
+    say("link-why", usbPossible() ? null : "This browser has no USB serial port; the Android app has.");
+    byId("wifi-link").hidden = kind !== "wifi";
+    byId("usb-link").hidden = kind !== "usb";
+  }
+  for (const choice of choices) {
+    choice.addEventListener("change", () => {
+      if (!choice.checked || choice.value === link()) return;
+      setLink(choice.value);
+      showLink();
+      client.begin();
+    });
+  }
+  showLink();
+  byId("connect-wifi").addEventListener("click", () => take(field.value));
+  byId("connect-usb").addEventListener("click", () => client.begin());
   byId("about").textContent = webView();
 
   client.watch((state) => {
@@ -108,6 +133,7 @@ export function start({message, shown}) {
       say("last-fault", null);
     }
     askFault();
+    byId("usb-state").textContent = state.link === "answers" ? "A board answers on USB serial." : "Connect the phone to the board's USB port with a cable, then press Connect over USB.";
     if (shown()) {
       route().then((found) => {
         byId("route").textContent = routeLine(found);

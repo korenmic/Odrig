@@ -54,12 +54,14 @@ class ClockModes(unittest.TestCase):
         self.assertTrue(replies(run)[-1]['clock_message'])
         self.assertEqual(kept['clocks.txt'], mode_file('only', True).encode())
 
-    def test_invalid_settings_are_off_with_a_diagnostic(self):
+    def test_invalid_settings_fail_closed_with_a_diagnostic(self):
         for data in ('odrig-clocks 2\nmode on\nmessage off\n', mode_file('only') + 'extra\n',
                      'odrig-clocks 1\nclocks only\nmessage off\n', 'odrig-clocks 2\nmode only\n'):
             with self.subTest(data=data):
                 run = support.start({**SHOW4, 'clocks.txt': data}, asked(0, 'status'))
-                self.assertEqual(replies(run)[-1]['clock_mode'], 'off')
+                self.assertEqual(replies(run)[-1]['clock_mode'], 'only')
+                self.assertEqual(replies(run)[-1]['clock_error'], 'unreadable')
+                self.assertIsNone(replies(run)[-1]['animation'])
                 self.assertIn('clocks unreadable', run.logs)
 
     def test_failed_saves_and_readback_never_publish_a_mode_change(self):

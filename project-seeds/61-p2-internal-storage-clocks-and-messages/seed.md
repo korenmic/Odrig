@@ -61,7 +61,10 @@ Related work:
    represent, persist, list and resolve these paths through its catalog/content
    model. Current internal names are flat, so filename substring matching or a
    clock-type test is not a substitute for adding real path support. The physical
-   representation and compatible schema migration are specification work.
+   representation and compatible schema migration are specification work. Seed 74
+   part B gives the board's own storage real folders (stored names `<n>/<name>` and
+   `folders.txt`, spec 74 requirement 4.1); this seed builds on them and on seeds 66
+   and 67's Clocks-only browsing, on the branch of pull request #63.
 
 2. Retain every currently valid internal flat name, show, animation id, catalog,
    saved order, mapping and operator preference. Firmware updates and normal show
@@ -85,8 +88,13 @@ Related work:
 5. Apply the logical clock boundary to every playback entry point in Only mode,
    including manual play, folder play, automatic next, restart, resume and cleanup
    after storage/catalog changes. Internal clock/message files belong inside that
-   boundary; an unrelated internal file does not. Browsing remains unrestricted.
-   Leaving Only restores ordinary playback according to the existing rules.
+   boundary; an unrelated internal file does not. Raw command browsing remains
+   unrestricted. The operators' app keeps its visible browsing and upload
+   destinations inside Clocks in Only (the decision of 2026-11-01), and from this
+   seed on that boundary holds the board's own `clocks/` and `clocks/message/` and
+   their sub-folders as well as the card's, with uploads accepted into them as into
+   the card's (the owner's answer 2 of 2026-11-09). Leaving Only restores ordinary
+   playback according to the existing rules.
 
 6. Resolve automatic-playback duplicates by the same normalized full relative path,
    including extension, and the same validated file/animation type available from
@@ -114,7 +122,9 @@ Related work:
    command tool, firmware and shared app agreeing. Extend existing listing/upload/
    catalog paths compatibly and make the effective source/path understandable in
    the app. Preserve old-firmware handling. Prefer existing command forms; any new
-   command spelling needs the owner's explicit approval before implementation.
+   command spelling needs the owner's explicit approval before implementation. The
+   owner approved on 2026-11-09 the one this seed needs: `clocks storage sd|internal`,
+   kept on the board, and the status member `"clock_storage":"sd"|"internal"`.
 
 9. Retain the fixed-memory, bounded-work and incremental catalog protections.
    Do not add a boot-wide animation-body scan, unbounded in-memory path union,
@@ -177,9 +187,24 @@ None. The owner selected SD precedence on 2026-10-31 and requested a dropdown wi
 named options for same-path/same-type duplicates. `SD card` is the default;
 `Internal storage` selects internal-first. Internal path/catalog representation,
 bounded lookup, compatible settings encoding and use of existing transports are
-specification work. The repository's approval requirement for any new command
-spelling still applies before implementation; no unapproved command syntax is
-invented by this seed.
+specification work. The two questions that needed the owner, the command's spelling
+and the Clocks-only boundary of the app, are answered below.
+
+## The Owner's Answers
+
+On 2026-11-09 the owner was asked, one question at a time:
+
+1. The command that chooses the preferred storage. APPROVED as proposed:
+   `clocks storage sd` and `clocks storage internal`, kept on the board with the
+   other clock settings, and the status member `"clock_storage":"sd"` or
+   `"clock_storage":"internal"`; the default is the SD card. The dropdown of the
+   clock settings sends it. The seed is built in full.
+2. The decision of 2026-11-01, "Clocks-only app browsing and destinations",
+   changes: in Clocks only the app also shows the board's own `clocks/` and
+   `clocks/message/` folders and accepts uploads into them, like the card's.
+
+No other product question is left open. The deployment of the seven messages and
+the owner's LED and phone checks stay person-only steps after implementation.
 
 ## Definition Of Done
 

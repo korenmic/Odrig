@@ -86,7 +86,7 @@ export default async function (app) {
   await app.until(() => app.shown() === "target", "the target screen");
   seen.target = look(app);
   app.fill("address", "not an address");
-  app.press("Use");
+  app.press("Connect over Wi-Fi");
   await app.until(() => app.text("message-text") !== null, "a message");
   seen.message = look(app);
   seen.made = {};

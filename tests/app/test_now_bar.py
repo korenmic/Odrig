@@ -116,7 +116,7 @@ class ItsActions(unittest.TestCase):
             (2, {}, [["Restore", "Select", "Delete"], []], ["Restore 2 two.odrg to playlist", "Select 2 two.odrg", "Delete 2 two.odrg"]),
             (3, {}, [["Ignore", "Select", "Delete"], ["Edit"]], ["Ignore 3 words.odrgx in playlist", "Select 3 words.odrgx", "Delete 3 words.odrgx", "Edit 3 words.odrgx"]),
             (4, {}, [["Ignore", "Select", "Delete"], ["Edit"]], ["Ignore 4 time.odrgx in playlist", "Select 4 time.odrgx", "Delete 4 time.odrgx", "Edit 4 time.odrgx"]),
-            (60001, {}, [["Delete"], []], ["Delete 60001 card.odrg"]),
+            (60001, {}, [["Select", "Delete"], []], ["Select 60001 card.odrg", "Delete 60001 card.odrg"]),
             (60001, {"writable": False}, [["External storage is read-only."], []], []),
             (1, {"items": [{"id": 1, "file": "one.odrg", "bytes": 1000, "external": False}]}, [["This software allows no change."], []], []),
         )

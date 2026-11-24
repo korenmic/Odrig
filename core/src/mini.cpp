@@ -2,6 +2,7 @@
 
 #include "core_state.h"
 #include "mini.h"
+#include "rotation.h"
 #include "brightness.h"
 
 namespace odrig {
@@ -25,7 +26,7 @@ void mini_render(Core &core, const uint8_t *layer) {
             uint32_t sums[3] = {};
             for (uint32_t dy = 0; dy < 10; ++dy) {
                 for (uint32_t dx = 0; dx < 10; ++dx) {
-                    const uint32_t at = (y * 10 + dy) * 60 + x * 10 + dx;
+                    const uint32_t at = rotation_pixel(core, (y * 10 + dy) * 60 + x * 10 + dx);
                     const uint8_t *colour;
                     if (core.decoder.colours != 0) {
                         const uint8_t index = layer != nullptr && layer[at] != 0 ?

@@ -72,6 +72,8 @@ uint32_t file_entry(Core &core, const char *name) {
         file.name[length] = name[length];
     }
     file.name[length] = '\0';
+    file.held = 0;
+    file.rank = 0;
     return core.file_count++;
 }
 
@@ -80,7 +82,7 @@ uint32_t file_entry(Core &core, const char *name) {
 bool read_item(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
     const bool fill = limits != nullptr;
     char name[kNameSize];
-    char file[33];
+    char file[kStoredNameRoom];
     uint32_t members = 0;
     uint32_t id = 0;
     uint32_t seconds = 0;
@@ -131,7 +133,7 @@ bool read_item(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
                 return false;
             }
         } else if (member == 2) {
-            if (!json.string(file, sizeof file) || !is_file_name(file)) {
+            if (!json.string(file, sizeof file) || !is_stored_name(file)) {
                 return false;
             }
         } else if (member == 8) {
@@ -392,6 +394,34 @@ bool is_file_name(const char *name) {
         }
     }
     return (length >= 5 && same_text(name + length - 5, ".odrg")) || (length >= 6 && same_text(name + length - 6, ".odrgx"));
+}
+
+uint32_t stored_folder(const char *name) {
+    uint32_t number = 0;
+    uint32_t at = 0;
+    for (; at < 4 && name[at] >= '0' && name[at] <= '9'; ++at) {
+        number = number * 10 + static_cast<uint32_t>(name[at] - '0');
+    }
+    return at != 0 && at < 4 && name[at] == '/' && name[0] != '0' && number <= 255 ? number : 0;
+}
+
+const char *stored_base(const char *name) {
+    if (stored_folder(name) == 0) {
+        return name;
+    }
+    while (*name != '/') {
+        ++name;
+    }
+    return name + 1;
+}
+
+bool is_stored_name(const char *name) {
+    const char *base = stored_base(name);
+    uint32_t length = 0;
+    while (base[length] != '\0') {
+        ++length;
+    }
+    return length >= 1 && length <= 32 && is_file_name(base);
 }
 
 Reason read_show(Core &core, char *id_text) {

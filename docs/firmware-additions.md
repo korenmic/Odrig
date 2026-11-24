@@ -62,6 +62,8 @@ takes every line marked *No*.
 | 28 | Renders bounded runtime message widgets, saves Off/Between/Only clock mode, shuffles independent complete-message turns, and applies persisted own/ancestor external exclusions without outside fallback in Only. | 59 | `core/src/message_clock.cpp`, `breaks.cpp`, `ignored.cpp`, `player.cpp` | The core | No: full standalone player remains pending |
 | 29 | Names in `status` the memory the board has: the external memory in the heap, 0 when none was found, and the internal memory free when the core started, in the host text beside its build, its storage and its last reset. | 77 | `odrig_usermod.cpp` | Written again | No |
 
+| 29 | Keeps boot-local civil time with phone-zone rules, persistent daily LED hours and sticky manual control; all timing routes share atomic board identity guards. | 64 | `core/src/civil_time.cpp`; host identity and manual WLED feedback in `odrig_usermod.cpp` | Core plus host identity/power integration | No: standalone player remains cancelled |
+
 ## Coming
 
 Nothing at present. Seed 22, a USB stick through a hub, was superseded by the microSD

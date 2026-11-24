@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "run": "20261101-164328-136064",
+  "suites": {
+    "core": {
+      "ok": 1096,
+      "skip": 1
+    },
+    "emulator": {
+      "ok": 668,
+      "skip": 19
+    },
+    "firmware": {
+      "ok": 653,
+      "skip": 1,
+      "fail": 4
+    },
+    "firmware-host": {
+      "ok": 28
+    }
+  },
+  "cases": 2470,
+  "allCasesHavePassingVerification": true,
+  "allFullSuiteRunsClean": false,
+  "recheckedCases": [
+    "tests.firmware.test_power_callbacks.PowerCallbacks.test_initial_and_unchanged_callbacks_never_wait_for_busy_storage",
+    "tests.firmware.test_power_callbacks.PowerCallbacks.test_latest_explicit_request_wins_and_is_applied_once",
+    "tests.firmware.test_power_callbacks.PowerCallbacks.test_manual_requests_are_deferred_until_storage_is_available",
+    "tests.firmware.test_power_callbacks.PowerCallbacks.test_updates_and_initial_state_do_not_create_manual_overrides"
+  ],
+  "qualification": "The suite process had imported the new harness before its empty-guard compiler warning was corrected. Only the four affected cases were rerun; all pass with GNU and MSVC. The recorded full run remains failed.",
+  "beforeFailure": "Six scenarios hit callback result 10: attempted storage pacing wait, including initialization and unchanged power.",
+  "logs": {
+    "boot-power-before.log": {
+      "sha256": "3f3ed51f785c64c4843f6eb15e815803fbf72794ecfdba0be2c090e5583020de"
+    },
+    "boot-power-after-harness.log": {
+      "sha256": "48cca4579043e676c1592bf1b660aeba0d3df91db541fe3f8ef6e1108f3af614"
+    },
+    "boot-power-gnu-recheck.log": {
+      "sha256": "a80529b0fba7dbeae78a2324eb25b7b145d31b21bc00a02800e8f2fd26f98423"
+    }
+  },
+  "esp32s3Emulation": {
+    "input": {
+      "appSha256": "429d2ebe8072923acbd11a40b1e764ac29e08f20cfb3830d5dfe00b8cdddf0bb",
+      "appBytes": 1890944,
+      "offset": "0x10000",
+      "bootloaderAndStoragePreserved": true
+    },
+    "state": {
+      "input": "build/boot-regression-after/populated-flash.bin",
+      "seconds": 120,
+      "batches": 81723,
+      "restarts": 0,
+      "pc": "4037b132",
+      "harts": 2,
+      "pcs": [
+        "4037b132",
+        "40376b5b"
+      ],
+      "cycles": 1140266243,
+      "registers": [
+        "821546b4",
+        "3fcb08f0",
+        "0",
+        "0",
+        "8037f6a6",
+        "3fcb0810",
+        "60023",
+        "3",
+        "8209a99a",
+        "3fcb08b0",
+        "0",
+        "0",
+        "8037f6a6",
+        "3fcb07f0",
+        "60023",
+        "3fcb08cf",
+        "60f20",
+        "1c",
+        "1",
+        "a002",
+        "4",
+        "0",
+        "421546b4",
+        "0",
+        "0",
+        "0"
+      ]
+    },
+    "statusReplies": 4,
+    "faultReplies": 4,
+    "allRepliesOk": true,
+    "physicalAcceptance": false,
+    "limitations": [
+      "No real radio, SD card, USB or power supply",
+      "FPS remained zero and readiness checking in master and PR; no physical playback proof"
+    ]
+  },
+  "physicalAcceptance": false,
+  "exactPhysicalResetCauseConfirmed": false
+}

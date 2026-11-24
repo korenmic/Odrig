@@ -37,7 +37,7 @@ export default async function(app) {
     if (act.wait) await app.sleep(act.wait);
     if (act.reload) { await app.reload(); await shown(app, 2); }
     if (act.target) {
-      app.press("Target"); app.fill("address", act.target); app.press("Use");
+      app.press("Target"); app.fill("address", act.target); app.press("Connect over Wi-Fi");
       seen.changed = look(app);
       await shown(app, 2);
     }

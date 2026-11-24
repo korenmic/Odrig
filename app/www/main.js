@@ -1,18 +1,23 @@
 // The start of the app: which screen is shown, the place for a message, and what the
 // system's back gesture does.
 
+import * as batch from "./batch.js";
 import * as client from "./client.js";
+import "./timing.js";
 import * as messages from "./messages.js";
 import * as previews from "./previews.js";
 import * as authoring from "./screens/author.js";
 import * as catalogs from "./screens/catalogs.js";
 import * as clocksScreen from "./screens/clocks.js";
 import * as miniScreen from "./screens/mini.js";
+import * as timeScreen from "./screens/time.js";
+import * as rotationScreen from "./screens/rotation.js";
 import * as animationsScreen from "./screens/show.js";
 import * as uploadScreen from "./screens/storage.js";
 import * as settingsScreen from "./screens/mapping.js";
 import * as photomap from "./screens/photomap.js";
 import * as targetScreen from "./screens/target.js";
+import * as usbDiagnostics from "./screens/usb-diagnostics.js";
 
 const SCREENS = ["animations", "upload", "settings", "target"];
 const LINKS = {checking: "Checking", answers: "Connected", "no-answer": "No answer"};
@@ -40,8 +45,11 @@ function show(name) {
   settingsScreen.showing(name === "settings");
   photomap.showing(name === "settings");
   catalogs.showing(name === "settings");
+  timeScreen.showing(name === "settings");
+  rotationScreen.showing(name === "settings");
   animationsScreen.showing(name === "animations");
   targetScreen.showing(name === "target");
+  usbDiagnostics.showing(name === "target");
 }
 
 // Shows a text in the place for messages until it is dismissed or another takes its
@@ -132,6 +140,7 @@ for (const name of SCREENS) {
 window.history.replaceState({screen: "target", depth: 0}, "");
 show("target");
 targetScreen.start({message, shown: () => screen === "target"});
+usbDiagnostics.start();
 animationsScreen.start({message});
 // The phone's own previews and the keys kept on it are taken up while the app starts; the rows
 // show them when they come, and no page of a catalog is asked before, nor after a few seconds
@@ -144,9 +153,24 @@ authoring.start({message, go});
 settingsScreen.start();
 clocksScreen.start({go});
 miniScreen.start();
+timeScreen.start();
+rotationScreen.start();
 photomap.start();
 catalogs.start({message});
-client.onRefusal((refusal) => message(messages.ofRefusal(refusal, client.state.status === null ? null : client.state.status.error)));
+// The line of a batch's run, on every screen: a tap opens Upload, and takes away the line's
+// end sentence.
+batch.watch(() => {
+  const words = batch.line();
+  const line = byId("batch-line");
+  line.hidden = words === null;
+  if (words !== null && line.textContent !== words) line.textContent = words;
+});
+byId("batch-line").addEventListener("click", () => {
+  go("upload");
+  batch.seen();
+});
+client.onRefusal((refusal) => message(messages.ofRefusal(refusal, client.state.status === null ? null : client.state.status.error,
+  client.state.status?.hasClockStorage === true)));
 client.watch((state) => {
   const pill = byId("top-link");
   pill.textContent = LINKS[state.link];

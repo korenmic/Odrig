@@ -68,9 +68,10 @@ the entry links to it.
 - **turn**: The time an animation has in the playlist before the next one starts: unless
   the show says otherwise, the fewest whole loops that last 30 seconds. See
   [show.md](../docs/show.md#the-turn-of-an-animation).
-- **clock break**: While the clocks are on, a turn of a clock from the card's folder `clocks`,
-  after every 5 turns or when 5 minutes have passed, then the message of its sub-folder
-  `message` once while it is on. A turn the 5 minutes cut goes on after it from where it was. See
+- **clock break**: While the clocks are on, a turn of a clock from the folder `clocks` of the
+  card or of the board's own storage, after every 5 turns or when 5 minutes have passed, then
+  a message from the sub-folder `message` of either once while it is on. A turn the 5
+  minutes cut goes on after it from where it was. See
   [show.md](../docs/show.md#clocks-between-the-animations).
 - **installed file set**: The one folder of files that a show is installed as:
   `mapping.json`, `show.json` and the `.odrg` files the show names. Whatever plays a show
@@ -81,8 +82,12 @@ the entry links to it.
   `read <id> <offset>`, which reads a file back, `catalog` for the catalogs of storage,
   `remove <id>`, `ignore` for playlist inclusion, `order` for the saved order of the
   playlist, `mapping` for assignments and the diagonal check, `repeat` for the loops of
-  the turn in progress, `clocks` for the clocks between the animations,
-  `debug mini on|off` for temporary miniature output, and `upload`, which
+  the turn in progress, `clocks` for the clocks between the animations, `time` for
+  the board's civil clock and phone-zone rules, `schedule` for daily hours and manual mode, `guard` to bind timing to a board,
+  `rotation` for saved square output orientation, `debug mini on|off` for temporary miniature output,
+  `folder make` for the folders of the board's storage and of the card,
+  `move external` for a file moved to another folder of the card,
+  `saved <id>` for what is saved for an animation, and `upload`, which
   sends a file as several lines. Each is answered by one
   line of JSON. See
   [commands.md](../docs/commands.md).
@@ -132,6 +137,9 @@ the entry links to it.
   known are kept in `thumbnails/`, the default preview catalog; a phone keeps those of what
   it uploaded. Not the moving picture of the form of a text or a clock, which the app draws
   itself, and not `python -m preview`, which plays one animation in the emulator.
+- **archive**: One zip file of animation files that the operators' app opens on the phone,
+  lists, and uploads the ticked files of one after another; nothing of the zip reaches the
+  board but those files. See [android-app.md](../docs/android-app.md#an-archive-of-animations).
 - **collection**: Every animation file the installation has been given, kept as the file
   that is played, with its preview and a readme of where it came from beside it, in
   `collection/`. Git tracks the small ones; the heavy ones, the groups of a long video and

@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "variant": "clocks-recovery",
+  "feature": "Clocks-only recovery and fail-closed saved policy",
+  "pr": "https://github.com/korenmic/Odrig/pull/45",
+  "baseCommit": "56e2d58bbe7d6d9977d89cc37c148946a0a918b2",
+  "runtimeSourceCommit": "11fee3162318a382520ca9dcd045a224c647d92e",
+  "firmwareSourceCommit": "1b73c2fff42128b9aa7f7df9ffb326bee7f64a81",
+  "firmwareRebuilt": true,
+  "firmwareInputEquivalence": {
+    "variant": "clocks-recovery",
+    "apkSourceCommit": "11fee3162318a382520ca9dcd045a224c647d92e",
+    "firmwareSourceCommit": "1b73c2fff42128b9aa7f7df9ffb326bee7f64a81",
+    "firmwareInputsByteIdentical": true,
+    "inputsSha256": "1b4262c2c4dc97879472fcc1fb2da9c9b4d76fd788f243feb9d5f62654e17535",
+    "firmwareRebuilt": true,
+    "buildWasCleanCommittedSnapshot": true,
+    "verifiedUtc": "2026-11-01T23:02:29.154861+00:00"
+  },
+  "publishedUtc": "2026-11-01T23:08:21.818789+00:00",
+  "destination": "G:\\My Drive\\Artifacts\\odrig\\standalone-clocks-recovery",
+  "apk": {
+    "file": "odrig-clocks-recovery-debug.apk",
+    "bytes": 19083943,
+    "sha256": "f5f9f1236f2034b0495ae225fb6315235423dff987057620d43d2c044387850a",
+    "certificateSha256": "5a489ec294e53cdec085d71092cf4e7285ae08d4d43c19929d84130f3649f0f1"
+  },
+  "firmware": {
+    "file": "odrig-clocks-recovery-firmware.bin",
+    "bytes": 1880176,
+    "sha256": "224c7ad41945f892869c626093293599a984896a29d7038626ae8ff8329562e3",
+    "offset": "0x10000",
+    "environment": "odrig_microsd",
+    "offlineInspectionPassed": true
+  },
+  "apkPackagingTests": {
+    "testedUtc": "2026-11-01T23:03:31.199073+00:00",
+    "tests": 8,
+    "sha256": "f5f9f1236f2034b0495ae225fb6315235423dff987057620d43d2c044387850a",
+    "allPassed": true
+  },
+  "android": {
+    "testedUtc": "2026-11-01T23:07:44.673108+00:00",
+    "variant": "clocks-recovery",
+    "androidVersion": "16",
+    "avd": "Odrig_Usb_Diagnostics_70",
+    "ownedAvdOnly": true,
+    "readOnly": true,
+    "cleanInstallPassed": true,
+    "previousPublishedUpgradePassed": true,
+    "launchPassed": true,
+    "apkSha256": "f5f9f1236f2034b0495ae225fb6315235423dff987057620d43d2c044387850a",
+    "previousApkSha256": "7058f799edce216286a3cd8004eb48b9c418fa2209fbcdf95ae59a6f711bf8dd",
+    "nativeCoreFeature": {
+      "nativeAndroidWifi": true,
+      "variant": "clocks-recovery",
+      "unrelatedTimeSettingsAbsent": true,
+      "automaticOnlyRecovery": true,
+      "nativeOnlyMode": true,
+      "disconnect": {
+        "path": "clocks",
+        "playDisabled": true
+      },
+      "reconnect": {
+        "path": "clocks",
+        "mode": "only",
+        "noRoot": true
+      }
+    },
+    "httpTransport": "The unchanged native Android Target sender and Wi-Fi availability gate use an ADB reverse TCP tunnel and transparent HTTP adapter to the real native core. All commands/replies are unmocked. Direct VM slirp transport dropped replies (unexpected EOF) in retained earlier attempts; this does not verify physical Wi-Fi/radio reliability.",
+    "physicalAcceptance": false,
+    "ownedAvdConfigUnchanged": true
+  },
+  "firmwareEmulator": {
+    "variant": "clocks-recovery",
+    "runtimeSourceCommit": "1b73c2fff42128b9aa7f7df9ffb326bee7f64a81",
+    "imageSha256": "224c7ad41945f892869c626093293599a984896a29d7038626ae8ff8329562e3",
+    "imageBytes": 1880176,
+    "retainedLoaderOriginalSha256": "53f1e17c81e72cdd99ce362ad9a8181a229d3879b11561b2e76052e1afa17c45",
+    "retainedLoaderFixtureSha256": "c9f1a7d30d5f81053b04bea05ddc1f45bbe8209eac1742c4275dbb55a1436f93",
+    "loaderAdjustment": "Documented 8MB-to-16MB header change, hash recomputed, code unchanged",
+    "hostSeconds": 60,
+    "emulatedSeconds": 2.022464775,
+    "restarts": 0,
+    "statusReplies": 2,
+    "faultReplies": 2,
+    "allRepliesOk": true,
+    "passed": true,
+    "physicalBootAcceptance": false,
+    "limitations": [
+      "No physical SPI flash readback, radio, USB cable, SD card, LEDs or power supply.",
+      "This is bounded startup/command coverage, not sustained playback or confirmation that the original physical boot incident is fixed.",
+      "The model did not demonstrate animation playback; native shared-core output tests supply functional rendering verification separately."
+    ],
+    "statusSamples": [
+      {
+        "fps": 0,
+        "readiness": "checking",
+        "playing": "all",
+        "checked": 0,
+        "toCheck": 1
+      },
+      {
+        "fps": 0,
+        "readiness": "checking",
+        "playing": "all",
+        "checked": 0,
+        "toCheck": 1
+      }
+    ],
+    "renderingDemonstrated": false
+  },
+  "physicalAcceptance": false,
+  "originalArtifactAndSigningFilesUnchanged": true,
+  "identityEvidence": "New separate feature subfolder; mounted bytes read back. Independent cloud/phone readback not performed.",
+  "files": [
+    {
+      "file": "odrig-clocks-recovery-debug.apk",
+      "bytes": 19083943,
+      "sha256": "f5f9f1236f2034b0495ae225fb6315235423dff987057620d43d2c044387850a"
+    },
+    {
+      "file": "odrig-clocks-recovery-firmware.bin",
+      "bytes": 1880176,
+      "sha256": "224c7ad41945f892869c626093293599a984896a29d7038626ae8ff8329562e3"
+    },
+    {
+      "file": "odrig-clocks-recovery-firmware.bin.build.json",
+      "bytes": 15298,
+      "sha256": "043d449fc6f5cdbfbe255a7e85650b6115d8a55985bc80452f86934831281613"
+    },
+    {
+      "file": "firmware-verification.json",
+      "bytes": 845,
+      "sha256": "9a0d26c3af60ddeb7729b025454ad9f3523e115a653ba0c4486bdb618a2bacef"
+    },
+    {
+      "file": "firmware-image-info.txt",
+      "bytes": 1501,
+      "sha256": "37e3d4fb81285ef90e65e62bc03fcc8e6af1e2e5cd4991317fdfeece55417fca"
+    },
+    {
+      "file": "firmware-emulator-verification.json",
+      "bytes": 1401,
+      "sha256": "5ca0058775cdf5339aaf1ecd5f955b21f658595e26e764f97e8763dd5bb638da"
+    },
+    {
+      "file": "android-verification.json",
+      "bytes": 1254,
+      "sha256": "5b7dbbe62f9d88833db411e4ac2136c00df6c1ebe59653893adefca32866a074"
+    },
+    {
+      "file": "SHA256SUMS.txt",
+      "bytes": 199,
+      "sha256": "9d834d575116b491b239af074235bdbd5d45b7a38b4a7fb378ab00bb8a0da5ba"
+    },
+    {
+      "file": "README.txt",
+      "bytes": 2200,
+      "sha256": "078b14fabd643c99bef4f003c99c2e153eb241157fd2188a39d8d4bf6193cb42"
+    }
+  ]
+}

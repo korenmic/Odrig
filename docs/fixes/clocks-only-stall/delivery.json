@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "clocks-only urgent firmware repair",
+  "deliveredUtc": "2026-10-31T22:14:09.913981+00:00",
+  "firmwareSourceCommit": "317eca0c23586038772f07936f3abddef6458a65",
+  "sourceTrackedDirty": false,
+  "firmware": {
+    "file": "odrig-firmware.bin",
+    "bytes": 1888192,
+    "sha256": "9743c4e8432885408699676dba66ef96329ddb3f5e8799d841901d5681ec10bb",
+    "kind": "ESP32-S3 application image",
+    "offset": "0x10000",
+    "environment": "odrig_microsd",
+    "inputsSha256": "59b3374100051942ea093475b1fd7299546e1d97119743eb7f76f81337c332e4",
+    "offlineInspectionPassed": true
+  },
+  "apk": {
+    "file": "odrig-debug.apk",
+    "sourceCommit": "74eb4ac21cdbc4c973f581147ad5337a20dfd704",
+    "unchanged": true,
+    "bytes": 19092430,
+    "sha256": "273e64fa7bf2db869f273b0c3f06844edfb9cba8a34cd614d741cdbe3524fcc9"
+  },
+  "certificateSha256": "5a489ec294e53cdec085d71092cf4e7285ae08d4d43c19929d84130f3649f0f1",
+  "signingBackupsVerifiedUnchanged": true,
+  "verification": {
+    "firmwareCases": 654,
+    "firmwareSkips": 1,
+    "emulatorCases": 671,
+    "emulatorSkips": 19,
+    "onboardingCases": 88,
+    "allPassed": true,
+    "failFirstCases": 2,
+    "uninterruptedBeforeMs": 6400,
+    "uninterruptedAfterMs": 32,
+    "nativeCollectionRuns": 2,
+    "simulatedSecondsPerRun": 300
+  },
+  "identityEvidence": {
+    "method": "in-place r+b overwrite; mounted bytes/size/device/inode verified",
+    "independentDriveApiFileIdLookup": false,
+    "files": [
+      {
+        "file": "odrig-firmware.bin",
+        "bytes": 1888192,
+        "sha256": "9743c4e8432885408699676dba66ef96329ddb3f5e8799d841901d5681ec10bb",
+        "device": 428019990,
+        "inodeBefore": 11087,
+        "inodeAfter": 11087,
+        "inPlace": true
+      },
+      {
+        "file": "odrig-firmware.bin.sha256",
+        "bytes": 85,
+        "sha256": "4894b7f63e5027afaca1ed1a81f52c340a3639799af75577e0169f85e47e89d3",
+        "device": 428019990,
+        "inodeBefore": 11105,
+        "inodeAfter": 11105,
+        "inPlace": true
+      },
+      {
+        "file": "odrig-firmware.bin.build.json",
+        "bytes": 15606,
+        "sha256": "e3180202a49ae9995a8de1d14a0573e1a1b098539a611befac03a7506828466c",
+        "device": 428019990,
+        "inodeBefore": 11108,
+        "inodeAfter": 11108,
+        "inPlace": true
+      },
+      {
+        "file": "odrig-firmware-verification.json",
+        "bytes": 845,
+        "sha256": "ccacfa16af3a0e5bd29d908b45e26c738fec0532eac37f0525994a0f16c7dd84",
+        "device": 428019990,
+        "inodeBefore": 11111,
+        "inodeAfter": 11111,
+        "inPlace": true
+      },
+      {
+        "file": "odrig-firmware-image-info.txt",
+        "bytes": 1501,
+        "sha256": "941a980c77f527cb1fcf6230a854382e975968913c36c11fc367f73c22378ab9",
+        "device": 428019990,
+        "inodeBefore": 11114,
+        "inodeAfter": 11114,
+        "inPlace": true
+      }
+    ]
+  },
+  "physicalAcceptance": false,
+  "causeConfirmation": "Firmware starvation proven in a scheduler model; physical reset reason/trial still required.",
+  "prCiGate": "Exact pushed-head results reported separately after the delivery proof is pushed."
+}

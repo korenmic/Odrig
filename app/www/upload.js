@@ -50,6 +50,35 @@ export function fits(bytes, free) {
   return bytes + Math.floor(bytes / 256) + 16384 <= free;
 }
 
+// The line while the installation checks a file it has received whole, `elapsed`
+// milliseconds after its last byte: the whole seconds, minutes without a leading zero and
+// seconds in two digits.
+export function checkingText(elapsed) {
+  const seconds = Math.max(0, Math.floor(elapsed / 1000));
+  return `Checking the animation on the installation: ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+// Writes into `line` how long the installation has been checking since `since`, a time of
+// `performance.now()`: at once, and again at each next whole second. Returns the function
+// that stops it; nothing is written after it.
+export function showChecking(line, since) {
+  let timer = null;
+  let stopped = false;
+  function write() {
+    if (stopped) {
+      return;
+    }
+    const elapsed = Math.max(0, performance.now() - since);
+    line.textContent = checkingText(elapsed);
+    timer = setTimeout(write, 1000 - (elapsed % 1000));
+  }
+  write();
+  return () => {
+    stopped = true;
+    clearTimeout(timer);
+  };
+}
+
 // Bytes in base64 with the alphabet of RFC 4648, section 5, without `=` at the end.
 function base64(bytes) {
   let text = "";
@@ -66,14 +95,18 @@ function base64(bytes) {
 // send now. `report` is told the part of the file the target has received and the speed in
 // bytes a second, `end` how the upload ended: `{done: true, id}`, with the id the target
 // gave or null, `{cancelled: true}`, or `{error}` with the Refusal or the Failure that
-// ended it. `wake` asks the client to look for the next line again.
-export function uploading({id, file, bytes, expect = null, external = false, create = false}, {report, end, wake}) {
+// ended it. `wake` asks the client to look for the next line again. `checking`, when it is
+// given, is told once, when the reply to the last piece has come, the `performance.now()`
+// of that moment: the target checks the file from then until the job ends. A reply that
+// comes after the job has ended tells nothing and changes nothing.
+export function uploading({id, file, bytes, expect = null, external = false, create = false}, {report, end, wake, checking = null}) {
   const crc = crc32(bytes);
   let stage = "begin";
   let chunk = 0;
   let received = 0;
   let waitUntil = 0;
   let cancelled = false;
+  let blocked = null;
   const samples = [];
 
   function finish(how) {
@@ -96,12 +129,17 @@ export function uploading({id, file, bytes, expect = null, external = false, cre
   return {
     id,
     file,
+    external,
     over() {
       return stage === "over";
     },
     cancel() {
       cancelled = true;
       wake();
+    },
+    block(error) {
+      cancelled = true;
+      blocked = error;
     },
     // The line that ended the job threw: a refusal or a failure of the way.
     failed(error) {
@@ -113,7 +151,7 @@ export function uploading({id, file, bytes, expect = null, external = false, cre
       }
       if (cancelled) {
         if (stage === "begin") {
-          finish({cancelled: true});
+          finish(blocked === null ? {cancelled: true} : {error: blocked});
           return null;
         }
         return async () => {
@@ -124,7 +162,7 @@ export function uploading({id, file, bytes, expect = null, external = false, cre
               throw error;
             }
           }
-          finish({cancelled: true});
+          finish(blocked === null ? {cancelled: true} : {error: blocked});
         };
       }
       if (performance.now() < waitUntil) {
@@ -133,6 +171,9 @@ export function uploading({id, file, bytes, expect = null, external = false, cre
       if (stage === "begin") {
         return async () => {
           chunk = external ? await commands.uploadBeginExternal(file, bytes.length) : await commands.uploadBegin(id, file, bytes.length, create ? crc : null);
+          if (stage === "over") {
+            return;
+          }
           stage = expect === null ? "data" : "expect";
           samples.push({at: performance.now(), received: 0});
           report(0, 0);
@@ -148,16 +189,27 @@ export function uploading({id, file, bytes, expect = null, external = false, cre
             }
             throw error;
           }
+          if (stage === "over") {
+            return;
+          }
           stage = "data";
         };
       }
       if (stage === "data") {
         return async () => {
-          received = await commands.uploadData(received, base64(bytes.subarray(received, Math.min(bytes.length, received + chunk))));
-          samples.push({at: performance.now(), received});
+          const given = await commands.uploadData(received, base64(bytes.subarray(received, Math.min(bytes.length, received + chunk))));
+          if (stage === "over") {
+            return;
+          }
+          received = given;
+          const at = performance.now();
+          samples.push({at, received});
           report(received / bytes.length, speed());
           if (received >= bytes.length) {
             stage = "end";
+            if (checking !== null) {
+              checking(at);
+            }
           }
         };
       }

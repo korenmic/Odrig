@@ -62,7 +62,14 @@ class TheAddress(Target):
         self.assertGreaterEqual(len(sent), 1)
         self.assertEqual(set(sent), {("4.3.2.1", b"status"), ("4.3.2.1", b"space")})
 
-    def test_an_address_that_was_set_is_kept_when_the_app_is_opened_again_and_board_puts_the_boards_back(self):
+    def test_the_screen_has_one_wifi_button_and_a_switch_whose_usb_choice_a_browser_disables(self):
+        found = support.run("link")
+        self.assertEqual(found.seen["buttons"], ["Connect over Wi-Fi"])
+        self.assertEqual(found.seen["choices"], [{"value": "wifi", "checked": True, "disabled": False}, {"value": "usb", "checked": False, "disabled": True}])
+        self.assertEqual(found.seen["why"], "This browser has no USB serial port; the Android app has.")
+        self.assertEqual((found.seen["wifiShown"], found.seen["usbShown"], found.seen["field"]), (True, False, "4.3.2.1"))
+
+    def test_an_address_that_was_set_is_kept_when_the_app_is_opened_again_and_an_emptied_field_puts_the_boards_back(self):
         _, first = self.emulator()
         other = entered(self, support.StandIn(support.SOUND))
         found = support.run("kept", address=first, settings={"other": other.address})
@@ -172,7 +179,7 @@ class Requests(Target):
         with emulator_support.EventStream(emulator.port) as stream:
             support.run("answers", address=address)
             logged = emulator_support.of_kind(stream.read_until(lambda events: sum(event.kind == "log" for event in events) >= 2, 5), "log")
-        self.assertLessEqual({(entry["line"], entry["transport"]) for entry in logged}, {("status", "http"), ("list 0", "http"), ("space", "http"), ("order get", "http"), ("fault", "http"), ("catalog", "http")})
+        self.assertLessEqual({(entry["line"], entry["transport"]) for entry in logged if not support.timing_read(entry["line"])}, {("status", "http"), ("list 0", "http"), ("space", "http"), ("order get", "http"), ("fault", "http"), ("catalog", "http")})
         self.assertIn(("status", "http"), {(entry["line"], entry["transport"]) for entry in logged})
         self.assertTrue(all(json.loads(entry["reply"])["ok"] for entry in logged))
 

@@ -340,13 +340,15 @@ class WithinTheLevel(WithACard, unittest.TestCase):
         root_internal, _, root_select, _, night_internal, night_external, _, night_select = found["steps"]
         self.assertEqual(root_internal["filters"]["storage"], ["All 3", "Internal 2", "External 1"])
         self.assertEqual((ids(root_internal), [(folder["path"], folder["shown"]) for folder in root_internal["folders"]]), ([1, 2], [("night", True), ("only", True)]))
+        # Select all leaves out the files of a card the board may not write.
         self.assertEqual((root_select["selected"], root_select["held"], root_select["offered"]), ([1, 2], [1, 2], True))
         self.assertEqual(night_internal["filters"]["storage"], ["All 1", "Internal 0", "External 1"])
         self.assertEqual((ids(night_internal), [(folder["path"], folder["shown"]) for folder in night_internal["folders"]], night_internal["filterEmpty"]),
                          ([], [("night/deep", True)], "No animation matches the filters.\nShow all"))
         self.assertEqual(night_internal["orderNote"], "")
         self.assertEqual((ids(night_external), night_external["filterEmpty"]), ([60002], None))
-        self.assertEqual((night_select["selected"], night_select["held"], night_select["offered"]), ([], [], False))
+        # One of them is selected by hand, for a download.
+        self.assertEqual((night_select["selected"], night_select["held"], night_select["offered"]), ([60002], [60002], False))
         # A card without a catalog is not counted: the list holds one level of it.
         self.assertTrue(found["first"]["externalLine"].startswith("External storage: free "), found["first"]["externalLine"])
 

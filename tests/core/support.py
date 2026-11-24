@@ -23,6 +23,10 @@ from odrig.generators import dense, dvd_bounce, hello_world
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CONVERTER = ROOT / "converter" / "odrig.js"
 
+# The name of a file an upload gives, and a name of a folder of its path.
+UPLOAD_NAME = re.compile(r"[a-z0-9._-]{1,32}")
+FOLDER_PART = re.compile(r"[^\x00-\x1f\x7f-\uffff\\:*?\"<>|/ .](?:[^\x00-\x1f\x7f-\uffff\\:*?\"<>|/]*[^\x00-\x1f\x7f-\uffff\\:*?\"<>|/ .])?")
+
 
 def pack_with_the_converter(show_file, mapping_file, sources, out, compressed=True):
     """Packs a show into the folder `out` with the converter, `node converter/odrig.js pack`.
@@ -198,6 +202,184 @@ def found_in(data):
     if data not in _FOUND:
         _FOUND[data] = decode_each([data])[0]
     return _FOUND[data]
+
+
+Taken = collections.namedtuple("Taken", "bytes charge pending")
+Taken.__doc__ = """One call of the core's decoder for a record or for the end of a file of frames:
+the bytes of the body it took, the charge the core gives it, and whether it gave
+`pending`."""
+
+
+def _taken(lines):
+    """The calls `odrig_host decode --taken` printed for one file, up to its `end` or its
+    `rejected` line; none for a text or a clock."""
+    calls = []
+    for line in lines:
+        word, _, rest = line.partition(" ")
+        if word == "taken":
+            numbers = rest.split()
+            calls.append(Taken(int(numbers[0]), int(numbers[1]), numbers[2:] == ["pending"]))
+        elif word in ("end", "rejected"):
+            return tuple(calls)
+        elif word not in ("container", "header"):
+            break
+    raise AssertionError("odrig_host decode --taken printed no ending")
+
+
+def taken_each(files):
+    """The calls of the core's decoder for each of these files, given as bytes."""
+    lines = iter(host_lines("decode", "--taken", "--batch", stdin=batch(files)))
+    results = [_taken(lines) for _ in files]
+    if next(lines, None) is not None:
+        raise AssertionError(f"odrig_host decode --taken printed more than {len(files)} results")
+    return results
+
+
+_TAKEN = {}
+
+
+def taken_in(data):
+    """The calls of the core's decoder for one file, kept for the files that were asked for
+    before. The reference player takes the charge of each step of the check from it."""
+    if data not in _TAKEN:
+        _TAKEN[data] = taken_each([data])[0]
+    return _TAKEN[data]
+
+
+def _own_canvas(data):
+    """The canvas a runtime file names, or (0, 0) when its headers cannot say."""
+    try:
+        if odrgx.is_container(data):
+            container = odrgx.read_header(data)
+            return container.width, container.height
+        return struct.unpack_from("<HH", data, 6)
+    except (errors.Rejection, struct.error):
+        return 0, 0
+
+
+def check_steps(data, canvas=None):
+    """The steps the check of an uploaded file takes on a canvas, each as `(charge,
+    pending)`: one for a file whose headers or canvas are refused; for a text or a clock
+    the header, its payload and, when the payload is sound, the end, each charged 0; for
+    frames the header, charged 0, and each call of the core's decoder for a record or for
+    the end, as `decode --taken` gives them. Without a canvas the file is taken to fit."""
+    if header_fault(data, canvas if canvas is not None else _own_canvas(data)) is not None:
+        return ((0, False),)
+    if type_of(data) != "frames":
+        return ((0, False),) * (2 if found_in(data).reason is not None else 3)
+    return ((0, False),) + tuple((call.charge, call.pending) for call in taken_in(data))
+
+
+class CheckPace:
+    """The pace of the check of an uploaded file, stated a second time from the
+    requirements: the steps it still has to take, the pace that sets a refresh's budget, the
+    debt that larger steps leave, and the mark that the pace has fallen."""
+
+    UNIT = 256              # a budget's and a debt's unit, in bytes of charge
+    PACE_START = 1
+    PACE_MOST = 3
+    DEBT_MOST = 15
+    STEPS_MOST = 64         # the most steps of one refresh
+    RATE_SLOW = 21          # a second with fewer refreshes lowers the pace
+    RATE_STEADY = 40        # a second with this many or more raises it
+    RATE_TRIAL = 27         # a second with this many or more raises it while it has not fallen
+    MIDDLE_MS = 500         # a second that has had TRIAL_FEWEST refreshes or fewer at its
+    TRIAL_FEWEST = 11       # middle lowers it
+
+    def __init__(self, steps):
+        self.steps = tuple(steps)
+        self.taken = 0
+        self.pace = self.PACE_START
+        self.debt = 0
+        self.fell = False
+
+    @property
+    def ended(self):
+        """Whether the check has taken its last step."""
+        return self.taken == len(self.steps)
+
+    def _down(self):
+        self.pace = max(0, self.pace - 1)
+        self.fell = True
+
+    def _up(self):
+        self.pace = min(self.PACE_MOST, self.pace + 1)
+
+    def refresh(self, into_second_ms, new_second, last_second, this_second):
+        """One refresh of the check: `into_second_ms` past the start of its second, whether
+        it is the first refresh of a new second, the refreshes of the second before it and
+        those of its own second, this one included. Returns the steps it took."""
+        if new_second:
+            if last_second < self.RATE_SLOW:
+                self._down()
+            elif last_second >= self.RATE_STEADY or (last_second >= self.RATE_TRIAL and not self.fell):
+                self._up()
+        if not self.fell and into_second_ms >= self.MIDDLE_MS and this_second <= self.TRIAL_FEWEST:
+            self._down()
+        budget = self.UNIT << self.pace
+        owed = self.UNIT * self.debt
+        if owed >= budget:
+            self.debt -= budget // self.UNIT
+            return 0
+        allowance = budget - owed
+        charge = taken = 0
+        pending = False
+        while not self.ended and taken < self.STEPS_MOST and charge < allowance:
+            step, pending = self.steps[self.taken]
+            self.taken += 1
+            taken += 1
+            charge += step
+        over = 0 if pending or charge <= allowance else (charge - allowance) // self.UNIT
+        self.debt = min(over, self.DEBT_MOST)
+        return taken
+
+    def line(self):
+        """The line `--trace-check` prints after a refresh of the check."""
+        return f"check {self.pace} {self.debt} {int(self.fell)}"
+
+
+def refresh_times(polls, t0, grid=20):
+    """The times of the polls that produce a refresh, by the grid rule, for a session whose
+    first call came at t0 and whose polls come at these times, in order."""
+    times = []
+    due = t0
+    for now in polls:
+        if now >= due:
+            due = t0 + (now - t0) // grid * grid + grid
+            times.append(now)
+    return times
+
+
+def check_end(steps, refreshes, t0, first):
+    """The index of the refresh at which a check of these steps ends, or None: `refreshes`
+    are the times of every refresh of a session whose first call came at t0, those before
+    the check included, and the check begins at the refresh with index `first`."""
+    pace = CheckPace(steps)
+    counts = collections.Counter()
+    running = 0
+    for index, now in enumerate(refreshes):
+        second = (now - t0) // 1000
+        new_second = second != running
+        running = second
+        counts[second] += 1
+        if index < first:
+            continue
+        pace.refresh((now - t0) % 1000, new_second, counts[second - 1] if second else 0, counts[second])
+        if pace.ended:
+            return index
+    return None
+
+
+@functools.lru_cache(maxsize=None)
+def fade():
+    """An ODRG file of a fade of 60 x 60, three bytes a pixel, uncompressed: 1,024 frames of
+    20 ms, every value of frame k being k mod 56 above that of the first frame."""
+    frames = []
+    for k in range(1024):
+        d = k % 56
+        picture = bytes(value for y in range(60) for x in range(60) for value in ((4 * x) % 200 + d, (4 * y) % 200 + d, (x + y) % 200 + d))
+        frames.append((20, picture))
+    return odrg.encode(jsonframes.Animation(60, 60, tuple(frames)), compressed=False)
 
 
 # Row-leg mappings beyond the tracked one: a leg that starts on the left, legs of two and
@@ -465,7 +647,7 @@ def demo_show():
 # in the current playlist's window, which runs with the time, the counts of the turn in
 # progress, and the names of the file and the folder that play, which the tests of what
 # plays look at.
-READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "clocks", "clock_message", "clock_mode", "clock_only", "left", "mini", "dimming")
+READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "clocks", "clock_message", "clock_mode", "clock_storage", "clock_only", "left", "mini", "dimming", "timing")
 
 
 def without_readiness(state):
@@ -526,6 +708,28 @@ def dense_clip(width, height, seconds, compressed=True):
     """The bytes of an ODRG file of the converter's dense test clip."""
     animation = jsonframes.Animation(width, height, tuple(dense.frames(width, height, seconds)))
     return odrg.encode(animation, compressed=compressed)
+
+
+# A stored block of DEFLATE that is not the last and holds no byte, at a byte's boundary.
+EMPTY_BLOCK = b"\x00\x00\x00\xff\xff"
+
+
+def with_empty_blocks(data, blocks):
+    """A compressed ODRG file with the frames of this one, whose DEFLATE stream holds
+    `blocks` empty stored blocks before each frame record: a valid file, 5 bytes larger for
+    each block, whose added bytes inflate to nothing."""
+    _, _, flags, _, _, colours, _ = odrg.HEADER.unpack_from(data)
+    if not flags & 1:
+        raise ValueError("the file's body is not compressed")
+    body = zlib.decompress(data[odrg.HEADER.size:], wbits=-15)
+    deflater = zlib.compressobj(9, zlib.DEFLATED, -15)
+    at = 3 * colours
+    stream = deflater.compress(body[:at]) + deflater.flush(zlib.Z_SYNC_FLUSH)
+    while at < len(body):
+        end = at + 4 + struct.unpack_from("<H", body, at + 2)[0]
+        stream += EMPTY_BLOCK * blocks + deflater.compress(body[at:end]) + deflater.flush(zlib.Z_SYNC_FLUSH)
+        at = end
+    return data[:odrg.HEADER.size] + stream + deflater.flush()
 
 
 def upload_lines(number, name, data, piece=1500):
@@ -753,12 +957,14 @@ class ReferencePlayer:
     RESERVE = 16384
     BASE64 = frozenset(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
 
-    def __init__(self, files, storage=BOARD_STORAGE, changeable=True, check_first=True):
+    def __init__(self, files, storage=BOARD_STORAGE, changeable=True, check_first=True, trace_check=False):
         """`files` maps the name of each installed file to its content. `storage` is the
         total space the host reports, or None for a host that cannot tell its space.
         `changeable` says whether the host's storage can be changed. With `check_first`
         the check after the start has ended before the first call, as the test host's
-        option of that name has it; without, the player is as after power-on."""
+        option of that name has it; without, the player is as after power-on. With
+        `trace_check` a refresh of the check of an upload prints its pace and its debt, as
+        the test host's option `--trace-check` has it."""
         self.storage = storage
         self.changeable = changeable
         self.error = None       # the reason the show is invalid, or None
@@ -771,10 +977,8 @@ class ReferencePlayer:
         self.upload = None      # the open upload
         self.had_refresh = False
         self.last_grid = None   # the grid time of the latest refresh
-        # For a file whose body is refused: the frame records that decode before the one
-        # that is refused, by the CRC-32 of the file. The check ends two steps later.
-        # Without an entry the check is taken to end after every record the header names.
-        self.sound_records = {}
+        self.second_running = 0 # the second after power-on of the latest refresh
+        self.trace_check = trace_check
         # The check after the start: for each file whose body is still to be read, in the
         # order of the checks, its name, the steps left, and the reason its body is
         # refused for or None; and the refreshes in a row without a grid time left out.
@@ -810,8 +1014,23 @@ class ReferencePlayer:
         self.last_sent = None   # the LED data of the latest refresh
         self.clocks = False     # the clocks between the animations are on
         self.clock_message = False  # the message after each clock is on
+        self.clock_storage = "sd"   # the storage whose copy of a clock or a message plays
         content = {name: data if isinstance(data, bytes) else data.encode("utf-8") for name, data in files.items()}
         self.files = content    # the files of the folder by name
+        self.schedule = (1, 1080, 360, 0)
+        self.schedule_error = False
+        kept_schedule = content.get("schedule.txt")
+        if kept_schedule is not None:
+            form = re.fullmatch(rb"odrig-schedule 1\n([01]) ([0-9]+) ([0-9]+) ([012])\n", kept_schedule)
+            values = tuple(int(value) for value in form.groups()) if form else None
+            if values is None or any(len(value) > 1 and value.startswith(b"0") for value in form.groups()) or not (0 <= values[1] < 1440 and 0 <= values[2] < 1440) or values[1] == values[2]:
+                self.schedule = (0, 1080, 360, 0)
+                self.schedule_error = True
+                self.start_logs.append("schedule unreadable")
+            else:
+                self.schedule = values
+                if values[3]:
+                    self.on = values[3] == 1
         if changeable:
             for name in self.PARTS:
                 content.pop(name, None)
@@ -845,27 +1064,36 @@ class ReferencePlayer:
             self.logged = []
 
     CLOCKS = "clocks.txt"
-    CLOCKS_FORMS = {b"odrig-clocks 1\nclocks %s\nmessage %s\n" % (clocks, message): (clocks == b"on", message == b"on")
+    CLOCKS_FORMS = {b"odrig-clocks 1\nclocks %s\nmessage %s\n" % (clocks, message): (clocks == b"on", message == b"on", "sd")
                     for clocks in (b"on", b"off") for message in (b"on", b"off")}
-    CLOCKS_FORMS.update({b"odrig-clocks 2\nmode %s\nmessage %s\n" % (clocks, message): (clocks == b"between", message == b"on")
+    CLOCKS_FORMS.update({b"odrig-clocks 2\nmode %s\nmessage %s\n" % (clocks, message): (clocks == b"between", message == b"on", "sd")
                          for clocks in (b"between", b"off") for message in (b"on", b"off")})
+    CLOCKS_FORMS.update({b"odrig-clocks 3\nmode %s\nmessage %s\nstorage %s\n" % (clocks, message, storage): (clocks == b"between", message == b"on", storage.decode("ascii"))
+                         for clocks in (b"between", b"off") for message in (b"on", b"off") for storage in (b"sd", b"internal")})
 
     def _read_clocks(self):
-        """Reads `clocks.txt` whole and strictly: a missing file is both settings off, a file
-        out of its supported forms both off, and the log says so."""
+        """Reads `clocks.txt` whole and strictly: a missing file is the settings off and the
+        card's copies preferred, a file out of its supported forms the same, and the log says
+        so."""
         data = self.files.get(self.CLOCKS)
         if data is None:
             return
         if data not in self.CLOCKS_FORMS:
             self.start_logs.append("clocks unreadable")
             return
-        self.clocks, self.clock_message = self.CLOCKS_FORMS[data]
+        self.clocks, self.clock_message, self.clock_storage = self.CLOCKS_FORMS[data]
 
     def _clocks(self, arguments):
-        """`clocks on|off` and `clocks message on|off`: the setting is saved in the file,
-        written whole, before it takes effect; one already in force writes nothing."""
+        """`clocks on|off`, `clocks message on|off` and `clocks storage sd|internal`: the
+        setting is saved in the file, written whole, before it takes effect; one already in
+        force writes nothing. The file is of version 2 while the card's copies are preferred,
+        else of version 3."""
         message = len(arguments) == 2 and arguments[0] == b"message"
-        if (len(arguments) != 1 and not message) or arguments[-1] not in (b"on", b"off"):
+        storage = len(arguments) == 2 and arguments[0] == b"storage"
+        if storage:
+            if arguments[1] not in (b"sd", b"internal"):
+                return "bad-argument"
+        elif (len(arguments) != 1 and not message) or arguments[-1] not in (b"on", b"off"):
             return "bad-argument"
         if self.error is not None:
             return "show-invalid"
@@ -874,10 +1102,15 @@ class ReferencePlayer:
         if not self.changeable:
             return "storage-error"
         on = arguments[-1] == b"on"
-        settings = (self.clocks, on) if message else (on, self.clock_message)
-        if settings != (self.clocks, self.clock_message):
-            self.files[self.CLOCKS] = next(text for text, form in self.CLOCKS_FORMS.items() if form == settings and text.startswith(b"odrig-clocks 2\n"))
-            self.clocks, self.clock_message = settings
+        current = (self.clocks, self.clock_message, self.clock_storage)
+        if storage:
+            settings = (self.clocks, self.clock_message, arguments[1].decode("ascii"))
+        else:
+            settings = (self.clocks, on, self.clock_storage) if message else (on, self.clock_message, self.clock_storage)
+        if settings != current:
+            version = b"odrig-clocks 3\n" if settings[2] == "internal" else b"odrig-clocks 2\n"
+            self.files[self.CLOCKS] = next(text for text, form in self.CLOCKS_FORMS.items() if form == settings and text.startswith(version))
+            self.clocks, self.clock_message, self.clock_storage = settings
         return None
 
     REPEATS = "repeats.txt"
@@ -967,6 +1200,7 @@ class ReferencePlayer:
             # A host whose storage cannot be changed has no second reader: there the
             # body is read at the start.
             steps, reason, clip = self._judge(data)
+            steps = len(steps)
             if reason is not None and not self.changeable:
                 self._quarantine(name, reason)
                 continue
@@ -1184,16 +1418,20 @@ class ReferencePlayer:
             self.window_started = now
         grid = self.t0 + (now - self.t0) // self.GRID * self.GRID
         self.next_due = grid + self.GRID
-        self.refreshes_in[(now - self.t0) // 1000] += 1
+        second = (now - self.t0) // 1000
+        self.refreshes_in[second] += 1
+        new_second = second != self.second_running
+        self.second_running = second
         in_step = self.had_refresh and grid == self.last_grid + self.GRID
         self.had_refresh, self.last_grid = True, grid
         picture = self._picture(now, grid)
-        # The check of an uploaded file takes one step after a refresh that followed the
-        # one before it without a gap.
-        if in_step and self.upload is not None and self.upload["state"] == "checking":
+        # The check of an uploaded file takes its steps at every refresh, in step or late,
+        # as its pace and its debt allow; every refresh of the check is progress.
+        if self.upload is not None and self.upload["state"] == "checking":
             self.upload["progress"] = now
-            self.upload["steps"] -= 1
-            if self.upload["steps"] == 0:
+            pace = self.upload["pace"]
+            pace.refresh((now - self.t0) % 1000, new_second, self.refreshes_in[second - 1] if second else 0, self.refreshes_in[second])
+            if pace.ended:
                 self.upload["state"] = "checked"
         # The check after the start takes as many steps as refreshes have followed one
         # another without a gap and no more than 2 ms after their grid times, while the
@@ -1234,6 +1472,7 @@ class ReferencePlayer:
     LINE_MAX = 2048
     COMMANDS = {b"repeat": (2, 3), b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"fault": (0,), b"space": (0,), b"list": (0, 1, 2, 3), b"remove": (1,), b"upload": range(0, 2048), b"read": range(0, 2048), b"clocks": range(0, 2048)}
     READ_MOST = 600
+    READ_COUNT_MOST = 720
     EXPECT_LARGEST = 16384
     RANGES = {b"play": (1, 4294967295), b"brightness": (0, 255), b"list": (0, 4294967295), b"remove": (1, 4294967295)}
     REPLY_MAX = 1024
@@ -1337,6 +1576,13 @@ class ReferencePlayer:
             self._remove(value)
         elif name not in (b"status", b"fault"):
             self.on = name == b"on"
+            self.schedule = (*self.schedule[:3], 1 if self.on else 2)
+            if self.changeable:
+                if self.schedule_error:
+                    return "storage-error"
+                if self.upload is not None:
+                    return "busy"
+                self.files["schedule.txt"] = ("odrig-schedule 1\n" + " ".join(map(str, self.schedule)) + "\n").encode("ascii")
         return None
 
     def _counts(self):
@@ -1447,37 +1693,37 @@ class ReferencePlayer:
         self.upload = None
 
     def _judge(self, data):
-        """What the check of an uploaded file finds: the steps it takes, and the reason
-        the file is refused for, or None with the frames of the file."""
+        """What the check of an uploaded file finds: its steps with their charges, and the
+        reason the file is refused for, or None with the frames of the file."""
+        steps = check_steps(data, self.canvas)
         fault = header_fault(data, self.canvas)
         if fault is not None:
-            return 1, fault, None
+            return steps, fault, None
         if type_of(data) != "frames":
             # The payload is read whole in one step, and the end in another.
             reason = found_in(data).reason
-            return (2, reason, None) if reason is not None else (3, None, _Drawn(data, odrgx.read_header(data).loop_ms))
+            return (steps, reason, None) if reason is not None else (steps, None, _Drawn(data, odrgx.read_header(data).loop_ms))
         try:
             records = odrg.decode(frames_payload(data)).records
         except errors.Rejection as rejection:
-            sound = self.sound_records.get(zlib.crc32(data))
-            if sound is None:
-                sound = len(found_in(data).records)
-            return sound + 2, rejection.reason, None
+            return steps, rejection.reason, None
         if odrgx.is_container(data):
             # After the last record: the payload's length, then the loop.
             container = odrgx.read_header(data)
             if len(data) - odrgx.HEADER.size != container.payload_size:
-                return len(records) + 2, "payload-size", None
+                return steps, "payload-size", None
             if sum(duration for duration, _ in records) != container.loop_ms:
-                return len(records) + 2, "loop-mismatch", None
-        return len(records) + 2, None, _Clip(records)
+                return steps, "loop-mismatch", None
+        return steps, None, _Clip(records)
 
     def _read(self, arguments):
         """`read <id> <offset>`: up to 600 bytes of the file of an animation, from an offset,
-        with its size. Returns an error code or the reply."""
-        number = self._number(arguments[0], 1, 4294967295) if len(arguments) == 2 else None
-        offset = self._number(arguments[1], 0, 4294967295) if len(arguments) == 2 else None
-        if number is None or offset is None:
+        with its size; `read <id> <offset> <count>`: up to `count` bytes, 1 to 720. Returns an
+        error code or the reply."""
+        number = self._number(arguments[0], 1, 4294967295) if len(arguments) in (2, 3) else None
+        offset = self._number(arguments[1], 0, 4294967295) if len(arguments) in (2, 3) else None
+        count = self._number(arguments[2], 1, self.READ_COUNT_MOST) if len(arguments) == 3 else self.READ_MOST
+        if number is None or offset is None or count is None:
             return "bad-argument"
         if self.error is not None:
             return "show-invalid"
@@ -1494,8 +1740,24 @@ class ReferencePlayer:
             return "bad-argument"
         if not self.changeable:
             return "storage-error"
-        piece = base64.urlsafe_b64encode(data[offset:offset + self.READ_MOST]).rstrip(b"=")
+        piece = base64.urlsafe_b64encode(data[offset:offset + count]).rstrip(b"=")
         return b'{"ok":true,"bytes":%d,"data":"%s"}\n' % (len(data), piece)
+
+    @staticmethod
+    def _upload_path(word):
+        """The path of `upload begin`, decoded once from URI escapes: `(folder, name)`, the
+        folder empty for a name at the root, or None for a path out of form."""
+        decoded = re.sub(rb"%([0-9A-Fa-f]{2})", lambda found: bytes([int(found.group(1), 16)]), word)
+        if b"%" in re.sub(rb"%[0-9A-Fa-f]{2}", b"", word) or len(decoded) > 100 or any(byte < 32 or byte > 126 for byte in decoded):
+            return None
+        folder, _, name = decoded.decode("ascii").rpartition("/")
+        if not UPLOAD_NAME.fullmatch(name) or not name.endswith(show.ENDINGS):
+            return None
+        if folder:
+            parts = folder.split("/")
+            if len(folder) > 93 or len(parts) > 3 or any(not FOLDER_PART.fullmatch(part) for part in parts) or parts[-1].lower().endswith(show.ENDINGS):
+                return None
+        return folder, name
 
     def _upload(self, arguments):
         """The `upload` commands. Returns an error code, a reply, or None."""
@@ -1503,11 +1765,15 @@ class ReferencePlayer:
         if verb == b"begin":
             number = self._number(arguments[1], 1, 65535) if len(arguments) == 4 else None
             size = self._number(arguments[3], 1, 4294967295) if len(arguments) == 4 else None
-            name = arguments[2].decode("latin-1") if len(arguments) == 4 else ""
-            if number is None or size is None or not show.FILE_NAME.fullmatch(name) or not name.endswith(show.ENDINGS):
+            path = self._upload_path(arguments[2]) if len(arguments) == 4 else None
+            if number is None or size is None or path is None:
                 return "bad-argument"
             if self.error is not None:
                 return "show-invalid"
+            folder, name = path
+            if folder:
+                # The reference keeps no folders of the board's storage.
+                return "unknown-id"
             if self.upload is not None:
                 return "busy"
             item = self.items.get(number)
@@ -1545,7 +1811,8 @@ class ReferencePlayer:
             self.files["upload.part"] = upload["data"]
             if len(upload["data"]) == upload["size"]:
                 upload["state"] = "checking"
-                upload["steps"], upload["reason"], upload["clip"] = self._judge(upload["data"])
+                steps, upload["reason"], upload["clip"] = self._judge(upload["data"])
+                upload["pace"] = CheckPace(steps)
             return b'{"ok":true,"received":%d}\n' % len(upload["data"])
         if verb == b"end":
             if len(arguments) != 2 or not re.fullmatch(rb"[0-9a-f]{8}", arguments[1]):
@@ -1746,7 +2013,7 @@ class ReferencePlayer:
         checked = 0 if self.error is not None else len(names) - to_check
         unavailable = 0 if self.error is not None else len([item for item in self.items.values() if item.cycle is None and item.file in self.faults])
         readiness = "recovery" if self.error is not None else "checking" if to_check else "degraded" if unavailable else "ready"
-        state.update(readiness=readiness, checked=checked, to_check=to_check, unavailable=unavailable,
+        state.update(timing=True, readiness=readiness, checked=checked, to_check=to_check, unavailable=unavailable,
                      checking=self.checks[0][0] if self.error is None and self.checks else None, host=None)
         # The seed of the clock on the LEDs, then the seconds left in the window of the
         # current playlist, the root, the last member.
@@ -1759,6 +2026,7 @@ class ReferencePlayer:
         state["playlist"] = None
         state["clocks"], state["clock_message"] = self.clocks, self.clock_message
         state["clock_mode"] = "between" if self.clocks else "off"
+        state["clock_storage"] = self.clock_storage
         state["clock_only"] = None
         state["left"] = max(0, self.WINDOW - (now - self.window_started)) // 1000
         return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
@@ -1783,11 +2051,13 @@ class ReferencePlayer:
         """The lines the test host prints for one input line of a session."""
         word, _, rest = line.partition(" ")
         if word == "poll":
+            checking = self.upload["pace"] if self.upload is not None and self.upload["state"] == "checking" else None
             refresh = self.poll(int(rest))
             logs, self.logged = [f"log {text}" for text in self.logged], []
             if refresh is None:
                 return logs + [f"idle {rest}"]
-            return logs + [f"refresh {rest}"] + [f"data {leg} {rgb.hex()}" for leg, rgb in refresh]
+            traced = [checking.line()] if self.trace_check and checking is not None else []
+            return logs + [f"refresh {rest}"] + [f"data {leg} {rgb.hex()}" for leg, rgb in refresh] + traced
         if line == "error":
             return [f"error {self.error or 'none'}"]
         if word in ("line", "linehex", "bytes"):

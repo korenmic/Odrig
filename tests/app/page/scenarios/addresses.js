@@ -7,7 +7,7 @@ export default async function (app) {
       app.press("Target");
     }
     app.fill("address", address);
-    app.press("Use");
+    app.press("Connect over Wi-Fi");
     await app.until(() => app.kept() === address && app.raw("link") !== "Checking", `an end of the check of ${address}`, 9000);
     seen.push({address, link: app.raw("link"), failure: app.raw("link-failure"), shown: app.shown()});
   }

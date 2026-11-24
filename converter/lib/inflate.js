@@ -296,3 +296,308 @@ export function inflateRaw(bytes) {
     }
   }
 }
+
+// The same raw DEFLATE stream decoded a part at a time, holding only the 32,768
+// bytes the distances reach back into and the output not given yet.
+//
+// `push(bytes)` gives it input, `end()` says the input has ended, and `pull(limit)` decodes
+// until about `limit` bytes of output are ready, the input runs out, or the stream ends, and
+// gives that output. `finished` says the last block was read, `used` how many bytes of input
+// the stream took, `wanting` that it waits for input, and `held` the bytes of output it holds.
+// Its verdicts, reason and detail, are those of `inflateRaw` for the same input; `truncated`
+// comes only after the end of the input is told, and the output given before a verdict is a
+// prefix of what `inflateRaw` gives.
+export function inflateStream() {
+  const RING = 1 << 17;
+  const MASK = RING - 1;
+  const REACH = 32768;
+  const MOST_PULL = 65536;
+  const NEED = {};
+  let input = new Uint8Array(4096);
+  let base = 0;
+  let filled = 0;
+  let at = 0;
+  let hold = 0;
+  let held = 0;
+  let ended = false;
+  const ring = new Uint8Array(RING);
+  let produced = 0;
+  let given = 0;
+  let finished = false;
+  let last = false;
+  let block = null;
+  let stored = 0;
+  let wanting = false;
+
+  const bad = (what) => new Rejection(BAD_DEFLATE, what);
+  const cut = () => new Rejection(TRUNCATED, "the file ends inside the DEFLATE stream");
+
+  const bits = (count) => {
+    while (held < count) {
+      if (at >= filled) {
+        throw NEED;
+      }
+      hold |= input[at - base] << held;
+      at += 1;
+      held += 8;
+    }
+    const value = hold & ((1 << count) - 1);
+    hold >>>= count;
+    held -= count;
+    return value;
+  };
+
+  const symbol = (code) => {
+    const {count, symbols, longest} = code;
+    let pattern = 0;
+    let first = 0;
+    let index = 0;
+    for (let length = 1; ; length += 1) {
+      if (held === 0) {
+        if (at >= filled) {
+          throw NEED;
+        }
+        hold = input[at - base];
+        at += 1;
+        held = 8;
+      }
+      pattern |= hold & 1;
+      hold >>>= 1;
+      held -= 1;
+      const codes = count[length];
+      if (pattern - codes < first) {
+        return symbols[index + (pattern - first)];
+      }
+      if (length >= longest) {
+        throw bad("a bit pattern is no code of its block");
+      }
+      index += codes;
+      first = (first + codes) * 2;
+      pattern *= 2;
+    }
+  };
+
+  const lengths = new Uint8Array(MOST_LENGTH_CODES + MOST_DISTANCE_CODES + 2);
+  const lengthCode = table(288);
+  const distanceCode = table(MOST_DISTANCE_CODES);
+  const codeLengthCode = table(19);
+
+  const fixedCodes = () => {
+    lengths.fill(8, 0, 144);
+    lengths.fill(9, 144, 256);
+    lengths.fill(7, 256, 280);
+    lengths.fill(8, 280, 288);
+    construct(lengths, 0, 288, lengthCode);
+    lengths.fill(5, 0, MOST_DISTANCE_CODES);
+    construct(lengths, 0, MOST_DISTANCE_CODES, distanceCode);
+  };
+
+  const dynamicCodes = () => {
+    const counts = bits(14);
+    const lengthCodes = (counts & 31) + 257;
+    const distanceCodes = ((counts >> 5) & 31) + 1;
+    const listed = (counts >> 10) + 4;
+    if (lengthCodes > MOST_LENGTH_CODES || distanceCodes > MOST_DISTANCE_CODES) {
+      throw bad("a block lists more codes than there are");
+    }
+    const codeLengths = new Uint8Array(19);
+    for (let i = 0; i < listed; i += 1) {
+      codeLengths[CODE_LENGTH_ORDER[i]] = bits(3);
+    }
+    if (construct(codeLengths, 0, 19, codeLengthCode) !== 0 && codeLengthCode.longest !== 0) {
+      throw bad("the lengths of the code of code lengths make no code");
+    }
+    const total = lengthCodes + distanceCodes;
+    let have = 0;
+    while (have < total) {
+      let coded;
+      if (codeLengthCode.longest === 0) {
+        bits(1);
+        coded = 0;
+      } else {
+        coded = symbol(codeLengthCode);
+      }
+      if (coded < 16) {
+        lengths[have] = coded;
+        have += 1;
+        continue;
+      }
+      let repeated = 0;
+      let times;
+      if (coded === 16) {
+        times = 3 + bits(2);
+        if (have === 0) {
+          throw bad("a block repeats a code length before the first one");
+        }
+        repeated = lengths[have - 1];
+      } else if (coded === 17) {
+        times = 3 + bits(3);
+      } else {
+        times = 11 + bits(7);
+      }
+      if (have + times > total) {
+        throw bad("a block repeats a code length beyond its last code");
+      }
+      lengths.fill(repeated, have, have + times);
+      have += times;
+    }
+    if (lengths[END_OF_BLOCK] === 0) {
+      throw bad("a block has no code for its end");
+    }
+    let left = construct(lengths, 0, lengthCodes, lengthCode);
+    if (left < 0 || (left > 0 && lengthCode.longest !== 1)) {
+      throw bad("the lengths of the literal and length codes make no code");
+    }
+    left = construct(lengths, lengthCodes, distanceCodes, distanceCode);
+    if (left < 0 || (left > 0 && distanceCode.longest > 1)) {
+      throw bad("the lengths of the distance codes make no code");
+    }
+  };
+
+  // One step of the stream: a block's header and codes, a literal, a length with its
+  // distance, the end of a block, or a part of a stored block. Gives false when the input ran
+  // out before the step was whole; nothing of the step is kept then, and it is read again
+  // when more input has come.
+  const unit = () => {
+    const saved = [at, hold, held];
+    try {
+      if (block === null) {
+        const header = bits(3);
+        const kind = header >> 1;
+        if (kind === 0) {
+          hold = 0;
+          held = 0;
+          if (at + 4 > filled) {
+            throw NEED;
+          }
+          const length = input[at - base] | (input[at - base + 1] << 8);
+          const complement = input[at - base + 2] | (input[at - base + 3] << 8);
+          at += 4;
+          if (length !== (complement ^ 0xffff)) {
+            throw bad("the two lengths of a stored block do not agree");
+          }
+          stored = length;
+          block = "stored";
+        } else if (kind === 1) {
+          fixedCodes();
+          block = "coded";
+        } else if (kind === 2) {
+          dynamicCodes();
+          block = "coded";
+        } else {
+          throw bad("a block of a kind that does not exist");
+        }
+        last = (header & 1) === 1;
+        if (block === "stored" && stored === 0) {
+          block = null;
+          finished = last;
+        }
+      } else if (block === "stored") {
+        const count = Math.min(stored, filled - at, MOST_PULL);
+        if (count === 0) {
+          throw NEED;
+        }
+        for (let i = 0; i < count; i += 1) {
+          ring[produced & MASK] = input[at - base + i];
+          produced += 1;
+        }
+        at += count;
+        stored -= count;
+        if (stored === 0) {
+          block = null;
+          finished = last;
+        }
+      } else {
+        let found = symbol(lengthCode);
+        if (found < END_OF_BLOCK) {
+          ring[produced & MASK] = found;
+          produced += 1;
+        } else if (found === END_OF_BLOCK) {
+          block = null;
+          finished = last;
+        } else {
+          if (found > 285) {
+            throw bad("a length symbol that does not exist");
+          }
+          found -= 257;
+          const length = LENGTH_BASE[found] + bits(LENGTH_EXTRA[found]);
+          found = symbol(distanceCode);
+          if (found > 29) {
+            throw bad("a distance symbol that does not exist");
+          }
+          const distance = DISTANCE_BASE[found] + bits(DISTANCE_EXTRA[found]);
+          if (distance > produced) {
+            throw bad("a distance reaches back beyond the start of the output");
+          }
+          for (let i = 0; i < length; i += 1) {
+            ring[produced & MASK] = ring[(produced - distance) & MASK];
+            produced += 1;
+          }
+        }
+      }
+      return true;
+    } catch (error) {
+      if (error !== NEED) {
+        throw error;
+      }
+      [at, hold, held] = saved;
+      if (ended) {
+        throw cut();
+      }
+      return false;
+    }
+  };
+
+  return {
+    push(bytes) {
+      if (ended) {
+        throw new Error("the input has ended");
+      }
+      // The input taken already is dropped, and what is left kept at the start.
+      if (at - base > input.length / 2) {
+        input.copyWithin(0, at - base, filled - base);
+        base = at;
+      }
+      const need = filled - base + bytes.length;
+      if (need > input.length) {
+        const larger = new Uint8Array(Math.max(2 * input.length, need));
+        larger.set(input.subarray(0, filled - base));
+        input = larger;
+      }
+      input.set(bytes, filled - base);
+      filled += bytes.length;
+    },
+    end() {
+      ended = true;
+    },
+    pull(limit = MOST_PULL) {
+      const most = Math.min(limit, MOST_PULL);
+      wanting = false;
+      while (!finished && produced - given < most) {
+        if (!unit()) {
+          wanting = true;
+          break;
+        }
+      }
+      const count = produced - given;
+      const out = new Uint8Array(count);
+      for (let i = 0; i < count; i += 1) {
+        out[i] = ring[(given + i) & MASK];
+      }
+      given = produced;
+      return out;
+    },
+    get finished() {
+      return finished;
+    },
+    get wanting() {
+      return wanting;
+    },
+    get used() {
+      return at;
+    },
+    get held() {
+      return Math.min(produced, REACH) + (produced - given);
+    },
+  };
+}

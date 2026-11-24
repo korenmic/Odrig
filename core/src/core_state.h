@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "container.h"
+#include "civil_time.h"
 #include "file_source.h"
 #include "inflate.h"
 #include "odrg_decoder.h"
@@ -50,24 +51,46 @@ struct ItemInfo {
     uint32_t count;
 };
 
-// One `.odrg` or `.odrgx` file the show names. `type` is what it holds, as its header says.
-// `bytes` is its size, known once a check has read its body to its end. `total_ms` is its
-// length, the sum of the durations of its frames, and 0 while it is not known: a check
-// finds it, and so does playing the file through once. `fault` is the Reason of a fault of
-// the file in this boot, kNone while it is usable: a file with a fault is quarantined, and
-// its animations are unavailable until an upload replaces it. `checked` says that its
-// `bytes` are known: kCheckedRead when a check has read it whole in this boot,
-// kCheckedFromCatalog when they came from the storage's catalog.
+// Room for the stored name of a file of the show, with its 0: a name of 32 characters at
+// most, at the root of the storage, or `<n>/<name>` in the storage's folder `n`, 1 to 255.
+const uint32_t kStoredNameRoom = 37;
+
+// One `.odrg` or `.odrgx` file the show names, by its stored name. `type` is what it holds,
+// as its header says: kTypeFrames for any type that is not drawn. `bytes` is its size, known
+// once a check has read its body to its end. `total_ms` is its length, the sum of the
+// durations of its frames, and 0 while it is not known: a check finds it, and so does
+// playing the file through once; a length of 4,294,967,295 ms or more is kept as
+// 4,294,967,295. `fault` is the Reason of a fault of the file in this boot, kNone while it
+// is usable: a file with a fault is quarantined, and its animations are unavailable until
+// an upload replaces it. `checked` says that its `bytes` are known: kCheckedRead when a
+// check has read it whole in this boot, kCheckedFromCatalog when they came from the
+// storage's catalog. `rank` is 0 for a file at the root and for one whose folder
+// `folders.txt` does not name, else 1 and the index of its folder's line there; `held` says
+// that its folder or one above it is ignored. `clock` is the class its folder gives it in
+// the Clocks subtree of the internal storage: kClockFace in the folder `clocks`,
+// kClockMessage in `clocks/message`, kClockBelow in another folder below `clocks`, else
+// kNotClock. `copy` marks a file of a class that is a copy of a card's file of that class:
+// it is written by a draw of the clocks before that draw reads it, and read nowhere else.
 const uint8_t kCheckedRead = 1;
 const uint8_t kCheckedFromCatalog = 2;
+const uint8_t kNotClock = 0;
+const uint8_t kClockFace = 1;
+const uint8_t kClockMessage = 2;
+const uint8_t kClockBelow = 3;
 struct FileInfo {
-    char name[33];
+    char name[kStoredNameRoom];
     uint8_t fault;
-    uint8_t checked;
-    uint8_t type;
+    uint8_t checked : 2;
+    uint8_t type : 2;
+    uint8_t held : 1;
+    uint8_t clock : 2;
+    uint8_t copy : 1;
+    uint8_t rank : 6;
+    uint8_t spare_rank : 2;
     uint32_t bytes;
-    uint64_t total_ms;
+    uint32_t total_ms;
 };
+static_assert(sizeof(FileInfo) == 48, "a file of the show takes 48 bytes");
 
 // The work in which a file came to a reason: the check at the start or after it, playback,
 // the check of an upload, the check of a drive's file.
@@ -129,17 +152,21 @@ struct Upload {
     uint8_t reason;         // why the file is not valid, a Reason
     uint8_t header_read : 1; // the first step of the check has been taken
     uint8_t absent : 1;     // the external destination must remain absent
+    uint8_t pace : 2;       // the check's budget is kUploadChargeUnit << pace
+    uint8_t debt : 4;       // the charge the check owes, in kUploadChargeUnit
     uint16_t id;            // the id the item gets, or has
     char name[33];          // the name the file gets
-    uint8_t installed;      // the file is installed: the id, the name, the size and the CRC-32 are its
+    uint8_t installed : 1;  // the file is installed: the id, the name, the size and the CRC-32 are its
+    uint8_t pace_fell : 1;  // the pace has fallen during this check
     uint32_t size;          // the size `upload begin` named
     uint32_t received;
     uint32_t crc;           // the running CRC-32 of the bytes received
     uint32_t records_left;  // the frame records the check has still to decode
     uint64_t total_ms;      // the sum of the durations of the records decoded
     uint32_t progress;      // low timestamp bits; quiet intervals use modular subtraction
-    uint32_t folder;        // external folder id, zero for the root
+    uint32_t folder;        // external folder id, zero for the root; of an internal upload the number of its folder, 0 for the root
 };
+static_assert(sizeof(Upload) == 72, "the upload takes 72 bytes");
 
 // What the core knows of the file at one place of a drive's list: its size, its length and
 // its type once the check has read it whole, the id it got when the drive was taken up, its
@@ -237,8 +264,13 @@ struct OrderReader {
     char line[kOrderLineRoom];
 };
 
-// A length as the drive's table keeps it.
-inline uint32_t drive_length(uint64_t total_ms) {
+// A type as the tables of files keep it: a drawn one, or kTypeFrames for any other.
+inline uint8_t stored_type(uint8_t type) {
+    return is_drawn(type) ? type : kTypeFrames;
+}
+
+// A length as the tables of files keep it.
+inline uint32_t kept_length(uint64_t total_ms) {
     return total_ms < 0xFFFFFFFFu ? static_cast<uint32_t>(total_ms) : 0xFFFFFFFFu;
 }
 
@@ -292,6 +324,10 @@ struct Folder {
 // The most folders of the table of a drive without a catalog, the root among them; a
 // folder that is none; and the room for the current playlist's path, with its 0.
 const uint32_t kFolderMost = 33;
+// The most folders of the internal storage, and the mark of a level or of a current
+// playlist that is an internal folder, with its number in the low bits.
+const uint32_t kInternalFolderMost = 32;
+const uint32_t kInternalLevel = 0x40000000u;
 const uint32_t kNoFolder = 0xFFFFFFFFu;
 const uint32_t kPlaylistPathRoom = 104;
 
@@ -404,6 +440,8 @@ struct Core {
     // Fields are grouped by alignment; comments name related state across these groups.
     odrig_host host;
 
+    CivilTime civil;
+
     Mini *mini;
 
     LegInfo *legs;
@@ -488,6 +526,8 @@ struct Core {
     uint64_t break_due;
 
     uint64_t break_rest;
+
+    uint64_t clocks_retry;
 
     uint8_t *pixels;        // the pixel buffer of the decoder
 
@@ -723,6 +763,11 @@ struct Core {
     uint8_t turn_manual : 1;
     uint8_t break_manual : 1;
     uint8_t only_dirty : 1;
+    uint8_t rotation : 2;
+    uint8_t rotation_error : 1;
+    uint8_t clocks_error : 1;
+    // The storage whose copy of a clock or a message plays: 0 the card's, 1 the board's own.
+    uint8_t clock_storage_internal : 1;
 
     // Whether the saved repeats of a drive without a catalog are to be read before its files
     // are checked.
@@ -739,8 +784,8 @@ struct Core {
 
     uint8_t file_present;
 
-    // The two settings of `clocks.txt`: the clocks between the animations, and the message
-    // after each clock.
+    // The mode and the message of `clocks.txt`: the clocks between the animations, and the
+    // message after each clock. Its preferred storage is `clock_storage_internal`.
     uint8_t clocks_on;
 
     uint8_t clock_message_on;
@@ -806,6 +851,14 @@ struct Core {
     uint8_t rebuild_page;
 
     uint8_t rebuild_open;
+
+    // The internal folders: the lines of `folders.txt`, 0 for none, which spares a flat
+    // show every reading of it; and whether the file could not be read in this boot.
+    uint8_t internal_folders : 6;
+    uint8_t folders_error : 1;
+
+    // The id of the internal folder `clocks`, 0 while there is none.
+    uint16_t clocks_internal_id;
 
 };
 

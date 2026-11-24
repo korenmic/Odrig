@@ -17,6 +17,7 @@
 #include "odrig_mini_output.h"
 #include "odrig_routing.h"
 #include "odrig_log.h"
+#include "odrig_power.h"
 #include "odrig_sd_config.h"
 #include "odrig_serial.h"
 #include "odrig_uart.h"
@@ -29,6 +30,13 @@
 namespace {
 
 odrig_core *core = nullptr;
+OdrigPower powerState;
+portMUX_TYPE powerGuard = portMUX_INITIALIZER_UNLOCKED;
+
+struct PowerLocked {
+  PowerLocked() { portENTER_CRITICAL(&powerGuard); }
+  ~PowerLocked() { portEXIT_CRITICAL(&powerGuard); }
+};
 
 // Held for every call to the core after its start, so that the calls follow one another
 // whichever task makes them.
@@ -68,6 +76,12 @@ int aboutHost(void *, char *buffer, size_t capacity) {
 #endif
   snprintf(buffer, capacity, "%s %s %s %s external %u internal %u reset %s", WLED_RELEASE_NAME, __DATE__, __TIME__, storage,
            (unsigned)heap_caps_get_total_size(MALLOC_CAP_SPIRAM), (unsigned)internalFreeAtStart, reset);
+  return 1;
+}
+
+int identityHost(void *, char *buffer, size_t capacity) {
+  if (capacity < 19) return 0;
+  snprintf(buffer, capacity, "esp32-%012llx", static_cast<unsigned long long>(ESP.getEfuseMac() & 0xFFFFFFFFFFFFULL));
   return 1;
 }
 
@@ -162,12 +176,41 @@ bool legAt(uint32_t index, OdrigLeg *out) {
 
 // Called with the core lock held, including for a complete refresh copy.
 void syncLegs() {
+  const bool on = odrig_core_power(core) != 0;
+  {
+    PowerLocked held;
+    powerState.publish(on);
+    if (on && bri == 0) bri = briLast == 0 ? 128 : briLast;
+    else if (!on && bri != 0) { briLast = bri; bri = 0; }
+  }
   for (uint32_t i = 0; i < legsRead; i++) {
     odrig_leg leg;
     if (!OdrigRouting::onPin(core, legs[i].pin, &leg)) continue;
     legs[i].leg = leg.leg;
     legs[i].rgb = leg.rgb;
   }
+}
+
+void manualPower(uint8_t mode) {
+  if (core == nullptr || updating) return;
+  PowerLocked held;
+  powerState.stateChange(bri != 0, mode == CALL_MODE_INIT);
+}
+
+// WLED state callbacks only record intent. Storage work runs between loop passes,
+// after pacing allows it, without holding WLED's callback resources.
+void applyPower() {
+  if (core == nullptr || updating || OdrigFiles::holding()) return;
+  bool on = false;
+  {
+    PowerLocked held;
+    if (!powerState.takeQueued(&on)) return;
+  }
+  Locked held;
+  const char *line = on ? "on" : "off";
+  char reply[ODRIG_REPLY_MAX];
+  odrig_core_command(core, OdrigFiles::nowMs(), line, on ? 2 : 3, reply, sizeof reply);
+  syncLegs();
 }
 
 // Asks the core for a refresh. The timestamp is read after the lock is taken.
@@ -203,10 +246,10 @@ void requestRefreshes(void *) {
       ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(50));
       continue;
     }
-    const bool due = refreshDue();
-    if (!due) {
-      vTaskDelay(1);
-    }
+    refreshDue();
+    // A queued notification need not block. Leave time for idle even when every
+    // rendered frame is already overdue and the consumer takes it immediately.
+    vTaskDelay(1);
   }
 }
 
@@ -309,6 +352,7 @@ class OdrigUsermod : public Usermod {
     // What the player logged last before a reset goes to the log before it starts again.
     OdrigLog::retained();
     odrig_host host = OdrigLog::withLog(OdrigDrive::withDrive(OdrigFiles::host()));
+    host.identity = identityHost;
     host.about = aboutHost;
     internalFreeAtStart = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     core = odrig_core_begin(&host);
@@ -318,6 +362,10 @@ class OdrigUsermod : public Usermod {
 #endif
     readLegs();
     enableMiniSupport();
+    {
+      Locked held;
+      syncLegs();
+    }
     const OdrigLegSource source = {legCount, legAt};
     OdrigLeds::source(source);
     OdrigLeds::hold();
@@ -331,6 +379,7 @@ class OdrigUsermod : public Usermod {
 
   void loop() override {
     if (updating) return;
+    applyPower();
 #ifdef ODRIG_PROBE
     OdrigProbe::pass(OdrigFiles::nowMs());
 #endif
@@ -408,6 +457,17 @@ class OdrigUsermod : public Usermod {
   }
 
   void onUpdateBegin(bool begins) override { updating = begins; }
+
+  void readFromJsonState(JsonObject &root) override {
+    if (core == nullptr || updating) return;
+    const bool boolean = root["on"].is<bool>();
+    const char *text = root["on"].is<const char *>() ? root["on"].as<const char *>() : nullptr;
+    if (!boolean && (text == nullptr || text[0] != 't')) return;
+    PowerLocked held;
+    powerState.explicitRequest(boolean ? root["on"].as<bool>() : !powerState.on());
+  }
+
+  void onStateChange(uint8_t mode) override { manualPower(mode); }
 
   // The usermod's settings in WLED's settings file, which WLED's page "Usermods" shows and
   // changes: how many seconds the chip's own USB socket is looked at for a computer as the

@@ -87,7 +87,7 @@ Every function receives `ctx` as its first argument.
 | `write` | `int write(void *ctx, const uint8_t *bytes, size_t length)`: adds bytes to the file being written. `length` is 1 to 1,500. Returns 1, or -1. |
 | `write_close` | `int write_close(void *ctx)`: ends the writing. When it has returned 1, the file is whole in storage and stays so through a power cut. Returns 1, or -1 on a failure. |
 | `rename` | `int rename(void *ctx, const char *from, const char *to)`: gives the file `from` the name `to`, in place of a file that has it. After a power cut during the call, `to` is its old file or the new one, whole. Returns 1, or -1. |
-| `remove` | `int remove(void *ctx, const char *name)`: removes the file of this name. A file being written under it is given up. Returns 1 when it removed one, 0 when there was none, -1 on a failure. |
+| `remove` | `int remove(void *ctx, const char *name)`: removes the file of this name. A file being written under it is given up. Returns 1 when it removed one, 0 when there was none, -1 on a failure. Given the number of a folder of the storage, `<n>`, or `drive/<path>` of a folder of the drive's folder `odrig`, it removes that folder while it is empty: 1, 0 when there was none, -1 while it holds anything. |
 | `space` | `int space(void *ctx, uint32_t *free_bytes, uint32_t *total_bytes)`: the free and the total bytes of the storage the files are in; a value above 4,294,967,295 is given as that. Returns 1, or -1 when the host cannot tell. |
 | `read_at` | `int32_t read_at(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity)`: reads a file apart from the one that `open`, `read` and `close` hold: up to `capacity` bytes from this offset. Returns the number read, 0 at or after the end of the file, -1 on a failure and when there is no such file. `capacity` is never above 512. |
 | `drive` | `uint32_t drive(void *ctx)`: the number of the drive of animations that is plugged in now: a number other than 0 that changes each time a drive is plugged in, or 0 while none is. The core calls it at each refresh, before the LED data is made. `NULL` for a host without a drive; see [a drive](#a-drive). |
@@ -96,7 +96,9 @@ Every function receives `ctx` as its first argument.
 | `about` | `int about(void *ctx, char *buffer, size_t capacity)`: optional; a text that names the host, its build, its storage and the reason of its last start, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when it has none. The core asks it at each `status`, with room for 128 bytes, and reports it as `host`. `NULL` for a host without it. |
 | `drive_list` | `int32_t drive_list(void *ctx, uint32_t drive)`: optional; lists the drive's folder `odrig` and its sub-folders to three levels now, depth first, a folder's animation files by the bytes of their names and then its sub-folders by the bytes of their names, every file or, as the firmware does, up to the 256th file and the 32nd sub-folder, and returns the number of files listed, or -1 when that drive is not plugged in any more. A host that has it lists the folder only when it is called: the core calls it for a drive without a catalog and for a rebuild of a drive's catalog. |
 | `drive_bind` | `int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name)`: optional; gives the place to the file of the drive's folder with this name, so that `drive_name` gives the name and `drive/<place>` opens it. Returns 1, or 0 when that drive is not plugged in any more or the name is not one of the drive. Without it every drive is listed. |
+| `identity` | `int identity(void *ctx, char *buffer, size_t capacity)`: optional stable board ID, complete NUL-terminated1..31 ASCII letters/digits/hyphen/underscore. Returns1 or0 unavailable; never truncate. |
 | `drive_writable` | `int drive_writable(void *ctx, uint32_t drive)`: optional; 1 when the core may change the files of that drive with the storage functions, by the names `drive/<name>`, 0 otherwise. Without it the drive is read only. |
+| `make_folder` | `int make_folder(void *ctx, const char *name)`: optional; makes the folder `drive/<path>` of the drive's folder `odrig`, a path of folders alone whose parent is there, or the folder of the storage `<n>`, 1 to 255, inside the storage's own folder; 1 when the folder is there afterwards, made now or before, 0 when that storage makes no folders, -1 on failure and when a file has that name. The storage's own folder is made only by `write_open`. Without it, or with 0, `folder make` answers `unsupported`. Before an upload into a folder the core asks for each folder of its path, so that a folder removed while it was empty is there again. |
 
 Capacity callbacks must meet the 50 ms per-call budget and must not start or wait
 for an allocation-table scan under a lock playback needs. The microSD firmware
@@ -115,11 +117,13 @@ The last seven members are the storage functions: three that write a file, `rena
 `remove`, `space`, and `read_at`, which reads a second file beside the one that plays.
 
 - A name the core gives any of them is 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_`
-  and `.`: `mapping.json`, `show.json`, the name of an `.odrg` file, or one of the names
-  the core keeps for itself, `upload.part`, `show.part`, `pending.txt`, `mapping.part`,
+  and `.`: `mapping.json`, `show.json`, the name of an `.odrg` file, alone or after the
+  number of a folder of the storage, `<n>/`, 1 to 255 without a leading zero, or one of the
+  names the core keeps for itself, `upload.part`, `show.part`, `pending.txt`, `mapping.part`,
   `order.txt`, `order.part`, `repeats.txt`, `repeats.part`, `clocks.txt`, `clocks.part`,
-  `playlist.txt`, `playlist.part`, `brightness.txt`, `brightness.part`, `ignored.txt`
-  and `ignored.part`.
+  `playlist.txt`, `playlist.part`, `brightness.txt`, `brightness.part`, `ignored.txt`,
+  `ignored.part`, `folders.txt` and `folders.part`; and to `make_folder` and `remove` the
+  number `<n>` of a folder of the storage alone.
 - The core has at most one file being written, gives `write` at most 1,500 bytes in one
   call, and reads a file with `read_at` from offset 0 on, each call where its last call for
   that file ended; only the commands `read` and `catalog page`, and the reads of the files
@@ -142,8 +146,8 @@ The last seven members are the storage functions: three that write a file, `rena
 The drive and drive_name members describe the drive. A host with a drive sets both, and has storage that
 can be changed; with either of them `NULL`, or with `write_open` `NULL`, the core has no
 drive and calls neither. To `open` and `read_at` the core names the file at place `p` of
-the drive's list `drive/p`, as `drive/0`; no name of the installed file set has a slash,
-and a drive's file is named by its path from the drive's folder, `drive/night/comet.odrg`
+the drive's list `drive/p`, as `drive/0`; no name of the installed file set has a slash but
+after the number of its folder, and a drive's file is named by its path from the drive's folder, `drive/night/comet.odrg`
 for one in a sub-folder. A host that is given such a name for a drive that is gone answers
 as for a file that is not there.
 
@@ -157,6 +161,7 @@ as for a file that is not there.
 | `int odrig_core_leg(const odrig_core *core, uint32_t index, odrig_leg *out)` | Fills in leg `index`, counted from 0 in the order of the mapping file. Returns 1, or 0 for an index that is not a leg. |
 | `size_t odrig_core_command(odrig_core *core, uint64_t now_ms, const char *line, size_t length, char *reply, size_t capacity)` | Takes one command line and writes its reply. Returns the length of the reply. `capacity` must be at least `ODRIG_REPLY_MAX`; with less the core does nothing and returns 0. |
 | `void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, size_t length, odrig_reply_fn on_reply, void *reply_ctx)` | Takes bytes of a transport, cuts them into lines, answers each line, and calls `on_reply` once for each. |
+| `int odrig_core_power(const odrig_core *core)` | Effective LED visibility after the latest command/poll; reads only,0 for a null core. Hosts mirror it without issuing a manual request. |
 | `const char *odrig_core_error(const odrig_core *core)` | The reason the show is invalid, as a text that ends in a zero, or `NULL` when the show is valid. |
 | `void odrig_core_mini_support(odrig_core *core)` | Opts the host into checked miniature output transitions, on a 60x60 canvas. |
 | `int odrig_core_mini(const odrig_core *core, odrig_mini *out)` | Reads miniature support, revision, requested/active/pending/failure state and its borrowed 180-byte RGB buffer. The chain index is `x*6+y` in a 10x6 bottom-left coordinate system. Normal legs are unchanged. |
@@ -295,7 +300,7 @@ normal brightness rounding at `min(selected brightness,40)`, then their 100 samp
 summed and divided with floor rounding. All side columns stay black. Physical
 order is `x*6+y`, bottom left, in the [README orientation](../README.md#approved-connection-and-orientation).
 The core uses three local channel sums per cell, with no per-frame allocation or
-second decoder. The measured host allocation with a drive is 131069 bytes, below
+second decoder. The measured host allocation with a drive is 131045 bytes, below
 131072. Off, invalid or blank output clears the image.
 
 `debug mini on|off` requests a RAM-only transition. Only the host acknowledgement
@@ -316,6 +321,13 @@ five words at most, and a line with more is no valid command. Every line gets ex
 reply, an empty line too: one JSON object on one line of at most 1,024 bytes, ended by a
 newline, without a zero after it. The reply is written into the room the caller gives.
 
+`read` gathers the bytes it gives in the chunk buffer, before byte 1,400, from which a
+rebuild of a catalog keeps the counts and the CRC-32s of its pages between its steps, and
+`read` is not refused while one runs: 600 without a count, and as many as its count asks
+for, 720 at most. 720 bytes in base64 and a size of ten digits make a reply of 1,001 bytes.
+Two `static_assert`s of `content.cpp` hold both bounds, the 1,400 bytes before the kept
+pages and the reply's 1,024, so the count takes no memory of its own.
+
 `odrig_core_feed` is for a transport that delivers bytes, such as a serial port. Every
 newline ends a line. The core keeps an unfinished line of up to 2,048 characters, and a
 carriage return after them, from one call to the next, and of a line without end it keeps
@@ -331,14 +343,15 @@ and `odrig_core_command` works as ever.
 A line that is no valid command is answered with the first code that applies, in the
 order of the table of [commands.md](commands.md): `line-too-long`, `unknown-command`,
 `bad-argument`, `show-invalid`, `unsupported`, `no-upload`, `incomplete`, `bad-checksum`, `busy`,
-`unknown-id`, `unavailable`, `in-use`, `read-only`, `mapping-conflict`, `stale`, `order-conflict`, `no-space`, `bad-offset`, `bad-file` and
+`unknown-id`, `unavailable`, `in-use`, `read-only`, `mapping-conflict`, `rotation-conflict`, `zone-unset`, `stale`, `order-conflict`, `no-space`, `bad-offset`, `bad-file` and
 `storage-error`. It
 changes nothing, except that `bad-checksum`, `stale`, `bad-file` and `storage-error` discard the
-upload they are about.
+upload they are about. Manual On/Off also retains its immediate LED control when
+its persistence is refused; schedule readback distinguishes the unsaved override.
 
 ## Startup
 
-`odrig_core_begin` reads `mapping.json`, then `show.json`, and then opens every different
+After reading schedule settings, `odrig_core_begin` reads `mapping.json`, then `show.json`, and then opens every different
 `.odrg` file the show names, in the order in which the show first names them. Of each
 file it reads the header, the first 16 bytes, and compares the canvas with the mapping's.
 It decodes no frame record, so the time the start takes does not grow with the files. A
@@ -389,9 +402,14 @@ change left:
    items, and then `repeats.txt`, for their saved repeats; see [the saved
    order](#the-saved-order) and [the saved repeats](#the-saved-repeats).
 
+After `pending.txt` it opens `folders.txt`, the folders of the storage, and reads it, see
+[internal folders](#internal-folders); a show without one has no folders and pays nothing
+more.
+
 A folder with none of the files is asked to remove two names that are not there,
-`upload.part` and `show.part`, and to open five that are not there, `catalog.do`,
-`mapping.json`, `show.json`, `pending.txt` and `catalog.txt`, and for nothing else; the
+`upload.part` and `show.part`, and to open six that are not there, `catalog.do`,
+`mapping.json`, `show.json`, `pending.txt`, `folders.txt` and `catalog.txt`, and for
+nothing else; the
 reads with `read_at` of the saved order, the repeats and the settings find nothing, as
 for a show with no item. It then plays on the installation's mapping with the empty show.
 
@@ -527,8 +545,12 @@ core only. No reply, log line or reason text ever holds it.
 **The steps of the checks.** A step of the check after the start, of the check of an
 uploaded file and of the check of a drive's file decodes one frame record, or takes one
 slice of a settling. A step that ends `pending` counts no record and is taken again at
-the next step. The check at the start of a host whose storage cannot be changed reads
-every file whole inside `odrig_core_begin`, through every slice: nothing waits on it.
+the next step. The check after the start and the check of a drive's file pace their steps
+by refreshes in step. The check of an uploaded file takes its steps at every refresh,
+several of them within its budget, at most 64, and the one that passes the budget; a
+slice of settling ends the steps of its refresh ("Uploads and the check"). The check at
+the start of a host whose storage cannot be changed reads every file whole inside
+`odrig_core_begin`, through every slice: nothing waits on it.
 
 **Playback in slices.** At one refresh the player decodes at most 131,072 bytes of a body,
 a record's boundary after it, and always one whole record; a slice of settling counts
@@ -543,6 +565,7 @@ of. When settling ends with a reason, the player acts on it as on any reason.
 |---|---|---|
 | Settling in one call | 32,768 bytes | The decoder inflates about 30 MB a second on the board's chip; 32 KiB is about a millisecond, far below a refresh of 20 ms. |
 | Decoding at one refresh | 131,072 bytes | Twelve dense 60 x 60 records: a pause of a quarter of a second is caught up at once, and a longer one over a few refreshes. |
+| The check of an upload at one refresh | 256 to 2,048 bytes of charge, by the pace; at most 64 steps | A refresh does at most its allowance and one step more, whatever the file holds, and the pace follows the refresh rate. The rests after a larger step pay at most 3,840 of its charge, so records far larger than the budget, such as dense 60 x 60 ones, average about 2.6 times it. |
 | One call on the board | 50 ms at most | A command waits for one call; 50 ms keeps a session of commands quick. |
 | One read of the host | 250 ms at most | The microSD card's and the USB drive's own drivers time out sooner; a read that fails is `read-error`. |
 
@@ -635,6 +658,29 @@ of [reasons.md](reasons.md), "Widgets in ODRGX", and held in the window while it
   pixel buffer is not written again in the turn. A hand or a cap touches only the pixels
   near it; the time walks the slowest points of the turn so far, one for at least every 6
   seconds of it.
+- **The board's own clocks.** The files of the board's own folder `clocks` are faces, and
+  those of `clocks/message` messages, beside the card's: [show.md](show.md#clocks-between-the-animations).
+  Each file's entry keeps its class in two bits, `clock`, written with its `rank` and
+  `held` whenever the folders are read, [Internal folders](#internal-folders): a face, a
+  message, a file of another folder below `clocks`, or none. The id of the folder `clocks`
+  is 16 bits of the core object's padding, 0 while there is none, and the preferred storage
+  of copies one bit of a byte of its flags. A draw counts its bag at once: the card's files
+  of the folder of its class, then the show's animations of that class in the item table's
+  order, so a change of either count draws a new order. While the
+  card's copies are preferred, the first time a draw comes to a file of the board's own
+  storage that plays, it reads the card's files of that folder once and marks, in a bit of
+  each file's entry, `copy`, the board's files of the class that are copies of a card's file
+  that plays; it then passes over a marked file. The marks are written by the draw that
+  reads them and read nowhere else, so a mark of an earlier draw is never taken, and a bit
+  of each file holds a show of any size. While the board's own copies are preferred, a draw
+  makes no mark: a card's file it comes to is passed over when a show's animation of its
+  class that plays is a copy of it, found in the item table by the name and the type of the
+  card's row the draw read to judge the file. The preferred storage is kept in the fourth
+  line of a `clocks.txt` of version 3, read with the mode and the message at the start and
+  by the retry of unreadable settings; it is the card, 0, when the file is of version 1 or
+  2, missing or out of form. `clocks storage` writes it and sets both orders to be drawn
+  anew. Nothing of it is a
+  block or a table: [Memory](#memory) is as it is without it.
 
 ## A drive
 
@@ -714,8 +760,10 @@ its id, and asks the host for a name only when `list` writes it or a log line ne
   window is kWindowMs, 86,400,000, of running time. Whether it has passed is judged by the
   turn's end time where a turn of the playlist ends, by the refresh's time at a refresh
   while a cycle or nothing plays, and when a mapping test ends; the rotation makes the
-  next folder of the table current, the root after the last and while the tree is not
-  known, and the new playlist plays from its first animation, or a cycle goes on. The
+  next folder current, those of the board's own storage, see
+  [Internal folders](#internal-folders), before those of the table, which it passes over
+  while the tree is not known, and the root after the last, and the new playlist plays
+  from its first animation, or a cycle goes on. The
   whole rounds that a long time without a refresh takes off at once end before the
   window's end, and a rotation sums the new playlist's round anew; with an indexed drive
   no round is taken off at once, since summing one would read every row: the turns are
@@ -733,6 +781,22 @@ its id, and asks the host for a name only when `list` writes it or a log line ne
   found by binary search, and the positions the core holds at or after it move on by one;
   a removal moves those after it back by one. The core's own commit gives the marker's
   CRC-32 to the look, which does not read the drive again for it.
+- `move external` moves a file of such a drive to another of its folders in one commit:
+  the file renamed through `drive/upload.part`, its folder made first with `make_folder`
+  when it is not the root, its row last among the new folder's files with its id, its old
+  folder left as a removal leaves it, and its entry on its new name's page with the fields
+  of its old line. The index change writes up to four files of folders: two of their edits
+  are held by the command's frame and two by the change, so that no frame passes 512
+  bytes, and the plan and the checks are made in frames of their own, gone before the
+  commit. The command's frame then holds the old name, the new one and the two edits; so
+  its deepest chain, from `command_answer` to a rename of the commit, is 2,416 bytes with
+  the board's compiler at `-Os` by `-fstack-usage`, where that of `folder make external` is
+  2,064. The player lets go of the file before the
+  commit, and the positions it holds follow the file, which plays on under its new path.
+  The saved settings of its old path go to its new one after the commit, through the
+  journal `drive/moving.txt` that the mount of the drive finishes after a cut, as
+  [catalog.md](catalog.md#a-drives-index-in-a-change) states. A folder is moved by the
+  app, file by file.
 - `catalog rebuild external` lists the drive's folder once and reads every listed file
   with the check's steps, without a limit, then writes the drive's catalog and index anew,
   a few lines at each step, through two files of its own that no reader reads,
@@ -775,6 +839,94 @@ its id, and asks the host for a name only when `list` writes it or a log line ne
   plays, is left out from then on and logged in the same way. Its turn ends there, that
   refresh keeps the picture before, the playlist goes on as after a pull, and the show
   stays valid. One file left out never drops the drive's other files.
+
+## Internal folders
+
+The board's own storage has folders, each a playlist, as the card's folders are; the
+commands are in [commands.md](commands.md#folders-of-the-boards-own-storage). They cost the
+core no memory: every figure of [Memory](#memory) is as it is without them.
+
+- **Numbered folders and stored names.** A folder is a folder of the storage named by its
+  number, 1 to 255, and a file in it has the stored name `<n>/<name>`, at most 36
+  characters; a file at the root keeps its name. `show.json`, the file table, every host
+  call, the internal catalog's keys, `pending.txt` and the `f` lines of `repeats.txt` and
+  `brightness.txt` hold the stored name, which stays while the file stays in its folder.
+- **`folders.txt`.** The folders' paths, ids and Ignore are kept in one file, in the tree's
+  order, depth first, siblings by the bytes of their names, a folder's line after its
+  parent's:
+
+  ```
+  odrig-folders 1 4
+  2 41 0 shows
+  1 39 0 shows/night
+  3 42 1 shows/old
+  ```
+
+  The header names the next number to give; each line is `<number> <id> <ignored> <path>`:
+  the number, 1 to 255, the id, 1 to 60,000, unique and no item's, 0 or 1, and the path,
+  one to three names under the card's rule, 93 bytes at most, the last not ending in
+  `.odrg` or `.odrgx`. Siblings differ in more than the case of their letters. A show
+  without the file has no folders. The core never keeps the file: it reads it through
+  `read_at` from its start, a line at a time into a buffer of 128 bytes on the stack,
+  whenever a command, the start or the rotation needs it, and writes it as `folders.part`,
+  renamed onto it.
+- **What the file table keeps.** A file's entry, 48 bytes as before, holds its stored name
+  in 37 bytes, its length as a 32-bit number that stays at 4,294,967,295 ms for a longer
+  file, while the catalogs keep the exact length, its `checked` and its type in two bits
+  each, `held`, whether its folder or a folder above it is ignored, and `rank`, 1 and the
+  index of its folder's line, 0 at the root, and in its last three bits the class of its
+  folder in the Clocks subtree, `clock`, and the mark of a copy, `copy`, of
+  [Clocks](#clocks). The core object keeps the number of lines and whether the file could
+  not be read in this boot, one byte inside its own padding, and the id of the folder
+  `clocks` in two bytes more of it. The start, and every change of a folder or of a file in
+  one, marks each file again with one reading of the file.
+- **The start.** It opens `folders.txt` after `pending.txt` and reads it whole, each line
+  checked against the line before it. A line out of form or of order, a line whose parent
+  is not before it, or two lines with one number or one id make the file damaged: the core
+  logs `folders unreadable`, leaves the file as it is and has no folders in this boot; the
+  files of folders then play and are listed at the root under their stored names, a
+  command that would change a folder answers `storage-error`, and a saved playlist of one
+  of its folders stays saved while the root plays in its place. A folder whose id an item has
+  is given the lowest free id, and the file is written again; this is the only write the
+  start makes for the folders, and only for such a file.
+- **The walk.** The show's animations play in the order of their walk key: the rank of the
+  folder, then the key of the saved order. The root's playlist plays the root's animations,
+  then each folder's in the tree's order, its own files before its sub-folders', then the
+  card's. A folder's playlist is the ranks of its subtree; the current one is kept as
+  `kInternalLevel` and its number in `current`, its ranks in the record of the current
+  folder and `:` and its path in `playlist.txt`, which an older firmware takes for a folder
+  of the card it has not. The rotation goes from the root to the folders in the tree's
+  order, then the card's, then the root. A held file plays only by `play` of it. A host
+  without a drive keeps no current playlist and plays the root's.
+- **Changes.** `folder make internal` writes the new line into `folders.part`, which makes
+  the storage's folder of the show when there is none, then makes the folder `<n>` with
+  `make_folder`, then renames the part: a cut leaves the old file or the new one, and at
+  worst an empty numbered folder without a line, which a later folder of that number takes.
+  A folder emptied of its last file by a removal or an upload, with no sub-folder, loses
+  its line, and so does each folder above it left empty the same way, and then the core
+  removes the numbered folders with `remove("<n>")`. A removal while a rebuild runs or an
+  upload is received, or one that a power cut ends before the prune, leaves the emptied
+  folder with its line, as a folder never filled is. `folder remove` of an empty folder
+  drops its line alone through `folders.part`, renamed onto the file, and then removes
+  `<n>`; the header keeps its next number, and a numbered folder the host cannot remove
+  then stays, without a line, as after a cut of `folder make internal`. Nothing above it
+  is pruned. `move internal` rewrites the file
+  once: one reading plans it, finding the folder's line and its subtree, which stand
+  together, checking each new path for 93 bytes and three levels and each file listed in
+  the subtree for 100, and finding where the subtree goes among the new parent's
+  sub-folders; three more readings, each from the file's start, write the lines before that
+  place, the subtree with its new start, and the rest, into `folders.part`, renamed onto the
+  file. Numbers, ids, Ignore and stored names stay, so no file and no folder of the storage
+  is touched, and the current playlist's path follows in `playlist.txt` at the next
+  refresh. Numbers are given in turn from the
+  header's, back to 1 after 255, passing over one a line or a stored name of the file
+  table has. A folder's id is the lowest that no item and no folder has.
+- **Limits.** 32 folders, three levels, a folder's path of 93 bytes, a file's path of 100
+  bytes, a name of 32 characters, a stored name of 36. `upload begin` refuses a longer
+  path, and a file that a computer's tool put in a folder of a longer path has rank 0: it
+  is listed and played at the root under its stored name. So `file` in `status` holds 100
+  bytes at most, and `checking` gives the first 32 characters of a path, as of a drive's
+  name, which keeps the longest reply to `status` under 1,024 bytes.
 
 ## The catalogs
 
@@ -820,7 +972,7 @@ tables. The core keeps three names in the folder for itself:
 |---|---|
 | `upload.part` | The bytes of the open upload. |
 | `show.part` | The next `show.json`, until it is renamed. |
-| `pending.txt` | The names of `.odrg` files that a change makes or is about to delete, one on a line, each ended by a line feed. A file named here that no item of `show.json` names is not part of the show. |
+| `pending.txt` | The stored names of `.odrg` files that a change makes or is about to delete, one on a line, each ended by a line feed. A file named here that no item of `show.json` names is not part of the show. |
 
 The saved order and the saved playlist have files of their own, `order.txt` and
 `playlist.txt`, each written as `order.part` or `playlist.part` and renamed: see [the saved
@@ -921,7 +1073,7 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
   `bytes + bytes / 256 + 16,384` is more than the free bytes; then it begins the file
   `upload.part`.
 - **An unchanged file.** After `upload end` installed a file, the upload's record keeps
-  its id, its name, its size and its CRC-32, and a byte of its padding says that it is
+  its id, its name, its size and its CRC-32, and a bit of the record says that it is
   installed, until the next upload begins or the core starts again. `upload begin` with a
   CRC-32 compares them, and the item's file, and answers `unchanged` without a call to the
   host when all agree and the file is usable. The core keeps no CRC-32 of the other files:
@@ -931,16 +1083,48 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
 - **The check.** A file must be decoded whole before it joins the show. That is done
   beside playback, with a second source, second decoders, a pixel buffer and a window of
   their own, which read `upload.part` back with `read_at`, 256 bytes at a time. It runs
-  in steps inside `odrig_core_poll`, one step after the LED data of a refresh is
-  complete, and none after a refresh before which a grid time was skipped: when the host
-  is late, the check waits. The first step reads the header and compares the canvas with
-  the mapping's; each further step decodes one frame record, which is what playback does
-  for a refresh; the step after the last record asks for the end of the file and
-  compares the size and the CRC-32 of what was read back with what was received. A file
-  of F frame records is checked in F + 2 refreshes, a text or a clock in three. No upload is open while the check
-  after the start reads the installed files. The check of a drive's files gives the
-  second decoders up when an upload begins and takes them again once it is closed, so
-  the two never need them at the same time.
+  in steps inside `odrig_core_poll`, after the LED data of every refresh is complete, in
+  step or late; a poll that produces no refresh takes none, nor does a command. The first
+  step reads the header and compares the canvas with the mapping's; each further step
+  decodes one frame record, or takes one slice of a settling, and a text or a clock reads
+  its payload whole in one step; the step after the last record asks for the end of the
+  file and compares the size and the CRC-32 of what was read back with what was received.
+  - *The charge.* Each step is charged by its work: the bytes of the body it took,
+    inflated bytes of a compressed body, the palette with the first record, or the bytes
+    of the file it took when those are more, as a compressed stream's block headers and
+    its empty blocks are; and a whole coded record with the run bit and predictor 1 or 2,
+    which walks every position of the picture whatever its bytes, n / 32 more, n being the
+    decoder's pixel buffer: 337 for a picture of 60 x 60 of three bytes a pixel, 112 with a
+    palette. The end of a compressed body is charged the last bytes of its stream. The
+    header, a text's or a clock's payload and the end of a text or a clock are charged 0.
+  - *The budget and the debt.* A refresh takes steps while their charge is below its
+    allowance, at most 64 and the first always. The allowance is the budget, 256 shifted
+    left by the pace (256, 512, 1,024 or 2,048), less 256 times the debt. What the steps
+    passed the allowance by is the debt, in whole 256s rounded down, at most 15; a refresh
+    whose debt is a whole budget or more takes no step and pays the budget's 256s. A
+    refresh whose last step was a slice of settling leaves no debt. So a refresh does at
+    most its allowance and one step more, a file of small records never rests, and the
+    refreshes after a record larger than the budget rest for at most 3,840 of its charge:
+    the work of a refresh is about its budget on average while records pass the
+    allowance by no more than that, and more for larger ones, about 2.6 times the budget
+    for the dense 60 x 60 records of 10,805 bytes, which are taken every 2 refreshes at
+    the pace 3 and every 16 at the pace 0.
+  - *The pace.* It is 1 when the last byte arrives. At the first refresh of each whole
+    second it changes by the refreshes of the second before, as `status` reports them as
+    `fps`: below 21 it goes down by one, and the pace has fallen; otherwise at 40 or more it
+    goes up by one; otherwise at 27 or more it goes up by one while it has not fallen. At a
+    refresh 500 ms or more into its second, while the pace has not fallen, a second that
+    has had 11 refreshes or fewer, this one included, takes it down by one: a rise that
+    cost the board its rate is taken back. It stays between 0 and 3.
+  - *The time.* On a host that refreshes 50 times a second the tracked clock of 14,399
+    small frames, `collection/card/clocks/time-original-5-every-row-another-time.odrg`,
+    is checked in 381 refreshes, 7.6 s, where one record a refresh in step took 14,402
+    refreshes, 288 s; at 22 a second in 1,223 refreshes, where the check never ended. A
+    text or a clock is checked at the first refresh after its last byte.
+
+  No upload is open while the check after the start reads the installed files. The check
+  of a drive's files gives the second decoders up when an upload begins and takes them
+  again once it is closed, so the two never need them at the same time.
 - **`upload expect`** reads the file of the upload's item through `read_at`, 512 bytes
   at a time into the chunk buffer, and compares its CRC-32; it takes no step of the check.
 - **`upload end`** is answered with `busy` while the check runs. Afterwards it puts the
@@ -951,8 +1135,8 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
 - **Discarding.** `upload cancel`, a wrong checksum, a failed check and a failed storage
   call discard the upload: `upload.part` is removed. So
   does every call that carries a timestamp 60,000 ms or more after the last progress:
-  `upload begin`, an `upload data` that was taken, or a step of the check. The core
-  reads no clock for it.
+  `upload begin`, an `upload data` that was taken, or a refresh of the check, one that
+  only pays a debt too. The core reads no clock for it.
 
 ## Memory
 
@@ -966,7 +1150,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,712 |
+| The core object | fixed | 3,792 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -984,13 +1168,13 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
 | Miniature state and physical RGB, only for a 60x60 canvas | fixed | 188 |
-| **Total** | | **125,177** |
+| **Total** | | **125,257** |
 
 That is about 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-45,776 of them. The example show on the two-leg mapping asks for 88,466 bytes. A host
+45,776 of them. The example show on the two-leg mapping asks for 88,546 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,637 bytes for the target file. A host with a drive
+of the check and the saved order: 77,717 bytes for the target file. A host with a drive
 is asked for three blocks more, after the three of the check: the table of a drive
 without a catalog, 12 bytes for each of 256 places, 3,072 bytes; the boot's memory of 16
 files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive's index,
@@ -1001,7 +1185,7 @@ a table of 33 records of 8 bytes and 104 bytes of room for the current playlist'
 368, the saved repeats of32 drive files at6 bytes each (192), and32 brightness
 preferences at5 bytes each (160), followed by128 external exclusion records at5 bytes
 each (640). Positions retain all32 bits. With it
-the target file takes 130,965 bytes, below 131,072. The clocks between the animations add
+the target file takes 131,045 bytes, below 131,072. The clocks between the animations add
 no block: their settings, their counts, the paused turn and the key and the place of their
 order are fields of the core object, and the order is a permutation computed from its key. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
@@ -1051,6 +1235,7 @@ repeated exactly.
 | `odrig_host shuffle KEY COUNT` | Prints on one line the permutation of 0 to COUNT - 1, 1 to 65,536, that the 32-bit KEY draws, as the player orders the clocks of its breaks: the place of each index in turn. The suite compares it with the twin `clock_shuffle` of `tests/core/support.py`. |
 | `odrig_host decode --batch` | The same for any number of files on standard input. |
 | `odrig_host decode --slice BYTES FILE`, `decode --slice BYTES --batch` | The same, with the decoder settling a defect in slices of `BYTES` bytes, not of 32,768: it is called again while it gives `pending`, and `pending <calls>`, how many calls gave it, comes before the last line. |
+| `odrig_host decode --taken FILE`, `decode --taken --batch` | The same without the `frame` lines: after each call of the decoder for a record or for the end, `next` or `finish`, one line `taken <bytes> <charge>`, the bytes of the body the call took and the charge the check of an upload gives it, with ` pending` at its end for a call that gave `pending`. A text or a clock has no such line. |
 | `odrig_host inflate` | Decodes standard input as one raw DEFLATE stream with the core's decoder. Prints `data <hex>` and `left <n>`, the number of bytes of input after the stream; or `rejected <reason>`. |
 | `odrig_host inflate --batch` | The same for any number of streams on standard input. |
 | `odrig_host reasons` | Prints every reason name the core can report, one on a line. |
@@ -1090,6 +1275,7 @@ leg; and `ready`.
 | `--trace-files` | Prints `open <name> <result>` for every call of `open`. |
 | `--trace-reads` | Prints `read <name> <bytes>` for every call of `close`: how many bytes of the file `read` gave since it was opened. |
 | `--trace-calls` | Prints `call <bytes>` after every `poll` and every command: how many bytes `read` and `read_at` gave during that call of the core. |
+| `--trace-check` | Prints `check <pace> <debt> <fell>` after the `data` lines of a refresh at which an upload was being checked when the refresh began: the pace and the debt of the check after that refresh, and 1 when its pace has fallen during the check, else 0. |
 | `--about TEXT` | The host has `about`, which gives this text. |
 | `--check-first` | The check after the start takes all its steps before the startup lines are printed, with no refresh between them. The session then begins as a core that has run for a while: every file is read. |
 | `--storage BYTES` | The total space `space` reports, 0 to 4,294,967,295. The free space is the total less the sizes of the files, each rounded up to 4,096, and not below 0. Without it the total is 13,500,416, the size of the board's storage on its bigger layout. |
@@ -1105,14 +1291,19 @@ leg; and `ready`.
 | `--drive DIR` | The host has a drive, plugged in at the start: its list is the animation files of the folder `DIR/odrig` and of its sub-folders to three levels, depth first by the rules of `drive_list`, each named by its path from `odrig`. The core then reads them as `drive/0`, `drive/1` and so on. With `--check-first` they are read before the startup lines too. |
 | `--drive-pulled` | With `--drive`: no drive is plugged in at the start. |
 | `--command-read-fails FILE OFFSET` | `read_at` returns -1 for that file at or after that offset when it is called inside a command, as `read` and `upload expect` call it; the checks read the file whole. |
+| `--read-at-fails-first FILE N` | The first N calls of `read_at` for that file return -1, wherever they are made; the calls after them read it. |
 | `--drive-read-fails NAME OFFSET` | With `--drive`: `read` fails at that offset of the drive's file of that name. `read_at` is not touched, so the check finds the file sound and the player meets the fault. |
 | `--drive-read-only` | With `--drive`: `drive_writable` says 0, and every storage call on a name of the drive fails. |
+| `--no-folders` | The host has no `make_folder`: it makes neither a folder of the drive nor a numbered folder of its own storage. |
 | `--trace-drive` | With `--drive`: prints `drive list <count>` for every `drive_list` and `drive bind <place> <name>` for every `drive_bind`. |
 | `--trace-read-at` | Prints `read_at <name> <offset> <count>` for every `read_at`: the name, where it read from and how many bytes it gave. |
 
-A storage call is one of `write_open`, `write`, `write_close`, `rename` and `remove`.
-`space` and `read_at` are not counted and not traced. The storage functions work on the
-folder of a session, and for `session --batch` on the files held in memory. A file that
+A storage call is one of `write_open`, `write`, `write_close`, `rename`, `remove` and
+`make_folder`. `space` and `read_at` are not counted and not traced. The storage functions
+work on the folder of a session, and for `session --batch` on the files held in memory;
+a numbered folder of the storage is a sub-folder of it, or a set of names in memory, and a
+file goes into one only when it was made. `space` counts two blocks for each numbered
+folder and the files in it. A file that
 was being written when the program ends stays with the bytes written so far.
 
 The host hands out every file in pieces of changing sizes, none above 512 bytes, through
@@ -1147,6 +1338,11 @@ existing pixel memory. Poll uses the normal palette, brightness and LED mapping
 on that picture while ordinary show progression is paused. Exit restarts the
 saved animation; cycles retain the current entry as their first resumed turn.
 The mode is transient and no show file changes. There is no runtime allocation.
+Entry waits neither for the check after a start nor for an open upload: the diagonal
+is decoded through playback's own file and decoder and a snake is drawn, while both
+checks use the checker's. An open upload goes on under the test; an item it adds or a
+file it replaces changes the show, and `player_item_added` plays nothing until the
+test's end, which plays the saved selection, else the playlist's first animation.
 
 The test of a snake is drawn, not decoded, as a clock is: at each refresh the core clears
 the pixel buffer, three bytes a pixel and no palette, and lights a white block of 3 x 3
@@ -1272,18 +1468,20 @@ The core reads it at the start, once the show is read and after `order.txt`, thr
 second source, and keeps the path and the time: the root is current until the tree is
 known, and plays in the folder's place meanwhile; when the tree is built the folder of the
 path is current again, or the root when the card has no playlist of that path, with a
-fresh window, saved as such. The removal of the current folder's last file makes the root
-current the same way.
+fresh window, saved as such. A folder of the board's own storage is found again the same
+way, and while `folders.txt` cannot be read its path stays saved, the root playing in its
+place. The removal of the current folder's last file makes the root current the same way.
 
 The file is written as `playlist.part`, one `write` of at most 130 bytes from a buffer on
 the stack, `write_close` and `rename`, when the current playlist changes by a choice or by
-the rotation, and at most once in 900,000 ms while the tree has a folder, from the
-refresh, so that a restart loses at most 15 minutes of the window. A write while an upload
-receives its bytes, or while a rebuild holds a page open, waits for the next refresh that
-is free. Nothing is written while the tree has no folder and no file exists: a show
-without a card, or with a flat card, makes no storage call more than before. When the
-host fails the part is removed and nothing is refused. The start probes `playlist.part`
-with `read_at` and removes it when it is there, as it does `order.part`.
+the rotation, and at most once in 900,000 ms while the board's own storage or the card has
+a folder, from the refresh, so that a restart loses at most 15 minutes of the window. A
+write while an upload receives its bytes, or while a rebuild holds a page open, waits for
+the next refresh that is free. Nothing is written while neither has a folder and no file
+exists: a show without folders of its own, without a card or with a flat card, makes no
+storage call more than before. When the host fails the part is removed and nothing is
+refused. The start probes `playlist.part` with `read_at` and removes it when it is there,
+as it does `order.part`.
 
 ## Saved animation brightness
 
@@ -1301,8 +1499,8 @@ values/presence use existing item padding/flags.32 external values use 5-byte
 records beside compact 6-byte repeat records with full 32-bit positions/16-bit counts.
 The independent 128-byte reader preserves the 512-byte stack-frame compiler bound.
 
-The measured 100-item Windows host requests 130965 bytes with a drive,21 allocation
-blocks, and the Core object is 3712 bytes. Existing 128 KiB/4096 limits remain unchanged;
+The measured 100-item Windows host requests 131045 bytes with a drive,21 allocation
+blocks, and the Core object is 3792 bytes. Existing 128 KiB/4096 limits remain unchanged;
 no allocation is added per frame. The store streams and verifies a part before
 publishing it, keeps prior usable cache after failed updates, and discards partial
 startup application if the settings file is damaged. `dimming` is additive status;
@@ -1328,3 +1526,58 @@ selection only after relevant changes. No per-frame allocation or additional blo
 is introduced. `status` adds explicit mode/reason metadata within its unchanged
 1,024-byte bound; escaped host descriptions use at most160 bytes, while ordinary
 127-byte ASCII descriptions and supported full file/folder paths remain intact.
+
+## Civil time
+
+`civil_time.cpp` owns a boot-local UTC anchor independent of the player clock.
+The accepted epoch advances using clamped monotonic elapsed milliseconds; reset
+never restores it. The supported range is 2000 through 2099. The persisted phone
+zone snapshot supplies its IANA name, offsets and exact UTC transition instants;
+only crossing a cached transition reads its rules during normal playback.
+
+The zone grammar and commands are in [commands.md](commands.md#board-time). A
+complete snapshot fits the existing 1500-byte chunk and 2048-byte command line.
+Publication verifies the complete staged bytes before atomic rename. Missing or
+damaged rules never supply invented time. Routine clock sets write no storage.
+The combined clock and schedule state uses56 Core bytes; the target with a drive takes131,045 bytes in
+21 blocks, below the unchanged128 KiB bound. No allocation occurs after startup,
+and the512-byte compiler frame bound remains enabled.
+
+## Daily LED schedule
+
+The civil-time state also holds minute-resolution daily On/Off times, enablement,
+a three-state manual mode and its settings revision/error. Settings are loaded
+before the animation files, and the saved manual mode is applied after ordinary
+player initialization. Clock/zone validity is still boot-local.
+
+The scheduler evaluates before replies and before LED rendering, including exact
+boundaries, overnight windows, DST skips/repeated hours and time corrections. It
+changes only LED visibility: playback and brightness continue independently. No
+ordinary refresh reads zone rules unless their cached transition was crossed;
+no tick or boundary writes timing settings.
+
+The atomic grammar, revision guards and error semantics are specified in
+[commands.md](commands.md#daily-schedule-and-manual-control). Manual control is
+immediate even on a persistence failure, which remains explicitly observable.
+The current target takes131,045 host bytes with a drive in21blocks, and Core is
+3792 bytes. The existing128KiB/4096-byte limits and512-byte frame guard remain.
+
+## Output rotation
+
+`rotation` reads installation-wide square output orientation; `rotation set REV DEGREES`
+atomically saves 0/90/180/270 clockwise degrees to `rotation.txt`. Missing data means0;
+malformed/unreadable data reports an error and uses0 without invalidating a show.
+The existing spare state bits hold orientation, without another canvas allocation.
+Rendering permutes composed samples before physical mapping and miniature averaging.
+Physical mapping diagnostics remain unrotated and refuse orientation changes.
+Source files, previews, timing, brightness and current limits keep their behavior.
+Orientation is independent of installed content. Missing or invalid mapping/show
+files and unavailable animation files do not disable its read, save or startup
+restore; the installation is always60x60. Content validation still controls playback.
+See [the command contract](commands.md#square-output-rotation).
+
+Uncertain clock settings use one8-byte retry timestamp and a packed flag. A startup
+open probe distinguishes authoritative absence before independent reads parse the
+file. Unreadable policy stays dark with effective Only and an explicit clock_error;
+independent reads retry at most once a second. No allocation happens after startup,
+and the131072-byte arena,4096-byte Core and512-byte frame limits are unchanged.

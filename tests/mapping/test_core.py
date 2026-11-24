@@ -86,7 +86,9 @@ class MappingCommands(unittest.TestCase):
     def test_test_is_idempotent_does_not_mutate_show_and_respects_power(self):
         run,left=support.start_and_keep(files(),[support.line(1000,'mapping test on'),support.line(1001,'mapping test on'),support.line(1002,'off'),'poll 1020',support.line(1021,'remove 1'),support.line(1022,'mapping get'),support.line(1023,'mapping test off'),support.line(1024,'mapping test off')])
         self.assertEqual(answers(run)[3],dict(ok=False,error='busy'))
-        self.assertTrue(answers(run)[4]['test']); self.assertEqual(left,files())
+        self.assertTrue(answers(run)[4]['test'])
+        self.assertEqual({name: data for name, data in left.items() if name != 'schedule.txt'}, files())
+        self.assertEqual(left.get('schedule.txt'), b'odrig-schedule 1\n1 1080 360 2\n')
         produced,_=refreshes([l for l in run.lines if l.startswith(('refresh ','data ','idle '))])
         self.assertTrue(all(not any(data) for data in produced[0][1].values()))
 

@@ -1,2 +1,2 @@
 // Read-only preparation; frame bodies remain encoded.
-export {prepareReady as prepare} from "./convert.js";
+export {prepareReady as prepare, inspectReady as inspect} from "./convert.js";

@@ -151,10 +151,6 @@ class TheSnakeTests(unittest.TestCase):
     def test_its_entry_is_refused_as_the_diagonals_is(self):
         run = support.start(support.example_show(), [support.line(T0, "mapping test snake 1")])
         self.assertEqual(answers(run), [{"ok": False, "error": "bad-argument"}])
-        run = support.start(files(), [support.line(T0, "mapping test snake 1")], check_first=False)
-        self.assertEqual(answers(run), [{"ok": False, "error": "busy"}])
-        upload = support.start(files(), [support.line(T0, "upload begin 99 new.odrg 100"), support.line(T0 + 1, "mapping test snake 1")])
-        self.assertEqual(answers(upload)[1], {"ok": False, "error": "busy"})
         broken = {**files(), "show.json": "{"}
         run = support.start(broken, [support.line(T0, "mapping test snake 1")])
         self.assertEqual(answers(run), [{"ok": False, "error": "show-invalid"}])
@@ -165,6 +161,121 @@ class TheSnakeTests(unittest.TestCase):
         self.assertEqual(answers(run)[:-1], [{"ok": False, "error": "bad-argument"}] * len(lines))
         self.assertFalse(answers(run)[-1]["test"])
         self.assertEqual(left, files())
+
+
+def swapped_pins():
+    pins = PINS.copy()
+    pins[0], pins[19] = pins[19], pins[0]
+    return pins
+
+
+def mapping_save(pins):
+    return f"mapping set {REVISION} " + ",".join(map(str, pins))
+
+
+class TestsWheneverPlayDoes(unittest.TestCase):
+    """A test starts while the check after the start goes on and while an upload is open,
+    as an animation does; the upload goes on to its end under the test."""
+
+    assert_snake = TheSnakeTests.assert_snake
+
+    def upload_under_a_test(self, number, name, data, before, test):
+        """The lines that play `before`, open an upload, start a test, send the rest of the
+        upload and poll until its check is done, then end it; the time after the end."""
+        begin, *pieces = support.upload_lines(number, name, data)
+        script = [f"poll {T0}"]
+        if before is not None:
+            script.append(support.line(T0 + 1, f"play {before}"))
+        script += [f"poll {T0 + 20}", support.line(T0 + 21, begin), support.line(T0 + 22, test)]
+        script += [support.line(T0 + 23, piece) for piece in pieces]
+        script += [f"poll {T0 + 20 * k}" for k in range(2, 101)]
+        script.append(support.line(T0 + 2001, support.upload_end(data)))
+        return script, len(pieces)
+
+    def test_a_test_and_a_mapping_save_are_taken_while_the_check_after_the_start_goes_on(self):
+        swapped = swapped_pins()
+        script = [f"poll {T0}", support.line(T0 + 1, "status"), support.line(T0 + 2, "mapping test on"), support.line(T0 + 3, "mapping test snake 6"),
+                  support.line(T0 + 4, mapping_save(swapped))]
+        script += [f"poll {T0 + 20 * k}" for k in range(1, 501)]
+        script += [support.line(T0 + 10001, "status"), support.line(T0 + 10002, "mapping get")]
+        run = support.start(files(), script, check_first=False)
+        replies = answers(run)
+        self.assertEqual((replies[0]["readiness"], replies[0]["to_check"] > 0), ("checking", True))
+        self.assertEqual(replies[1:4], [{"ok": True}] * 3)
+        after, mapping = replies[4:]
+        self.assertNotEqual(after["readiness"], "checking")
+        self.assertEqual((after["to_check"], after["playing"], after["animation"]), (0, None, None))
+        self.assertEqual((mapping["test"], mapping["snake"], mapping["pins"]), (True, 6, swapped))
+        self.assert_snake(pictures(run)[-1], 6, 20 * 500)
+
+    def test_an_upload_open_when_a_test_starts_ends_under_it_and_the_tests_end_resumes_what_played(self):
+        data = support.clip(11, 60, 60, (20, 20, 20))
+        script, pieces = self.upload_under_a_test(3, "new.odrg", data, 2, "mapping test snake 4")
+        script += [f"poll {T0 + 2020}", support.line(T0 + 2021, "status"), support.line(T0 + 2022, "list"), support.line(T0 + 2023, "mapping test off"),
+                   f"poll {T0 + 2040}", support.line(T0 + 2041, "status")]
+        run, left = support.start_and_keep(files(), script)
+        replies = answers(run)
+        self.assertEqual(replies[0], {"ok": True})
+        self.assertEqual(replies[2], {"ok": True})
+        self.assertTrue(all(reply["ok"] for reply in replies[3:3 + pieces]), replies[3:3 + pieces])
+        self.assertEqual(replies[3 + pieces], {"ok": True})
+        during, listed, stopped, after = replies[4 + pieces:]
+        self.assertEqual((during["playing"], during["animation"]), (None, None))
+        self.assertEqual([item["id"] for item in listed["items"]], [1, 2, 3])
+        self.assertEqual(stopped, {"ok": True})
+        self.assertEqual((after["playing"], after["animation"]), ("all", 2))
+        self.assertEqual(left["new.odrg"], data)
+        self.assert_snake(pictures(run)[-2], 4, 2020)
+
+    def test_an_upload_under_a_test_that_replaces_the_animation_that_played_plays_it_at_the_tests_end(self):
+        data = support.clip(12, 60, 60, (20, 20))
+        script, pieces = self.upload_under_a_test(2, "dvd.odrg", data, 2, "mapping test on")
+        script += [f"poll {T0 + 2020}", support.line(T0 + 2021, "status"), support.line(T0 + 2022, "mapping test off"), f"poll {T0 + 2040}", support.line(T0 + 2041, "status")]
+        run, left = support.start_and_keep(files(), script)
+        replies = answers(run)
+        self.assertEqual(replies[3 + pieces], {"ok": True})
+        during, _, after = replies[4 + pieces:]
+        self.assertEqual((during["playing"], during["animation"]), (None, None))
+        self.assertEqual((after["playing"], after["animation"]), ("all", 2))
+        self.assertEqual(left["dvd.odrg"], data)
+
+    def test_when_nothing_played_the_first_animation_uploaded_under_a_test_plays_at_its_end(self):
+        empty = {"mapping.json": files()["mapping.json"], "show.json": support.show_text([], brightness=32)}
+        data = support.clip(13, 60, 60, (20, 20))
+        script, pieces = self.upload_under_a_test(1, "first.odrg", data, None, "mapping test snake 1")
+        script += [f"poll {T0 + 2020}", support.line(T0 + 2021, "status"), support.line(T0 + 2022, "mapping test off"), f"poll {T0 + 2040}", support.line(T0 + 2041, "status")]
+        run = support.start(empty, script)
+        replies = answers(run)
+        self.assertEqual(replies[1], {"ok": True})
+        self.assertEqual(replies[2 + pieces], {"ok": True})
+        during, _, after = replies[3 + pieces:]
+        self.assertEqual((during["playing"], during["animation"]), (None, None))
+        self.assertEqual((after["playing"], after["animation"]), ("all", 1))
+        self.assert_snake(pictures(run)[-2], 1, 2020)
+
+    def test_an_upload_cancelled_under_a_test_changes_nothing_and_the_test_shows_on(self):
+        source = files()
+        data = support.clip(14, 60, 60, (20, 20))
+        begin, first, *_ = support.upload_lines(3, "new.odrg", data)
+        script = [f"poll {T0}", support.line(T0 + 1, begin), support.line(T0 + 2, "mapping test snake 2"), support.line(T0 + 3, first), support.line(T0 + 4, "upload cancel"),
+                  f"poll {T0 + 20}", support.line(T0 + 21, "mapping get"), support.line(T0 + 22, "list")]
+        run, left = support.start_and_keep(source, script)
+        replies = answers(run)
+        self.assertEqual((replies[1], replies[2]["ok"], replies[3]), ({"ok": True}, True, {"ok": True}))
+        self.assertEqual((replies[4]["test"], replies[4]["snake"]), (True, 2))
+        self.assertEqual([item["id"] for item in replies[5]["items"]], [1, 2])
+        self.assertEqual(left, source)
+        self.assert_snake(pictures(run)[-1], 2, 20)
+
+    def test_what_a_test_refuses_stays_refused_and_a_mapping_save_waits_for_an_open_upload(self):
+        swapped = swapped_pins()
+        script = [support.line(T0, "mapping test on"), support.line(T0 + 1, "catalog rebuild internal"), support.line(T0 + 2, "upload begin 3 new.odrg 100"),
+                  support.line(T0 + 3, "mapping test off"), support.line(T0 + 4, "upload begin 3 new.odrg 100"), support.line(T0 + 5, mapping_save(swapped)),
+                  support.line(T0 + 6, "upload cancel"), support.line(T0 + 7, mapping_save(swapped))]
+        replies = answers(support.start(files(), script))
+        busy = {"ok": False, "error": "busy"}
+        self.assertEqual(replies[:4], [{"ok": True}, busy, busy, {"ok": True}])
+        self.assertEqual((replies[4]["ok"], replies[5], replies[6], replies[7]), (True, busy, {"ok": True}, {"ok": True}))
 
 
 if __name__ == "__main__":

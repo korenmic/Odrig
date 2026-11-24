@@ -3,21 +3,27 @@
 
 import {playRow, rows, shown, spaceKnown, storage} from "../reading.js";
 
-export default async function (app) {
-  const settings = app.settings;
-  await shown(app, settings.rows);
-  app.press("Upload");
-  await app.until(() => app.shown() === "upload" && app.text("upload-space") !== "-", "Upload with the space");
-  const blob = await (await fetch(`/m/${settings.file}`)).blob();
+// Gives the Upload screen the file of the settings and makes the animation of it.
+async function make(app) {
+  const file = app.settings.file;
+  const blob = await (await fetch(`/m/${file}`)).blob();
   const view = app.frame.contentWindow;
   const handed = new view.DataTransfer();
-  handed.items.add(new view.File([blob], settings.file, {type: blob.type}));
+  handed.items.add(new view.File([blob], file, {type: blob.type}));
   const field = app.byId("media");
   field.files = handed.files;
   field.dispatchEvent(new view.Event("change", {bubbles: true}));
   await app.until(() => app.text("media-name") !== null, "the name of the file");
   app.press("Make the animation");
   await app.until(() => app.text("made-facts") !== null, "the animation", 30000);
+}
+
+export default async function (app) {
+  const settings = app.settings;
+  await shown(app, settings.rows);
+  app.press("Upload");
+  await app.until(() => app.shown() === "upload" && app.text("upload-space") !== "-", "Upload with the space");
+  await make(app);
   // The named storage choices, including absence, come from the same dropdown.
   const store = app.text("store-on") === null ? null
     : [...app.byId("upload-storage").options].map(option => `${option.textContent}${option.selected ? " (chosen)" : ""}${option.disabled ? " (disabled)" : ""}`);
@@ -35,6 +41,42 @@ export default async function (app) {
     await app.until(() => app.text("uploading") === "Cancelled.", "the upload cancelled", 10000);
     seen.uploading = app.text("uploading");
     seen.sending = [];
+  } else if (settings.cancel === "checking") {
+    // Cancel while the installation checks the file; the line is read again a moment later.
+    await app.until(() => (app.text("uploading") || "").startsWith("Checking"), "the check under way", 10000);
+    seen.checking = app.text("uploading");
+    app.press("Cancel");
+    await app.until(() => app.text("uploading") === "Cancelled.", "the upload cancelled", 10000);
+    seen.uploading = app.text("uploading");
+    await app.sleep(1500);
+    seen.later = app.text("uploading");
+    seen.sending = [];
+  } else if (settings.readdress === true) {
+    // The address is used again while the reply to the last piece is on its way, which ends
+    // the upload. The line, hidden then, is read as it is for three seconds; then the
+    // animation is made and uploaded again, and every text of its line is read.
+    await app.until(() => /Sending: [0-9]+%, /.test(app.text("uploading") || ""), "the upload under way", 10000);
+    await app.sleep(500);
+    const client = await app.frame.contentWindow.eval('import("/client.js")');
+    client.begin();
+    seen.ended = app.raw("uploading");
+    seen.afterwards = [];
+    for (let tick = 0; tick < 6; tick += 1) {
+      await app.sleep(500);
+      seen.afterwards.push(app.raw("uploading"));
+    }
+    await make(app);
+    await app.until(() => app.text("upload-made") !== null && !app.byId("upload-made").disabled, "the upload button again", 10000);
+    app.press("Upload to the installation");
+    const progress = [];
+    await app.until(() => {
+      const now = app.text("uploading");
+      if (now !== null && progress[progress.length - 1] !== now) {
+        progress.push(now);
+      }
+      return app.text("message-text") !== null;
+    }, "a message after the second upload", 30000);
+    seen.sending = progress;
   } else {
     if (settings.hide === true) {
       // The app leaves the screen of the phone while it uploads, and comes back.
@@ -49,15 +91,22 @@ export default async function (app) {
       hidden = false;
       app.doc.dispatchEvent(new Event("visibilitychange"));
     }
+    // Every text of the line, and for each Checking text whether Cancel is shown with it.
     const progress = [];
+    const cancelShown = [];
     await app.until(() => {
       const now = app.text("uploading");
       if (now !== null && progress[progress.length - 1] !== now) {
         progress.push(now);
+        if (now.startsWith("Checking")) {
+          cancelShown.push(app.text("cancel-upload") !== null);
+        }
       }
       return app.text("message-text") !== null;
     }, "a message after the upload", 30000);
     seen.sending = progress;
+    seen.cancelShown = cancelShown;
+    seen.lineHidden = app.text("uploading") === null;
   }
   await app.sleep(1500);
   seen.message = app.text("message-text");

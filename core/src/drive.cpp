@@ -157,7 +157,7 @@ bool index_parse_row(const char *line, uint32_t length, DriveRow &row) {
         !word(line, &at, " ") || !decimal(line, &at, 20, 0xFFFFFFFFFFFFFFFFull, &total_ms) || !word(line, &at, " ")) {
         return false;
     }
-    row.total_ms = drive_length(total_ms);
+    row.total_ms = kept_length(total_ms);
     if (word(line, &at, "frames ")) {
         row.type = kTypeFrames;
     } else if (word(line, &at, "text ")) {

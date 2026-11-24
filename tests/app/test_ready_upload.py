@@ -87,12 +87,12 @@ class ReadyUploads(unittest.TestCase):
         self.assertFalse((folder/'ready.odrg').exists())
         self.assertFalse((drive/'ready.odrg').exists())
 
-    def test_internal_choice_from_folder_visibly_uses_flat_root(self):
+    def test_internal_choice_from_a_card_folder_visibly_uses_the_internal_root(self):
         folder, drive, media, data, emulator = self.card()
         found = support.run('ready-upload', address=f'127.0.0.1:{emulator.port}',
                             settings={'rows': 2, 'path': 'night/deep', 'file': 'ready.odrg', 'store': 'internal'}, media=media).seen
         self.assertEqual(found['destination'], 'Internal /ready.odrg')
-        self.assertIn('flat root', found['reason'])
+        self.assertEqual(found['reason'], 'This upload goes to the root of Internal storage: the explored folder is on the card.')
         self.assertIn('Uploaded as animation', found['message'])
         self.assertEqual((folder/'ready.odrg').read_bytes(), data)
         self.assertFalse((drive/'night/deep/ready.odrg').exists())

@@ -44,6 +44,39 @@ class ClockModes(unittest.TestCase):
         self.assertTrue(status['clock_message'])
         self.assertEqual((self.folder / 'clocks.txt').read_bytes(), b'odrig-clocks 2\nmode between\nmessage on\n')
 
+    def test_the_preferred_storage_is_the_same_line_on_every_transport_and_survives_restart(self):
+        def transports():
+            yield self.emulator.command
+            with support.Lines(self.emulator.tcp) as tcp:
+                yield tcp.ask
+            if support.HAS_SERIAL:
+                with support.Serial(self.emulator.serial) as port:
+                    yield port.ask
+
+        def asked(send, line):
+            return json.loads(send(line))
+        for send in transports():
+            self.assertEqual(asked(send, 'clocks storage sd'), dict(ok=True))
+            self.assertEqual(asked(send, 'clocks storage card'), dict(ok=False, error='bad-argument'))
+            self.assertEqual(asked(send, 'status')['clock_storage'], 'sd')
+        self.assertFalse((self.folder / 'clocks.txt').exists())
+        for number, send in enumerate(transports()):
+            self.assertEqual(asked(send, 'clocks storage internal'), dict(ok=True))
+            self.assertEqual(asked(send, 'status')['clock_storage'], 'internal')
+            if number == 0:
+                self.assertEqual((self.folder / 'clocks.txt').read_bytes(), b'odrig-clocks 3\nmode off\nmessage off\nstorage internal\n')
+        result = support.run_tool('--http', f'127.0.0.1:{self.emulator.port}', 'clocks', 'on')
+        self.assertEqual((result.status, json.loads(result.out), result.err), (0, dict(ok=True), ''))
+        saved = b'odrig-clocks 3\nmode between\nmessage off\nstorage internal\n'
+        self.assertEqual((self.folder / 'clocks.txt').read_bytes(), saved)
+        self.emulator.stop()
+        self.emulator = support.entered(self, support.Emulator(self.folder, '--drive', self.top, tcp_port=0))
+        status = self.emulator.status()
+        self.assertEqual((status['clock_mode'], status['clock_storage']), ('between', 'internal'))
+        result = support.run_tool(*support.line_target(self.emulator), 'clocks', 'storage', 'sd')
+        self.assertEqual((result.status, json.loads(result.out), result.err), (0, dict(ok=True), ''))
+        self.assertEqual((self.folder / 'clocks.txt').read_bytes(), b'odrig-clocks 2\nmode between\nmessage off\n')
+
     def test_only_survives_restart(self):
         self.only()
         self.emulator.stop()

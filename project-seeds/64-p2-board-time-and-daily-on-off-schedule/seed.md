@@ -114,13 +114,13 @@ those animations to show actual time is separate work.
 
 ## Technical Constraints
 
-- Planning only: this request creates a seed, not specs, queued implementation,
-  firmware/APK changes or artifact delivery.
+- The owner now authorizes autonomous S2S, enqueue, implementation, testing and
+  deployment of APK and firmware, with no further permission requests. Choose the
+  exact compatible command forms in the spec and record them in the command list.
 - Reuse the one core, serialized command interface and shared `app/www` for APK
   and emulator. New protocol operations need exact wire forms, capability and
-  reply/error contracts in S2S; obtain the owner's required approval for actual
-  additions to `docs/commands.md` before implementation. The current request
-  authorizes the read/set-time and schedule functionality, not guessed spellings.
+  reply/error contracts in S2S. The owner's autonomous implementation instruction
+  authorizes those in-scope protocol choices; no separate command approval remains.
 - Follow the approved phone-zone/DST policy below; do not silently substitute
   UTC, a hardcoded Israel offset or whatever time WLED happens to have at boot.
 - Keep schedule configuration across resets but never persist clock validity.
@@ -149,9 +149,8 @@ at the next scheduled boundary. An explicit return to scheduling is required.
 ## Open Questions Requiring The Owner
 
 None remain for seed-to-spec. The seed is ready for S2S with zero open product
-questions. Exact wire forms, capability and error contracts are specification work;
-the repository's required owner approval of command additions still applies before
-implementation.
+questions. Exact wire forms, capability and error contracts are specification work
+authorized by the owner's instruction to implement autonomously as the agent sees fit.
 
 ## Definition Of Done
 
@@ -169,5 +168,5 @@ implementation.
    refusal/timeouts and confirmation. Tests prove no per-poll time writes, flash
    write loop, unexpected brightness change or playback restart.
 5. Portable relevant suites and firmware/APK verification pass. Firmware and APK
-   delivery occurs only under a later implementation request; any unperformed
-   physical board/phone checks remain stated openly.
+    delivery is now authorized; any unperformed physical board/phone checks remain
+    stated openly and are never represented as performed.

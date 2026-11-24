@@ -54,8 +54,10 @@ void tree_choose(Core &core, uint32_t folder);
 void tree_find_current(Core &core);
 
 // A level of the drive's tree, as `list` and `order get` give it: the root, 0, which holds
-// the show's items too, or a folder of the tree by its ordinal. The level a position of the
-// playlist is at: 0 for an item of the show, the folder of a file of the drive.
+// the show's items too, an internal folder, kInternalLevel and its number, or a folder of
+// the tree by its ordinal. The level a position of the playlist is at: 0 for an item of the
+// show at the root, the internal folder of one in a folder, the folder of a file of the
+// drive.
 uint32_t level_of(const Core &core, uint32_t position);
 
 // The reply to `order get` and `order get in`: the ids of a level's listed animations in

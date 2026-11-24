@@ -32,7 +32,7 @@ class Content(unittest.TestCase):
         player's. `storage` is what the reference player reports as the total, or None for
         a host that cannot tell; `changeable` whether its storage can be changed."""
         run, left = support.start_and_keep(files, script, options)
-        self.reference = support.ReferencePlayer(files, storage=storage, changeable=changeable)
+        self.reference = support.ReferencePlayer(files, storage=storage, changeable=changeable, trace_check="--trace-check" in options)
         expected = self.reference.run(script)
         # With the option --trace-store the test host prints the storage calls as well.
         printed = [line for line in run.lines if not line.startswith("store ")]
