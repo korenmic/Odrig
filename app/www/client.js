@@ -1481,13 +1481,30 @@ export function switchOff() {
   want("off", () => commands.off());
 }
 
+// A brightness request goes only to the target it was made for, while the link answers and
+// status is fresh; one made for the animation status names goes only while that animation's
+// override is as it was. A save or a removal names its animation by id, and the default is
+// one value for every animation, so a change of the animation playing does not stop them.
 function capturedBrightness(snapshot, carry) {
-  if (snapshot !== null && (snapshot.version !== target || state.link !== "answers" || !state.statusFresh ||
-      state.status?.animation !== snapshot.animation || state.status?.file !== snapshot.file ||
-      (state.status?.dimming?.saved != null) !== snapshot.override)) {
-    throw new commands.Refusal("stale", "brightness");
+  if (snapshot !== null) {
+    const status = state.status;
+    const plays = status?.animation === snapshot.animation && status?.file === snapshot.file;
+    if (snapshot.version !== target || state.link !== "answers" || !state.statusFresh ||
+        (plays && (status?.dimming?.saved != null) !== snapshot.override)) {
+      throw new commands.Refusal("stale", "brightness");
+    }
   }
   return carry();
+}
+
+// What the target keeps for an animation, `saved <id>`, asked for the target of a snapshot.
+export function brightnessSaved(id, snapshot) {
+  return requestOperation("brightness-edit", () => {
+    if (snapshot.version !== target || state.link !== "answers" || !state.statusFresh) {
+      throw new commands.Refusal("stale", "brightness");
+    }
+    return commands.saved(id);
+  });
 }
 
 export function setBrightness(value, snapshot = null) {

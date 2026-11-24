@@ -7,6 +7,9 @@ from . import support
 from .test_clocks import Target as ClocksTarget
 from .test_target import entered
 
+# The line of the file while a gesture on animation 1 lasts after another began to play.
+AWAY = "Animation 1: hello.odrg, no longer playing"
+
 
 class Target(ClocksTarget):
     def __init__(self, test, saved=None, legacy=False, unsupported=False):
@@ -22,6 +25,8 @@ class Target(ClocksTarget):
         self.lose_reply = False
         self.command_seen = threading.Event()
         self.on = True
+        # `saved <id>` answers what the stand-in keeps, or the value named here.
+        self.readback = {}
 
     def status(self):
         code, body = super().status()
@@ -38,6 +43,10 @@ class Target(ClocksTarget):
         return code, json.dumps(reply) + "\n"
 
     def reply(self, line):
+        if line.startswith(b"saved ") and self.answering:
+            number = int(line.split()[1])
+            value = self.readback.get(number, self.saved.get(number))
+            return 200, json.dumps({"ok": True, "brightness": value, "repeat": None, "start": False}) + "\n"
         if line.startswith(b"brightness ") and self.answering:
             if self.refusal:
                 return 200, json.dumps(dict(ok=False, error=self.refusal)) + "\n"
@@ -142,19 +151,86 @@ class BrightnessControls(unittest.TestCase):
         self.assertEqual(seen["other"]["label"], "Default brightness")
         self.assertEqual(target.sent(), [])
 
-    def test_animation_identity_change_cancels_held_and_dirty_edits(self):
-        for act in (dict(slide=70), dict(type="70")):
+    def test_a_held_drag_or_typed_value_stays_with_its_animation_across_a_change(self):
+        for act, end in ((dict(slide=70), dict(release=True)), (dict(type="70"), dict(enter=True))):
             with self.subTest(edit=act):
                 target = Target(self, saved=20)
                 def changed():
                     target.animation, target.file = 2, "dvd.odrg"
-                seen = run(target, [act, dict(step=True, until=dict(file="Animation 2: dvd.odrg", number="128"), look="changed"),
-                    dict(release=True, wait=300)], steps=[changed])
-                self.assertFalse(seen["changed"]["checked"])
-                self.assertEqual(target.sent(), [])
+                seen = run(target, [act, dict(step=True, until=dict(file=AWAY), look="away"),
+                    dict(**end, until=dict(text="Saved 70 for hello.odrg.", file="Animation 2: dvd.odrg"), look="saved")], steps=[changed])
+                away = seen["away"]
+                self.assertEqual((away["number"], away["label"], away["checked"]), ("70", "This animation’s brightness", True))
+                self.assertEqual(target.sent(), ["brightness 1 70 save"])
+                self.assertIn(b"saved 1", [line for _, line in target.stand_in.lines])
+                self.assertEqual((target.saved, target.default), ({1: 70, 2: None}, 128))
+                self.assertEqual((seen["saved"]["number"], seen["saved"]["checked"]), ("128", False))
 
-    def test_save_queued_behind_new_identity_status_is_cancelled_before_sending(self):
+    def test_a_default_drag_across_a_change_stays_an_edit_of_the_default(self):
+        target = Target(self)
+        def changed():
+            target.animation, target.file = 2, "dvd.odrg"
+        seen = run(target, [dict(slide=70), dict(step=True, until=dict(file=AWAY), look="away"),
+            dict(slide=60), dict(release=True, until=dict(file="Animation 2: dvd.odrg", number="60"), wait=300)], steps=[changed])
+        self.assertEqual(seen["away"]["label"], "Default brightness")
+        self.assertEqual((target.default, target.saved), (60, {1: None, 2: None}))
+        self.assertTrue(target.sent())
+        self.assertTrue(all(len(line.split()) == 2 for line in target.sent()), target.sent())
+
+    def test_an_override_drag_across_a_clock_stays_with_its_animation(self):
         target = Target(self, saved=20)
+        def clock():
+            target.animation, target.file = 60003, "clocks/c1.odrg"
+        seen = run(target, [dict(slide=70), dict(step=True, until=dict(file=AWAY)),
+            dict(release=True, until=dict(text="Saved 70 for hello.odrg.", file="Animation 60003: clocks/c1.odrg"), look="saved")], steps=[clock])
+        self.assertEqual(target.sent(), ["brightness 1 70 save"])
+        self.assertEqual((target.saved.get(60003), target.default), (None, 128))
+        self.assertFalse(seen["saved"]["checked"])
+
+    def test_a_refused_save_for_an_animation_no_longer_playing_is_said(self):
+        target = Target(self, saved=20)
+        def changed():
+            target.animation, target.file = 2, "dvd.odrg"
+            target.refusal = "unknown-id"
+        seen = run(target, [dict(slide=70), dict(step=True, until=dict(file=AWAY)),
+            dict(release=True, until=dict(text="Not saved for hello.odrg."), look="refused")], steps=[changed])
+        self.assertEqual(seen["refused"]["said"], "Not saved for hello.odrg. This animation is no longer listed. Read fresh status before trying again.")
+        self.assertEqual((target.sent(), target.saved[1]), (["brightness 1 70 save"], 20))
+
+    def test_a_read_back_that_differs_is_said(self):
+        target = Target(self, saved=20)
+        target.readback = {1: 33}
+        def changed():
+            target.animation, target.file = 2, "dvd.odrg"
+        seen = run(target, [dict(slide=70), dict(step=True, until=dict(file=AWAY)),
+            dict(release=True, until=dict(text="keeps"), look="differs")], steps=[changed])
+        self.assertEqual(seen["differs"]["said"], "hello.odrg keeps 33.")
+        self.assertEqual(target.sent(), ["brightness 1 70 save"])
+
+    def test_a_lost_reply_for_an_animation_no_longer_playing_is_said_and_not_sent_again(self):
+        target = Target(self, saved=20)
+        target.lose_reply = True
+        def changed():
+            target.animation, target.file = 2, "dvd.odrg"
+        def recover():
+            target.answering = True
+        seen = run(target, [dict(slide=70), dict(step=True, until=dict(file=AWAY)),
+            dict(release=True, until=dict(unknown=True)),
+            dict(step=True, until=dict(unknown=False, text="no reply came"), look="said")], steps=[changed, recover])
+        self.assertEqual(seen["said"]["said"], "Brightness for hello.odrg is unknown: no reply came. It is not sent again.")
+        self.assertEqual(target.sent(), ["brightness 1 70 save"])
+
+    def test_a_target_chosen_during_a_drag_takes_nothing_and_says_so(self):
+        first, second = Target(self, saved=20), Target(self, saved=0)
+        seen = run(first, [dict(slide=70),
+            dict(target=second.stand_in.address, until=dict(checked=True, slider=0, disabled=False), look="second"),
+            dict(release=True, wait=400)])
+        self.assertEqual((first.sent(), second.sent()), ([], []))
+        self.assertEqual(seen["second"]["said"], "Not saved for hello.odrg: another installation was chosen.")
+
+    def lagging(self, target):
+        """Steps that make the stand-in play animation 2 from its next status, whose reply comes
+        0.8 s late, and wait until it has been asked: the panel still shows animation 1."""
         reported = threading.Event()
         original = target.status
         def changed_status():
@@ -166,10 +242,25 @@ class BrightnessControls(unittest.TestCase):
             target.status = changed_status
         def waiting():
             self.assertTrue(reported.wait(5))
+        return [arm, waiting]
+
+    def test_a_save_queued_behind_a_change_still_goes_to_its_animation(self):
+        target = Target(self, saved=20)
         seen = run(target, [dict(step=True), dict(step=True), dict(slide=70, release=True),
-            dict(until=dict(file="Animation 2: dvd.odrg", disabled=False, slider=128), wait=1200, look="new")], steps=[arm, waiting])
+            dict(until=dict(file="Animation 2: dvd.odrg", text="Saved 70 for hello.odrg.", disabled=False), look="new")],
+            steps=self.lagging(target))
         self.assertFalse(seen["new"]["checked"])
-        self.assertEqual(target.sent(), [])
+        self.assertEqual(target.sent(), ["brightness 1 70 save"])
+        self.assertEqual(target.saved, {1: 70, 2: None})
+
+    def test_a_press_while_the_panel_still_shows_the_animation_that_left_saves_for_it(self):
+        target = Target(self)
+        seen = run(target, [dict(step=True), dict(step=True), dict(tap=True),
+            dict(until=dict(file="Animation 2: dvd.odrg", text="Saved 128 for hello.odrg."), look="saved")],
+            steps=self.lagging(target))
+        self.assertFalse(seen["saved"]["checked"])
+        self.assertEqual(target.sent(), ["brightness 1 128 save"])
+        self.assertEqual(target.saved, {1: 128, 2: None})
 
     def test_refusal_keeps_confirmed_preference(self):
         target = Target(self, saved=20)

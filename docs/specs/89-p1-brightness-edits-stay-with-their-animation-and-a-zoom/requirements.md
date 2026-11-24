@@ -63,8 +63,9 @@ Override for this animation to keep a value for the animation playing.`
 file:
 
 - another target chosen: `Not saved for <file>: another installation was chosen.`;
-- status not fresh or the app hidden when it ends: `Not saved for <file>: the
-  installation did not answer.`;
+- status no longer fresh, or the app hidden, while it lasts or when it ends, as seed 58
+  drops a draft held through uncertainty: `Not saved for <file>: the installation did not
+  answer.`;
 - a refusal: `Not saved for <file>.` followed by the text the panel gives that refusal
   today;
 - a lost or unreadable reply: `Brightness for <file> is unknown: no reply came. It is not

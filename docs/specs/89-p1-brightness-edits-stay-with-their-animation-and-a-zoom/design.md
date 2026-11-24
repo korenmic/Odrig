@@ -45,8 +45,9 @@ and `override` is `status.dimming?.saved != null`.
 
 `draw` while a gesture lasts:
 
-- When `client.targetVersion()` differs from `bound.version`, the gesture ends at once
-  without being applied (requirement 2.3).
+- When `client.targetVersion()` differs from `bound.version`, or status is no longer fresh,
+  the gesture ends at once without being applied, its line kept over the panel's next move
+  (requirement 2.3); a held draft so never outlives uncertainty, as seed 58 has it.
 - Otherwise nothing of the gesture changes: the label follows `bound.override`, the line of
   the file is `Animation <bound.animation>: <bound.fileText>`, followed by `, no longer
   playing` when status names another animation or file, and the slider and the field keep

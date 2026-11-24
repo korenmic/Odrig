@@ -23,7 +23,7 @@ Rules for every task:
 - Code and tests state what they do now: no comment about seeds, tasks, dates or earlier
   versions.
 
-- [ ] 1. A gesture stays with its animation
+- [x] 1. A gesture stays with its animation
   - Set `"state": "in_progress"` in
     `project-seeds/89-p1-brightness-edits-stay-with-their-animation-and-a-zoom/state.json`.
   - `tests/app/test_brightness.py`: the stand-in answers `saved <id>`, can answer another
