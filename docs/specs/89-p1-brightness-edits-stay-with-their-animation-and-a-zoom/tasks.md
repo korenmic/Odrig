@@ -73,7 +73,7 @@ Rules for every task:
   - Suites: the panel's modules, onboarding.
   - Requirements: 8.2
 
-- [ ] 5. The pages
+- [x] 5. The pages
   - `docs/android-app.md`: "Saved animation brightness controls" and the panel's
     description at the top of the page, as the design has them.
   - Entries at the end of `docs/drifts.md` for the design's decisions.

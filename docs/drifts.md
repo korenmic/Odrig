@@ -15561,3 +15561,112 @@ The 411 is such an answer, and it is unchanged. A connection that ends inside th
 body gets no answer, as on `POST /odrig`.
 
 **Resolution.** `emulator/httpd.py`, `tests/emulator/test_http.py`.
+
+## Seed 89: the branch it is built on
+
+**Question.** The seed says it is built on `master`, as seed 58 is. Where is it built?
+
+**Answer.** On `seed-87-live-mirror`, the newest tip of the stack on `master` (pull request
+#68 on pull request #63's branch), with `master`'s commit of the seed merged in, as the
+owner asked on 2026-11-24 for its pull request. The panel's code there is `master`'s with
+the line of the file written by `playingFile`, so little separates the two.
+
+**Resolution.** The branch `seed-89-brightness-edits-and-zoom`.
+
+## Seed 89: how wide the zoom's bar is
+
+**Question.** The seed puts the zoom's bar "as wide as the slider's row" and its words
+beside it. Does the bar span the whole row, or the slider?
+
+**Answer.** It has the slider's edges, and its words stand where `Override for this
+animation` stands below them: each pin then sits over the end of the slider it sets, and
+the two rows keep one layout at every width.
+
+**Resolution.** `app/www/index.html`, `app/www/style.css`, `tests/app/test_look.py`.
+
+## Seed 89: confirming a save for an animation that no longer plays
+
+**Question.** Status confirms a save by `dimming.saved`, which describes the animation
+playing. What confirms a save for the animation a gesture was bound to once another plays?
+
+**Answer.** `saved <id>`, which reports what the installation keeps for an animation of the
+show or of the card, playing or not; status still confirms a save while it names the
+animation. The panel says `Saved <value> for <file>.` only after that read-back.
+
+**Resolution.** `app/www/screens/brightness.js`, `app/www/client.js`.
+
+## Seed 89: what ends a gesture before its end
+
+**Question.** A change of the animation playing no longer ends a gesture. What does?
+
+**Answer.** A change of target, and status that stops being fresh: either ends the gesture
+at once, unapplied, with its line kept over the panel's next move. The second keeps seed
+58's rule that a draft held through uncertainty is dropped, not sent after recovery, which
+requirement 2.3 now says too. The app hidden ends it the same way.
+
+**Resolution.** `app/www/screens/brightness.js`, `docs/specs/89-*/requirements.md`.
+
+## Seed 89: when the hold begins
+
+**Question.** The panel takes no new gesture for one second after it moves to another
+animation. Is the first status after a start, a reload or a change of target such a move?
+
+**Answer.** No. The hold begins only when the panel moves from an animation it showed, with
+an id and a file, to another of the same target, by status or at the end of a gesture.
+Without that, every tap at the start of the app would wait a second for nothing.
+
+**Resolution.** `app/www/screens/brightness.js`.
+
+## Seed 89: how the zoom is kept
+
+**Question.** Under what name and in what form does the app keep the zoom on the phone?
+
+**Answer.** `odrig.brightness-zoom` in the storage of the web view, as `odrig.panel`, its
+value `<start> <end>`, two whole numbers with the first below the second and the second at
+most 255. Anything else, or a storage that throws, is 0 to 255 for that run, and nothing is
+said.
+
+**Resolution.** `app/www/zoom.js`.
+
+## Seed 89: the zoom's two pins
+
+**Question.** How are two pins on one bar made, and how do the tests measure them?
+
+**Answer.** As two range inputs over each other, which take no pointer themselves while
+their thumbs do; each thumb is a touch area of 48 by 48 pixels around a visible disc. When
+the pins touch, the one that can move away is on top: `Start` when both are in the upper
+half of 0 to 255, `End` otherwise. Their arrow keys are the browser's own, which give the
+same `input` events the tests send. The tests of the look measure the two as one control,
+the bar they share, since a control's distance from another is measured between controls
+a finger tells apart.
+
+**Resolution.** `app/www/index.html`, `app/www/style.css`, `app/www/screens/brightness.js`,
+`tests/app/page/scenarios/look.js`.
+
+## Seed 89: a press of the box across a change
+
+**Question.** The seed asks for a press of the box that spans a change of animation against
+the real emulator. How long does a press last?
+
+**Answer.** No time: its case is a press while the panel still shows the animation that has
+just left, before the next status arrives. The stand-in of the app's suite delays that
+status and proves it; the real emulator proves a drag and typed digits across the end of a
+turn and a drag into a clock break.
+
+**Resolution.** `tests/app/test_brightness.py`.
+
+## Seed 89: the panel's lines
+
+**Question.** What exactly does the panel say?
+
+**Answer.** `Saved <value> for <file>.`, `Removed the saved brightness of <file>.`, `The
+default, <value>, is for every animation without its own brightness, until the
+installation starts again. Tick Override for this animation to keep a value for the
+animation playing.`, `Not saved for <file>: another installation was chosen.`, `Not saved
+for <file>: the installation did not answer.`, `Not saved for <file>.` followed by the text
+of the refusal, `Brightness for <file> is unknown: no reply came. It is not sent again.`,
+`<file> keeps <value>.` or `<file> keeps no saved brightness.`, `<value> is above the zoom
+<start> to <end>.` or `below`, and `Zoom <start> to <end>`; `<file>` is the file as the
+panel showed it.
+
+**Resolution.** `app/www/screens/brightness.js`, `app/www/zoom.js`.
