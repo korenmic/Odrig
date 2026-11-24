@@ -48,7 +48,7 @@ Rules for every task:
   - Suites: the panel's modules, onboarding.
   - Requirements: 2.2, 3.1, 3.2, 3.3, 3.4, 7.2, 8.1
 
-- [ ] 3. The brightness zoom
+- [x] 3. The brightness zoom
   - `tests/app/page/scenarios/zoom-kept.js` and its test; the zoom acts and `look` of
     `tests/app/page/scenarios/brightness.js`; the zoom tests of the design;
     `tests/app/page/scenarios/look.js`'s `measure`; the layout tests of `test_look.py` and

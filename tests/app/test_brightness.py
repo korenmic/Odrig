@@ -378,6 +378,11 @@ class BrightnessControls(unittest.TestCase):
                 self.assertLessEqual(box["right"], size[0])
                 slider = next(control for control in seen["controls"] if control["what"] == "level")
                 self.assertGreater(min(box["bottom"], slider["bottom"]), max(box["top"], slider["top"]))
+                zoom = next(control for control in seen["controls"] if control["what"] == "level-zoom")
+                self.assertGreaterEqual(zoom["bottom"] - zoom["top"], 48 - 0.01)
+                self.assertGreaterEqual(zoom["left"], 0)
+                self.assertLessEqual(zoom["right"], size[0])
+                self.assertLessEqual(zoom["bottom"], slider["top"])
 
     def test_real_emulator_capture_other_controller_and_persistence_on_reload(self):
         folder = entered(self, emulator_support.demo_show())
@@ -392,3 +397,57 @@ class BrightnessControls(unittest.TestCase):
         self.assertEqual(seen["other"]["slider"], 0)
         self.assertEqual(seen["default"]["number"], "83")
         self.assertEqual((folder / "brightness.txt").read_bytes(), b"odrig-brightness 1\n")
+
+
+class Zoom(unittest.TestCase):
+    """The brightness zoom: two pins that set the range the slider moves through, kept on the
+    phone and never sent."""
+
+    def test_the_zoom_sets_the_range_the_slider_moves_through(self):
+        target = Target(self)
+        seen = run(target, [dict(zoom=[2, 12], look="zoomed"), dict(slide=12, release=True, until=dict(number="12"), wait=300)])
+        self.assertEqual((seen["first"]["min"], seen["first"]["max"], seen["first"]["zoomSaid"]), (0, 255, "Zoom 0 to 255"))
+        zoomed = seen["zoomed"]
+        self.assertEqual((zoomed["min"], zoomed["max"], zoomed["zoomSaid"]), (2, 12, "Zoom 2 to 12"))
+        self.assertEqual((target.sent(), target.default), (["brightness 12"], 12))
+
+    def test_the_pins_never_cross_and_send_nothing(self):
+        target = Target(self)
+        seen = run(target, [dict(zoom=[2, 12]), dict(pin=["start", 200], look="start"), dict(pin=["end", 0], look="end")])
+        self.assertEqual((seen["start"]["zoomStart"], seen["start"]["zoomEnd"], seen["start"]["min"]), (11, 12, 11))
+        self.assertEqual((seen["end"]["zoomStart"], seen["end"]["zoomEnd"], seen["end"]["max"]), (11, 12, 12))
+        self.assertEqual(target.sent(), [])
+
+    def test_a_value_outside_the_zoom_stands_in_the_field_and_never_moves_the_zoom(self):
+        target = Target(self)
+        seen = run(target, [dict(zoom=[2, 12], look="above"),
+            dict(type="1", enter=True, until=dict(outside="1 is below the zoom 2 to 12."), look="below")])
+        above, below = seen["above"], seen["below"]
+        self.assertEqual((above["number"], above["slider"], above["outside"]), ("128", 12, "128 is above the zoom 2 to 12."))
+        self.assertEqual((below["number"], below["slider"], below["zoomStart"], below["zoomEnd"]), ("1", 2, 2, 12))
+        self.assertEqual(target.sent(), ["brightness 1"])
+
+    def test_both_modes_and_a_reload_keep_the_zoom(self):
+        target = Target(self, saved=5)
+        seen = run(target, [dict(zoom=[2, 12], look="override"), dict(tap=True, until=dict(checked=False, disabled=False), look="default"),
+            dict(reload=True, until=dict(zoomStart=2, zoomEnd=12), look="reloaded")])
+        self.assertEqual((seen["override"]["label"], seen["override"]["slider"], seen["override"]["outside"]),
+                         ("This animation’s brightness", 5, None))
+        default = seen["default"]
+        self.assertEqual((default["label"], default["min"], default["max"], default["outside"]),
+                         ("Default brightness", 2, 12, "128 is above the zoom 2 to 12."))
+        self.assertEqual((seen["reloaded"]["min"], seen["reloaded"]["max"]), (2, 12))
+        self.assertEqual(target.sent(), ["brightness 1 default"])
+
+
+class ZoomKept(unittest.TestCase):
+    def test_the_kept_pair_is_read_back_and_anything_else_is_the_full_range(self):
+        seen = support.run("zoom-kept").seen
+        full, narrow = {"start": 0, "end": 255}, {"start": 2, "end": 12}
+        self.assertEqual((seen["none"], seen["throwing"], seen["empty"], seen["threw"]), (full, full, full, False))
+        self.assertEqual(seen["malformed"], [full] * 8)
+        self.assertEqual((seen["good"], seen["full"], seen["readBack"]), (narrow, full, narrow))
+        self.assertEqual(seen["written"], {"odrig.brightness-zoom": "2 12"})
+        self.assertEqual(seen["words"], "Zoom 2 to 12")
+        self.assertEqual(seen["outside"], ["40 is above the zoom 2 to 12.", "1 is below the zoom 2 to 12.", None, None])
+        self.assertEqual(seen["moved"], [{"start": 11, "end": 12}, {"start": 2, "end": 3}, full, {"start": 0, "end": 12}])

@@ -133,7 +133,7 @@ class Look(unittest.TestCase):
             nav = {control["what"] for control in screen["controls"] if control["group"] == "nav"}
             self.assertEqual(len(nav), 4, where)
 
-    def test_the_brightness_field_stands_on_one_line_with_its_label_and_the_slider_under_it(self):
+    def test_the_brightness_field_stands_on_one_line_with_its_label_the_zoom_and_the_slider_under_it(self):
         for size in SIZES:
             where = f"{size[0]} wide"
             level = self.measured[size]["animations"]["level"]
@@ -150,10 +150,17 @@ class Look(unittest.TestCase):
             self.assertGreaterEqual(field["right"] - field["left"], 44, where)
             self.assertGreaterEqual(field["bottom"] - field["top"], 48 - 0.01, where)
             self.assertEqual(level["digits"], "tabular-nums", where)
-            # The shortened slider below the field, with its checkbox beside it.
-            self.assertAlmostEqual(slider["top"] - field["bottom"], 8, delta=0.5, msg=where)
+            # The zoom's row 8 pixels under the field: its bar with the slider's edges, 48 high,
+            # and its words where the checkbox stands below them.
+            zoom, words, override = level["zoom"], level["zoomSaid"], level["override"]
+            self.assertAlmostEqual(zoom["top"] - field["bottom"], 8, delta=0.5, msg=where)
+            self.assertAlmostEqual(zoom["left"], slider["left"], delta=0.5, msg=where)
+            self.assertAlmostEqual(zoom["right"], slider["right"], delta=0.5, msg=where)
+            self.assertGreaterEqual(zoom["bottom"] - zoom["top"], 48 - 0.01, where)
+            self.assertAlmostEqual(words["left"], override["left"], delta=0.5, msg=where)
+            # The shortened slider 8 pixels under the zoom's row, with its checkbox beside it.
+            self.assertAlmostEqual(slider["top"] - zoom["bottom"], 8, delta=0.5, msg=where)
             self.assertAlmostEqual(slider["left"], level["left"], delta=0.5, msg=where)
-            override = level["override"]
             self.assertAlmostEqual(override["left"] - slider["right"], 8, delta=0.5, msg=where)
             self.assertAlmostEqual(override["right"], level["right"], delta=0.5, msg=where)
             self.assertGreater(min(override["bottom"], slider["bottom"]), max(override["top"], slider["top"]), where)

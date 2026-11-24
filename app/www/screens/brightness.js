@@ -1,10 +1,12 @@
 // One edit flow for the slider, numeric value and saved animation preference. A gesture, a
 // drag of the slider, an edit of the number field or a press of the box, is bound when it
 // begins to the target, the animation and the mode the panel shows, and is applied to them
-// when it ends, whatever plays by then.
+// when it ends, whatever plays by then. The zoom above the slider sets the range the slider
+// moves through; it is kept on the phone and sends nothing.
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
 import {playingFile} from "../messages.js";
+import * as zoom from "../zoom.js";
 
 const EVERY_MS = 200;
 const RESTS_MS = 1000;
@@ -38,7 +40,17 @@ let note = null;
 let noteKept = false;
 let holdUntil = 0;
 let holdTimer = null;
+let range = {...zoom.FULL};
 let redraw = () => {};
+
+// The storage of the phone, or null when it cannot be reached.
+function phoneStorage() {
+  try {
+    return window.localStorage;
+  } catch (_) {
+    return null;
+  }
+}
 
 function defaultLine(value) {
   return `The default, ${value}, is for every animation without its own brightness, until the installation starts again. ` +
@@ -92,7 +104,28 @@ function writeLevel(value) {
 }
 function showValue(value) {
   writeLevel(value);
-  byId("level").value = String(value ?? 0);
+  placeSlider();
+}
+// The slider at the value in force, at the zoom's nearest end when the value is outside it,
+// and the line that says so.
+function placeSlider() {
+  const value = inForce === null ? range.start : Math.min(range.end, Math.max(range.start, inForce));
+  byId("level").value = String(value);
+  say("level-zoom-outside", zoom.outside(inForce, range));
+}
+// The pins, the slider's range and the zoom's words.
+function showZoom() {
+  const start = byId("level-zoom-start");
+  const end = byId("level-zoom-end");
+  const bar = byId("level-zoom-bar");
+  start.value = String(range.start);
+  end.value = String(range.end);
+  byId("level").min = String(range.start);
+  byId("level").max = String(range.end);
+  byId("level-zoom-said").textContent = zoom.words(range);
+  bar.style.setProperty("--zoom-start", String(range.start / 255));
+  bar.style.setProperty("--zoom-end", String(range.end / 255));
+  bar.classList.toggle("start-above", range.start > 127);
 }
 function unsent() {
   return byId("level-number").value !== (inForce === null ? "" : String(inForce));
@@ -369,6 +402,22 @@ export function start(options) {
   redraw = options.redraw;
   const level = byId("level");
   const field = byId("level-number");
+  range = zoom.load(phoneStorage());
+  showZoom();
+  placeSlider();
+  for (const which of ["start", "end"]) {
+    const pin = byId(`level-zoom-${which}`);
+    pin.addEventListener("input", () => {
+      range = zoom.moved(range, which, pin.value);
+      zoom.save(phoneStorage(), range);
+      showZoom();
+      placeSlider();
+    });
+    pin.addEventListener("change", () => {
+      zoom.save(phoneStorage(), range);
+      showZoom();
+    });
+  }
   level.addEventListener("input", () => {
     if (gesture === null) begin("slide");
     else gesture.kind = "slide";
@@ -377,6 +426,7 @@ export function start(options) {
     writeLevel(gesture.value);
     if (dropped && document.activeElement === field) field.blur();
     say("level-range", null);
+    say("level-zoom-outside", null);
     if (!gesture.bound.override) sendDefault(gesture.bound, gesture.value);
   });
   level.addEventListener("change", () => {

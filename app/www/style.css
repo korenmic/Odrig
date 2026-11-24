@@ -442,6 +442,93 @@ button[aria-pressed="true"] {
   margin: 0;
 }
 
+/* The brightness zoom above the slider: a bar with the slider's edges, whose two pins set the
+   range the slider moves through, and its words where the checkbox stands below them. The
+   pins are two range inputs over each other; only their thumbs take a finger. */
+#level-zoom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+
+#level-zoom-bar {
+  position: relative;
+  flex: 1 1 100px;
+  min-width: 80px;
+  height: 48px;
+  /* The part between the pins in the accent colour, over a thin track: the middle of a
+     thumb is 24 pixels in from each end of the bar. */
+  background:
+    linear-gradient(to right, transparent calc(24px + (100% - 48px) * var(--zoom-start, 0)), var(--teal) 0,
+      var(--teal) calc(24px + (100% - 48px) * var(--zoom-end, 1)), transparent 0) center / 100% 4px no-repeat,
+    linear-gradient(var(--edge-strong), var(--edge-strong)) center / calc(100% - 48px) 2px no-repeat;
+}
+
+#level-zoom-bar > input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 48px;
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+#level-zoom-start {
+  z-index: 1;
+}
+
+#level-zoom-end {
+  z-index: 2;
+}
+
+/* When the pins touch in the upper half, Start is on top: it is the one that can move away. */
+#level-zoom-bar.start-above > #level-zoom-start {
+  z-index: 3;
+}
+
+#level-zoom-bar > input::-webkit-slider-runnable-track {
+  height: 48px;
+  background: transparent;
+}
+
+#level-zoom-bar > input::-webkit-slider-thumb {
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--teal) 0 9px, var(--on-accent) 10px 12px, transparent 13px);
+  pointer-events: auto;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+#level-zoom-bar > input::-moz-range-track {
+  height: 48px;
+  background: transparent;
+}
+
+#level-zoom-bar > input::-moz-range-thumb {
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--teal) 0 9px, var(--on-accent) 10px 12px, transparent 13px);
+  pointer-events: auto;
+}
+
+#level-zoom-said {
+  flex: 0 1 180px;
+  min-width: 0;
+  margin: 0;
+}
+
 #level-file {
   overflow-wrap: anywhere;
 }

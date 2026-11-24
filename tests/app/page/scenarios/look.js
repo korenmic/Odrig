@@ -50,12 +50,16 @@ export function measure(app) {
     const at = element.getBoundingClientRect();
     return top.classList.contains("frozen") && !top.contains(element) && at.top < topBox.bottom && at.bottom > topBox.top;
   };
-  const controls = [...doc.querySelectorAll("button, input, select, label.button")].filter((element) => displayed(element) && !covered(element)).map((element) => ({
-    what: element.id || element.getAttribute("aria-label") || element.textContent.trim(),
-    group: element.closest("nav") !== null ? "nav" : element.closest("#message") !== null ? "message" : element.closest("#confirm") !== null ? "question" :
-      element.closest("#row-menu") !== null ? "menu" : "screen",
-    ...box(element.type === "checkbox" ? element.closest("label") : element),
-  }));
+  // The two pins of the brightness zoom lie over each other on one bar: they are one control,
+  // the bar.
+  const zoomBar = doc.getElementById("level-zoom-bar");
+  const controls = [...doc.querySelectorAll("button, input, select, label.button")]
+    .filter((element) => displayed(element) && !covered(element) && element.id !== "level-zoom-end").map((element) => ({
+      what: element.id === "level-zoom-start" ? "level-zoom" : element.id || element.getAttribute("aria-label") || element.textContent.trim(),
+      group: element.closest("nav") !== null ? "nav" : element.closest("#message") !== null ? "message" : element.closest("#confirm") !== null ? "question" :
+        element.closest("#row-menu") !== null ? "menu" : "screen",
+      ...box(element.id === "level-zoom-start" ? zoomBar : element.type === "checkbox" ? element.closest("label") : element),
+    }));
   const texts = [...doc.querySelectorAll("p, label, h1, h2, button, input, span")]
     .filter((element) => displayed(element) && [...element.childNodes].some((node) => node.nodeType === 3 && node.textContent.trim() !== ""))
     .map((element) => {
@@ -76,6 +80,8 @@ export function measure(app) {
     label: box(doc.querySelector("#level-line label")),
     field: box(field),
     slider: box(doc.getElementById("level")),
+    zoom: zoomBar === null ? null : box(zoomBar),
+    zoomSaid: zoomBar === null ? null : box(doc.getElementById("level-zoom-said")),
     override: box(doc.querySelector('label[for="level-override"]')),
     left: panelBox.left + parseFloat(panelStyle.borderLeftWidth) + parseFloat(panelStyle.paddingLeft),
     right: panelBox.right - parseFloat(panelStyle.borderRightWidth) - parseFloat(panelStyle.paddingRight),
