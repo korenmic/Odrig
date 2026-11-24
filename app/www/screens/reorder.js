@@ -200,6 +200,10 @@ function lift() {
   row.style.left = `${box.left}px`;
   row.style.width = `${box.width}px`;
   row.style.top = `${box.top}px`;
+  // While a row is held the page scrolls by the drag alone: the browser's anchoring, which
+  // would hold a row of the list in place as the placeholder moves, would undo its steps
+  // when little of the list shows under the panel that stays at the top.
+  document.documentElement.style.overflowAnchor = "none";
   // Where the other rows of the held row's group stand, in the page, with the placeholder
   // in the held row's place: the held row lands before the first of them whose middle lies
   // below it, and after the last of them otherwise.
@@ -257,6 +261,7 @@ function settle() {
   row.style.left = "";
   row.style.width = "";
   row.style.top = "";
+  document.documentElement.style.overflowAnchor = "";
   if (press.placeholder) press.placeholder.remove();
   if (press.frame) window.cancelAnimationFrame(press.frame);
   clearTimeout(press.timer);

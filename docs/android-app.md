@@ -20,6 +20,7 @@ a top bar with the app's name and whether the installation answers.
   it, hidden while nothing plays, while a test shows and while the list does not hold the
   animation yet, `ON` or `OFF`, the selected brightness and the refreshes a second,
   `Default brightness` or `This animation's brightness` beside its numeric field,
+  the `Brightness zoom` row, whose two pins set the range the slider moves through,
   and the shortened slider with `Override for this animation` beside it. The field
   and slider follow each other both ways, and the current file is named. The
   panel shows no line of what plays, such as `Playlist` or `Cycle 3`, and no words `On`
@@ -433,19 +434,47 @@ already in flight is also confirmed before capture. A reply acknowledges a comma
 only subsequent status confirms its setting. The checkbox is never stored on the
 phone. Reload, reconnect and changes from another client follow target status.
 
-Input captures target epoch, animation ID, full file and mode. Identity changes
-cancel unsent edits; queued commands validate the capture, sent commands retain it,
-and late replies cannot repaint another identity. Missing/null capability retains
-default controls but disables overrides. Unknown or malformed status, no known file,
-and damaged settings explain why saving is unavailable. A non-status reply cannot
-restore status freshness after a failure. Uncertain saves are not automatically
-repeated; readback determines what the target kept.
+A gesture, a drag of the slider, an edit of the number field or a press of the box, is
+bound when it begins to the target, the animation and the mode the panel shows. When the
+playlist moves on while it lasts, at the end of a turn, at a clock or a message, or by
+another controller's `play`, the panel keeps showing the bound animation, `Animation 1:
+red.odrg, no longer playing`, with the gesture's value. When it ends, a value of **This
+animation's brightness** is saved for that animation with `brightness <id> <value> save`,
+which the installation takes for an animation that does not play, and a value of
+**Default brightness** stays the default. Then the panel shows the animation playing and
+says what was saved for which animation, `Saved 70 for red.odrg.`; a save for an
+animation that no longer plays is confirmed by `saved <id>`, one for the animation playing
+by status. Another installation chosen, or status no longer fresh, ends a gesture
+unapplied; that, a refusal, no reply and a read-back that differs are each said with the
+animation's file, and nothing is sent again by itself. Late replies cannot repaint
+another target. For one second after the panel moves to another animation, its name in
+bold, the slider, the field and the box take no new gesture, so that a touch aimed at the
+animation that left does not land on the next. A confirmed default is followed by the
+line that it is for every animation without its own brightness until the installation
+starts again: the default is not kept. Missing/null capability retains default controls
+but disables overrides. Unknown or malformed status, no known file, and damaged settings
+explain why saving is unavailable. A non-status reply cannot restore status freshness
+after a failure.
+
+**Brightness zoom** stands above the slider: its bar has the slider's edges, and `Zoom 2
+to 12` stands where the box stands below it. Its two pins, `Start` and `End`, set the
+range the slider moves through, in steps of 1 and at least 1 apart, so that a narrow range
+spreads over the slider's whole width. Moving a pin changes no brightness and sends
+nothing. A value outside the zoom stands as it is in the number field, which still takes
+0 to 255, with the slider at the zoom's nearest end and a line such as `40 is above the
+zoom 2 to 12.`; the app never moves the zoom by itself, and both pins at the ends give 0
+to 255 again. The zoom holds in both modes and for every target. The app keeps it in its
+own storage on the phone, `odrig.brightness-zoom`, across restarts and reconnections, and
+uses 0 to 255 for a run in which that storage cannot be used.
 
 Storage identity, limits, corruption recovery and default/zero precedence are in
 [commands.md](commands.md#saved-animation-brightness). Browser/emulator proof is in
 the seed 58 verification document. Board/phone acceptance remains open, including
 restart retention and removing an override at brightness 40 or less. Firmware
-compilation is deferred to seed 60; the final APK follows all 56–59 software.
+compilation is deferred to seed 60; the final APK follows all 56–59 software. The bound
+gesture, the hold and the zoom are proven in the browser against stand-ins and the
+emulator in the seed 89 verification document; its phone check, an override dragged across
+the end of a turn and a zoom of 2 to 12 kept after the app restarts, is open.
 
 ### Playback and storage
 

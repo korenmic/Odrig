@@ -1,10 +1,17 @@
-// One edit flow for the slider, numeric value and saved animation preference.
+// One edit flow for the slider, numeric value and saved animation preference. A gesture, a
+// drag of the slider, an edit of the number field or a press of the box, is bound when it
+// begins to the target, the animation and the mode the panel shows, and is applied to them
+// when it ends, whatever plays by then. The zoom above the slider sets the range the slider
+// moves through; it is kept on the phone and sends nothing.
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
 import {playingFile} from "../messages.js";
+import * as zoom from "../zoom.js";
 
 const EVERY_MS = 200;
 const RESTS_MS = 1000;
+// How long the panel takes no new gesture after it moves to another animation.
+const HOLD_MS = 1000;
 const RANGE = "The brightness is 0 to 255.";
 const REFUSALS = {
   busy: "The target is busy. Try saving brightness again when it finishes.",
@@ -15,20 +22,48 @@ const REFUSALS = {
   "show-invalid": "The show is invalid. Fix it before saving brightness.",
   unsupported: "This target does not support saved animation brightness.",
 };
-let held = false;
+const REFUSED = "Brightness was not saved. Read fresh status before trying again.";
 let sentValue = null;
 let sentAt = -Infinity;
 let waiting = null;
+let queued = null;
 let inForce = null;
-let edit = null;
+let gesture = null;
 let binding = "";
+let place = null;
 let pending = null;
 let unconfirmedAt = -1;
 let switching = false;
 let modeChanging = false;
 let defaultAwaiting = null;
 let note = null;
+let noteKept = false;
+let holdUntil = 0;
+let holdTimer = null;
+let range = {...zoom.FULL};
 let redraw = () => {};
+
+// The storage of the phone, or null when it cannot be reached.
+function phoneStorage() {
+  try {
+    return window.localStorage;
+  } catch (_) {
+    return null;
+  }
+}
+
+function defaultLine(value) {
+  return `The default, ${value}, is for every animation without its own brightness, until the installation starts again. ` +
+    "Tick Override for this animation to keep a value for the animation playing.";
+}
+function hold() {
+  holdUntil = performance.now() + HOLD_MS;
+  clearTimeout(holdTimer);
+  holdTimer = setTimeout(() => {
+    holdTimer = null;
+    redraw();
+  }, HOLD_MS + 20);
+}
 
 const byId = (id) => document.getElementById(id);
 function say(id, text) {
@@ -38,10 +73,27 @@ function say(id, text) {
 function snapshot() {
   const status = client.state.status;
   return {version: client.targetVersion(), animation: status?.animation, file: status?.file,
+    fileText: typeof status?.file === "string" ? playingFile(status, client.clockStorageOf(status)) : null,
     override: status?.dimming?.saved != null};
 }
-function key(of, mode = true) {
-  return JSON.stringify([of.version, of.animation, of.file, ...(mode ? [of.override] : [])]);
+function key(of) {
+  return JSON.stringify([of.version, of.animation, of.file, of.override]);
+}
+// Whether status names the animation of a snapshot, on its target.
+function plays(of) {
+  const status = client.state.status;
+  return of.version === client.targetVersion() && status?.animation === of.animation && status?.file === of.file;
+}
+// The place the panel shows without a gesture, the target and the animation status names, or
+// null while status names none.
+function placeOf(of) {
+  return typeof of.animation === "number" && typeof of.file === "string" ? JSON.stringify([of.version, of.animation, of.file]) : null;
+}
+// Sets the panel's line. A line that is kept stays when the panel next moves to another
+// animation; any other goes then.
+function line(text, kept = false) {
+  note = text;
+  noteKept = kept;
 }
 function valueOf(status) {
   return status?.dimming?.value ?? status?.brightness ?? null;
@@ -52,7 +104,28 @@ function writeLevel(value) {
 }
 function showValue(value) {
   writeLevel(value);
-  byId("level").value = String(value ?? 0);
+  placeSlider();
+}
+// The slider at the value in force, at the zoom's nearest end when the value is outside it,
+// and the line that says so.
+function placeSlider() {
+  const value = inForce === null ? range.start : Math.min(range.end, Math.max(range.start, inForce));
+  byId("level").value = String(value);
+  say("level-zoom-outside", zoom.outside(inForce, range));
+}
+// The pins, the slider's range and the zoom's words.
+function showZoom() {
+  const start = byId("level-zoom-start");
+  const end = byId("level-zoom-end");
+  const bar = byId("level-zoom-bar");
+  start.value = String(range.start);
+  end.value = String(range.end);
+  byId("level").min = String(range.start);
+  byId("level").max = String(range.end);
+  byId("level-zoom-said").textContent = zoom.words(range);
+  bar.style.setProperty("--zoom-start", String(range.start / 255));
+  bar.style.setProperty("--zoom-end", String(range.end / 255));
+  bar.classList.toggle("start-above", range.start > 127);
 }
 function unsent() {
   return byId("level-number").value !== (inForce === null ? "" : String(inForce));
@@ -60,60 +133,173 @@ function unsent() {
 function typing() {
   return document.activeElement === byId("level-number") && document.body.classList.contains("typing");
 }
-function cancelEdit() {
+function isFresh(state = client.state) {
+  return state.link === "answers" && state.statusFresh && state.status !== null && state.statusCount > unconfirmedAt;
+}
+
+// A gesture begins bound to what the panel shows; one already lasting stays as it is.
+function begin(kind) {
+  if (gesture === null) {
+    gesture = {kind, bound: snapshot(), value: null};
+    note = null;
+  }
+  return gesture;
+}
+// Ends the gesture without applying it, and says why.
+function drop(why) {
+  const ended = gesture;
+  gesture = null;
   clearTimeout(waiting);
   waiting = null;
-  held = false;
-  edit = null;
-  sentValue = null;
-  sentAt = -Infinity;
-  switching = false;
+  queued = null;
+  if (ended !== null) line(`Not saved for ${ended.bound.fileText}: ${why}.`, true);
+}
+// Ends the gesture and applies its value to what it is bound to.
+function finish() {
+  const ended = gesture;
+  gesture = null;
+  if (ended === null) return;
+  const {bound, value} = ended;
+  if (bound.version !== client.targetVersion()) {
+    line(`Not saved for ${bound.fileText}: another installation was chosen.`, true);
+  } else if (document.hidden || !isFresh()) {
+    line(`Not saved for ${bound.fileText}: the installation did not answer.`, true);
+  } else if (bound.override) {
+    void mutate(value, bound, value);
+  } else {
+    if (performance.now() - sentAt >= RESTS_MS) sentValue = null;
+    sendDefault(bound, value);
+  }
+  redraw();
+}
+
+// The default, sent at most every EVERY_MS while the slider moves: the last value waits.
+function sendDefault(bound, value) {
+  queued = {bound, value};
+  clearTimeout(waiting);
+  waiting = null;
+  const left = sentAt + EVERY_MS - performance.now();
+  if (left > 0) {
+    waiting = setTimeout(flushDefault, left);
+    return;
+  }
+  flushDefault();
+}
+function flushDefault() {
+  waiting = null;
+  const next = queued;
+  queued = null;
+  if (next === null || document.hidden || next.bound.version !== client.targetVersion() || next.value === sentValue) return;
+  sentValue = next.value;
+  sentAt = performance.now();
   defaultAwaiting?.finish(false);
-  defaultAwaiting = null;
+  const request = {snapshot: next.bound, value: next.value, count: null, finish: () => {}};
+  request.confirmed = new Promise((finish) => { request.finish = finish; });
+  defaultAwaiting = request;
+  client.setBrightness(next.value, next.bound).then((accepted) => {
+    if (defaultAwaiting !== request) return;
+    if (!accepted) {
+      defaultAwaiting = null;
+      request.finish(false);
+    } else {
+      request.count = client.state.statusCount;
+    }
+  });
+}
+
+// The end of a request: the line of what the target keeps, and the controls from status.
+function settle(request, confirmed, kept) {
+  pending = null;
+  const file = request.snapshot.fileText;
+  if (request.saved === undefined) {
+    line(confirmed ? defaultLine(request.value) : "The setting changed before confirmation. The current value is shown.");
+  } else if (confirmed) {
+    line(request.saved === null ? `Removed the saved brightness of ${file}.` : `Saved ${request.saved} for ${file}.`);
+  } else {
+    line(kept === null || kept === undefined ? `${file} keeps no saved brightness.` : `${file} keeps ${kept}.`);
+  }
+  showValue(valueOf(client.state.status));
+  request.finish(confirmed);
+  redraw();
+}
+function fail(request, error, refused) {
+  pending = null;
+  unconfirmedAt = client.state.statusCount;
+  const file = request.snapshot.fileText;
+  line(refused && error instanceof Refusal ? `Not saved for ${file}. ${REFUSALS[error.code] ?? REFUSED}` :
+    `Brightness for ${file} is unknown: no reply came. It is not sent again.`);
+  showValue(valueOf(client.state.status));
+  request.finish(false);
+  redraw();
+}
+// A save or a removal is confirmed by status while status names its animation, else by
+// `saved <id>`; a default by status.
+function confirm(request, status) {
+  if (request.saved === undefined) {
+    settle(request, status.brightness === request.value, null);
+  } else if (plays(request.snapshot)) {
+    settle(request, status.dimming?.saved === request.saved, status.dimming?.saved ?? null);
+  } else {
+    request.reading = true;
+    client.brightnessSaved(request.snapshot.animation, request.snapshot).then((reply) => {
+      if (pending !== request) return;
+      settle(request, reply.brightness === request.saved, reply.brightness);
+    }).catch((error) => {
+      if (pending !== request) return;
+      fail(request, error, false);
+    });
+  }
 }
 
 export function draw(state) {
   const status = state.status;
   const current = snapshot();
-  const currentBinding = JSON.stringify([key(current), state.statusFresh]);
-  const changed = binding !== currentBinding;
-  if (pending !== null && key(pending.snapshot, false) !== key(current, false)) {
+  const fresh = isFresh(state);
+  if (gesture !== null && gesture.bound.version !== current.version) drop("another installation was chosen");
+  else if (gesture !== null && !fresh) drop("the installation did not answer");
+  if (pending !== null && pending.snapshot.version !== current.version) {
     pending.finish(false);
     pending = null;
   }
-  if (changed) {
+  const currentBinding = JSON.stringify([key(current), state.statusFresh]);
+  if (gesture === null && binding !== currentBinding) {
     binding = currentBinding;
-    cancelEdit();
-    note = null;
     unconfirmedAt = -1;
+    const now = placeOf(current);
+    if (now !== null && now !== place) {
+      if (noteKept) noteKept = false;
+      else note = null;
+      // A move from one known animation to another of the same target holds new gestures.
+      if (place !== null && JSON.parse(place)[0] === current.version) hold();
+      place = now;
+    }
     showValue(valueOf(status));
   }
   if (defaultAwaiting !== null && defaultAwaiting.count !== null &&
       state.statusCount > defaultAwaiting.count && state.link === "answers") {
     const request = defaultAwaiting;
     defaultAwaiting = null;
-    request.finish(status.brightness === request.value);
-  }
-  if (pending !== null && pending.count !== null && state.statusCount > pending.count && state.link === "answers") {
-    const request = pending;
-    pending = null;
-    const confirmed = request.saved === undefined ? status.brightness === request.value :
-      status.dimming !== null && status.dimming.saved === request.saved;
-    note = confirmed ? null : "The setting changed before confirmation. The current value is shown.";
-    showValue(valueOf(status));
+    const confirmed = status.brightness === request.value;
+    if (confirmed) line(defaultLine(request.value));
     request.finish(confirmed);
   }
-  const fresh = state.link === "answers" && state.statusFresh && status !== null && state.statusCount > unconfirmedAt;
+  if (pending !== null && pending.count !== null && !pending.reading && state.statusCount > pending.count && state.link === "answers") {
+    confirm(pending, status);
+  }
+  const view = gesture !== null ? gesture.bound : current;
+  const away = gesture !== null && !plays(gesture.bound);
   const dimming = status?.dimming;
   const known = fresh && dimming != null;
-  const canSave = known && status.error === null && status.animation !== null &&
-    typeof status.file === "string" && dimming.error === null;
+  const canSave = known && status.error === null && typeof view.animation === "number" &&
+    typeof view.file === "string" && dimming.error === null;
+  const holding = gesture === null && performance.now() < holdUntil;
   const box = byId("level-override");
-  box.checked = known && dimming.saved !== null;
+  box.checked = gesture !== null ? view.override : known && dimming.saved !== null;
   box.indeterminate = !fresh;
-  box.disabled = !canSave || pending !== null || modeChanging;
-  byId("level-label").textContent = current.override ? "This animation\u2019s brightness" : "Default brightness";
-  say("level-file", typeof status?.file === "string" ? `Animation ${status.animation}: ${playingFile(status, client.clockStorageOf(status))}` : null);
+  box.disabled = !canSave || pending !== null || modeChanging || holding;
+  byId("level-label").textContent = view.override ? "This animation\u2019s brightness" : "Default brightness";
+  say("level-file", typeof view.file === "string" ? `Animation ${view.animation}: ${view.fileText}${away ? ", no longer playing" : ""}` : null);
+  byId("level-file").classList.toggle("just-changed", holding);
   let explanation = note;
   if (!fresh) explanation = "Brightness setting unknown. Waiting for fresh status.";
   else if (dimming == null) explanation = "This target does not support saved animation brightness. The default can still be changed.";
@@ -121,20 +307,23 @@ export function draw(state) {
   else if (!canSave) explanation = "Play an animation with a known file to save its brightness.";
   else if (pending !== null || modeChanging) explanation = "Saving brightness; waiting for confirmed status.";
   say("level-said", explanation);
-  byId("level").disabled = pending !== null || (current.override && !canSave);
-  byId("level-number").disabled = pending !== null || (current.override && !canSave);
-  if (!held && pending === null && performance.now() - sentAt >= RESTS_MS && !unsent() && !typing()) {
+  // A control in use is never disabled under the finger.
+  const locked = gesture === null && (pending !== null || holding || (view.override && !canSave));
+  byId("level").disabled = locked;
+  byId("level-number").disabled = locked;
+  if (gesture === null && pending === null && performance.now() - sentAt >= RESTS_MS && !unsent() && !typing()) {
     showValue(valueOf(status));
   }
 }
 
-// A reply acknowledges the command; only a later status confirms the setting.
+// A reply acknowledges the command; only a later status, or `saved <id>`, confirms the setting.
 function mutate(value, captured, saved) {
-  if (pending !== null || document.hidden || !client.state.statusFresh || key(captured) !== key(snapshot())) return Promise.resolve(false);
+  if (pending !== null || document.hidden || !client.state.statusFresh || captured.version !== client.targetVersion()) return Promise.resolve(false);
   clearTimeout(waiting);
   waiting = null;
+  queued = null;
   return new Promise((finish) => {
-    const request = {snapshot: captured, value, saved, count: null, finish};
+    const request = {snapshot: captured, value, saved, count: null, reading: false, finish};
     pending = request;
     note = null;
     redraw();
@@ -147,50 +336,9 @@ function mutate(value, captured, saved) {
       redraw();
     }).catch((error) => {
       if (pending !== request) return;
-      pending = null;
-      unconfirmedAt = client.state.statusCount;
-      note = error instanceof Refusal ? (REFUSALS[error.code] ?? "Brightness was not saved. Read fresh status before trying again.") :
-        "Brightness result unknown. Read fresh status before trying again.";
-      showValue(valueOf(client.state.status));
-      finish(false);
-      redraw();
+      fail(request, error, true);
     });
   });
-}
-
-function sendLevel() {
-  clearTimeout(waiting);
-  waiting = null;
-  const captured = edit ?? snapshot();
-  if (key(captured) !== key(snapshot()) || document.hidden) return;
-  const value = Number(byId("level").value);
-  if (captured.override) {
-    if (!held && value !== sentValue) {
-      sentValue = value;
-      sentAt = performance.now();
-      void mutate(value, captured, value);
-    }
-    return;
-  }
-  const left = sentAt + EVERY_MS - performance.now();
-  if (left > 0) { waiting = setTimeout(sendLevel, left); return; }
-  if (value !== sentValue) {
-    sentValue = value;
-    sentAt = performance.now();
-    defaultAwaiting?.finish(false);
-    const request = {snapshot: captured, value, count: null, finish: () => {}};
-    request.confirmed = new Promise((finish) => { request.finish = finish; });
-    defaultAwaiting = request;
-    client.setBrightness(value, captured).then((accepted) => {
-      if (defaultAwaiting !== request) return;
-      if (!accepted) {
-        defaultAwaiting = null;
-        request.finish(false);
-      } else {
-        request.count = client.state.statusCount;
-      }
-    });
-  }
 }
 
 function numeric() {
@@ -203,38 +351,47 @@ function commitLevel() {
   if (document.hidden || value === null) {
     say("level-range", !document.hidden && byId("level-number").value !== "" ? RANGE : null);
     showValue(inForce);
+    if (gesture?.kind === "type") gesture = null;
     return;
   }
   say("level-range", null);
-  if (value === inForce) { showValue(inForce); return; }
+  if (value === inForce) {
+    showValue(inForce);
+    if (gesture?.kind === "type") gesture = null;
+    return;
+  }
   showValue(value);
-  if (performance.now() - sentAt >= RESTS_MS) sentValue = null;
-  sendLevel();
+  begin("type").value = value;
+  finish();
 }
 
 async function switchOverride() {
   const box = byId("level-override");
   const enable = box.checked;
   switching = false;
-  const captured = snapshot();
+  const typed = gesture?.kind === "type" ? gesture : null;
+  const captured = typed !== null ? typed.bound : snapshot();
   box.checked = captured.override;
-  if (pending !== null || modeChanging) return;
+  if (pending !== null || modeChanging || (gesture !== null && typed === null)) return;
   modeChanging = true;
+  note = null;
+  let value = inForce;
   redraw();
   try {
     if (defaultAwaiting !== null && !(await defaultAwaiting.confirmed)) return;
-    if (key(captured) !== key(snapshot())) return;
+    if (captured.version !== client.targetVersion()) return;
     if (unsent()) {
-      const value = numeric();
-      if (value === null) { say("level-range", RANGE); return; }
-      showValue(value);
-      const confirmed = await mutate(value, captured, captured.override ? value : undefined);
-      if (!confirmed || key(captured) !== key(snapshot())) return;
+      const typedValue = numeric();
+      if (typedValue === null) { say("level-range", RANGE); return; }
+      showValue(typedValue);
+      gesture = null;
+      const confirmed = await mutate(typedValue, captured, captured.override ? typedValue : undefined);
+      if (!confirmed) return;
+      value = typedValue;
     }
-    const status = client.state.status;
-    if (status?.dimming == null || status.animation === null || typeof status.file !== "string") return;
-    const value = status.dimming.value;
-    await mutate(value, snapshot(), enable ? value : null);
+    gesture = null;
+    if (client.state.status?.dimming == null || typeof captured.animation !== "number" || typeof captured.file !== "string") return;
+    await mutate(value, captured, enable ? value : null);
   } finally {
     modeChanging = false;
     redraw();
@@ -245,25 +402,42 @@ export function start(options) {
   redraw = options.redraw;
   const level = byId("level");
   const field = byId("level-number");
+  range = zoom.load(phoneStorage());
+  showZoom();
+  placeSlider();
+  for (const which of ["start", "end"]) {
+    const pin = byId(`level-zoom-${which}`);
+    pin.addEventListener("input", () => {
+      range = zoom.moved(range, which, pin.value);
+      zoom.save(phoneStorage(), range);
+      showZoom();
+      placeSlider();
+    });
+    pin.addEventListener("change", () => {
+      zoom.save(phoneStorage(), range);
+      showZoom();
+    });
+  }
   level.addEventListener("input", () => {
-    if (edit === null) edit = snapshot();
-    held = true;
+    if (gesture === null) begin("slide");
+    else gesture.kind = "slide";
     const dropped = unsent();
-    writeLevel(Number(level.value));
+    gesture.value = Number(level.value);
+    writeLevel(gesture.value);
     if (dropped && document.activeElement === field) field.blur();
     say("level-range", null);
-    sendLevel();
+    say("level-zoom-outside", null);
+    if (!gesture.bound.override) sendDefault(gesture.bound, gesture.value);
   });
   level.addEventListener("change", () => {
-    if (edit === null) return;
-    held = false;
-    writeLevel(Number(level.value));
+    if (gesture === null || gesture.kind !== "slide") return;
+    gesture.value = Number(level.value);
+    writeLevel(gesture.value);
     say("level-range", null);
-    if (edit.override || performance.now() - sentAt >= RESTS_MS) sentValue = null;
-    sendLevel();
+    finish();
   });
   field.addEventListener("input", () => {
-    if (edit === null) edit = snapshot();
+    begin("type");
     const digits = field.value.replace(/[^0-9]/g, "");
     if (digits !== field.value) field.value = digits;
     say("level-range", null);
@@ -278,6 +452,9 @@ export function start(options) {
   });
   byId("level-override").addEventListener("change", () => { void switchOverride(); });
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) { cancelEdit(); showValue(valueOf(client.state.status)); }
+    if (document.hidden) {
+      drop("the installation did not answer");
+      showValue(valueOf(client.state.status));
+    }
   });
 }
