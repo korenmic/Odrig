@@ -97,7 +97,7 @@ async function deleteSelected(question) {
   const ids = question.animations.map((item) => item.id);
   let done = 0;
   deleting = true;
-  client.setContentBusy(true);
+  client.setContentBusy("deletion");
   try {
     while (done < ids.length) {
       if (ownVersion !== client.targetVersion() || document.hidden) throw new Error("deletion stopped");
