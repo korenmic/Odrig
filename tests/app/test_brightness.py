@@ -1,7 +1,10 @@
 import json
+import pathlib
+import tempfile
 import threading
 import unittest
 
+from tests.core import support as core_support
 from tests.emulator import support as emulator_support
 from . import support
 from .test_clocks import Target as ClocksTarget
@@ -399,13 +402,75 @@ class BrightnessControls(unittest.TestCase):
         self.assertEqual((folder / "brightness.txt").read_bytes(), b"odrig-brightness 1\n")
 
 
+class AgainstTheEmulator(unittest.TestCase):
+    """The emulator's own turns: a gesture on `a.odrg`, whose saved brightness is 20, that lasts
+    past the end of its turn or into a clock break is saved for `a.odrg`, the default stays
+    128, and a restart of the emulator reads the value back."""
+
+    CLOCKS = {"clocks/c1.odrg": 7, "clocks/c2.odrg": 8, "clocks/c3.odrg": 9, "clocks/message/m.odrg": 10}
+
+    def started(self, clocks=False):
+        """An emulator on a show of `a.odrg` and `b.odrg` whose turns last two seconds; with
+        clocks, also a card of three clocks and a message, and breaks between the turns."""
+        items = [{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}]
+        files = {"mapping.json": core_support.mapping_texts()["legs-2"],
+                 "a.odrg": core_support.clip(1, 60, 6, durations=(1000, 1000), compressed=False),
+                 "b.odrg": core_support.clip(2, 60, 6, durations=(1000, 1000), compressed=False),
+                 "show.json": json.dumps({"version": 1, "brightness": 128, "min_seconds": 2, "items": items})}
+        options = []
+        if clocks:
+            files["clocks.txt"] = "odrig-clocks 1\nclocks on\nmessage on\n"
+            top = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+            for name, seed in self.CLOCKS.items():
+                path = top.joinpath("odrig", *name.split("/"))
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(core_support.clip(seed, 60, 6, durations=(1000,), compressed=False))
+            options = ["--drive", str(top)]
+        folder = emulator_support.installed(pathlib.Path(entered(self, tempfile.TemporaryDirectory()), "show"), files)
+        emulator = entered(self, emulator_support.Emulator(folder, *options))
+        self.assertEqual(json.loads(emulator.command("brightness 1 20 save")), {"ok": True})
+        return folder, options, emulator
+
+    def kept(self, folder, options, emulator):
+        """What `a.odrg` keeps, by `brightness.txt` and by `saved 1` after a restart."""
+        self.assertEqual(json.loads(emulator.command("status"))["brightness"], 128)
+        emulator.stop()
+        again = entered(self, emulator_support.Emulator(folder, *options))
+        return (folder / "brightness.txt").read_bytes(), json.loads(again.command("saved 1"))["brightness"]
+
+    def run_on(self, emulator, acts, rows=2):
+        return support.run("brightness", address=f"127.0.0.1:{emulator.port}", settings={"acts": acts, "rows": rows}).seen
+
+    READY = dict(until=dict(file="Animation 1: a.odrg", checked=True, sliderDisabled=False), within=20000)
+
+    def test_a_drag_across_the_end_of_a_turn_is_saved_for_its_animation(self):
+        folder, options, emulator = self.started()
+        seen = self.run_on(emulator, [self.READY, dict(slide=70), dict(until=dict(file="Animation 1: a.odrg, no longer playing")),
+            dict(release=True, until=dict(text="Saved 70 for a.odrg."), look="saved")])
+        self.assertNotEqual(seen["saved"]["file"], "Animation 1: a.odrg, no longer playing")
+        self.assertEqual(self.kept(folder, options, emulator), (b"odrig-brightness 1\n70 f a.odrg\n", 70))
+
+    def test_digits_committed_after_the_end_of_a_turn_are_saved_for_their_animation(self):
+        folder, options, emulator = self.started()
+        self.run_on(emulator, [self.READY, dict(type="70"), dict(until=dict(file="Animation 1: a.odrg, no longer playing")),
+            dict(enter=True, until=dict(text="Saved 70 for a.odrg."))])
+        self.assertEqual(self.kept(folder, options, emulator), (b"odrig-brightness 1\n70 f a.odrg\n", 70))
+
+    def test_a_drag_into_a_clock_break_is_saved_for_its_animation(self):
+        folder, options, emulator = self.started(clocks=True)
+        seen = self.run_on(emulator, [self.READY, dict(slide=70), dict(until=dict(nowHas="clocks/"), within=30000, look="clock"),
+            dict(release=True, until=dict(text="Saved 70 for a.odrg."))])
+        self.assertEqual(seen["clock"]["file"], "Animation 1: a.odrg, no longer playing")
+        self.assertEqual(self.kept(folder, options, emulator), (b"odrig-brightness 1\n70 f a.odrg\n", 70))
+
+
 class Zoom(unittest.TestCase):
     """The brightness zoom: two pins that set the range the slider moves through, kept on the
     phone and never sent."""
 
     def test_the_zoom_sets_the_range_the_slider_moves_through(self):
         target = Target(self)
-        seen = run(target, [dict(zoom=[2, 12], look="zoomed"), dict(slide=12, release=True, until=dict(number="12"), wait=300)])
+        seen = run(target, [dict(zoom=[2, 12], look="zoomed"), dict(slide=12, release=True, until=dict(number="12", text="The default, 12,"))])
         self.assertEqual((seen["first"]["min"], seen["first"]["max"], seen["first"]["zoomSaid"]), (0, 255, "Zoom 0 to 255"))
         zoomed = seen["zoomed"]
         self.assertEqual((zoomed["min"], zoomed["max"], zoomed["zoomSaid"]), (2, 12, "Zoom 2 to 12"))
@@ -421,7 +486,7 @@ class Zoom(unittest.TestCase):
     def test_a_value_outside_the_zoom_stands_in_the_field_and_never_moves_the_zoom(self):
         target = Target(self)
         seen = run(target, [dict(zoom=[2, 12], look="above"),
-            dict(type="1", enter=True, until=dict(outside="1 is below the zoom 2 to 12."), look="below")])
+            dict(type="1", enter=True, until=dict(outside="1 is below the zoom 2 to 12.", text="The default, 1,"), look="below")])
         above, below = seen["above"], seen["below"]
         self.assertEqual((above["number"], above["slider"], above["outside"]), ("128", 12, "128 is above the zoom 2 to 12."))
         self.assertEqual((below["number"], below["slider"], below["zoomStart"], below["zoomEnd"]), ("1", 2, 2, 12))

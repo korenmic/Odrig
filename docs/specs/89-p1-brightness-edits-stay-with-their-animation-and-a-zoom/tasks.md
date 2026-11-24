@@ -64,7 +64,7 @@ Rules for every task:
   - Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 5.1, 5.2, 5.3, 5.4, 6.1, 6.2, 6.3,
     6.4, 6.5, 8.3
 
-- [ ] 4. Against the real emulator
+- [x] 4. Against the real emulator
   - `tests/app/test_brightness.py`: the class against the real emulator of the design, with
     its show of two-second turns and its card with clocks.
   - Prove it fails first on the branch's base: in a temporary worktree at 124fc998 with the

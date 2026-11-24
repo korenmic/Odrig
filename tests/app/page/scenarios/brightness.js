@@ -6,19 +6,19 @@ function look(app) {
   return {checked: box.checked, disabled: box.disabled, unknown: box.indeterminate,
     slider: Number(app.byId("level").value), number: app.byId("level-number").value,
     label: app.raw("level-label"), file: app.text("level-file"), said: app.text("level-said"),
-    range: app.text("level-range"), sliderDisabled: app.byId("level").disabled,
+    range: app.text("level-range"), now: app.text("now-text"), sliderDisabled: app.byId("level").disabled,
     fieldDisabled: app.byId("level-number").disabled, bold: app.byId("level-file").classList.contains("just-changed"),
     ...zoomOf(app)};
 }
 
 // The zoom's pins, the slider's range, the zoom's words and the line of a value outside it.
 function zoomOf(app) {
-  const start = app.byId("level-zoom-start");
-  const end = app.byId("level-zoom-end");
-  const outside = app.byId("level-zoom-outside");
+  const start = app.doc.getElementById("level-zoom-start");
+  const end = app.doc.getElementById("level-zoom-end");
+  const outside = app.doc.getElementById("level-zoom-outside");
   return {zoomStart: start === null ? null : Number(start.value), zoomEnd: end === null ? null : Number(end.value),
     min: Number(app.byId("level").min), max: Number(app.byId("level").max),
-    zoomSaid: app.byId("level-zoom-said") === null ? null : app.text("level-zoom-said"),
+    zoomSaid: app.doc.getElementById("level-zoom-said") === null ? null : app.text("level-zoom-said"),
     outside: outside === null || outside.hidden ? null : app.text("level-zoom-outside")};
 }
 
@@ -31,7 +31,7 @@ function movePin(app, which, value) {
 }
 
 export default async function(app) {
-  await shown(app, 2);
+  await shown(app, app.settings.rows ?? 2);
   const seen = {first: look(app)};
   for (const act of app.settings.acts) {
     if (act.zoom !== undefined) { movePin(app, "start", act.zoom[0]); movePin(app, "end", act.zoom[1]); }
@@ -58,16 +58,17 @@ export default async function(app) {
       seen.probeEnabled = enabled;
     }
     if (act.wait) await app.sleep(act.wait);
-    if (act.reload) { await app.reload(); await shown(app, 2); }
+    if (act.reload) { await app.reload(); await shown(app, app.settings.rows ?? 2); }
     if (act.target) {
       app.press("Target"); app.fill("address", act.target); app.press("Connect over Wi-Fi");
       seen.changed = look(app);
-      await shown(app, 2);
+      await shown(app, app.settings.rows ?? 2);
     }
     if (act.until) await app.until(() => {
       const now = look(app);
-      return Object.entries(act.until).every(([key, value]) => key === "text" ? now.said?.includes(value) : now[key] === value);
-    }, JSON.stringify(act.until), 15000);
+      return Object.entries(act.until).every(([key, value]) => key === "text" ? now.said?.includes(value) :
+        key === "nowHas" ? now.now?.includes(value) : now[key] === value);
+    }, JSON.stringify(act.until), act.within ?? 15000);
     if (act.look) seen[act.look] = look(app);
     if (act.measure) seen[act.measure] = measure(app);
   }
