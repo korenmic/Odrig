@@ -8,6 +8,8 @@ import {playingFile} from "../messages.js";
 
 const EVERY_MS = 200;
 const RESTS_MS = 1000;
+// How long the panel takes no new gesture after it moves to another animation.
+const HOLD_MS = 1000;
 const RANGE = "The brightness is 0 to 255.";
 const REFUSALS = {
   busy: "The target is busy. Try saving brightness again when it finishes.",
@@ -34,7 +36,22 @@ let modeChanging = false;
 let defaultAwaiting = null;
 let note = null;
 let noteKept = false;
+let holdUntil = 0;
+let holdTimer = null;
 let redraw = () => {};
+
+function defaultLine(value) {
+  return `The default, ${value}, is for every animation without its own brightness, until the installation starts again. ` +
+    "Tick Override for this animation to keep a value for the animation playing.";
+}
+function hold() {
+  holdUntil = performance.now() + HOLD_MS;
+  clearTimeout(holdTimer);
+  holdTimer = setTimeout(() => {
+    holdTimer = null;
+    redraw();
+  }, HOLD_MS + 20);
+}
 
 const byId = (id) => document.getElementById(id);
 function say(id, text) {
@@ -162,7 +179,7 @@ function settle(request, confirmed, kept) {
   pending = null;
   const file = request.snapshot.fileText;
   if (request.saved === undefined) {
-    line(confirmed ? null : "The setting changed before confirmation. The current value is shown.");
+    line(confirmed ? defaultLine(request.value) : "The setting changed before confirmation. The current value is shown.");
   } else if (confirmed) {
     line(request.saved === null ? `Removed the saved brightness of ${file}.` : `Saved ${request.saved} for ${file}.`);
   } else {
@@ -219,6 +236,8 @@ export function draw(state) {
     if (now !== null && now !== place) {
       if (noteKept) noteKept = false;
       else note = null;
+      // A move from one known animation to another of the same target holds new gestures.
+      if (place !== null && JSON.parse(place)[0] === current.version) hold();
       place = now;
     }
     showValue(valueOf(status));
@@ -227,7 +246,9 @@ export function draw(state) {
       state.statusCount > defaultAwaiting.count && state.link === "answers") {
     const request = defaultAwaiting;
     defaultAwaiting = null;
-    request.finish(status.brightness === request.value);
+    const confirmed = status.brightness === request.value;
+    if (confirmed) line(defaultLine(request.value));
+    request.finish(confirmed);
   }
   if (pending !== null && pending.count !== null && !pending.reading && state.statusCount > pending.count && state.link === "answers") {
     confirm(pending, status);
@@ -238,12 +259,14 @@ export function draw(state) {
   const known = fresh && dimming != null;
   const canSave = known && status.error === null && typeof view.animation === "number" &&
     typeof view.file === "string" && dimming.error === null;
+  const holding = gesture === null && performance.now() < holdUntil;
   const box = byId("level-override");
   box.checked = gesture !== null ? view.override : known && dimming.saved !== null;
   box.indeterminate = !fresh;
-  box.disabled = !canSave || pending !== null || modeChanging;
+  box.disabled = !canSave || pending !== null || modeChanging || holding;
   byId("level-label").textContent = view.override ? "This animation\u2019s brightness" : "Default brightness";
   say("level-file", typeof view.file === "string" ? `Animation ${view.animation}: ${view.fileText}${away ? ", no longer playing" : ""}` : null);
+  byId("level-file").classList.toggle("just-changed", holding);
   let explanation = note;
   if (!fresh) explanation = "Brightness setting unknown. Waiting for fresh status.";
   else if (dimming == null) explanation = "This target does not support saved animation brightness. The default can still be changed.";
@@ -252,7 +275,7 @@ export function draw(state) {
   else if (pending !== null || modeChanging) explanation = "Saving brightness; waiting for confirmed status.";
   say("level-said", explanation);
   // A control in use is never disabled under the finger.
-  const locked = gesture === null && (pending !== null || (view.override && !canSave));
+  const locked = gesture === null && (pending !== null || holding || (view.override && !canSave));
   byId("level").disabled = locked;
   byId("level-number").disabled = locked;
   if (gesture === null && pending === null && performance.now() - sentAt >= RESTS_MS && !unsent() && !typing()) {

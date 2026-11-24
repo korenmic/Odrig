@@ -446,6 +446,12 @@ button[aria-pressed="true"] {
   overflow-wrap: anywhere;
 }
 
+/* For a second after the panel moves to another animation its name is bold, and the
+   controls take no new gesture. */
+#level-file.just-changed {
+  font-weight: 700;
+}
+
 input[type="range"] {
   padding: 0;
   border: 0;

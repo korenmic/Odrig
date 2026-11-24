@@ -6,7 +6,8 @@ function look(app) {
   return {checked: box.checked, disabled: box.disabled, unknown: box.indeterminate,
     slider: Number(app.byId("level").value), number: app.byId("level-number").value,
     label: app.raw("level-label"), file: app.text("level-file"), said: app.text("level-said"),
-    range: app.text("level-range")};
+    range: app.text("level-range"), sliderDisabled: app.byId("level").disabled,
+    fieldDisabled: app.byId("level-number").disabled, bold: app.byId("level-file").classList.contains("just-changed")};
 }
 
 export default async function(app) {

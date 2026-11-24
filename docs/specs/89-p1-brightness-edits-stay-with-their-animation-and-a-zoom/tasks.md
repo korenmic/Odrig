@@ -39,7 +39,7 @@ Rules for every task:
   - Suites: the panel's modules, onboarding.
   - Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1, 2.3, 2.4, 2.5, 7.1, 7.3, 7.4, 8.1
 
-- [ ] 2. The hold and the default's line
+- [x] 2. The hold and the default's line
   - `tests/app/test_brightness.py`: the tests of the hold and of the default's line.
   - Prove it fails first: the box takes a press at once after a change, and no line follows
     a confirmed default.

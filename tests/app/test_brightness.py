@@ -9,6 +9,9 @@ from .test_target import entered
 
 # The line of the file while a gesture on animation 1 lasts after another began to play.
 AWAY = "Animation 1: hello.odrg, no longer playing"
+# The panel's line after a confirmed change of the default.
+DEFAULT_LINE = ("The default, {}, is for every animation without its own brightness, until the installation starts again. "
+                "Tick Override for this animation to keep a value for the animation playing.")
 
 
 class Target(ClocksTarget):
@@ -171,11 +174,41 @@ class BrightnessControls(unittest.TestCase):
         def changed():
             target.animation, target.file = 2, "dvd.odrg"
         seen = run(target, [dict(slide=70), dict(step=True, until=dict(file=AWAY), look="away"),
-            dict(slide=60), dict(release=True, until=dict(file="Animation 2: dvd.odrg", number="60"), wait=300)], steps=[changed])
+            dict(slide=60), dict(release=True, until=dict(file="Animation 2: dvd.odrg", number="60", text="The default, 60,"), look="after")],
+            steps=[changed])
         self.assertEqual(seen["away"]["label"], "Default brightness")
+        self.assertEqual(seen["after"]["said"], DEFAULT_LINE.format(60))
         self.assertEqual((target.default, target.saved), (60, {1: None, 2: None}))
         self.assertTrue(target.sent())
         self.assertTrue(all(len(line.split()) == 2 for line in target.sent()), target.sent())
+
+    def test_a_confirmed_default_says_it_is_not_kept_after_a_start(self):
+        target = Target(self)
+        seen = run(target, [dict(type="40", enter=True, until=dict(text="The default, 40,"), look="said")])
+        self.assertEqual(seen["said"]["said"], DEFAULT_LINE.format(40))
+        self.assertEqual(target.sent(), ["brightness 40"])
+
+    def test_a_move_to_another_animation_holds_new_gestures_for_a_second(self):
+        target = Target(self, saved=20)
+        def changed():
+            target.animation, target.file = 2, "dvd.odrg"
+        seen = run(target, [dict(step=True, until=dict(file="Animation 2: dvd.odrg"), look="held"), dict(tap=True, look="tapped"),
+            dict(wait=1300, look="free"), dict(tap=True, until=dict(checked=True, disabled=False), look="taken")], steps=[changed])
+        first, held, free = seen["first"], seen["held"], seen["free"]
+        self.assertEqual((first["bold"], first["disabled"], first["sliderDisabled"]), (False, False, False))
+        self.assertEqual((held["bold"], held["disabled"], held["sliderDisabled"], held["fieldDisabled"]), (True, True, True, True))
+        self.assertFalse(seen["tapped"]["checked"])
+        self.assertEqual((free["bold"], free["disabled"], free["sliderDisabled"], free["fieldDisabled"]), (False, False, False, False))
+        self.assertEqual(target.sent(), ["brightness 2 128 save"])
+
+    def test_the_end_of_a_gesture_that_moves_the_panel_holds_the_next(self):
+        target = Target(self, saved=20)
+        def changed():
+            target.animation, target.file = 2, "dvd.odrg"
+        seen = run(target, [dict(slide=70), dict(step=True, until=dict(file=AWAY)),
+            dict(release=True, until=dict(file="Animation 2: dvd.odrg"), look="moved")], steps=[changed])
+        self.assertTrue(seen["moved"]["bold"])
+        self.assertTrue(seen["moved"]["sliderDisabled"])
 
     def test_an_override_drag_across_a_clock_stays_with_its_animation(self):
         target = Target(self, saved=20)
